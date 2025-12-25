@@ -1,9 +1,13 @@
-#############################################################################????
+#############################################################################
 # PixlPunkt - Release Workflow
-#############################################################################????
+#############################################################################
 # Creates a GitHub release with signed MSIX packages and SDK.
 # Triggered manually or on version tags (v*).
-#############################################################################????
+#
+# Versioning:
+# - Tag push (v1.0.0): MinVer automatically uses 1.0.0
+# - Manual dispatch: Overrides version with input value
+#############################################################################
 
 name: Release
 
@@ -14,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.0.0)'
+        description: 'Release version (e.g., 1.0.0) - overrides MinVer'
         required: true
       prerelease:
         description: 'Is this a pre-release?'
@@ -37,6 +41,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for MinVer
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -48,8 +54,11 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "version_args=-p:Version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
+            # Extract version from tag, MinVer will also compute this
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "version_args=" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and pack SDK
@@ -57,7 +66,7 @@ jobs:
           dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj \
             --configuration Release \
             --output ./artifacts \
-            -p:Version=${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.version_args }}
 
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v4
@@ -85,6 +94,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for MinVer
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -97,8 +108,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "version_args=-p:Version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "version_args=" >> $GITHUB_OUTPUT
           fi
 
       - name: Decode and import signing certificate
@@ -138,6 +151,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
+          $versionArgs = "${{ steps.version.outputs.version_args }}"
           $thumbprint = $env:CERT_THUMBPRINT
           
           $versionParts = $version -split '\.'
@@ -150,22 +164,30 @@ jobs:
           Write-Host "  Platform: ${{ matrix.platform }}" -ForegroundColor Gray
           Write-Host "  Thumbprint: $thumbprint" -ForegroundColor Gray
           
-          dotnet publish PixlPunkt/PixlPunkt.csproj `
-            --configuration Release `
-            --runtime ${{ matrix.rid }} `
-            --self-contained true `
-            -p:Platform=${{ matrix.platform }} `
-            -p:Version=$version `
-            -p:ApplicationVersion=$msixVersion `
-            -p:GenerateAppxPackageOnBuild=true `
-            -p:AppxPackageSigningEnabled=true `
-            -p:PackageCertificateThumbprint=$thumbprint `
-            -p:AppxBundle=Never `
-            -p:UapAppxPackageBuildMode=SideloadOnly `
-            -p:AppxPackageDir=../artifacts/${{ matrix.platform }}/ `
-            -p:PublishReadyToRun=true `
-            -p:GenerateAppInstallerFile=false `
-            -p:WindowsAppSDKSelfContained=true
+          $buildArgs = @(
+            "publish", "PixlPunkt/PixlPunkt.csproj",
+            "--configuration", "Release",
+            "--runtime", "${{ matrix.rid }}",
+            "--self-contained", "true",
+            "-p:Platform=${{ matrix.platform }}",
+            "-p:ApplicationVersion=$msixVersion",
+            "-p:GenerateAppxPackageOnBuild=true",
+            "-p:AppxPackageSigningEnabled=true",
+            "-p:PackageCertificateThumbprint=$thumbprint",
+            "-p:AppxBundle=Never",
+            "-p:UapAppxPackageBuildMode=SideloadOnly",
+            "-p:AppxPackageDir=../artifacts/${{ matrix.platform }}/",
+            "-p:PublishReadyToRun=true",
+            "-p:GenerateAppInstallerFile=false",
+            "-p:WindowsAppSDKSelfContained=true"
+          )
+          
+          # Add version override if specified (manual dispatch)
+          if ($versionArgs) {
+            $buildArgs += $versionArgs
+          }
+          
+          & dotnet @buildArgs
           
           Write-Host ""
           Write-Host "Build output:" -ForegroundColor Yellow

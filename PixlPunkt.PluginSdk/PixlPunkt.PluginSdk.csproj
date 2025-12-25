@@ -7,17 +7,14 @@
     
     <!-- Package metadata -->
     <PackageId>PixlPunkt.PluginSdk</PackageId>
-    <Version>1.0.0</Version>
-    <Authors>PixlPunkt Team</Authors>
-    <Company>PixlPunkt</Company>
+    <!-- Version is set automatically by MinVer from git tags (configured in Directory.Build.props) -->
     <Product>PixlPunkt Plugin SDK</Product>
     <Description>SDK for developing PixlPunkt plugins. Create custom tools, brushes, and effects.</Description>
     <PackageTags>pixlpunkt;plugin;sdk;pixel-art;image-editing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ChadRoesler/PixlPunkt</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/ChadRoesler/PixlPunkt</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     
     <!-- Assembly info -->
     <AssemblyName>PixlPunkt.PluginSdk</AssemblyName>
@@ -29,8 +26,6 @@
     
     <!-- NuGet package generation -->
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     
     <!-- Include build targets in package -->
     <DevelopmentDependency>true</DevelopmentDependency>
@@ -40,6 +35,10 @@
   <!-- Dependencies -->
   <ItemGroup>
     <PackageReference Include="FluentIcons.Common" Version="2.0.316" />
+    <PackageReference Include="MinVer" Version="6.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <!-- Include README in package -->
@@ -47,14 +46,15 @@
     <None Include="..\README.md" Pack="true" PackagePath="\" Condition="Exists('..\README.md')" />
   </ItemGroup>
 
-  <!-- Include MSBuild targets in NuGet package -->
+  <!-- Include package icon -->
   <ItemGroup>
-    <None Include="build\**\*" Pack="true" PackagePath="build\" />
+    <None Include="Assets\Icons\punkFileIcon.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
 
-  <!-- Ensure targets are imported by projects that reference this SDK -->
+  <!-- Include MSBuild targets in NuGet package (with correct naming convention) -->
   <ItemGroup>
     <None Include="build\PixlPunkt.PluginSdk.targets" Pack="true" PackagePath="build\$(PackageId).targets" />
+    <None Include="build\README.md" Pack="true" PackagePath="build\" Condition="Exists('build\README.md')" />
   </ItemGroup>
 
 </Project>

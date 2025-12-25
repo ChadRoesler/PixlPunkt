@@ -29,6 +29,15 @@
     -->
     <NoWarn>$(NoWarn);CS1591;CS0169;CS0414;CS0649;CS0067;CS0618;CS0253;CS8601;CS8604;CS8629</NoWarn>
   </PropertyGroup>
+
+  <!-- MinVer for automatic versioning from git tags -->
+  <ItemGroup>
+    <PackageReference Include="MinVer" Version="6.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  
   <ItemGroup>
     <Compile Remove="UI\CanvasViewHost\**" />
     <Compile Remove="UI\Windows\**" />
