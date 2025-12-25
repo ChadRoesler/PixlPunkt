@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,12 +9,13 @@
     <PackageId>PixlPunkt.PluginSdk</PackageId>
     <!-- Version is set automatically by MinVer from git tags (configured in Directory.Build.props) -->
     <Product>PixlPunkt Plugin SDK</Product>
-    <Description>SDK for developing PixlPunkt plugins. Create custom tools, brushes, and effects.</Description>
-    <PackageTags>pixlpunkt;plugin;sdk;pixel-art;image-editing</PackageTags>
+    <Description>SDK for developing PixlPunkt plugins. Create custom tools, brushes, effects, and file format handlers for the PixlPunkt pixel art editor.</Description>
+    <PackageTags>pixlpunkt;plugin;sdk;pixel-art;image-editing;drawing;sprite;game-dev</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ChadRoesler/PixlPunkt</PackageProjectUrl>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReadmeFile>README.nuget.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>https://github.com/ChadRoesler/PixlPunkt/blob/main/CHANGELOG.md</PackageReleaseNotes>
     
     <!-- Assembly info -->
     <AssemblyName>PixlPunkt.PluginSdk</AssemblyName>
@@ -41,9 +42,9 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Include README in package -->
+  <!-- Include SDK-specific README in package (not the main repo README) -->
   <ItemGroup>
-    <None Include="..\README.md" Pack="true" PackagePath="\" Condition="Exists('..\README.md')" />
+    <None Include="README.nuget.md" Pack="true" PackagePath="README.nuget.md" />
   </ItemGroup>
 
   <!-- Include package icon -->
