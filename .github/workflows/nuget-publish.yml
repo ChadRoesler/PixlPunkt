@@ -28,29 +28,27 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
       
-      - name: Build
-        run: dotnet build PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj -c Release --no-restore
-      
       - name: Pack (with version override)
         if: ${{ github.event.inputs.version != '' }}
-        run: dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj -c Release --no-build -p:PackageVersion=${{ github.event.inputs.version }}
+        run: dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj -c Release -o ./nupkgs -p:PackageVersion=${{ github.event.inputs.version }}
       
       - name: Pack (from MinVer/git tags)
         if: ${{ github.event.inputs.version == '' }}
-        run: dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj -c Release --no-build
+        run: dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj -c Release -o ./nupkgs
+      
+      - name: List packages
+        run: Get-ChildItem -Path ./nupkgs -Recurse
       
       - name: Push to NuGet
-        run: dotnet nuget push PixlPunkt.PluginSdk/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
       
       - name: Push symbols to NuGet
-        run: dotnet nuget push PixlPunkt.PluginSdk/bin/Release/*.snupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push ./nupkgs/*.snupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
         continue-on-error: true
       
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
-          path: |
-            PixlPunkt.PluginSdk/bin/Release/*.nupkg
-            PixlPunkt.PluginSdk/bin/Release/*.snupkg
+          path: ./nupkgs/*
           retention-days: 30
