@@ -1,0 +1,9 @@
+﻿{
+  "id": "pixlpunkt.example",
+  "displayName": "Example Plugin",
+  "version": "1.0.0",
+  "author": "PixlPunkt Team",
+  "description": "Example plugin demonstrating the SDK with custom tools and effects",
+  "entryPoint": "PixlPunkt.ExamplePlugin.dll",
+  "minApiVersion": 1
+}

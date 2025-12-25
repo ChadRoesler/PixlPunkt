@@ -1,0 +1,112 @@
+﻿<UserControl
+    x:Class="PixlPunkt.UI.CanvasHost.CanvasViewHost"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:ic="using:FluentIcons.WinUI">
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Main canvas area with rulers -->
+        <Grid Grid.Row="0" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="20"/>  <!-- Horizontal ruler -->
+                <RowDefinition Height="*"/>   <!-- Canvas -->
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20"/>  <!-- Vertical ruler -->
+                <ColumnDefinition Width="*"/>   <!-- Canvas -->
+            </Grid.ColumnDefinitions>
+            
+            <!-- Corner (where rulers meet) -->
+            <Border x:Name="RulerCorner" Grid.Row="0" Grid.Column="0" 
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,1,1"/>
+            
+            <!-- Horizontal ruler (top) - drawn in Win2D canvas -->
+            <win2d:CanvasControl x:Name="HorizontalRulerCanvas" 
+                                 Grid.Row="0" Grid.Column="1"
+                                 PointerPressed="HorizontalRuler_PointerPressed"
+                                 PointerMoved="HorizontalRuler_PointerMoved"
+                                 PointerReleased="HorizontalRuler_PointerReleased" />
+            
+            <!-- Vertical ruler (left) - drawn in Win2D canvas -->
+            <win2d:CanvasControl x:Name="VerticalRulerCanvas" 
+                                 Grid.Row="1" Grid.Column="0"
+                                 PointerPressed="VerticalRuler_PointerPressed"
+                                 PointerMoved="VerticalRuler_PointerMoved"
+                                 PointerReleased="VerticalRuler_PointerReleased" />
+            
+            <!-- Main canvas -->
+            <win2d:CanvasControl x:Name="CanvasView"
+                                 Grid.Row="1" Grid.Column="1" />
+        </Grid>
+        
+        <!-- Bottom status bar -->
+        <Grid Grid.Row="1" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Left side: Zoom controls -->
+            <StackPanel Orientation="Horizontal" Grid.Column="0" Spacing="8" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <TextBlock x:Name="ZoomLevel" Text="100%" VerticalAlignment="Center" 
+                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" 
+                           FontWeight="Bold" Padding="3" HorizontalAlignment="Left"/>
+                <Button x:Name="ActualSizeBtn" ToolTipService.ToolTip="Actual Size" Click="ActualSizeBtn_Click" Padding="3">
+                    <ic:FluentIcon Icon="ResizeSmall"/>
+                </Button>
+                <Button x:Name="FitToScreenBtn" ToolTipService.ToolTip="Fit to Screen" Click="FitToScreenBtn_Click" Padding="3">
+                    <ic:FluentIcon Icon="ResizeLarge"/>
+                </Button>
+                <Button x:Name="ZoomOutBtn" ToolTipService.ToolTip="Zoom Out" Click="ZoomOutBtn_Click" Padding="3">
+                    <ic:FluentIcon Icon="ZoomOut"/>
+                </Button>
+                <Button x:Name="ZoomInBtn" ToolTipService.ToolTip="Zoom In" Click="ZoomInBtn_Click" Padding="3">
+                    <ic:FluentIcon Icon="ZoomIn"/>
+                </Button>
+            </StackPanel>
+            
+            <!-- Center: Snap and Lock indicators -->
+            <StackPanel Orientation="Horizontal" Grid.Column="2" Spacing="4" VerticalAlignment="Center" Margin="16,0 " Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <Border x:Name="SnapIndicator" 
+                        Background="{ThemeResource ControlFillColorDefaultBrush}" 
+                        CornerRadius="3" 
+                        Padding="6,2"
+                        ToolTipService.ToolTip="Snap to Guides (click to toggle)"
+                        PointerPressed="SnapIndicator_PointerPressed">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <ic:FluentIcon x:Name="SnapIcon" Icon="Link" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="SnapText" Text="SNAP" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+                <Border x:Name="LockGuidesIndicator" 
+                        Background="{ThemeResource ControlFillColorDefaultBrush}" 
+                        CornerRadius="3" 
+                        Padding="6,2"
+                        ToolTipService.ToolTip="Lock Guides (click to toggle - prevents moving/deleting guides)"
+                        PointerPressed="LockGuidesIndicator_PointerPressed">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <ic:FluentIcon x:Name="LockGuidesIcon" Icon="LockOpen" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="LockGuidesText" Text="LOCK" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            
+            <!-- Right side: Cursor coordinates -->
+            <StackPanel Orientation="Horizontal" Grid.Column="3" Spacing="4" VerticalAlignment="Center" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <TextBlock Text="X:" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" FontSize="12"/>
+                <TextBlock x:Name="CursorXText" Text="--" Foreground="{ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" FontSize="12" MinWidth="32" FontFamily="Consolas"/>
+                <TextBlock Text="Y:" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" FontSize="12" Margin="8,0,0,0"/>
+                <TextBlock x:Name="CursorYText" Text="--" Foreground="{ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" FontSize="12" MinWidth="32" FontFamily="Consolas"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,418 @@
+#############################################################################????
+# PixlPunkt - Release Workflow
+#############################################################################????
+# Creates a GitHub release with signed MSIX packages and SDK.
+# Triggered manually or on version tags (v*).
+#############################################################################????
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+      prerelease:
+        description: 'Is this a pre-release?'
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  #############################################################################
+  # Build SDK
+  #############################################################################
+  build-sdk:
+    name: Build Plugin SDK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and pack SDK
+        run: |
+          dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj \
+            --configuration Release \
+            --output ./artifacts \
+            -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-package
+          path: ./artifacts/*.nupkg
+
+  #############################################################################
+  # Build Application (MSIX Sideload Packages)
+  #############################################################################
+  build-app:
+    name: Build App (${{ matrix.platform }})
+    runs-on: windows-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, arm64]
+        include:
+          - platform: x64
+            rid: win-x64
+          - platform: arm64
+            rid: win-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Decode and import signing certificate
+        id: cert
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.SIGNING_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:CERT_BASE64) {
+            Write-Error "SIGNING_CERTIFICATE_BASE64 secret is not set"
+            exit 1
+          }
+          
+          $pfxBytes = [Convert]::FromBase64String($env:CERT_BASE64)
+          $pfxPath = Join-Path $env:RUNNER_TEMP "PixlPunkt.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          
+          # Import certificate to CurrentUser store for signing
+          $securePassword = ConvertTo-SecureString -String $env:CERT_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+          $thumbprint = $cert.Thumbprint
+          
+          # Export the public certificate (.cer) for distribution
+          $cerPath = Join-Path $env:RUNNER_TEMP "PixlPunkt.cer"
+          Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT | Out-Null
+          
+          echo "CERT_THUMBPRINT=$thumbprint" >> $env:GITHUB_ENV
+          echo "CERT_CER_PATH=$cerPath" >> $env:GITHUB_ENV
+          Write-Host "Certificate imported with thumbprint: $thumbprint"
+          Write-Host "Public certificate exported to: $cerPath"
+
+      - name: Restore dependencies
+        run: dotnet restore PixlPunkt.sln -r ${{ matrix.rid }}
+
+      - name: Build MSIX Package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $thumbprint = $env:CERT_THUMBPRINT
+          
+          $versionParts = $version -split '\.'
+          while ($versionParts.Count -lt 4) { $versionParts += "0" }
+          $msixVersion = $versionParts[0..3] -join '.'
+          
+          Write-Host "Building PixlPunkt MSIX package..." -ForegroundColor Cyan
+          Write-Host "  Version: $version" -ForegroundColor Gray
+          Write-Host "  MSIX Version: $msixVersion" -ForegroundColor Gray
+          Write-Host "  Platform: ${{ matrix.platform }}" -ForegroundColor Gray
+          Write-Host "  Thumbprint: $thumbprint" -ForegroundColor Gray
+          
+          dotnet publish PixlPunkt/PixlPunkt.csproj `
+            --configuration Release `
+            --runtime ${{ matrix.rid }} `
+            --self-contained true `
+            -p:Platform=${{ matrix.platform }} `
+            -p:Version=$version `
+            -p:ApplicationVersion=$msixVersion `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=true `
+            -p:PackageCertificateThumbprint=$thumbprint `
+            -p:AppxBundle=Never `
+            -p:UapAppxPackageBuildMode=SideloadOnly `
+            -p:AppxPackageDir=../artifacts/${{ matrix.platform }}/ `
+            -p:PublishReadyToRun=true `
+            -p:GenerateAppInstallerFile=false `
+            -p:WindowsAppSDKSelfContained=true
+          
+          Write-Host ""
+          Write-Host "Build output:" -ForegroundColor Yellow
+          Get-ChildItem -Path "artifacts/${{ matrix.platform }}" -Recurse | ForEach-Object { 
+            Write-Host "  $($_.FullName)" 
+          }
+
+      - name: Prepare release package
+        id: prepare
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $platform = "${{ matrix.platform }}"
+          $outputDir = "release-$platform"
+          
+          New-Item -ItemType Directory -Path $outputDir -Force
+          
+          # Find the PixlPunkt MSIX package (not dependencies like WindowsAppRuntime)
+          # The package should be in a folder structure and named with the app identity
+          $msixFiles = Get-ChildItem -Path "artifacts/$platform" -Filter "*.msix" -Recurse | 
+                       Where-Object { $_.Name -like "PixlPunkt*" -and $_.Name -notlike "*Dependencies*" }
+          
+          if ($msixFiles.Count -eq 0) {
+            # Fallback: Look for any msix that's NOT a framework/runtime package
+            Write-Host "No PixlPunkt*.msix found, searching for main package..." -ForegroundColor Yellow
+            $msixFiles = Get-ChildItem -Path "artifacts/$platform" -Filter "*.msix" -Recurse |
+                         Where-Object { 
+                           $_.Name -notlike "*WindowsAppRuntime*" -and 
+                           $_.Name -notlike "*Microsoft.*" -and
+                           $_.Name -notlike "*framework*" -and
+                           $_.DirectoryName -notlike "*Dependencies*"
+                         }
+          }
+          
+          Write-Host "Found MSIX files:" -ForegroundColor Cyan
+          $msixFiles | ForEach-Object { Write-Host "  - $($_.FullName)" }
+          
+          if ($msixFiles.Count -eq 0) {
+            Write-Host "ERROR: No suitable MSIX package found!" -ForegroundColor Red
+            Write-Host "Contents of artifacts/$platform :" -ForegroundColor Yellow
+            Get-ChildItem -Path "artifacts/$platform" -Recurse | ForEach-Object { Write-Host $_.FullName }
+            exit 1
+          }
+          
+          # Use the first matching file (should be the main app package)
+          $msixFile = $msixFiles | Select-Object -First 1
+          $newName = "PixlPunkt-$version-$platform.msix"
+          Copy-Item $msixFile.FullName -Destination "$outputDir/$newName"
+          Write-Host "Using package: $($msixFile.Name) -> $newName" -ForegroundColor Green
+          echo "msix_name=$newName" >> $env:GITHUB_OUTPUT
+          
+          # Copy the exported public certificate from the signing step
+          $cerPath = $env:CERT_CER_PATH
+          if ($cerPath -and (Test-Path $cerPath)) {
+            Copy-Item $cerPath -Destination "$outputDir/PixlPunkt.cer"
+            Write-Host "Certificate bundled: PixlPunkt.cer" -ForegroundColor Green
+          } else {
+            Write-Host "Warning: Certificate not found at $cerPath" -ForegroundColor Yellow
+          }
+          
+          # Create installation script
+          Set-Content -Path "$outputDir/Install-PixlPunkt.ps1" -Value @'
+          #Requires -RunAsAdministrator
+          $ErrorActionPreference = "Stop"
+          
+          Write-Host ""
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "       PixlPunkt Installer" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host ""
+          
+          # Install certificate
+          $certPath = Join-Path $PSScriptRoot "PixlPunkt.cer"
+          if (Test-Path $certPath) {
+              Write-Host "[1/2] Installing certificate..." -ForegroundColor Yellow
+              try {
+                  $cert = Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+                  Write-Host "      Certificate installed successfully." -ForegroundColor Green
+                  Write-Host "      Thumbprint: $($cert.Thumbprint)" -ForegroundColor DarkGray
+              } catch {
+                  if ($_.Exception.Message -like "*already exists*") {
+                      Write-Host "      Certificate already installed." -ForegroundColor Green
+                  } else {
+                      Write-Host "      Warning: $($_.Exception.Message)" -ForegroundColor Yellow
+                  }
+              }
+          } else {
+              Write-Host "[1/2] Certificate not found - skipping..." -ForegroundColor Yellow
+              Write-Host "      You may need to install the certificate manually." -ForegroundColor DarkGray
+          }
+          
+          # Install MSIX package
+          $msixPath = Get-ChildItem -Path $PSScriptRoot -Filter "PixlPunkt*.msix" | Select-Object -First 1
+          if ($msixPath) {
+              Write-Host ""
+              Write-Host "[2/2] Installing PixlPunkt..." -ForegroundColor Yellow
+              try {
+                  Add-AppxPackage -Path $msixPath.FullName
+                  Write-Host "      PixlPunkt installed successfully!" -ForegroundColor Green
+              } catch {
+                  Write-Host "      Error: $($_.Exception.Message)" -ForegroundColor Red
+                  Write-Host ""
+                  Write-Host "If installation failed, try:" -ForegroundColor Yellow
+                  Write-Host "  1. Ensure Windows Developer Mode is enabled, OR" -ForegroundColor DarkGray
+                  Write-Host "  2. Right-click the .msix file and select 'Install'" -ForegroundColor DarkGray
+                  exit 1
+              }
+          } else {
+              Write-Host "[2/2] MSIX package not found!" -ForegroundColor Red
+              exit 1
+          }
+          
+          Write-Host ""
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "   Installation Complete!" -ForegroundColor Green
+          Write-Host "   Launch PixlPunkt from Start Menu" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host ""
+          
+          Read-Host "Press Enter to exit"
+          '@
+          
+          # Create README
+          Set-Content -Path "$outputDir/README.txt" -Value @"
+          PixlPunkt $version ($platform)
+          ========================================
+          
+          AUTOMATIC INSTALLATION (Recommended):
+          -------------------------------------
+          1. Right-click "Install-PixlPunkt.ps1"
+          2. Select "Run with PowerShell"
+          3. Click "Yes" when prompted for Administrator access
+          4. Wait for installation to complete
+          
+          MANUAL INSTALLATION:
+          -------------------
+          1. Install the certificate:
+             - Right-click "PixlPunkt.cer"
+             - Select "Install Certificate"
+             - Choose "Local Machine"
+             - Select "Place all certificates in the following store"
+             - Click "Browse" and select "Trusted People"
+             - Click "Next" then "Finish"
+          
+          2. Install the application:
+             - Double-click the .msix file
+             - Click "Install" in the App Installer window
+          
+          UNINSTALL:
+          ---------
+          Settings > Apps > Installed apps > PixlPunkt > Uninstall
+          
+          TROUBLESHOOTING:
+          ---------------
+          If installation fails:
+          - Ensure you have Windows 10 version 1809+ or Windows 11
+          - Try enabling Developer Mode in Windows Settings
+          - Make sure the certificate is properly installed
+          
+          "@
+          
+          # Create ZIP archive
+          $zipName = "PixlPunkt-$version-$platform.zip"
+          Compress-Archive -Path "$outputDir/*" -DestinationPath $zipName
+          echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
+          
+          Write-Host "Release package created: $zipName" -ForegroundColor Green
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.platform }}
+          path: ${{ steps.prepare.outputs.zip_name }}
+
+  #############################################################################
+  # Create Release
+  #############################################################################
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-sdk, build-app]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./release-artifacts
+
+      - name: List artifacts
+        run: ls -R ./release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: PixlPunkt ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          body: |
+            ## PixlPunkt ${{ steps.version.outputs.version }}
+            
+            ### Downloads
+            | Platform | Download |
+            |----------|----------|
+            | Windows x64 | [PixlPunkt-${{ steps.version.outputs.version }}-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt-${{ steps.version.outputs.version }}-x64.zip) |
+            | Windows ARM64 | [PixlPunkt-${{ steps.version.outputs.version }}-arm64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt-${{ steps.version.outputs.version }}-arm64.zip) |
+            | Plugin SDK | [NuGet Package](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt.PluginSdk.${{ steps.version.outputs.version }}.nupkg) |
+            
+            ### Installation
+            1. Download the ZIP for your platform (x64 for most Windows PCs)
+            2. Extract the ZIP file
+            3. Right-click `Install-PixlPunkt.ps1` and select "Run with PowerShell"
+            4. Allow Administrator access when prompted
+            
+            The installer will automatically:
+            - Install the signing certificate
+            - Install the PixlPunkt application
+            
+            ### Requirements
+            - Windows 10 version 1809+ or Windows 11
+            - Administrator access (for certificate installation)
+            
+            ### What's Included
+            Each ZIP contains:
+            - `PixlPunkt-${{ steps.version.outputs.version }}-{platform}.msix` - The application package
+            - `PixlPunkt.cer` - Signing certificate (required for sideloading)
+            - `Install-PixlPunkt.ps1` - Automated installer script
+            - `README.txt` - Installation instructions
+          files: |
+            ./release-artifacts/app-x64/*.zip
+            ./release-artifacts/app-arm64/*.zip
+            ./release-artifacts/sdk-package/*.nupkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

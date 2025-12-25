@@ -1,0 +1,183 @@
+# ???????????????????????????????????????????????????????????????????????????
+# PixlPunkt.PluginSdk - Build & Package Workflow
+# ???????????????????????????????????????????????????????????????????????????
+# Builds the Plugin SDK and produces a NuGet package artifact.
+# Triggered on pushes to main/master and pull requests affecting SDK files.
+# Publishes to NuGet.org on version tags (sdk-v*) or manual dispatch.
+# ???????????????????????????????????????????????????????????????????????????
+
+name: Build SDK
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'PixlPunkt.PluginSdk/**'
+      - '.github/workflows/build-sdk.yml'
+    tags:
+      - 'sdk-v*'  # Trigger on SDK version tags like sdk-v1.0.0
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'PixlPunkt.PluginSdk/**'
+      - '.github/workflows/build-sdk.yml'
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: 'Version suffix (e.g., preview, beta)'
+        required: false
+        default: ''
+      publish_to_nuget:
+        description: 'Publish to NuGet.org'
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-sdk:
+    name: Build Plugin SDK
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_publish: ${{ steps.check_publish.outputs.should_publish }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/sdk-v* ]]; then
+            # Extract version from tag (sdk-v1.0.0 -> 1.0.0)
+            VERSION="${GITHUB_REF#refs/tags/sdk-v}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Using tag version: $VERSION"
+          else
+            # Use version from csproj with optional suffix
+            VERSION_SUFFIX="${{ github.event.inputs.version_suffix }}"
+            if [ -n "$VERSION_SUFFIX" ]; then
+              echo "version_suffix=-$VERSION_SUFFIX" >> $GITHUB_OUTPUT
+            fi
+            echo "Using project version with suffix: $VERSION_SUFFIX"
+          fi
+
+      - name: Check if should publish
+        id: check_publish
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/sdk-v* ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "Will publish: triggered by tag"
+          elif [[ "${{ github.event.inputs.publish_to_nuget }}" == "true" ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "Will publish: manual trigger requested"
+          else
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            echo "Will not publish: build only"
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
+
+      - name: Build SDK
+        run: dotnet build PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj --configuration Release --no-restore
+
+      - name: Pack NuGet package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          VERSION_SUFFIX="${{ steps.version.outputs.version_suffix }}"
+          
+          if [ -n "$VERSION" ]; then
+            # Use explicit version from tag
+            dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj \
+              --configuration Release \
+              --no-build \
+              --output ./artifacts \
+              -p:PackageVersion="$VERSION"
+          elif [ -n "$VERSION_SUFFIX" ]; then
+            # Use project version with suffix
+            dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj \
+              --configuration Release \
+              --no-build \
+              --output ./artifacts \
+              --version-suffix "${VERSION_SUFFIX#-}"
+          else
+            # Use project version as-is
+            dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj \
+              --configuration Release \
+              --no-build \
+              --output ./artifacts
+          fi
+          
+          echo "Created packages:"
+          ls -la ./artifacts/
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt.PluginSdk-nupkg
+          path: ./artifacts/*.nupkg
+          retention-days: 30
+
+      - name: Upload symbols package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt.PluginSdk-snupkg
+          path: ./artifacts/*.snupkg
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ???????????????????????????????????????????????????????????????????????????
+  # Publish to NuGet.org
+  # ???????????????????????????????????????????????????????????????????????????
+  publish-nuget:
+    name: Publish to NuGet.org
+    runs-on: ubuntu-latest
+    needs: build-sdk
+    if: needs.build-sdk.outputs.should_publish == 'true'
+    environment: nuget  # Optional: use GitHub environment for approval gates
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Download NuGet package
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt.PluginSdk-nupkg
+          path: ./packages
+
+      - name: Download symbols package
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt.PluginSdk-snupkg
+          path: ./packages
+        continue-on-error: true  # Symbols might not exist
+
+      - name: List packages
+        run: ls -la ./packages/
+
+      - name: Publish to NuGet.org
+        run: |
+          dotnet nuget push ./packages/*.nupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+      - name: Publish complete
+        run: |
+          echo "Package published to NuGet.org!"
+          echo "View at: https://www.nuget.org/packages/PixlPunkt.PluginSdk/"

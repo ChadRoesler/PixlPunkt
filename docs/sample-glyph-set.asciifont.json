@@ -1,0 +1,13 @@
+{
+  "name": "Custom Example",
+  "ramp": " .oO@",
+  "glyphWidth": 4,
+  "glyphHeight": 4,
+  "bitmaps": [
+    "0",
+    "40",
+    "660",
+    "6F6",
+    "FFFF"
+  ]
+}

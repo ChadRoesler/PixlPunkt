@@ -1,0 +1,118 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151 d18.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt", "PixlPunkt\PixlPunkt.csproj", "{AD9223E7-46D4-4F5F-A4DC-55DD04659492}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.PluginSdk", "PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj", "{06345212-8688-4F8F-91FA-4EB0C9785853}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.ExamplePlugin", "PixlPunkt.ExamplePlugin\PixlPunkt.ExamplePlugin.csproj", "{D80D4501-9A29-7BC9-60B2-22061246B5F4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		docs\ANIMATION_ARCHITECTURE.md = docs\ANIMATION_ARCHITECTURE.md
+		docs\CUSTOM_GLYPH_SETS.md = docs\CUSTOM_GLYPH_SETS.md
+		docs\QUICK_START.md = docs\QUICK_START.md
+		docs\sample-glyph-set.asciifont.json = docs\sample-glyph-set.asciifont.json
+		docs\USER_GUIDE.md = docs\USER_GUIDE.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}"
+	ProjectSection(SolutionItems) = preProject
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
+		CHANGELOG.md = CHANGELOG.md
+		CONTRIBUTING.md = CONTRIBUTING.md
+		INSTALL.md = INSTALL.md
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{A96C74E1-D7EC-46BD-A7EA-C7640056E361}"
+	ProjectSection(SolutionItems) = preProject
+		.github\PULL_REQUEST_TEMPLATE.md = .github\PULL_REQUEST_TEMPLATE.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{DB10A374-2E3A-42BA-B864-A3BC117B087F}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build-app.yml = .github\workflows\build-app.yml
+		.github\workflows\build-sdk.yml = .github\workflows\build-sdk.yml
+		.github\workflows\release.yml = .github\workflows\release.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ISSUE_TEMPLATE", "ISSUE_TEMPLATE", "{9B8DE5B3-3024-4687-97F0-E0D85F5777CD}"
+	ProjectSection(SolutionItems) = preProject
+		.github\ISSUE_TEMPLATE\bug_report.md = .github\ISSUE_TEMPLATE\bug_report.md
+		.github\ISSUE_TEMPLATE\feature_request.md = .github\ISSUE_TEMPLATE\feature_request.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{41FE7517-F399-449D-98F9-9DD1F0FC87AF}"
+	ProjectSection(SolutionItems) = preProject
+		scripts\Generate-SigningCertificate.ps1 = scripts\Generate-SigningCertificate.ps1
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM64 = Debug|ARM64
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|ARM64 = Release|ARM64
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|ARM64.Build.0 = Debug|ARM64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|x64.ActiveCfg = Debug|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|x64.Build.0 = Debug|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|x64.Deploy.0 = Debug|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|x86.ActiveCfg = Debug|x86
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|x86.Build.0 = Debug|x86
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|x86.Deploy.0 = Debug|x86
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|ARM64.ActiveCfg = Release|ARM64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|ARM64.Build.0 = Release|ARM64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|ARM64.Deploy.0 = Release|ARM64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|x64.ActiveCfg = Release|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|x64.Build.0 = Release|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|x64.Deploy.0 = Release|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|x86.ActiveCfg = Release|x86
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|x86.Build.0 = Release|x86
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|x86.Deploy.0 = Release|x86
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Debug|x64.Build.0 = Debug|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Debug|x86.Build.0 = Debug|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Release|ARM64.Build.0 = Release|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Release|x64.ActiveCfg = Release|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Release|x64.Build.0 = Release|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Release|x86.ActiveCfg = Release|Any CPU
+		{06345212-8688-4F8F-91FA-4EB0C9785853}.Release|x86.Build.0 = Release|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Debug|x64.Build.0 = Debug|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Debug|x86.Build.0 = Debug|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Release|ARM64.Build.0 = Release|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Release|x64.ActiveCfg = Release|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Release|x64.Build.0 = Release|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Release|x86.ActiveCfg = Release|Any CPU
+		{D80D4501-9A29-7BC9-60B2-22061246B5F4}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{DB10A374-2E3A-42BA-B864-A3BC117B087F} = {A96C74E1-D7EC-46BD-A7EA-C7640056E361}
+		{9B8DE5B3-3024-4687-97F0-E0D85F5777CD} = {A96C74E1-D7EC-46BD-A7EA-C7640056E361}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9E1BAE2F-CFB3-4022-8303-AE3CFDBD5546}
+	EndGlobalSection
+EndGlobal

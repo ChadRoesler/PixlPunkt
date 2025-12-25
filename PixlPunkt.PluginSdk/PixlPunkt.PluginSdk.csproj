@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- Package metadata -->
+    <PackageId>PixlPunkt.PluginSdk</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>PixlPunkt Team</Authors>
+    <Company>PixlPunkt</Company>
+    <Product>PixlPunkt Plugin SDK</Product>
+    <Description>SDK for developing PixlPunkt plugins. Create custom tools, brushes, and effects.</Description>
+    <PackageTags>pixlpunkt;plugin;sdk;pixel-art;image-editing</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ChadRoesler/PixlPunkt</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ChadRoesler/PixlPunkt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    
+    <!-- Assembly info -->
+    <AssemblyName>PixlPunkt.PluginSdk</AssemblyName>
+    <RootNamespace>PixlPunkt.PluginSdk</RootNamespace>
+    
+    <!-- Generate XML documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    
+    <!-- NuGet package generation -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    
+    <!-- Include build targets in package -->
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <BuildOutputTargetFolder>lib</BuildOutputTargetFolder>
+  </PropertyGroup>
+
+  <!-- Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="FluentIcons.Common" Version="2.0.316" />
+  </ItemGroup>
+
+  <!-- Include README in package -->
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" Condition="Exists('..\README.md')" />
+  </ItemGroup>
+
+  <!-- Include MSBuild targets in NuGet package -->
+  <ItemGroup>
+    <None Include="build\**\*" Pack="true" PackagePath="build\" />
+  </ItemGroup>
+
+  <!-- Ensure targets are imported by projects that reference this SDK -->
+  <ItemGroup>
+    <None Include="build\PixlPunkt.PluginSdk.targets" Pack="true" PackagePath="build\$(PackageId).targets" />
+  </ItemGroup>
+
+</Project>

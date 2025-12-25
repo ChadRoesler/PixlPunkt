@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PixlPunkt Plugin SDK MSBuild Targets
+  
+  This file provides automatic .punk packaging for plugin projects.
+  
+  Usage:
+  1. Reference PixlPunkt.PluginSdk
+  2. Set <PackAsPlugin>true</PackAsPlugin> in your .csproj
+  3. Optionally configure plugin metadata via properties or assembly attributes
+  4. Build - a .punk file will be created in the output directory
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Default values for plugin properties (evaluated at import time) -->
+  <PropertyGroup>
+    <PackAsPlugin Condition="'$(PackAsPlugin)' == ''">false</PackAsPlugin>
+    <PluginId Condition="'$(PluginId)' == ''">$(AssemblyName)</PluginId>
+    <PluginDisplayName Condition="'$(PluginDisplayName)' == ''">$(AssemblyTitle)</PluginDisplayName>
+    <PluginDisplayName Condition="'$(PluginDisplayName)' == ''">$(AssemblyName)</PluginDisplayName>
+    <PluginAuthor Condition="'$(PluginAuthor)' == ''">$(Authors)</PluginAuthor>
+    <PluginAuthor Condition="'$(PluginAuthor)' == ''">$(Company)</PluginAuthor>
+    <PluginAuthor Condition="'$(PluginAuthor)' == ''">Unknown</PluginAuthor>
+    <PluginDescription Condition="'$(PluginDescription)' == ''">$(Description)</PluginDescription>
+    <PluginDescription Condition="'$(PluginDescription)' == ''">A PixlPunkt plugin</PluginDescription>
+    <PluginVersion Condition="'$(PluginVersion)' == ''">$(Version)</PluginVersion>
+    <PluginVersion Condition="'$(PluginVersion)' == ''">1.0.0</PluginVersion>
+    <PluginEntryPoint Condition="'$(PluginEntryPoint)' == ''">$(AssemblyName).dll</PluginEntryPoint>
+    <PluginClass Condition="'$(PluginClass)' == ''">$(RootNamespace).$(AssemblyName.Replace('.', ''))</PluginClass>
+    <PluginMinApiVersion Condition="'$(PluginMinApiVersion)' == ''">1</PluginMinApiVersion>
+    <PluginFileName>$(AssemblyName).punk</PluginFileName>
+  </PropertyGroup>
+
+  <!-- Hook into the build process -->
+  <Target Name="PackPlugin" AfterTargets="Build" Condition="'$(PackAsPlugin)' == 'true'">
+    <!-- Compute paths at target execution time when all properties are resolved -->
+    <PropertyGroup>
+      <_PluginStagingDir>$(IntermediateOutputPath)punk_staging\</_PluginStagingDir>
+      <_PluginOutputDir Condition="'$(PluginOutputPath)' != ''">$(PluginOutputPath)</_PluginOutputDir>
+      <_PluginOutputDir Condition="'$(PluginOutputPath)' == ''">$(TargetDir)</_PluginOutputDir>
+    </PropertyGroup>
+    
+    <CallTarget Targets="_CleanPluginStaging" />
+    <CallTarget Targets="_PreparePluginStaging" />
+    <CallTarget Targets="_GeneratePluginManifest" />
+    <CallTarget Targets="_CreatePunkPackage" />
+    <CallTarget Targets="_CleanPluginStaging" />
+  </Target>
+
+  <!-- Clean staging directory -->
+  <Target Name="_CleanPluginStaging">
+    <PropertyGroup>
+      <_PluginStagingDir>$(IntermediateOutputPath)punk_staging\</_PluginStagingDir>
+    </PropertyGroup>
+    <RemoveDir Directories="$(_PluginStagingDir)" Condition="Exists('$(_PluginStagingDir)')" />
+  </Target>
+
+  <!-- Prepare staging directory with output files -->
+  <Target Name="_PreparePluginStaging">
+    <PropertyGroup>
+      <_PluginStagingDir>$(IntermediateOutputPath)punk_staging\</_PluginStagingDir>
+    </PropertyGroup>
+    
+    <MakeDir Directories="$(_PluginStagingDir)" />
+    
+    <!-- Copy main assembly -->
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(_PluginStagingDir)" />
+    
+    <!-- Copy PDB if it exists -->
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" 
+          DestinationFolder="$(_PluginStagingDir)" 
+          Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    
+    <!-- Copy dependencies (exclude SDK and framework assemblies) -->
+    <ItemGroup>
+      <_PluginDependencies Include="$(TargetDir)*.dll" 
+                           Exclude="$(TargetPath);$(TargetDir)PixlPunkt.PluginSdk.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PluginDependencies)" DestinationFolder="$(_PluginStagingDir)" />
+    
+    <!-- Copy additional assets if specified -->
+    <ItemGroup Condition="'$(PluginIncludeAssets)' != ''">
+      <_PluginAssets Include="$(PluginIncludeAssets)" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PluginAssets)" DestinationFolder="$(_PluginStagingDir)%(RecursiveDir)" 
+          Condition="'@(_PluginAssets)' != ''" />
+  </Target>
+
+  <!-- Generate manifest.json -->
+  <Target Name="_GeneratePluginManifest">
+    <PropertyGroup>
+      <_PluginStagingDir>$(IntermediateOutputPath)punk_staging\</_PluginStagingDir>
+      <_ManifestContent>
+{
+  "id": "$(PluginId)",
+  "name": "$(PluginDisplayName)",
+  "version": "$(PluginVersion)",
+  "author": "$(PluginAuthor)",
+  "description": "$(PluginDescription)",
+  "entryPoint": "$(PluginEntryPoint)",
+  "pluginClass": "$(PluginClass)",
+  "minApiVersion": $(PluginMinApiVersion)
+}
+      </_ManifestContent>
+    </PropertyGroup>
+    
+    <WriteLinesToFile File="$(_PluginStagingDir)manifest.json"
+                      Lines="$(_ManifestContent)"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+    
+    <Message Importance="high" Text="Generated manifest.json for plugin '$(PluginId)'" />
+  </Target>
+
+  <!-- Create the .punk package (ZIP file) -->
+  <Target Name="_CreatePunkPackage">
+    <PropertyGroup>
+      <_PluginStagingDir>$(IntermediateOutputPath)punk_staging\</_PluginStagingDir>
+      <_PluginOutputDir Condition="'$(PluginOutputPath)' != ''">$(PluginOutputPath)</_PluginOutputDir>
+      <_PluginOutputDir Condition="'$(PluginOutputPath)' == ''">$(TargetDir)</_PluginOutputDir>
+      <_PluginOutputFile>$(_PluginOutputDir)$(PluginFileName)</_PluginOutputFile>
+    </PropertyGroup>
+    
+    <MakeDir Directories="$(_PluginOutputDir)" Condition="!Exists('$(_PluginOutputDir)')" />
+    
+    <!-- Delete existing .punk file if present -->
+    <Delete Files="$(_PluginOutputFile)" Condition="Exists('$(_PluginOutputFile)')" />
+    
+    <!-- Use ZipDirectory to create the package -->
+    <ZipDirectory SourceDirectory="$(_PluginStagingDir)"
+                  DestinationFile="$(_PluginOutputFile)"
+                  Overwrite="true" />
+    
+    <Message Importance="high" Text="Created plugin package: $(_PluginOutputFile)" />
+  </Target>
+
+  <!-- Clean target to remove .punk files -->
+  <Target Name="CleanPunkPackage" AfterTargets="Clean" Condition="'$(PackAsPlugin)' == 'true'">
+    <PropertyGroup>
+      <_PluginStagingDir>$(IntermediateOutputPath)punk_staging\</_PluginStagingDir>
+      <_PluginOutputDir Condition="'$(PluginOutputPath)' != ''">$(PluginOutputPath)</_PluginOutputDir>
+      <_PluginOutputDir Condition="'$(PluginOutputPath)' == ''">$(TargetDir)</_PluginOutputDir>
+      <_PluginOutputFile>$(_PluginOutputDir)$(PluginFileName)</_PluginOutputFile>
+    </PropertyGroup>
+    <Delete Files="$(_PluginOutputFile)" Condition="Exists('$(_PluginOutputFile)')" />
+    <RemoveDir Directories="$(_PluginStagingDir)" Condition="Exists('$(_PluginStagingDir)')" />
+  </Target>
+
+</Project>

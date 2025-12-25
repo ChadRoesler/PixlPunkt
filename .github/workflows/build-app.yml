@@ -1,0 +1,197 @@
+# ???????????????????????????????????????????????????????????????????????????????
+# PixlPunkt Application - Build Workflow
+# ???????????????????????????????????????????????????????????????????????????????
+# Builds the PixlPunkt application as a sideloadable MSIX package.
+# Produces signed MSIX installers for x64 and ARM64 platforms.
+# ???????????????????????????????????????????????????????????????????????????????
+
+name: Build App
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'PixlPunkt/**'
+      - 'PixlPunkt.PluginSdk/**'
+      - '.github/workflows/build-app.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'PixlPunkt/**'
+      - 'PixlPunkt.PluginSdk/**'
+      - '.github/workflows/build-app.yml'
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-app:
+    name: Build PixlPunkt (${{ matrix.platform }})
+    runs-on: windows-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, arm64]
+        include:
+          - platform: x64
+            rid: win-x64
+          - platform: arm64
+            rid: win-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Decode and import signing certificate
+        id: cert
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.SIGNING_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:CERT_BASE64) {
+            $pfxBytes = [Convert]::FromBase64String($env:CERT_BASE64)
+            $certPath = Join-Path $env:RUNNER_TEMP "PixlPunkt.pfx"
+            [IO.File]::WriteAllBytes($certPath, $pfxBytes)
+            
+            # Import certificate to CurrentUser store for signing
+            $securePassword = ConvertTo-SecureString -String $env:CERT_PASSWORD -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+            $thumbprint = $cert.Thumbprint
+            
+            echo "CERT_THUMBPRINT=$thumbprint" >> $env:GITHUB_ENV
+            echo "HAS_CERT=true" >> $env:GITHUB_ENV
+            Write-Host "Certificate imported with thumbprint: $thumbprint"
+          }
+
+      - name: Restore dependencies
+        run: dotnet restore PixlPunkt.sln -r ${{ matrix.rid }}
+
+      - name: Build MSIX Package
+        shell: pwsh
+        run: |
+          $hasCert = $env:HAS_CERT -eq "true"
+          $thumbprint = $env:CERT_THUMBPRINT
+          
+          $buildArgs = @(
+            "publish"
+            "PixlPunkt/PixlPunkt.csproj"
+            "--configuration"
+            "Release"
+            "--runtime"
+            "${{ matrix.rid }}"
+            "--self-contained"
+            "true"
+            "-p:Platform=${{ matrix.platform }}"
+            "-p:GenerateAppxPackageOnBuild=true"
+            "-p:AppxBundle=Never"
+            "-p:UapAppxPackageBuildMode=SideloadOnly"
+            "-p:AppxPackageDir=../artifacts/${{ matrix.platform }}/"
+            "-p:PublishReadyToRun=true"
+          )
+          
+          if ($hasCert -and $thumbprint) {
+            # Use thumbprint-based signing (more reliable on CI)
+            $buildArgs += "-p:AppxPackageSigningEnabled=true"
+            $buildArgs += "-p:PackageCertificateThumbprint=$thumbprint"
+          } else {
+            # Disable signing for unsigned builds
+            $buildArgs += "-p:AppxPackageSigningEnabled=false"
+            $buildArgs += "-p:PackageCertificateThumbprint="
+          }
+          
+          Write-Host "Build arguments: $($buildArgs -join ' ')"
+          & dotnet @buildArgs
+
+      - name: Prepare artifacts
+        shell: pwsh
+        run: |
+          $platform = "${{ matrix.platform }}"
+          $msixDir = "artifacts/$platform"
+          
+          if (Test-Path $msixDir) {
+            $msixFiles = Get-ChildItem -Path $msixDir -Filter "*.msix" -Recurse
+            if ($msixFiles) {
+              $outputDir = "release/$platform"
+              New-Item -ItemType Directory -Path $outputDir -Force
+              
+              foreach ($file in $msixFiles) {
+                Copy-Item $file.FullName -Destination $outputDir
+              }
+              
+              if (Test-Path "certificates/PixlPunkt.cer") {
+                Copy-Item "certificates/PixlPunkt.cer" -Destination $outputDir
+              }
+              
+              # Create install script
+              Set-Content -Path "$outputDir/Install-PixlPunkt.ps1" -Value @'
+          #Requires -RunAsAdministrator
+          $ErrorActionPreference = "Stop"
+          Write-Host "Installing PixlPunkt..." -ForegroundColor Cyan
+          $certPath = Join-Path $PSScriptRoot "PixlPunkt.cer"
+          if (Test-Path $certPath) {
+              Write-Host "Installing certificate..." -ForegroundColor Yellow
+              Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+              Write-Host "Certificate installed." -ForegroundColor Green
+          }
+          $msixPath = Get-ChildItem -Path $PSScriptRoot -Filter "*.msix" | Select-Object -First 1
+          if ($msixPath) {
+              Write-Host "Installing MSIX package..." -ForegroundColor Yellow
+              Add-AppxPackage -Path $msixPath.FullName
+              Write-Host "PixlPunkt installed successfully!" -ForegroundColor Green
+          } else {
+              Write-Host "MSIX package not found!" -ForegroundColor Red
+              exit 1
+          }
+          '@
+              
+              Compress-Archive -Path "$outputDir/*" -DestinationPath "PixlPunkt-$platform.zip"
+            }
+          }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt-${{ matrix.platform }}
+          path: PixlPunkt-${{ matrix.platform }}.zip
+          retention-days: 30
+          if-no-files-found: warn
+
+  combine-artifacts:
+    name: Combine Artifacts
+    runs-on: ubuntu-latest
+    needs: build-app
+    if: success()
+
+    steps:
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt-x64
+          path: ./release
+        continue-on-error: true
+
+      - name: Download ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt-arm64
+          path: ./release
+        continue-on-error: true
+
+      - name: Upload combined release
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt-AllPlatforms
+          path: ./release/
+          retention-days: 30
+          if-no-files-found: warn

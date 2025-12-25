@@ -1,0 +1,43 @@
+{
+  "id": "pixlpunkt.example",
+  "name": "Example Plugin",
+  "version": "1.0.0",
+  "author": "PixlPunkt Team",
+  "description": "Example plugin demonstrating the SDK with custom tools and effects",
+  "minApiVersion": 1,
+  "entryPoint": "PixlPunkt.ExamplePlugin.dll",
+  "pluginClass": "PixlPunkt.ExamplePlugin.ExamplePlugin",
+  "tools": [
+    {
+      "id": "pixlpunkt.example.brush.sparkle",
+      "category": "Brush",
+      "name": "Sparkle Brush",
+      "description": "A brush that adds sparkle effects"
+    },
+    {
+      "id": "pixlpunkt.example.shape.star",
+      "category": "Shape",
+      "name": "Star Shape",
+      "description": "Creates a modifiable star shape"
+    },
+    {
+      "id": "pixlpunkt.example.select.ellipse",
+      "category": "Select",
+      "name": "Ellipse Selection",
+      "description": "Creates a Ellipse selection"
+    },
+    {
+      "id": "pixlpunkt.example.utility.info",
+      "category": "Utility",
+      "name": "Info Tool",
+      "description": "Gathers Info about the selected pixel"
+    },
+    {
+      "id": "pixlpunkt.example.tile.bucketfill",
+      "category": "Tile",
+      "name": "Tile Bucket Fill",
+      "description": "Flood fills tile mappings using the selected tile"
+    }
+  ],
+  "tags": ["example", "brush", "effects", "utility", "shape", "tile", "select"]
+}

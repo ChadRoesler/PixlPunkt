@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "PixlPunkt (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "PixlPunkt (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

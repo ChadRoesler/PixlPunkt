@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- Assembly info -->
+    <AssemblyName>PixlPunkt.ExamplePlugin</AssemblyName>
+    <RootNamespace>PixlPunkt.ExamplePlugin</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>PixlPunkt Team</Authors>
+    <Company>PixlPunkt</Company>
+    <Description>Example plugin demonstrating the PixlPunkt Plugin SDK</Description>
+    
+    <!-- Enable .punk packaging -->
+    <PackAsPlugin>true</PackAsPlugin>
+    
+    <!-- Plugin metadata -->
+    <PluginId>pixlpunkt.example</PluginId>
+    <PluginDisplayName>Example Plugin</PluginDisplayName>
+    <PluginAuthor>PixlPunkt Team</PluginAuthor>
+    <PluginDescription>Example plugin demonstrating the SDK with custom tools and effects</PluginDescription>
+    <PluginClass>PixlPunkt.ExamplePlugin.ExamplePlugin</PluginClass>
+    <PluginMinApiVersion>1</PluginMinApiVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Tools\Tile\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentIcons.Common" Version="2.0.316" />
+  </ItemGroup>
+
+  <!-- Import SDK targets for .punk packaging -->
+  <Import Project="..\PixlPunkt.PluginSdk\build\PixlPunkt.PluginSdk.targets" />
+
+</Project>
