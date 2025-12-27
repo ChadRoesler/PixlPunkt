@@ -122,6 +122,12 @@ namespace PixlPunkt.UI.Animation
         public event Action? AnimationPreviewDockRequested;
 
         /// <summary>
+        /// Raised when the user interacts with the animation panel (clicks, drags, etc.).
+        /// Used to track focus for keyboard shortcut routing.
+        /// </summary>
+        public event Action? Interacted;
+
+        /// <summary>
         /// Gets whether the Stage track is currently selected.
         /// </summary>
         public bool IsStageSelected { get; private set; }
@@ -1269,6 +1275,9 @@ namespace PixlPunkt.UI.Animation
 
         private void CanvasKeyframeCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+            // Notify that the animation panel was interacted with (for keyboard shortcut routing)
+            Interacted?.Invoke();
+
             if (_canvasAnimationState == null) return;
 
             var pos = e.GetCurrentPoint(CanvasKeyframeCanvas).Position;

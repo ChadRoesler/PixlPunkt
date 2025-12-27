@@ -1009,5 +1009,23 @@ namespace PixlPunkt.UI.CanvasHost
 
             return ReadCompositeBGRA(docX, docY);
         }
+
+        // ════════════════════════════════════════════════════════════════════
+        // INTERACTION TRACKING
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Raised when the user interacts with the canvas (clicks, paints, etc.).
+        /// Used to track focus for keyboard shortcut routing.
+        /// </summary>
+        public event Action? CanvasInteracted;
+
+        /// <summary>
+        /// Notifies that the user has interacted with the canvas.
+        /// </summary>
+        private void NotifyCanvasInteracted()
+        {
+            CanvasInteracted?.Invoke();
+        }
     }
 }

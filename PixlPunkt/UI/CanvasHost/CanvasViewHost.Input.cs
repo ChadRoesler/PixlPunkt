@@ -98,6 +98,9 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void CanvasView_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+            // Notify that the canvas was interacted with (for keyboard shortcut routing)
+            NotifyCanvasInteracted();
+
             // ════════════════════════════════════════════════════════════════════
             // EXTERNAL DROPPER MODE - intercepts all pointer input for color picker windows
             // ════════════════════════════════════════════════════════════════════

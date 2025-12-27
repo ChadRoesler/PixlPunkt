@@ -385,7 +385,8 @@ namespace PixlPunkt.UI.CanvasHost
             }
 
             var strokeSettings = GetStrokeSettingsForCurrentTool();
-            if (_activePainter != null && strokeSettings != null)
+            // SAFETY: Verify both the local painter reference AND the stroke engine agree there's an active stroke
+            if (_activePainter != null && strokeSettings != null && _stroke.HasActivePainterStroke)
             {
                 GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
 
@@ -658,7 +659,8 @@ namespace PixlPunkt.UI.CanvasHost
             }
 
             var strokeSettings = GetStrokeSettingsForCurrentTool();
-            if (_activePainter != null && strokeSettings != null)
+            // SAFETY: Verify both the local painter reference AND the stroke engine agree there's an active stroke
+            if (_activePainter != null && strokeSettings != null && _stroke.HasActivePainterStroke)
             {
                 GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
 

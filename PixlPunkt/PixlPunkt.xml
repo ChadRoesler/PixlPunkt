@@ -25560,6 +25560,12 @@
             Raised when the user wants to dock the animation preview back.
             </summary>
         </member>
+        <member name="E:PixlPunkt.UI.Animation.AnimationPanel.Interacted">
+            <summary>
+            Raised when the user interacts with the animation panel (clicks, drags, etc.).
+            Used to track focus for keyboard shortcut routing.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.UI.Animation.AnimationPanel.IsStageSelected">
             <summary>
             Gets whether the Stage track is currently selected.
@@ -27721,6 +27727,17 @@
             <param name="docX">X coordinate in document space.</param>
             <param name="docY">Y coordinate in document space.</param>
             <returns>The sampled BGRA color, or null if coordinates are out of bounds.</returns>
+        </member>
+        <member name="E:PixlPunkt.UI.CanvasHost.CanvasViewHost.CanvasInteracted">
+            <summary>
+            Raised when the user interacts with the canvas (clicks, paints, etc.).
+            Used to track focus for keyboard shortcut routing.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.NotifyCanvasInteracted">
+            <summary>
+            Notifies that the user has interacted with the canvas.
+            </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.InitializeComponent">
             <summary>
@@ -32221,6 +32238,44 @@
             Cleans up auto-save tracking when a document is closed.
             </summary>
         </member>
+        <member name="F:PixlPunkt.UI.PixlPunktMainWindow._spaceUsedForPan">
+            <summary>
+            Tracks whether Space was used for pan mode (vs animation toggle).
+            This ensures symmetric handling in KeyUp.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.PixlPunktMainWindow._animationPanelHasFocus">
+            <summary>
+            Tracks whether the Animation Panel was the last area the user interacted with.
+            When true, Space/Arrow shortcuts control animation. When false, they control pan/selection nudge.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.SetAnimationPanelFocus(System.Boolean)">
+            <summary>
+            Called when the user interacts with the Animation Panel.
+            Sets focus to animation mode for shortcuts.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.IsAnimationPanelVisible">
+            <summary>
+            Checks if the animation panel is visible (but not necessarily focused).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.ToggleAnimationPlayback">
+            <summary>
+            Toggles play/pause for the current animation mode.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.StepAnimationBackward">
+            <summary>
+            Steps the animation backward one frame.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.StepAnimationForward">
+            <summary>
+            Steps the animation forward one frame.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.CreateAndOpenCanvas(PixlPunkt.UI.Dialogs.NewCanvasResult)">
             <summary>
             Creates and opens a canvas from a NewCanvasResult.
@@ -32286,6 +32341,18 @@
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.OnAnimationPanelTextInputUnfocused">
             <summary>
             Restores tool shortcuts when text input in animation panel loses focus.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.OnAnimationPanelInteracted">
+            <summary>
+            Called when the user interacts with the animation panel.
+            Sets focus mode so keyboard shortcuts control animation.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.OnCanvasInteracted">
+            <summary>
+            Called when the user interacts with the canvas.
+            Clears animation panel focus so keyboard shortcuts control pan/selection.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.BuildAdvancedTemplatesMenu">

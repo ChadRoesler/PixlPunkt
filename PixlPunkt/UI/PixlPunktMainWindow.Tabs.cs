@@ -417,6 +417,14 @@ namespace PixlPunkt.UI
             AnimationPanel.TextInputFocused += OnAnimationPanelTextInputFocused;
             AnimationPanel.TextInputUnfocused += OnAnimationPanelTextInputUnfocused;
 
+            // Wire up animation panel interaction tracking (for keyboard shortcut routing)
+            AnimationPanel.Interacted -= OnAnimationPanelInteracted;
+            AnimationPanel.Interacted += OnAnimationPanelInteracted;
+
+            // Wire up canvas host interaction tracking (clears animation panel focus)
+            host.CanvasInteracted -= OnCanvasInteracted;
+            host.CanvasInteracted += OnCanvasInteracted;
+
             // Wire up canvas animation frame change to refresh the main canvas
             AnimationPanel.CanvasAnimationFrameChanged -= OnCanvasAnimationFrameChanged;
             AnimationPanel.CanvasAnimationFrameChanged += OnCanvasAnimationFrameChanged;
@@ -467,6 +475,7 @@ namespace PixlPunkt.UI
             host.BackgroundSampledLive -= OnHostBackgroundSampledLive;
             host.HistoryStateChanged -= Host_HistoryStateChanged;
             host.Document.ActiveLayerChanged -= OnDocumentActiveLayerChanged;
+            host.CanvasInteracted -= OnCanvasInteracted;
 
             // Unsubscribe layer selection handler to prevent memory leak
             if (_layersPanelSelectionHandler != null)
@@ -478,6 +487,9 @@ namespace PixlPunkt.UI
             // Unsubscribe animation panel text input focus events
             AnimationPanel.TextInputFocused -= OnAnimationPanelTextInputFocused;
             AnimationPanel.TextInputUnfocused -= OnAnimationPanelTextInputUnfocused;
+
+            // Unsubscribe animation panel interaction tracking
+            AnimationPanel.Interacted -= OnAnimationPanelInteracted;
 
             // Unsubscribe canvas animation frame change event
             AnimationPanel.CanvasAnimationFrameChanged -= OnCanvasAnimationFrameChanged;
@@ -570,5 +582,23 @@ namespace PixlPunkt.UI
         /// Restores tool shortcuts when text input in animation panel loses focus.
         /// </summary>
         private void OnAnimationPanelTextInputUnfocused() => SuspendToolAccelerators(false);
+
+        /// <summary>
+        /// Called when the user interacts with the animation panel.
+        /// Sets focus mode so keyboard shortcuts control animation.
+        /// </summary>
+        private void OnAnimationPanelInteracted()
+        {
+            SetAnimationPanelFocus(true);
+        }
+
+        /// <summary>
+        /// Called when the user interacts with the canvas.
+        /// Clears animation panel focus so keyboard shortcuts control pan/selection.
+        /// </summary>
+        private void OnCanvasInteracted()
+        {
+            SetAnimationPanelFocus(false);
+        }
     }
 }

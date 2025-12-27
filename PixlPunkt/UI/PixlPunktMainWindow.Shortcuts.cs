@@ -2,18 +2,42 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Tools;
+using PixlPunkt.UI.Animation;
 using Windows.System;
 
 namespace PixlPunkt.UI
 {
     public sealed partial class PixlPunktMainWindow : Window
     {
+        /// <summary>
+        /// Tracks whether Space was used for pan mode (vs animation toggle).
+        /// This ensures symmetric handling in KeyUp.
+        /// </summary>
+        private bool _spaceUsedForPan;
+
+        /// <summary>
+        /// Tracks whether the Animation Panel was the last area the user interacted with.
+        /// When true, Space/Arrow shortcuts control animation. When false, they control pan/selection nudge.
+        /// </summary>
+        private bool _animationPanelHasFocus;
+
         private void Root_KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            // Space for pan override
+            // Space for pan override OR animation playback toggle
             if (e.Key == VirtualKey.Space)
             {
+                // Check if animation panel has focus AND is visible - use Space for play/pause
+                if (_animationPanelHasFocus && IsAnimationPanelVisible())
+                {
+                    ToggleAnimationPlayback();
+                    _spaceUsedForPan = false; // Space used for animation, not pan
+                    e.Handled = true;
+                    return;
+                }
+
+                // Otherwise, use Space for pan override
                 CurrentHost?.BeginSpacePan();
+                _spaceUsedForPan = true; // Space used for pan
                 e.Handled = true;
                 return;
             }
@@ -26,6 +50,27 @@ namespace PixlPunkt.UI
             if (IsTextInputFocused() || _suspendToolAccelerators)
             {
                 return;
+            }
+
+            // ─────────────────────────────────────────────────────────────────
+            // ANIMATION FRAME NAVIGATION (Arrow keys when animation panel has focus)
+            // Left/Right: Previous/Next frame
+            // Only when animation panel was the last thing interacted with
+            // ─────────────────────────────────────────────────────────────────
+            if (_animationPanelHasFocus && IsAnimationPanelVisible() && !_ctrlDown && !_shiftDown)
+            {
+                if (e.Key == VirtualKey.Left)
+                {
+                    StepAnimationBackward();
+                    e.Handled = true;
+                    return;
+                }
+                else if (e.Key == VirtualKey.Right)
+                {
+                    StepAnimationForward();
+                    e.Handled = true;
+                    return;
+                }
             }
 
             // ─────────────────────────────────────────────────────────────────
@@ -43,8 +88,9 @@ namespace PixlPunkt.UI
             // SELECTION NUDGE WITH ARROW KEYS
             // Arrow keys: 1px nudge
             // Shift+Arrow keys: 5px nudge
+            // Only when NOT in animation panel focus mode
             // ─────────────────────────────────────────────────────────────────
-            if (CurrentHost?.HasSelection == true)
+            if (CurrentHost?.HasSelection == true && !_animationPanelHasFocus)
             {
                 int nudgeAmount = _shiftDown ? 5 : 1;
                 bool handled = true;
@@ -123,11 +169,102 @@ namespace PixlPunkt.UI
         {
             if (e.Key == VirtualKey.Space)
             {
-                CurrentHost?.EndSpacePan();
+                // Only end space pan if Space was actually used for panning
+                if (_spaceUsedForPan)
+                {
+                    CurrentHost?.EndSpacePan();
+                }
+                _spaceUsedForPan = false;
                 e.Handled = true;
             }
             if (e.Key == VirtualKey.Shift) _shiftDown = false;
             if (e.Key == VirtualKey.Control) _ctrlDown = false;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // ANIMATION PANEL FOCUS TRACKING
+        // ─────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Called when the user interacts with the Animation Panel.
+        /// Sets focus to animation mode for shortcuts.
+        /// </summary>
+        internal void SetAnimationPanelFocus(bool hasFocus)
+        {
+            _animationPanelHasFocus = hasFocus;
+        }
+
+        /// <summary>
+        /// Checks if the animation panel is visible (but not necessarily focused).
+        /// </summary>
+        private bool IsAnimationPanelVisible()
+        {
+            return AnimationPanel != null && 
+                   AnimationPanel.Visibility == Visibility.Visible;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // ANIMATION PLAYBACK HELPERS
+        // ─────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Toggles play/pause for the current animation mode.
+        /// </summary>
+        private void ToggleAnimationPlayback()
+        {
+            if (AnimationPanel == null) return;
+
+            var doc = CurrentHost?.Document;
+            if (doc == null) return;
+
+            if (AnimationPanel.CurrentMode == AnimationMode.Canvas)
+            {
+                doc.CanvasAnimationState?.TogglePlayPause();
+            }
+            else // Tile mode
+            {
+                doc.TileAnimationState?.TogglePlayPause();
+            }
+        }
+
+        /// <summary>
+        /// Steps the animation backward one frame.
+        /// </summary>
+        private void StepAnimationBackward()
+        {
+            if (AnimationPanel == null) return;
+
+            var doc = CurrentHost?.Document;
+            if (doc == null) return;
+
+            if (AnimationPanel.CurrentMode == AnimationMode.Canvas)
+            {
+                doc.CanvasAnimationState?.PreviousFrame();
+            }
+            else // Tile mode
+            {
+                doc.TileAnimationState?.PreviousFrame();
+            }
+        }
+
+        /// <summary>
+        /// Steps the animation forward one frame.
+        /// </summary>
+        private void StepAnimationForward()
+        {
+            if (AnimationPanel == null) return;
+
+            var doc = CurrentHost?.Document;
+            if (doc == null) return;
+
+            if (AnimationPanel.CurrentMode == AnimationMode.Canvas)
+            {
+                doc.CanvasAnimationState?.NextFrame();
+            }
+            else // Tile mode
+            {
+                doc.TileAnimationState?.NextFrame();
+            }
         }
 
         private void NewDocument_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
