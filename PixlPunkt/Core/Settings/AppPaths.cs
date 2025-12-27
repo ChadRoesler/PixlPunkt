@@ -136,6 +136,11 @@ namespace PixlPunkt.Core.Settings
         public static string GlyphSetsDirectory => Path.Combine(RootDirectory, "GlyphSets");
 
         /// <summary>
+        /// Gets the temporary directory for transient data like history offloading.
+        /// </summary>
+        public static string TempDirectory => Path.Combine(RootDirectory, "Temp");
+
+        /// <summary>
         /// Ensures the root directory and all standard subdirectories exist.
         /// </summary>
         public static void EnsureDirectoriesExist()
@@ -155,6 +160,7 @@ namespace PixlPunkt.Core.Settings
                 EnsureDirectoryExists(PluginsDirectory);
                 EnsureDirectoryExists(LogsDirectory);
                 EnsureDirectoryExists(GlyphSetsDirectory);
+                EnsureDirectoryExists(TempDirectory);
 
                 _initialized = true;
                 System.Diagnostics.Debug.WriteLine($"[AppPaths] Directories initialized at: {RootDirectory}");

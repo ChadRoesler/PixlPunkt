@@ -26,7 +26,7 @@ namespace PixlPunkt.Core.Reference
     /// and can extend beyond the canvas boundaries without being clipped.
     /// </para>
     /// </remarks>
-    public sealed class ReferenceImage : INotifyPropertyChanged
+    public sealed class ReferenceImage : INotifyPropertyChanged, IDisposable
     {
         private string _name = "Reference";
         private string? _filePath;
@@ -455,6 +455,23 @@ namespace PixlPunkt.Core.Reference
             OnPropertyChanged(nameof(PositionY));
             OnPropertyChanged(nameof(Rotation));
             TransformChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Releases allocated resources (for IDisposable).
+        /// </summary>
+        public void Dispose()
+        {
+            // Clear pixel data to allow GC to reclaim memory
+            _pixels = null;
+            
+            // Clear the preview bitmap reference
+            _previewBitmap = null;
+            
+            // Notify that the image data has been cleared
+            OnPropertyChanged(nameof(Pixels));
+            OnPropertyChanged(nameof(HasPixels));
+            OnPropertyChanged(nameof(PreviewBitmap));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

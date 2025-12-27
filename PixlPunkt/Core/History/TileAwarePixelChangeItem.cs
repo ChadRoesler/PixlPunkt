@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using FluentIcons.Common;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Logging;
@@ -18,8 +19,11 @@ namespace PixlPunkt.Core.History
     /// also captures affected tile states and propagates changes to all tile instances
     /// when undoing or redoing.
     /// </para>
+    /// <para>
+    /// Implements <see cref="IDisposableHistoryItem"/> to support memory management.
+    /// </para>
     /// </remarks>
-    public sealed class TileAwarePixelChangeItem : IHistoryItem, IRenderResult
+    public sealed class TileAwarePixelChangeItem : IDisposableHistoryItem, IRenderResult
     {
         private readonly RasterLayer _layer;
         private readonly TileSet? _tileSet;
@@ -28,16 +32,21 @@ namespace PixlPunkt.Core.History
         private readonly RectInt32 _bounds;
 
         // Pixel changes (before/after)
-        private readonly byte[] _pixelsBefore;
-        private readonly byte[] _pixelsAfter;
+        private byte[]? _pixelsBefore;
+        private byte[]? _pixelsAfter;
 
         // Tile definition changes
-        private readonly Dictionary<int, TileChange> _tileChanges = new();
-        private readonly Dictionary<int, List<(int tileX, int tileY)>> _tilePositions = new();
+        private Dictionary<int, TileChange>? _tileChanges;
+        private Dictionary<int, List<(int tileX, int tileY)>>? _tilePositions;
 
         // Individual pixel changes (for sparse changes without bounds)
-        private readonly List<(int idx, uint before, uint after)> _pixelDeltas = new();
+        private List<(int idx, uint before, uint after)>? _pixelDeltas;
         private bool _useSparsePixels;
+
+        // Offload state
+        private Guid _offloadId = Guid.Empty;
+        private bool _isOffloaded;
+        private long _offloadedMemorySize; // Track original size for UI/stats
 
         /// <summary>
         /// Gets a quick reference icon of the opperation (for UI display).
@@ -58,10 +67,244 @@ namespace PixlPunkt.Core.History
         public string Description => _description;
 
         /// <inheritdoc/>
-        public bool HasChanges => _pixelsBefore.Length > 0 || _pixelDeltas.Count > 0 || _tileChanges.Count > 0;
+        public bool HasChanges => (_pixelsBefore?.Length ?? 0) > 0 || (_pixelDeltas?.Count ?? 0) > 0 || (_tileChanges?.Count ?? 0) > 0 || _isOffloaded;
 
         /// <inheritdoc/>
         public bool CanPushToHistory => HasChanges;
+
+        // ====================================================================
+        // IDisposableHistoryItem IMPLEMENTATION
+        // ====================================================================
+
+        /// <summary>
+        /// Gets the estimated memory usage in bytes.
+        /// </summary>
+        public long EstimatedMemoryBytes
+        {
+            get
+            {
+                if (_isOffloaded) return 200; // Minimal overhead when offloaded
+                
+                long total = 100; // Base object overhead
+                
+                // Pixel arrays
+                total += _pixelsBefore?.Length ?? 0;
+                total += _pixelsAfter?.Length ?? 0;
+                
+                // Sparse pixel deltas: 12 bytes per entry (int + uint + uint)
+                total += (_pixelDeltas?.Count ?? 0) * 12L;
+                
+                // Tile changes: each has before + after byte arrays
+                if (_tileChanges != null)
+                {
+                    foreach (var change in _tileChanges.Values)
+                    {
+                        total += change.Before.Length + change.After.Length + 50; // + overhead
+                    }
+                }
+                
+                // Tile positions: each list entry is ~16 bytes
+                if (_tilePositions != null)
+                {
+                    foreach (var positions in _tilePositions.Values)
+                    {
+                        total += positions.Count * 16L + 30;
+                    }
+                }
+                
+                return total;
+            }
+        }
+
+        /// <inheritdoc/>
+        public bool IsOffloaded => _isOffloaded;
+
+        /// <inheritdoc/>
+        public Guid OffloadId => _offloadId;
+
+        /// <inheritdoc/>
+        public bool Offload(IHistoryOffloadService offloadService)
+        {
+            if (_isOffloaded) return false;
+            if ((_pixelsBefore?.Length ?? 0) == 0 && (_pixelDeltas?.Count ?? 0) == 0 && (_tileChanges?.Count ?? 0) == 0)
+                return false;
+
+            try
+            {
+                _offloadId = Guid.NewGuid();
+                _offloadedMemorySize = EstimatedMemoryBytes;
+
+                using var ms = new MemoryStream();
+                using var bw = new BinaryWriter(ms);
+
+                // Write flags and bounds
+                bw.Write(_useSparsePixels);
+                bw.Write(_bounds.X);
+                bw.Write(_bounds.Y);
+                bw.Write(_bounds.Width);
+                bw.Write(_bounds.Height);
+
+                // Write pixel arrays
+                bw.Write(_pixelsBefore?.Length ?? 0);
+                if (_pixelsBefore != null && _pixelsBefore.Length > 0)
+                    bw.Write(_pixelsBefore);
+
+                bw.Write(_pixelsAfter?.Length ?? 0);
+                if (_pixelsAfter != null && _pixelsAfter.Length > 0)
+                    bw.Write(_pixelsAfter);
+
+                // Write sparse deltas
+                bw.Write(_pixelDeltas?.Count ?? 0);
+                if (_pixelDeltas != null)
+                {
+                    foreach (var (idx, before, after) in _pixelDeltas)
+                    {
+                        bw.Write(idx);
+                        bw.Write(before);
+                        bw.Write(after);
+                    }
+                }
+
+                // Write tile changes
+                bw.Write(_tileChanges?.Count ?? 0);
+                if (_tileChanges != null)
+                {
+                    foreach (var (tileId, change) in _tileChanges)
+                    {
+                        bw.Write(tileId);
+                        bw.Write(change.Before.Length);
+                        bw.Write(change.Before);
+                        bw.Write(change.After.Length);
+                        bw.Write(change.After);
+                        
+                        // Write positions for this tile
+                        var positions = _tilePositions?.GetValueOrDefault(tileId);
+                        bw.Write(positions?.Count ?? 0);
+                        if (positions != null)
+                        {
+                            foreach (var (tx, ty) in positions)
+                            {
+                                bw.Write(tx);
+                                bw.Write(ty);
+                            }
+                        }
+                    }
+                }
+
+                offloadService.WriteData(_offloadId, ms.ToArray());
+
+                // Release memory
+                _pixelsBefore = null;
+                _pixelsAfter = null;
+                _pixelDeltas?.Clear();
+                _pixelDeltas = null;
+                _tileChanges?.Clear();
+                _tileChanges = null;
+                _tilePositions?.Clear();
+                _tilePositions = null;
+
+                _isOffloaded = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Error("Failed to offload TileAwarePixelChangeItem: {Error}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <inheritdoc/>
+        public bool Reload(IHistoryOffloadService offloadService)
+        {
+            if (!_isOffloaded || _offloadId == Guid.Empty)
+                return true;
+
+            try
+            {
+                var data = offloadService.ReadData(_offloadId);
+                if (data == null)
+                {
+                    LoggingService.Error("Failed to reload TileAwarePixelChangeItem: data not found");
+                    return false;
+                }
+
+                using var ms = new MemoryStream(data);
+                using var br = new BinaryReader(ms);
+
+                // Read flags and bounds (bounds is readonly, skip reading)
+                _useSparsePixels = br.ReadBoolean();
+                br.ReadInt32(); // bounds.X
+                br.ReadInt32(); // bounds.Y
+                br.ReadInt32(); // bounds.Width
+                br.ReadInt32(); // bounds.Height
+
+                // Read pixel arrays
+                int beforeLen = br.ReadInt32();
+                _pixelsBefore = beforeLen > 0 ? br.ReadBytes(beforeLen) : [];
+
+                int afterLen = br.ReadInt32();
+                _pixelsAfter = afterLen > 0 ? br.ReadBytes(afterLen) : [];
+
+                // Read sparse deltas
+                int deltaCount = br.ReadInt32();
+                _pixelDeltas = new List<(int, uint, uint)>(deltaCount);
+                for (int i = 0; i < deltaCount; i++)
+                {
+                    int idx = br.ReadInt32();
+                    uint before = br.ReadUInt32();
+                    uint after = br.ReadUInt32();
+                    _pixelDeltas.Add((idx, before, after));
+                }
+
+                // Read tile changes
+                int tileChangeCount = br.ReadInt32();
+                _tileChanges = new Dictionary<int, TileChange>(tileChangeCount);
+                _tilePositions = new Dictionary<int, List<(int, int)>>(tileChangeCount);
+
+                for (int i = 0; i < tileChangeCount; i++)
+                {
+                    int tileId = br.ReadInt32();
+                    
+                    int beforeTileLen = br.ReadInt32();
+                    byte[] beforeTile = br.ReadBytes(beforeTileLen);
+                    int afterTileLen = br.ReadInt32();
+                    byte[] afterTile = br.ReadBytes(afterTileLen);
+                    
+                    _tileChanges[tileId] = new TileChange { Before = beforeTile, After = afterTile };
+
+                    int posCount = br.ReadInt32();
+                    var positions = new List<(int, int)>(posCount);
+                    for (int p = 0; p < posCount; p++)
+                    {
+                        int tx = br.ReadInt32();
+                        int ty = br.ReadInt32();
+                        positions.Add((tx, ty));
+                    }
+                    _tilePositions[tileId] = positions;
+                }
+
+                _isOffloaded = false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Error("Failed to reload TileAwarePixelChangeItem: {Error}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            _pixelsBefore = null;
+            _pixelsAfter = null;
+            _pixelDeltas?.Clear();
+            _pixelDeltas = null;
+            _tileChanges?.Clear();
+            _tileChanges = null;
+            _tilePositions?.Clear();
+            _tilePositions = null;
+        }
 
         // ====================================================================
         // CONSTRUCTION
@@ -70,12 +313,6 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Creates a tile-aware pixel change item by capturing the current state of affected tiles.
         /// </summary>
-        /// <param name="layer">The layer being modified.</param>
-        /// <param name="tileSet">The tile set (can be null if no tiles).</param>
-        /// <param name="bounds">The bounding rectangle of the change.</param>
-        /// <param name="pixelsBefore">Layer pixels before the change.</param>
-        /// <param name="pixelsAfter">Layer pixels after the change.</param>
-        /// <param name="description">Description of the operation.</param>
         public TileAwarePixelChangeItem(
             RasterLayer layer,
             TileSet? tileSet,
@@ -92,6 +329,9 @@ namespace PixlPunkt.Core.History
             _pixelsAfter = (byte[])pixelsAfter.Clone();
             _description = description;
             _useSparsePixels = false;
+            _tileChanges = new();
+            _tilePositions = new();
+            _pixelDeltas = new();
 
             // Capture affected tile states
             CaptureAffectedTileStates();
@@ -100,9 +340,6 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Creates a tile-aware pixel change item for sparse pixel changes (tile modifier use case).
         /// </summary>
-        /// <param name="layer">The layer being modified.</param>
-        /// <param name="tileSet">The tile set (can be null if no tiles).</param>
-        /// <param name="description">Description of the operation.</param>
         public TileAwarePixelChangeItem(
             RasterLayer layer,
             TileSet? tileSet,
@@ -116,6 +353,9 @@ namespace PixlPunkt.Core.History
             _pixelsAfter = [];
             _description = description;
             _useSparsePixels = true;
+            _tileChanges = new();
+            _tilePositions = new();
+            _pixelDeltas = new();
         }
 
         /// <summary>
@@ -123,9 +363,12 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void AddPixelChange(int byteIdx, uint before, uint after)
         {
+            if (_isOffloaded)
+                throw new InvalidOperationException("Cannot modify offloaded history item");
+            
             if (before != after)
             {
-                _pixelDeltas.Add((byteIdx, before, after));
+                _pixelDeltas!.Add((byteIdx, before, after));
             }
         }
 
@@ -134,27 +377,31 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void RecordTileChange(int tileId, byte[] before, byte[] after, List<(int tileX, int tileY)> positions)
         {
-            _tileChanges[tileId] = new TileChange
+            if (_isOffloaded)
+                throw new InvalidOperationException("Cannot modify offloaded history item");
+            
+            _tileChanges![tileId] = new TileChange
             {
                 Before = (byte[])before.Clone(),
                 After = (byte[])after.Clone()
             };
-            _tilePositions[tileId] = new List<(int, int)>(positions);
+            _tilePositions![tileId] = new List<(int, int)>(positions);
         }
 
         /// <summary>
         /// Sets pre-captured tile before states, overriding the auto-captured states.
-        /// Use this when you captured tile states before the operation was performed.
         /// </summary>
         public void SetTileBeforeStates(Dictionary<int, byte[]> tileBeforeStates)
         {
+            if (_isOffloaded)
+                throw new InvalidOperationException("Cannot modify offloaded history item");
+            
             if (_tileSet == null || _mapping == null)
                 return;
 
             int tileW = _tileSet.TileWidth;
             int tileH = _tileSet.TileHeight;
 
-            // Find tiles that intersect the bounds
             int startTileX = Math.Max(0, _bounds.X / tileW);
             int startTileY = Math.Max(0, _bounds.Y / tileH);
             int endTileX = Math.Min(_mapping.Width - 1, (_bounds.X + _bounds.Width - 1) / tileW);
@@ -173,21 +420,18 @@ namespace PixlPunkt.Core.History
                 }
             }
 
-            _tileChanges.Clear();
-            _tilePositions.Clear();
+            _tileChanges!.Clear();
+            _tilePositions!.Clear();
 
             foreach (var tileId in affectedTileIds)
             {
-                // Get the pre-captured before state
                 if (!tileBeforeStates.TryGetValue(tileId, out var beforePixels))
                     continue;
 
-                // Get the current (after) state from the tile set
                 var afterPixels = _tileSet.GetTilePixels(tileId);
                 if (afterPixels == null)
                     continue;
 
-                // Find all positions mapped to this tile
                 var positions = new List<(int tileX, int tileY)>();
                 for (int ty = 0; ty < _mapping.Height; ty++)
                 {
@@ -209,9 +453,6 @@ namespace PixlPunkt.Core.History
             }
         }
 
-        /// <summary>
-        /// Captures the before/after state of tiles affected by the change.
-        /// </summary>
         private void CaptureAffectedTileStates()
         {
             if (_tileSet == null || _mapping == null)
@@ -220,7 +461,6 @@ namespace PixlPunkt.Core.History
             int tileW = _tileSet.TileWidth;
             int tileH = _tileSet.TileHeight;
 
-            // Find tiles that intersect the bounds
             int startTileX = Math.Max(0, _bounds.X / tileW);
             int startTileY = Math.Max(0, _bounds.Y / tileH);
             int endTileX = Math.Min(_mapping.Width - 1, (_bounds.X + _bounds.Width - 1) / tileW);
@@ -239,14 +479,12 @@ namespace PixlPunkt.Core.History
                 }
             }
 
-            // For each affected tile, capture before/after states
             foreach (var tileId in affectedTileIds)
             {
                 var currentPixels = _tileSet.GetTilePixels(tileId);
                 if (currentPixels == null)
                     continue;
 
-                // Find all positions mapped to this tile
                 var positions = new List<(int tileX, int tileY)>();
                 for (int ty = 0; ty < _mapping.Height; ty++)
                 {
@@ -259,22 +497,18 @@ namespace PixlPunkt.Core.History
                     }
                 }
 
-                // Current state is "after", we need to compute "before" from pixelsBefore
                 byte[] afterPixels = (byte[])currentPixels.Clone();
-                byte[] beforePixels = ComputeTileStateFromLayerSnapshot(_pixelsBefore, tileId, positions);
+                byte[] beforePixels = ComputeTileStateFromLayerSnapshot(_pixelsBefore!, tileId, positions);
 
-                _tileChanges[tileId] = new TileChange
+                _tileChanges![tileId] = new TileChange
                 {
                     Before = beforePixels,
                     After = afterPixels
                 };
-                _tilePositions[tileId] = positions;
+                _tilePositions![tileId] = positions;
             }
         }
 
-        /// <summary>
-        /// Computes what a tile's pixels should be based on a layer snapshot.
-        /// </summary>
         private byte[] ComputeTileStateFromLayerSnapshot(byte[] layerSnapshot, int tileId, List<(int tileX, int tileY)> positions)
         {
             if (_tileSet == null)
@@ -282,27 +516,22 @@ namespace PixlPunkt.Core.History
 
             int tileW = _tileSet.TileWidth;
             int tileH = _tileSet.TileHeight;
-            int layerW = _layer.Surface.Width;
 
-            // Start with current tile pixels
             var result = _tileSet.GetTilePixels(tileId);
             if (result == null)
                 return [];
 
             result = (byte[])result.Clone();
 
-            // For each position of this tile that intersects bounds, extract from snapshot
             foreach (var (tx, ty) in positions)
             {
                 int tileDocX = tx * tileW;
                 int tileDocY = ty * tileH;
 
-                // Check if this position intersects the bounds
                 if (tileDocX + tileW <= _bounds.X || tileDocX >= _bounds.X + _bounds.Width ||
                     tileDocY + tileH <= _bounds.Y || tileDocY >= _bounds.Y + _bounds.Height)
                     continue;
 
-                // Extract pixels from snapshot
                 for (int py = 0; py < tileH; py++)
                 {
                     int docY = tileDocY + py;
@@ -315,7 +544,6 @@ namespace PixlPunkt.Core.History
                         if (docX < _bounds.X || docX >= _bounds.X + _bounds.Width)
                             continue;
 
-                        // Index into the snapshot (which is bounds-relative)
                         int snapshotX = docX - _bounds.X;
                         int snapshotY = docY - _bounds.Y;
                         int srcIdx = (snapshotY * _bounds.Width + snapshotX) * 4;
@@ -335,16 +563,14 @@ namespace PixlPunkt.Core.History
             return result;
         }
 
-        // ====================================================================
-        // NON-TILE PIXEL CHANGES (for TileModifier sparse updates)
-        // ====================================================================
-
         /// <summary>
         /// Adds a non-tile pixel change for undo/redo.
         /// </summary>
         public void AddNonTileChange(int byteIdx, uint before, uint after)
         {
-            _pixelDeltas.Add((byteIdx, before, after));
+            if (_isOffloaded)
+                throw new InvalidOperationException("Cannot modify offloaded history item");
+            _pixelDeltas!.Add((byteIdx, before, after));
         }
 
         // ====================================================================
@@ -354,32 +580,34 @@ namespace PixlPunkt.Core.History
         /// <inheritdoc/>
         public void Undo()
         {
+            if (_isOffloaded)
+                throw new InvalidOperationException("History item must be reloaded before undo");
+            
             var layerPixels = _layer.Surface.Pixels;
 
             var layerName = _layer.Name ?? "(layer)";
             LoggingService.Info("Undo tile-aware change on layer={Layer} desc={Desc} sparse={Sparse} tileChangeCount={TileCount}",
-                layerName, _description, _useSparsePixels, _tileChanges.Count);
+                layerName, _description, _useSparsePixels, _tileChanges?.Count ?? 0);
 
             if (_useSparsePixels)
             {
-                foreach (var (idx, before, _) in _pixelDeltas)
+                foreach (var (idx, before, _) in _pixelDeltas!)
                 {
                     WritePixel(layerPixels, idx, before);
                 }
             }
             else
             {
-                WritePixelsToLayer(_pixelsBefore);
+                WritePixelsToLayer(_pixelsBefore!);
             }
 
-            // Restore tile definitions and propagate
-            if (_tileSet != null)
+            if (_tileSet != null && _tileChanges != null)
             {
                 foreach (var (tileId, change) in _tileChanges)
                 {
                     _tileSet.UpdateTilePixels(tileId, change.Before);
 
-                    if (_tilePositions.TryGetValue(tileId, out var positions))
+                    if (_tilePositions?.TryGetValue(tileId, out var positions) == true)
                     {
                         int tileW = _tileSet.TileWidth;
                         int tileH = _tileSet.TileHeight;
@@ -392,7 +620,7 @@ namespace PixlPunkt.Core.History
                         }
                     }
 
-                    LoggingService.Debug("Restored tile {TileId}; mappedPositions={Positions}", tileId, _tilePositions.TryGetValue(tileId, out var p) ? p.Count : 0);
+                    LoggingService.Debug("Restored tile {TileId}; mappedPositions={Positions}", tileId, _tilePositions?.TryGetValue(tileId, out var p) == true ? p.Count : 0);
                 }
             }
 
@@ -402,32 +630,34 @@ namespace PixlPunkt.Core.History
         /// <inheritdoc/>
         public void Redo()
         {
+            if (_isOffloaded)
+                throw new InvalidOperationException("History item must be reloaded before redo");
+            
             var layerPixels = _layer.Surface.Pixels;
 
             var layerName = _layer.Name ?? "(layer)";
             LoggingService.Info("Redo tile-aware change on layer={Layer} desc={Desc} sparse={Sparse} tileChangeCount={TileCount}",
-                layerName, _description, _useSparsePixels, _tileChanges.Count);
+                layerName, _description, _useSparsePixels, _tileChanges?.Count ?? 0);
 
             if (_useSparsePixels)
             {
-                foreach (var (idx, _, after) in _pixelDeltas)
+                foreach (var (idx, _, after) in _pixelDeltas!)
                 {
                     WritePixel(layerPixels, idx, after);
                 }
             }
             else
             {
-                WritePixelsToLayer(_pixelsAfter);
+                WritePixelsToLayer(_pixelsAfter!);
             }
 
-            // Apply tile definitions and propagate
-            if (_tileSet != null)
+            if (_tileSet != null && _tileChanges != null)
             {
                 foreach (var (tileId, change) in _tileChanges)
                 {
                     _tileSet.UpdateTilePixels(tileId, change.After);
 
-                    if (_tilePositions.TryGetValue(tileId, out var positions))
+                    if (_tilePositions?.TryGetValue(tileId, out var positions) == true)
                     {
                         int tileW = _tileSet.TileWidth;
                         int tileH = _tileSet.TileHeight;
@@ -440,7 +670,7 @@ namespace PixlPunkt.Core.History
                         }
                     }
 
-                    LoggingService.Debug("Applied tile {TileId}; mappedPositions={Positions}", tileId, _tilePositions.TryGetValue(tileId, out var p) ? p.Count : 0);
+                    LoggingService.Debug("Applied tile {TileId}; mappedPositions={Positions}", tileId, _tilePositions?.TryGetValue(tileId, out var p) == true ? p.Count : 0);
                 }
             }
 

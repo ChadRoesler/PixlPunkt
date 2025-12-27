@@ -12,6 +12,16 @@ namespace PixlPunkt.Core.Export
     /// <summary>
     /// Provides timelapse export functionality by rendering history states as animation frames.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// TimelapseExportService works with the history memory management system to support
+    /// full timelapse export even when history items have been offloaded to disk.
+    /// </para>
+    /// <para>
+    /// When history items are offloaded, they are automatically reloaded during JumpTo
+    /// operations, ensuring seamless timelapse rendering regardless of memory constraints.
+    /// </para>
+    /// </remarks>
     public sealed class TimelapseExportService
     {
         //////////////////////////////////////////////////////////////////
@@ -57,6 +67,11 @@ namespace PixlPunkt.Core.Export
         /// <param name="progress">Optional progress callback (0-1).</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of rendered frames.</returns>
+        /// <remarks>
+        /// This method automatically handles offloaded history items. When the memory manager
+        /// has offloaded old history steps to disk, they are transparently reloaded during
+        /// the timelapse rendering process.
+        /// </remarks>
         public async Task<List<RenderedFrame>> RenderTimelapseAsync(
             CanvasDocument document,
             TimelapseExportSettings settings,
@@ -88,9 +103,20 @@ namespace PixlPunkt.Core.Export
             // Get timeline for descriptions
             var timeline = history.GetTimeline();
 
+            // Log memory status for timelapse export
+            var memManager = history.MemoryManager;
+            if (memManager != null)
+            {
+                LoggingService.Info("Timelapse export starting: {TotalSteps} steps, memory={Mem}MB, offloaded={Offloaded}MB ({OffloadedCount} items)",
+                    totalSteps,
+                    memManager.CurrentMemoryBytes / (1024 * 1024),
+                    memManager.OffloadedBytes / (1024 * 1024),
+                    memManager.OffloadedItemCount);
+            }
+
             try
             {
-                // Jump to start of range
+                // Jump to start of range - this will reload any offloaded items as needed
                 history.JumpTo(rangeStart);
                 await Task.Yield(); // Allow UI to update
 
@@ -101,7 +127,7 @@ namespace PixlPunkt.Core.Export
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // Jump to this history position
+                    // Jump to this history position (automatically reloads offloaded items)
                     history.JumpTo(step);
 
                     // Composite the document at this state

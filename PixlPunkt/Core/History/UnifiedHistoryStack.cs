@@ -21,13 +21,18 @@ namespace PixlPunkt.Core.History
     /// - Descriptions available for "Undo: X" menu items
     /// - Dirty tracking via <see cref="IsDirty"/> for unsaved changes detection
     /// </para>
+    /// <para>
+    /// Memory management is provided via <see cref="HistoryMemoryManager"/> which
+    /// can automatically offload old history items to disk when memory limits are exceeded.
+    /// </para>
     /// </remarks>
-    public sealed class UnifiedHistoryStack
+    public sealed class UnifiedHistoryStack : IDisposable
     {
         private readonly Stack<IHistoryItem> _undo = new();
         private readonly Stack<IHistoryItem> _redo = new();
 
         private bool _suppressChanged;
+        private HistoryMemoryManager? _memoryManager;
 
         /// <summary>
         /// Tracks the undo stack count at the last save point.
@@ -69,6 +74,20 @@ namespace PixlPunkt.Core.History
 
         public int TotalCount => _undo.Count + _redo.Count;
 
+        /// <summary>
+        /// Gets the memory manager for this history stack, if enabled.
+        /// </summary>
+        public HistoryMemoryManager? MemoryManager => _memoryManager;
+
+        /// <summary>
+        /// Gets the current estimated memory usage of history in bytes.
+        /// </summary>
+        public long EstimatedMemoryBytes => _memoryManager?.CurrentMemoryBytes ?? 0;
+
+        /// <summary>
+        /// Gets the total bytes offloaded to disk.
+        /// </summary>
+        public long OffloadedBytes => _memoryManager?.OffloadedBytes ?? 0;
 
         /// <summary>
         /// Gets a value indicating whether the document has unsaved changes.
@@ -87,6 +106,45 @@ namespace PixlPunkt.Core.History
         /// Fired when the history state changes (after push, undo, or redo).
         /// </summary>
         public event Action? HistoryChanged;
+
+        /// <summary>
+        /// Creates a new unified history stack.
+        /// </summary>
+        public UnifiedHistoryStack()
+        {
+        }
+
+        /// <summary>
+        /// Enables memory management with the specified limit.
+        /// </summary>
+        /// <param name="memoryLimitBytes">Maximum memory to use before offloading. Default is 256MB.</param>
+        /// <param name="documentId">Optional document ID for offload folder naming.</param>
+        /// <returns>The memory manager instance.</returns>
+        public HistoryMemoryManager EnableMemoryManagement(long memoryLimitBytes = HistoryMemoryManager.DefaultMemoryLimitBytes, string? documentId = null)
+        {
+            if (_memoryManager != null)
+            {
+                _memoryManager.MemoryLimitBytes = memoryLimitBytes;
+                return _memoryManager;
+            }
+
+            _memoryManager = new HistoryMemoryManager(this, documentId)
+            {
+                MemoryLimitBytes = memoryLimitBytes
+            };
+
+            LoggingService.Info("History memory management enabled: limit={Limit}MB", memoryLimitBytes / (1024 * 1024));
+            return _memoryManager;
+        }
+
+        /// <summary>
+        /// Disables memory management.
+        /// </summary>
+        public void DisableMemoryManagement()
+        {
+            _memoryManager?.Dispose();
+            _memoryManager = null;
+        }
 
         private void RaiseChanged()
         {
@@ -109,19 +167,29 @@ namespace PixlPunkt.Core.History
             // Skip empty pixel changes
             if (item is PixelChangeItem pci && pci.IsEmpty) return;
 
+            // Dispose redo items that support it
+            foreach (var redoItem in _redo)
+            {
+                if (redoItem is IDisposableHistoryItem disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+
             _undo.Push(item);
             _redo.Clear();
-            LoggingService.Info("History pushed item={Item} undoCount={UndoCount}", item.Description, _undo.Count);
+
+            // Track memory usage
+            _memoryManager?.TrackItem(item);
+
+            LoggingService.Info("History pushed item={Item} undoCount={UndoCount} memUsage={Mem}MB",
+                item.Description, _undo.Count, EstimatedMemoryBytes / (1024 * 1024));
+
             RaiseChanged();
         }
 
-
-
-
         public bool Undo() => UndoInternal(raise: true);
         public bool Redo() => RedoInternal(raise: true);
-
-
 
         /// <summary>
         /// Undoes the most recent operation.
@@ -132,6 +200,10 @@ namespace PixlPunkt.Core.History
             if (!CanUndo) return false;
 
             var item = _undo.Pop();
+
+            // Ensure item is loaded if it was offloaded
+            _memoryManager?.EnsureLoaded(item);
+
             item.Undo();
             _redo.Push(item);
             LoggingService.Info("History undo item={Item} undoCount={UndoCount} redoCount={RedoCount}", item.Description, _undo.Count, _redo.Count);
@@ -148,6 +220,10 @@ namespace PixlPunkt.Core.History
             if (!CanRedo) return false;
 
             var item = _redo.Pop();
+
+            // Ensure item is loaded if it was offloaded
+            _memoryManager?.EnsureLoaded(item);
+
             item.Redo();
             _undo.Push(item);
             LoggingService.Info("History redo item={Item} undoCount={UndoCount} redoCount={RedoCount}", item.Description, _undo.Count, _redo.Count);
@@ -160,6 +236,18 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void Clear(bool resetSaveState = true)
         {
+            // Dispose all items that support it
+            foreach (var item in _undo)
+            {
+                if (item is IDisposableHistoryItem disposable)
+                    disposable.Dispose();
+            }
+            foreach (var item in _redo)
+            {
+                if (item is IDisposableHistoryItem disposable)
+                    disposable.Dispose();
+            }
+
             _undo.Clear();
             _redo.Clear();
             LoggingService.Info("History cleared");
@@ -237,6 +325,16 @@ namespace PixlPunkt.Core.History
             }
 
             RaiseChanged();
+        }
+
+        /// <summary>
+        /// Disposes of resources including the memory manager.
+        /// </summary>
+        public void Dispose()
+        {
+            Clear(resetSaveState: false);
+            _memoryManager?.Dispose();
+            _memoryManager = null;
         }
     }
 }

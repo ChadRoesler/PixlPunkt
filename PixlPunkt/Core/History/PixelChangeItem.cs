@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using FluentIcons.Common;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Logging;
@@ -23,15 +24,24 @@ namespace PixlPunkt.Core.History
     /// Implements both <see cref="IHistoryItem"/> for undo/redo support and
     /// <see cref="IRenderResult"/> for unified tool result handling.
     /// </para>
+    /// <para>
+    /// Implements <see cref="IDisposableHistoryItem"/> to support memory management:
+    /// old history items can be offloaded to disk and reloaded when needed.
+    /// </para>
     /// </remarks>
-    public sealed class PixelChangeItem : IHistoryItem, IRenderResult
+    public sealed class PixelChangeItem : IDisposableHistoryItem, IRenderResult
     {
         private readonly RasterLayer _layer;
         private readonly string _description;
         private readonly Icon _historyIcon;
-        private readonly List<int> _indices = new();
-        private readonly List<uint> _before = new();
-        private readonly List<uint> _after = new();
+        private List<int>? _indices;
+        private List<uint>? _before;
+        private List<uint>? _after;
+        
+        // Offload state
+        private Guid _offloadId = Guid.Empty;
+        private bool _isOffloaded;
+        private int _offloadedCount; // Track count for UI even when offloaded
 
         // ====================================================================
         // IHistoryItem / IRenderResult SHARED PROPERTIES
@@ -50,7 +60,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Gets whether this change item has any actual pixel changes.
         /// </summary>
-        public bool IsEmpty => _indices.Count == 0;
+        public bool IsEmpty => (_indices?.Count ?? _offloadedCount) == 0;
 
         // ====================================================================
         // IRenderResult IMPLEMENTATION
@@ -63,6 +73,126 @@ namespace PixlPunkt.Core.History
         public bool CanPushToHistory => HasChanges;
 
         // ====================================================================
+        // IDisposableHistoryItem IMPLEMENTATION
+        // ====================================================================
+
+        /// <summary>
+        /// Gets the estimated memory usage in bytes.
+        /// </summary>
+        /// <remarks>
+        /// Calculation: Each change stores an int index (4 bytes) + uint before (4 bytes) + uint after (4 bytes) = 12 bytes per change.
+        /// Plus List overhead and object overhead.
+        /// </remarks>
+        public long EstimatedMemoryBytes
+        {
+            get
+            {
+                if (_isOffloaded) return 100; // Minimal overhead when offloaded
+                
+                int count = _indices?.Count ?? 0;
+                // 12 bytes per change (index + before + after) + List overhead (~24 bytes per list) + object overhead (~40 bytes)
+                return count * 12L + 72 + 40;
+            }
+        }
+
+        /// <inheritdoc/>
+        public bool IsOffloaded => _isOffloaded;
+
+        /// <inheritdoc/>
+        public Guid OffloadId => _offloadId;
+
+        /// <inheritdoc/>
+        public bool Offload(IHistoryOffloadService offloadService)
+        {
+            if (_isOffloaded || _indices == null || _indices.Count == 0)
+                return false;
+
+            try
+            {
+                _offloadId = Guid.NewGuid();
+                _offloadedCount = _indices.Count;
+
+                // Serialize: [count:int][indices:int[]][before:uint[]][after:uint[]]
+                using var ms = new MemoryStream();
+                using var bw = new BinaryWriter(ms);
+
+                bw.Write(_indices.Count);
+                foreach (var idx in _indices) bw.Write(idx);
+                foreach (var b in _before!) bw.Write(b);
+                foreach (var a in _after!) bw.Write(a);
+
+                offloadService.WriteData(_offloadId, ms.ToArray());
+
+                // Release memory
+                _indices.Clear();
+                _indices.TrimExcess();
+                _indices = null;
+                _before!.Clear();
+                _before.TrimExcess();
+                _before = null;
+                _after!.Clear();
+                _after.TrimExcess();
+                _after = null;
+
+                _isOffloaded = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Error("Failed to offload PixelChangeItem: {Error}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <inheritdoc/>
+        public bool Reload(IHistoryOffloadService offloadService)
+        {
+            if (!_isOffloaded || _offloadId == Guid.Empty)
+                return true; // Already loaded
+
+            try
+            {
+                var data = offloadService.ReadData(_offloadId);
+                if (data == null)
+                {
+                    LoggingService.Error("Failed to reload PixelChangeItem: data not found");
+                    return false;
+                }
+
+                using var ms = new MemoryStream(data);
+                using var br = new BinaryReader(ms);
+
+                int count = br.ReadInt32();
+                _indices = new List<int>(count);
+                _before = new List<uint>(count);
+                _after = new List<uint>(count);
+
+                for (int i = 0; i < count; i++) _indices.Add(br.ReadInt32());
+                for (int i = 0; i < count; i++) _before.Add(br.ReadUInt32());
+                for (int i = 0; i < count; i++) _after.Add(br.ReadUInt32());
+
+                _isOffloaded = false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Error("Failed to reload PixelChangeItem: {Error}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            _indices?.Clear();
+            _indices = null;
+            _before?.Clear();
+            _before = null;
+            _after?.Clear();
+            _after = null;
+        }
+
+        // ====================================================================
         // BOUNDING RECT
         // ====================================================================
 
@@ -72,7 +202,7 @@ namespace PixlPunkt.Core.History
         /// <returns>The bounding rectangle (minX, minY, maxX, maxY), or null if no changes.</returns>
         public (int minX, int minY, int maxX, int maxY)? GetBoundingRect()
         {
-            if (_indices.Count == 0)
+            if (_indices == null || _indices.Count == 0)
                 return null;
 
             int surfW = _layer.Surface.Width;
@@ -111,6 +241,9 @@ namespace PixlPunkt.Core.History
             _layer = layer ?? throw new ArgumentNullException(nameof(layer));
             _description = description;
             _historyIcon = historyIcon;
+            _indices = new();
+            _before = new();
+            _after = new();
         }
 
         /// <summary>
@@ -121,9 +254,12 @@ namespace PixlPunkt.Core.History
         /// <param name="afterValue">The BGRA value after the change.</param>
         public void Add(int byteIndex, uint beforeValue, uint afterValue)
         {
-            _indices.Add(byteIndex);
-            _before.Add(beforeValue);
-            _after.Add(afterValue);
+            if (_isOffloaded)
+                throw new InvalidOperationException("Cannot add to offloaded history item");
+            
+            _indices!.Add(byteIndex);
+            _before!.Add(beforeValue);
+            _after!.Add(afterValue);
         }
 
         /// <summary>
@@ -135,6 +271,9 @@ namespace PixlPunkt.Core.History
         /// <param name="after">Pixel data after the change (BGRA, row-major).</param>
         public void AppendRegionDelta(RectInt32 rect, byte[] before, byte[] after)
         {
+            if (_isOffloaded)
+                throw new InvalidOperationException("Cannot modify offloaded history item");
+            
             int w = rect.Width, h = rect.Height;
             int surfW = _layer.Surface.Width;
             if (w <= 0 || h <= 0) return;
@@ -160,11 +299,14 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void Undo()
         {
+            if (_isOffloaded)
+                throw new InvalidOperationException("History item must be reloaded before undo");
+            
             var pixels = _layer.Surface.Pixels;
-            for (int i = 0; i < _indices.Count; i++)
+            for (int i = 0; i < _indices!.Count; i++)
             {
                 int idx = _indices[i];
-                uint val = _before[i];
+                uint val = _before![i];
                 WritePixel(pixels, idx, val);
             }
 
@@ -179,11 +321,14 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void Redo()
         {
+            if (_isOffloaded)
+                throw new InvalidOperationException("History item must be reloaded before redo");
+            
             var pixels = _layer.Surface.Pixels;
-            for (int i = 0; i < _indices.Count; i++)
+            for (int i = 0; i < _indices!.Count; i++)
             {
                 int idx = _indices[i];
-                uint val = _after[i];
+                uint val = _after![i];
                 WritePixel(pixels, idx, val);
             }
 
@@ -216,7 +361,7 @@ namespace PixlPunkt.Core.History
             item.AppendRegionDelta(rect, before, after);
 
             var layerName = layer.Name ?? "(layer)";
-            LoggingService.Info("Captured PixelChangeItem for layer={Layer} desc={Desc} count={Count}", layerName, description, item.IsEmpty ? 0 : item._indices.Count);
+            LoggingService.Info("Captured PixelChangeItem for layer={Layer} desc={Desc} count={Count}", layerName, description, item.IsEmpty ? 0 : item._indices!.Count);
 
             return item;
         }
@@ -237,7 +382,7 @@ namespace PixlPunkt.Core.History
             }
 
             var layerName = layer.Name ?? "(layer)";
-            LoggingService.Info("Captured PixelChangeItem for layer={Layer} desc={Desc} count={Count}", layerName, description, item.IsEmpty ? 0 : item._indices.Count);
+            LoggingService.Info("Captured PixelChangeItem for layer={Layer} desc={Desc} count={Count}", layerName, description, item.IsEmpty ? 0 : item._indices!.Count);
 
             return item;
         }

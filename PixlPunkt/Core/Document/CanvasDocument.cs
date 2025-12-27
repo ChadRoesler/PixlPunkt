@@ -183,6 +183,11 @@ namespace PixlPunkt.Core.Document
             Surface = new PixelSurface(pxW, pxH);
             Surface.Clear(0x00000000);
 
+            // Enable memory management for history with 256MB limit
+            // This allows automatic offloading of old history items to disk
+            // while preserving full timeline for timelapse export
+            History.EnableMemoryManagement(documentId: name);
+
             // Initialize tile set with document's tile dimensions
             TileSet = new TileSet(tileSize.Width, tileSize.Height);
             TileSet.TileAdded += _ => TileSetChanged?.Invoke();

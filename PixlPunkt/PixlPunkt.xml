@@ -8567,6 +8567,16 @@
             <summary>
             Provides timelapse export functionality by rendering history states as animation frames.
             </summary>
+            <remarks>
+            <para>
+            TimelapseExportService works with the history memory management system to support
+            full timelapse export even when history items have been offloaded to disk.
+            </para>
+            <para>
+            When history items are offloaded, they are automatically reloaded during JumpTo
+            operations, ensuring seamless timelapse rendering regardless of memory constraints.
+            </para>
+            </remarks>
         </member>
         <member name="T:PixlPunkt.Core.Export.TimelapseExportService.RenderedFrame">
             <summary>
@@ -8603,6 +8613,11 @@
             <param name="progress">Optional progress callback (0-1).</param>
             <param name="cancellationToken">Cancellation token.</param>
             <returns>List of rendered frames.</returns>
+            <remarks>
+            This method automatically handles offloaded history items. When the memory manager
+            has offloaded old history steps to disk, they are transparently reloaded during
+            the timelapse rendering process.
+            </remarks>
         </member>
         <member name="T:PixlPunkt.Core.Export.TimelapseExportSettings">
             <summary>
@@ -9163,6 +9178,293 @@
             Redoes the reorder by moving the folder to its new position.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.History.HistoryMemoryManager">
+            <summary>
+            Manages memory usage for the history stack with automatic offloading.
+            </summary>
+            <remarks>
+            <para>
+            <see cref="T:PixlPunkt.Core.History.HistoryMemoryManager"/> wraps a <see cref="T:PixlPunkt.Core.History.UnifiedHistoryStack"/> and monitors
+            memory usage. When usage exceeds the configured limit, it offloads older history items
+            to disk while preserving their metadata for the timeline UI.
+            </para>
+            <para>
+            Key behaviors:
+            </para>
+            <list type="bullet">
+            <item>Tracks estimated memory of all disposable history items</item>
+            <item>Offloads oldest items first when memory limit exceeded</item>
+            <item>Automatically reloads items when needed for undo/redo</item>
+            <item>Preserves full timeline for timelapse export</item>
+            </list>
+            </remarks>
+        </member>
+        <member name="F:PixlPunkt.Core.History.HistoryMemoryManager.DefaultMemoryLimitBytes">
+            <summary>
+            Default memory limit: 256 MB
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.History.HistoryMemoryManager.MinimumInMemoryBytes">
+            <summary>
+            Minimum memory to keep in RAM (32 MB) - recent items always stay in memory
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryMemoryManager.MemoryLimitBytes">
+            <summary>
+            Gets or sets the memory limit in bytes.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryMemoryManager.CurrentMemoryBytes">
+            <summary>
+            Gets the current estimated memory usage in bytes.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryMemoryManager.OffloadedBytes">
+            <summary>
+            Gets the total bytes offloaded to disk.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryMemoryManager.OffloadedItemCount">
+            <summary>
+            Gets the number of items currently offloaded.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryMemoryManager.IsEnabled">
+            <summary>
+            Gets whether memory management is enabled.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.Core.History.HistoryMemoryManager.ItemOffloaded">
+            <summary>
+            Raised when an item is offloaded.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.Core.History.HistoryMemoryManager.ItemReloaded">
+            <summary>
+            Raised when an item is reloaded.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryMemoryManager.#ctor(PixlPunkt.Core.History.UnifiedHistoryStack,System.String)">
+            <summary>
+            Creates a new history memory manager.
+            </summary>
+            <param name="stack">The history stack to manage.</param>
+            <param name="documentId">Optional document ID for offload folder naming.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryMemoryManager.TrackItem(PixlPunkt.Core.History.IHistoryItem)">
+            <summary>
+            Registers a history item for memory tracking.
+            </summary>
+            <param name="item">The item that was just pushed.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryMemoryManager.EnsureLoaded(PixlPunkt.Core.History.IHistoryItem)">
+            <summary>
+            Ensures an item is loaded in memory before undo/redo.
+            </summary>
+            <param name="item">The item to ensure is loaded.</param>
+            <returns>True if item is ready for use.</returns>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryMemoryManager.OffloadService">
+            <summary>
+            Gets the offload service for timelapse export access.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryMemoryManager.CheckMemory">
+            <summary>
+            Forces recalculation of memory and offloading check.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryMemoryManager.Dispose">
+            <summary>
+            Disposes of resources and cleans up offloaded files.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.HistoryOffloadService">
+            <summary>
+            Service that manages offloading history item data to disk for memory conservation.
+            </summary>
+            <remarks>
+            <para>
+            <see cref="T:PixlPunkt.Core.History.HistoryOffloadService"/> provides persistent storage for history item data
+            when memory limits are exceeded. This allows:
+            </para>
+            <list type="bullet">
+            <item>Unlimited undo history without unbounded memory growth</item>
+            <item>Full timelapse export even with memory-constrained history</item>
+            <item>Automatic cleanup when documents are closed</item>
+            </list>
+            <para>
+            Data is stored in a temporary folder specific to each document session.
+            Files are named by GUID and automatically cleaned up on disposal.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryOffloadService.TotalOffloadedBytes">
+            <summary>
+            Gets the total size of offloaded data in bytes.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.HistoryOffloadService.OffloadedItemCount">
+            <summary>
+            Gets the number of offloaded items.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryOffloadService.#ctor(System.String)">
+            <summary>
+            Creates a new history offload service.
+            </summary>
+            <param name="documentId">Unique identifier for the document (used for folder naming).</param>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryOffloadService.WriteData(System.Guid,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryOffloadService.ReadData(System.Guid)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryOffloadService.RemoveData(System.Guid)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryOffloadService.GetDataPath(System.Guid)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryOffloadService.ClearAll">
+            <summary>
+            Clears all offloaded data and removes the directory.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.HistoryOffloadService.Dispose">
+            <inheritdoc/>
+        </member>
+        <member name="T:PixlPunkt.Core.History.IDisposableHistoryItem">
+            <summary>
+            Extended history item interface for items that can release memory resources.
+            </summary>
+            <remarks>
+            <para>
+            <see cref="T:PixlPunkt.Core.History.IDisposableHistoryItem"/> extends <see cref="T:PixlPunkt.Core.History.IHistoryItem"/> with memory management
+            capabilities. History items that hold significant memory (pixel data, byte arrays) should
+            implement this interface to participate in the memory-constrained history system.
+            </para>
+            <para>
+            Key features:
+            </para>
+            <list type="bullet">
+            <item><see cref="P:PixlPunkt.Core.History.IDisposableHistoryItem.EstimatedMemoryBytes"/>: Reports approximate memory usage for tracking</item>
+            <item><see cref="P:PixlPunkt.Core.History.IDisposableHistoryItem.IsOffloaded"/>: Indicates if data has been offloaded to disk</item>
+            <item><see cref="M:PixlPunkt.Core.History.IDisposableHistoryItem.Offload(PixlPunkt.Core.History.IHistoryOffloadService)"/>: Serializes heavy data to disk and releases memory</item>
+            <item><see cref="M:PixlPunkt.Core.History.IDisposableHistoryItem.Reload(PixlPunkt.Core.History.IHistoryOffloadService)"/>: Restores data from disk when needed for undo/redo</item>
+            </list>
+            <para>
+            The history memory manager uses these methods to keep memory usage within configured limits
+            while preserving the full history timeline for timelapse export.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.History.IDisposableHistoryItem.EstimatedMemoryBytes">
+            <summary>
+            Gets the estimated memory usage of this history item in bytes.
+            </summary>
+            <remarks>
+            <para>
+            This should be a reasonable approximation including:
+            - Byte arrays (pixel data, snapshots)
+            - Lists of indices and values
+            - Any other significant allocations
+            </para>
+            <para>
+            For <see cref="T:PixlPunkt.Core.History.PixelChangeItem"/>, this includes:
+            - _indices list: Count * sizeof(int)
+            - _before list: Count * sizeof(uint)
+            - _after list: Count * sizeof(uint)
+            - Object overhead (~40 bytes)
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.History.IDisposableHistoryItem.IsOffloaded">
+            <summary>
+            Gets whether this item's heavy data has been offloaded to disk.
+            </summary>
+            <remarks>
+            When true, <see cref="M:PixlPunkt.Core.History.IDisposableHistoryItem.Reload(PixlPunkt.Core.History.IHistoryOffloadService)"/> must be called before <see cref="M:PixlPunkt.Core.History.IHistoryItem.Undo"/>
+            or <see cref="M:PixlPunkt.Core.History.IHistoryItem.Redo"/> can execute properly.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.History.IDisposableHistoryItem.OffloadId">
+            <summary>
+            Gets the unique identifier for this history item's offloaded data.
+            </summary>
+            <remarks>
+            This ID is used by the <see cref="T:PixlPunkt.Core.History.HistoryOffloadService"/> to locate the
+            serialized data on disk. Only valid when <see cref="P:PixlPunkt.Core.History.IDisposableHistoryItem.IsOffloaded"/> is true.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.History.IDisposableHistoryItem.Offload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <summary>
+            Offloads heavy data to disk, releasing memory.
+            </summary>
+            <param name="offloadService">The service to write data to.</param>
+            <returns>True if offload succeeded; false if item cannot be offloaded.</returns>
+            <remarks>
+            <para>
+            After calling this method:
+            - <see cref="P:PixlPunkt.Core.History.IDisposableHistoryItem.IsOffloaded"/> should return true
+            - <see cref="P:PixlPunkt.Core.History.IDisposableHistoryItem.EstimatedMemoryBytes"/> should return a reduced value
+            - Internal byte arrays/lists should be cleared or set to null
+            </para>
+            <para>
+            Some items may not support offloading (e.g., those with references to live objects).
+            In such cases, return false.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.History.IDisposableHistoryItem.Reload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <summary>
+            Reloads previously offloaded data from disk.
+            </summary>
+            <param name="offloadService">The service to read data from.</param>
+            <returns>True if reload succeeded.</returns>
+            <remarks>
+            After calling this method:
+            - <see cref="P:PixlPunkt.Core.History.IDisposableHistoryItem.IsOffloaded"/> should return false
+            - The item should be fully functional for undo/redo operations
+            </remarks>
+        </member>
+        <member name="T:PixlPunkt.Core.History.IHistoryOffloadService">
+            <summary>
+            Service interface for offloading and reloading history item data.
+            </summary>
+            <remarks>
+            Implementations handle serialization of history data to temporary storage
+            and retrieval when needed for undo/redo or timelapse export.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.History.IHistoryOffloadService.WriteData(System.Guid,System.Byte[])">
+            <summary>
+            Writes offloaded data for a history item.
+            </summary>
+            <param name="id">Unique identifier for this item's data.</param>
+            <param name="data">Serialized data to store.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.History.IHistoryOffloadService.ReadData(System.Guid)">
+            <summary>
+            Reads offloaded data for a history item.
+            </summary>
+            <param name="id">The identifier of the data to read.</param>
+            <returns>The serialized data, or null if not found.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.History.IHistoryOffloadService.RemoveData(System.Guid)">
+            <summary>
+            Removes offloaded data when no longer needed.
+            </summary>
+            <param name="id">The identifier of the data to remove.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.History.IHistoryOffloadService.GetDataPath(System.Guid)">
+            <summary>
+            Gets the file path for timelapse export to read history data.
+            </summary>
+            <param name="id">The identifier of the data.</param>
+            <returns>Path to the data file, or null if not available.</returns>
+        </member>
         <member name="T:PixlPunkt.Core.History.IHistoryItem">
             <summary>
             Base interface for all history items in the unified history stack.
@@ -9395,6 +9697,10 @@
             Implements both <see cref="T:PixlPunkt.Core.History.IHistoryItem"/> for undo/redo support and
             <see cref="T:PixlPunkt.Core.History.IRenderResult"/> for unified tool result handling.
             </para>
+            <para>
+            Implements <see cref="T:PixlPunkt.Core.History.IDisposableHistoryItem"/> to support memory management:
+            old history items can be offloaded to disk and reloaded when needed.
+            </para>
             </remarks>
         </member>
         <member name="P:PixlPunkt.Core.History.PixelChangeItem.HistoryIcon">
@@ -9416,6 +9722,30 @@
             <inheritdoc/>
         </member>
         <member name="P:PixlPunkt.Core.History.PixelChangeItem.CanPushToHistory">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.History.PixelChangeItem.EstimatedMemoryBytes">
+            <summary>
+            Gets the estimated memory usage in bytes.
+            </summary>
+            <remarks>
+            Calculation: Each change stores an int index (4 bytes) + uint before (4 bytes) + uint after (4 bytes) = 12 bytes per change.
+            Plus List overhead and object overhead.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.History.PixelChangeItem.IsOffloaded">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.History.PixelChangeItem.OffloadId">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.PixelChangeItem.Offload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.PixelChangeItem.Reload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.PixelChangeItem.Dispose">
             <inheritdoc/>
         </member>
         <member name="M:PixlPunkt.Core.History.PixelChangeItem.GetBoundingRect">
@@ -9737,6 +10067,9 @@
             also captures affected tile states and propagates changes to all tile instances
             when undoing or redoing.
             </para>
+            <para>
+            Implements <see cref="T:PixlPunkt.Core.History.IDisposableHistoryItem"/> to support memory management.
+            </para>
             </remarks>
         </member>
         <member name="P:PixlPunkt.Core.History.TileAwarePixelChangeItem.HistoryIcon">
@@ -9753,24 +10086,35 @@
         <member name="P:PixlPunkt.Core.History.TileAwarePixelChangeItem.CanPushToHistory">
             <inheritdoc/>
         </member>
+        <member name="P:PixlPunkt.Core.History.TileAwarePixelChangeItem.EstimatedMemoryBytes">
+            <summary>
+            Gets the estimated memory usage in bytes.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.TileAwarePixelChangeItem.IsOffloaded">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.History.TileAwarePixelChangeItem.OffloadId">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.Offload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.Reload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.Dispose">
+            <inheritdoc/>
+        </member>
         <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.#ctor(PixlPunkt.Core.Document.Layer.RasterLayer,PixlPunkt.Core.Tile.TileSet,Windows.Graphics.RectInt32,System.Byte[],System.Byte[],System.String)">
             <summary>
             Creates a tile-aware pixel change item by capturing the current state of affected tiles.
             </summary>
-            <param name="layer">The layer being modified.</param>
-            <param name="tileSet">The tile set (can be null if no tiles).</param>
-            <param name="bounds">The bounding rectangle of the change.</param>
-            <param name="pixelsBefore">Layer pixels before the change.</param>
-            <param name="pixelsAfter">Layer pixels after the change.</param>
-            <param name="description">Description of the operation.</param>
         </member>
         <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.#ctor(PixlPunkt.Core.Document.Layer.RasterLayer,PixlPunkt.Core.Tile.TileSet,System.String)">
             <summary>
             Creates a tile-aware pixel change item for sparse pixel changes (tile modifier use case).
             </summary>
-            <param name="layer">The layer being modified.</param>
-            <param name="tileSet">The tile set (can be null if no tiles).</param>
-            <param name="description">Description of the operation.</param>
         </member>
         <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.AddPixelChange(System.Int32,System.UInt32,System.UInt32)">
             <summary>
@@ -9785,17 +10129,6 @@
         <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.SetTileBeforeStates(System.Collections.Generic.Dictionary{System.Int32,System.Byte[]})">
             <summary>
             Sets pre-captured tile before states, overriding the auto-captured states.
-            Use this when you captured tile states before the operation was performed.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.CaptureAffectedTileStates">
-            <summary>
-            Captures the before/after state of tiles affected by the change.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.ComputeTileStateFromLayerSnapshot(System.Byte[],System.Int32,System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32}})">
-            <summary>
-            Computes what a tile's pixels should be based on a layer snapshot.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.History.TileAwarePixelChangeItem.AddNonTileChange(System.Int32,System.UInt32,System.UInt32)">
@@ -10024,6 +10357,10 @@
             - Descriptions available for "Undo: X" menu items
             - Dirty tracking via <see cref="P:PixlPunkt.Core.History.UnifiedHistoryStack.IsDirty"/> for unsaved changes detection
             </para>
+            <para>
+            Memory management is provided via <see cref="T:PixlPunkt.Core.History.HistoryMemoryManager"/> which
+            can automatically offload old history items to disk when memory limits are exceeded.
+            </para>
             </remarks>
         </member>
         <member name="F:PixlPunkt.Core.History.UnifiedHistoryStack._savedUndoCount">
@@ -10062,6 +10399,21 @@
             Gets the number of items in the redo stack.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.History.UnifiedHistoryStack.MemoryManager">
+            <summary>
+            Gets the memory manager for this history stack, if enabled.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.UnifiedHistoryStack.EstimatedMemoryBytes">
+            <summary>
+            Gets the current estimated memory usage of history in bytes.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.UnifiedHistoryStack.OffloadedBytes">
+            <summary>
+            Gets the total bytes offloaded to disk.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.History.UnifiedHistoryStack.IsDirty">
             <summary>
             Gets a value indicating whether the document has unsaved changes.
@@ -10075,6 +10427,24 @@
         <member name="E:PixlPunkt.Core.History.UnifiedHistoryStack.HistoryChanged">
             <summary>
             Fired when the history state changes (after push, undo, or redo).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.#ctor">
+            <summary>
+            Creates a new unified history stack.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.EnableMemoryManagement(System.Int64,System.String)">
+            <summary>
+            Enables memory management with the specified limit.
+            </summary>
+            <param name="memoryLimitBytes">Maximum memory to use before offloading. Default is 256MB.</param>
+            <param name="documentId">Optional document ID for offload folder naming.</param>
+            <returns>The memory manager instance.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.DisableMemoryManagement">
+            <summary>
+            Disables memory management.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.Push(PixlPunkt.Core.History.IHistoryItem)">
@@ -10136,6 +10506,11 @@
             <summary>
             Jump the history cursor to an "appliedCount" (0..TotalCount).
             0 = Start, AppliedCount = UndoCount.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.Dispose">
+            <summary>
+            Disposes of resources including the memory manager.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Imaging.PixelOps">
@@ -15240,6 +15615,11 @@
             <param name="canvasHeight">Canvas height.</param>
             <param name="padding">Optional padding percentage (0-0.5).</param>
         </member>
+        <member name="M:PixlPunkt.Core.Reference.ReferenceImage.Dispose">
+            <summary>
+            Releases allocated resources (for IDisposable).
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Reference.ReferenceImageService">
             <summary>
             Manages reference image overlays for a document.
@@ -17641,6 +18021,11 @@
         <member name="P:PixlPunkt.Core.Settings.AppPaths.GlyphSetsDirectory">
             <summary>
             Gets the custom glyph sets directory for ASCII effect.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AppPaths.TempDirectory">
+            <summary>
+            Gets the temporary directory for transient data like history offloading.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Settings.AppPaths.EnsureDirectoriesExist">
