@@ -291,6 +291,12 @@ namespace PixlPunkt.UI.CanvasHost
         private bool _isCommittingChanges;
 
         // ════════════════════════════════════════════════════════════════════
+        // FIELDS - LOCKED LAYER WARNING
+        // ════════════════════════════════════════════════════════════════════
+
+        private DispatcherTimer? _lockedLayerWarningTimer;
+
+        // ════════════════════════════════════════════════════════════════════
         // CONSTRUCTION
         // ════════════════════════════════════════════════════════════════════
         /// <summary>
@@ -361,6 +367,36 @@ namespace PixlPunkt.UI.CanvasHost
 
         private bool IsActiveLayerLocked
             => Document.ActiveLayer is RasterLayer rl && CanvasDocument.IsEffectivelyLocked(rl);
+
+        /// <summary>
+        /// Shows a warning that the active layer is locked and cannot be edited.
+        /// The warning auto-dismisses after a few seconds.
+        /// </summary>
+        private void ShowLockedLayerWarning()
+        {
+            // Don't spam warnings - only show if not already visible
+            if (LockedLayerWarning.IsOpen) return;
+
+            LockedLayerWarning.IsOpen = true;
+
+            // Auto-dismiss after 3 seconds
+            _lockedLayerWarningTimer?.Stop();
+            _lockedLayerWarningTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3)
+            };
+            _lockedLayerWarningTimer.Tick += (_, __) =>
+            {
+                LockedLayerWarning.IsOpen = false;
+                _lockedLayerWarningTimer.Stop();
+            };
+            _lockedLayerWarningTimer.Start();
+        }
+
+        private void LockedLayerWarning_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+        {
+            _lockedLayerWarningTimer?.Stop();
+        }
 
         private void EnsureComposite()
         {

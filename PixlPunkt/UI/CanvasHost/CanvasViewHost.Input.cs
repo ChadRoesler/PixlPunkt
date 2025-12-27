@@ -249,14 +249,22 @@ namespace PixlPunkt.UI.CanvasHost
             // Tile tools (LMB/RMB)
             if (_toolState?.IsActiveTileTool == true)
             {
-                if (IsActiveLayerLocked) return;
+                if (IsActiveLayerLocked)
+                {
+                    ShowLockedLayerWarning();
+                    return;
+                }
                 if (HandleTilePressed(e)) return;
             }
 
             // Jumble (LMB)
             if (_toolState?.ActiveToolId == ToolIds.Jumble && props.IsLeftButtonPressed)
             {
-                if (IsActiveLayerLocked) return;
+                if (IsActiveLayerLocked)
+                {
+                    ShowLockedLayerWarning();
+                    return;
+                }
                 HandleJumblePressed(p, e);
                 return;
             }
@@ -264,7 +272,11 @@ namespace PixlPunkt.UI.CanvasHost
             // Shape tools (built-in Rect/Ellipse and plugin shape tools)
             if (_toolState?.IsActiveShapeTool == true && props.IsLeftButtonPressed)
             {
-                if (IsActiveLayerLocked) return;
+                if (IsActiveLayerLocked)
+                {
+                    ShowLockedLayerWarning();
+                    return;
+                }
                 HandleShapePressed(p, e);
                 return;
             }
@@ -272,7 +284,11 @@ namespace PixlPunkt.UI.CanvasHost
             // Fill
             if (_toolState?.IsFill == true && props.IsLeftButtonPressed)
             {
-                if (IsActiveLayerLocked) return;
+                if (IsActiveLayerLocked)
+                {
+                    ShowLockedLayerWarning();
+                    return;
+                }
                 HandleFillPressed(p);
                 return;
             }
@@ -280,7 +296,11 @@ namespace PixlPunkt.UI.CanvasHost
             // Gradient Fill (drag-based)
             if (_toolState?.IsGradientFill == true && props.IsLeftButtonPressed)
             {
-                if (IsActiveLayerLocked) return;
+                if (IsActiveLayerLocked)
+                {
+                    ShowLockedLayerWarning();
+                    return;
+                }
                 HandleGradientFillPressed(p, e);
                 return;
             }
@@ -290,7 +310,11 @@ namespace PixlPunkt.UI.CanvasHost
                 (_toolState?.IsDropper != true) &&
                 (_toolState?.ActiveCategory == ToolCategory.Brush))
             {
-                if (IsActiveLayerLocked) return;
+                if (IsActiveLayerLocked)
+                {
+                    ShowLockedLayerWarning();
+                    return;
+                }
                 HandlePaintingPressed(p, e);
             }
         }

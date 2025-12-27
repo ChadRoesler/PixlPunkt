@@ -148,6 +148,14 @@ namespace PixlPunkt.Core.Compositing.Effects
             }
         }
 
+        /// <summary>
+        /// Separable box blur using O(n) running sum algorithm for RGB float channels.
+        /// Two-pass (horizontal then vertical) with running sum per scanline.
+        /// </summary>
+        /// <remarks>
+        /// This implementation is O(width*height*2) regardless of blur radius,
+        /// compared to the naive O(width*height*radius²) approach.
+        /// </remarks>
         private static (float[] R, float[] G, float[] B) BoxBlur(
             float[] srcR, float[] srcG, float[] srcB,
             int width, int height, int radius)
@@ -160,91 +168,83 @@ namespace PixlPunkt.Core.Compositing.Effects
             float[] dstG = new float[len];
             float[] dstB = new float[len];
 
-            // First pass
+            float countInv = 1f / (radius * 2 + 1);
+
+            // PASS 1: Horizontal blur using running sum
             for (int y = 0; y < height; y++)
             {
                 int rowBase = y * width;
+
+                // Running sums for RGB channels
+                float sumR = 0, sumG = 0, sumB = 0;
+
+                // Initialize running sum for first pixel (left edge handling)
+                for (int rx = -radius; rx <= radius; rx++)
+                {
+                    int px = Math.Clamp(rx, 0, width - 1);
+                    int idx = rowBase + px;
+                    sumR += srcR[idx];
+                    sumG += srcG[idx];
+                    sumB += srcB[idx];
+                }
+
                 for (int x = 0; x < width; x++)
                 {
                     int idx = rowBase + x;
-                    float sumR = 0, sumG = 0, sumB = 0;
-                    int count = 0;
 
-                    for (int oy = -radius; oy <= radius; oy++)
-                    {
-                        int ny = y + oy;
-                        if ((uint)ny >= (uint)height) continue;
+                    // Store the averaged pixel
+                    tmpR[idx] = sumR * countInv;
+                    tmpG[idx] = sumG * countInv;
+                    tmpB[idx] = sumB * countInv;
 
-                        int nRow = ny * width;
-                        for (int ox = -radius; ox <= radius; ox++)
-                        {
-                            int nx = x + ox;
-                            if ((uint)nx >= (uint)width) continue;
+                    // Slide the window: remove left edge, add right edge
+                    int leftEdge = Math.Clamp(x - radius, 0, width - 1);
+                    int rightEdge = Math.Clamp(x + radius + 1, 0, width - 1);
 
-                            int nIdx = nRow + nx;
-                            sumR += srcR[nIdx];
-                            sumG += srcG[nIdx];
-                            sumB += srcB[nIdx];
-                            count++;
-                        }
-                    }
+                    int leftIdx = rowBase + leftEdge;
+                    int rightIdx = rowBase + rightEdge;
 
-                    if (count > 0)
-                    {
-                        tmpR[idx] = sumR / count;
-                        tmpG[idx] = sumG / count;
-                        tmpB[idx] = sumB / count;
-                    }
-                    else
-                    {
-                        tmpR[idx] = srcR[idx];
-                        tmpG[idx] = srcG[idx];
-                        tmpB[idx] = srcB[idx];
-                    }
+                    sumR += srcR[rightIdx] - srcR[leftIdx];
+                    sumG += srcG[rightIdx] - srcG[leftIdx];
+                    sumB += srcB[rightIdx] - srcB[leftIdx];
                 }
             }
 
-            // Second pass
-            for (int y = 0; y < height; y++)
+            // PASS 2: Vertical blur using running sum
+            for (int x = 0; x < width; x++)
             {
-                int rowBase = y * width;
-                for (int x = 0; x < width; x++)
+                // Running sums for RGB channels
+                float sumR = 0, sumG = 0, sumB = 0;
+
+                // Initialize running sum for first pixel (top edge handling)
+                for (int ry = -radius; ry <= radius; ry++)
                 {
-                    int idx = rowBase + x;
-                    float sumR = 0, sumG = 0, sumB = 0;
-                    int count = 0;
+                    int py = Math.Clamp(ry, 0, height - 1);
+                    int idx = py * width + x;
+                    sumR += tmpR[idx];
+                    sumG += tmpG[idx];
+                    sumB += tmpB[idx];
+                }
 
-                    for (int oy = -radius; oy <= radius; oy++)
-                    {
-                        int ny = y + oy;
-                        if ((uint)ny >= (uint)height) continue;
+                for (int y = 0; y < height; y++)
+                {
+                    int idx = y * width + x;
 
-                        int nRow = ny * width;
-                        for (int ox = -radius; ox <= radius; ox++)
-                        {
-                            int nx = x + ox;
-                            if ((uint)nx >= (uint)width) continue;
+                    // Store the averaged pixel
+                    dstR[idx] = sumR * countInv;
+                    dstG[idx] = sumG * countInv;
+                    dstB[idx] = sumB * countInv;
 
-                            int nIdx = nRow + nx;
-                            sumR += tmpR[nIdx];
-                            sumG += tmpG[nIdx];
-                            sumB += tmpB[nIdx];
-                            count++;
-                        }
-                    }
+                    // Slide the window: remove top edge, add bottom edge
+                    int topEdge = Math.Clamp(y - radius, 0, height - 1);
+                    int bottomEdge = Math.Clamp(y + radius + 1, 0, height - 1);
 
-                    if (count > 0)
-                    {
-                        dstR[idx] = sumR / count;
-                        dstG[idx] = sumG / count;
-                        dstB[idx] = sumB / count;
-                    }
-                    else
-                    {
-                        dstR[idx] = tmpR[idx];
-                        dstG[idx] = tmpG[idx];
-                        dstB[idx] = tmpB[idx];
-                    }
+                    int topIdx = topEdge * width + x;
+                    int bottomIdx = bottomEdge * width + x;
+
+                    sumR += tmpR[bottomIdx] - tmpR[topIdx];
+                    sumG += tmpG[bottomIdx] - tmpG[topIdx];
+                    sumB += tmpB[bottomIdx] - tmpB[topIdx];
                 }
             }
 

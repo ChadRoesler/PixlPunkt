@@ -4466,6 +4466,16 @@
             </list>
             </remarks>
         </member>
+        <member name="M:PixlPunkt.Core.Compositing.Effects.DropShadowEffect.BoxBlur(System.UInt32[],System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Separable box blur using O(n) running sum algorithm.
+            Two-pass (horizontal then vertical) with running sum per scanline.
+            </summary>
+            <remarks>
+            This implementation is O(width*height*2) regardless of blur radius,
+            compared to the naive O(width*height*radius²) approach.
+            </remarks>
+        </member>
         <member name="T:PixlPunkt.Core.Compositing.Effects.EffectCloner">
             <summary>
             Provides methods for cloning layer effects using source-generated JSON serialization.
@@ -4528,6 +4538,16 @@
             Box blur complexity is O((2r+1)² × width × height × 2 passes). Total memory overhead is
             approximately 9 × width × height × sizeof(float) bytes for intermediate buffers.
             </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Compositing.Effects.GlowBloomEffect.BoxBlur(System.Single[],System.Single[],System.Single[],System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Separable box blur using O(n) running sum algorithm for RGB float channels.
+            Two-pass (horizontal then vertical) with running sum per scanline.
+            </summary>
+            <remarks>
+            This implementation is O(width*height*2) regardless of blur radius,
+            compared to the naive O(width*height*radius²) approach.
             </remarks>
         </member>
         <member name="T:PixlPunkt.Core.Compositing.Effects.GrainEffect">
@@ -27223,6 +27243,12 @@
             </summary>
             <param name="doc">The canvas document to display and edit.</param>
         </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ShowLockedLayerWarning">
+            <summary>
+            Shows a warning that the active layer is locked and cannot be edited.
+            The warning auto-dismisses after a few seconds.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnExternalDocumentModified">
             <summary>
             Handles external document modifications (e.g., from TileFrameEditorCanvas).
@@ -29829,6 +29855,81 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog">
+            <summary>
+            Dialog for batch exporting multiple tile animation reels at once.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.ReelViewModel">
+            <summary>
+            View model for a reel in the selection list.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.SelectedReels">
+            <summary>Gets the selected reels for export.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.SelectedFormat">
+            <summary>Gets the selected export format tag.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.Scale">
+            <summary>Gets the pixel scale factor.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.Loop">
+            <summary>Gets whether animations should loop (GIF).</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.VideoQuality">
+            <summary>Gets video quality (0-100).</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.OverrideFps">
+            <summary>Gets whether FPS is overridden.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.Fps">
+            <summary>Gets the FPS override value.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.HasReels">
+            <summary>Gets whether there are any reels to export.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.#ctor(PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Creates a new BatchTileAnimationExportDialog.
+            </summary>
+            <param name="document">The document containing tile animations.</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.GetExportOptions">
+            <summary>
+            Gets export options based on dialog settings.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.GetFileExtension">
+            <summary>
+            Gets the file extension for the selected format.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.IsImageSequence">
+            <summary>
+            Returns true if the format exports to a folder (image sequence).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.IsSpriteStrip">
+            <summary>
+            Returns true if the format exports as a sprite strip (single horizontal image).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Dialogs.Export.BrushExportDialog">
             <summary>
             Dialog for exporting a document as a custom brush (.mrk file).
@@ -29961,6 +30062,77 @@
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Dialogs.Export.CursorExportDialog.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog">
+            <summary>
+            Dialog that displays export progress with cancel support.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.CancellationToken">
+            <summary>
+            Gets the cancellation token for the export operation.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.WasCancelled">
+            <summary>
+            Gets whether the operation was cancelled by the user.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.#ctor">
+            <summary>
+            Creates a new ExportProgressDialog.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.WaitUntilShownAsync">
+            <summary>
+            Waits until the dialog is fully shown on screen.
+            Call this before starting the export task to ensure progress updates are visible.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.Start">
+            <summary>
+            Starts the progress tracking timer.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.UpdateProgress(System.Double,System.String,System.String)">
+            <summary>
+            Updates the progress display.
+            </summary>
+            <param name="progress">Progress value from 0.0 to 1.0.</param>
+            <param name="status">Optional status message.</param>
+            <param name="details">Optional detail text (e.g., "Frame 45 of 120").</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.Complete(System.Boolean)">
+            <summary>
+            Marks the export as complete, allowing the dialog to close.
+            </summary>
+            <param name="success">Whether the export was successful.</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.CreateProgressReporter(System.String)">
+            <summary>
+            Creates a Progress&lt;double&gt; that updates this dialog.
+            </summary>
+            <param name="statusFormat">Optional format string for status (e.g., "Rendering frames... {0:P0}").</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.CreateDetailedProgressReporter(System.String)">
+            <summary>
+            Creates a Progress&lt;(double, string)&gt; that updates progress and details.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.Export.ExportProgressDialog.GetBindingConnector(System.Int32,System.Object)">
             <summary>
             GetBindingConnector(int connectionId, object target)
             </summary>
@@ -31477,9 +31649,34 @@
             Menu handler: Export Timelapse from History
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.RunTimelapseExportAsync(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Export.TimelapseExportSettings,System.String,System.String,System.String,PixlPunkt.UI.Dialogs.Export.ExportProgressDialog)">
+            <summary>
+            Runs the timelapse export with progress updates.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.File_Export_Animation_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
             <summary>
             Menu handler: Export Animation (GIF, Video, Image Sequence)
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.RunAnimationExportAsync(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Export.AnimationExportService.ExportOptions,System.String,System.String,System.String,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.Int32,PixlPunkt.UI.Dialogs.Export.ExportProgressDialog)">
+            <summary>
+            Runs the animation export with progress updates.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.File_Export_BatchTileAnimation_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Menu handler: Batch Export Tile Animations
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.RunBatchTileAnimationExportAsync(PixlPunkt.Core.Document.CanvasDocument,System.Collections.Generic.IReadOnlyList{PixlPunkt.Core.Animation.TileAnimationReel},PixlPunkt.Core.Export.AnimationExportService.ExportOptions,System.String,System.String,System.Boolean,System.Int32,System.Int32,System.Boolean,System.Boolean,PixlPunkt.UI.Dialogs.Export.ExportProgressDialog)">
+            <summary>
+            Runs the batch tile animation export with progress updates.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.ExportSpriteStripAsync(System.Collections.Generic.List{PixlPunkt.Core.Export.AnimationExportService.RenderedFrame},System.String)">
+            <summary>
+            Exports animation frames as a horizontal sprite strip PNG.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.File_Export_Brush_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">

@@ -189,102 +189,108 @@ namespace PixlPunkt.Core.Compositing.Effects
             return ColorUtil.Pack(oa, or_, og, ob);
         }
 
+        /// <summary>
+        /// Separable box blur using O(n) running sum algorithm.
+        /// Two-pass (horizontal then vertical) with running sum per scanline.
+        /// </summary>
+        /// <remarks>
+        /// This implementation is O(width*height*2) regardless of blur radius,
+        /// compared to the naive O(width*height*radius²) approach.
+        /// </remarks>
         private static uint[] BoxBlur(uint[] src, int width, int height, int radius)
         {
             int len = src.Length;
             uint[] tmp = new uint[len];
             uint[] dst = new uint[len];
 
-            // Simple 2D box blur
+            // PASS 1: Horizontal blur using running sum
             for (int y = 0; y < height; y++)
             {
                 int rowBase = y * width;
+                
+                // Running sums for ARGB channels
+                int sumA = 0, sumR = 0, sumG = 0, sumB = 0;
+                
+                // Initialize running sum for first pixel (left edge handling)
+                for (int rx = -radius; rx <= radius; rx++)
+                {
+                    int px = Math.Clamp(rx, 0, width - 1);
+                    uint c = src[rowBase + px];
+                    ColorUtil.Unpack(c, out byte a, out byte r, out byte g, out byte b);
+                    sumA += a; sumR += r; sumG += g; sumB += b;
+                }
+                
+                int count = radius * 2 + 1;
+                
                 for (int x = 0; x < width; x++)
                 {
-                    int idx = rowBase + x;
-
-                    int sumA = 0, sumR = 0, sumG = 0, sumB = 0, count = 0;
-                    for (int oy = -radius; oy <= radius; oy++)
-                    {
-                        int ny = y + oy;
-                        if ((uint)ny >= (uint)height) continue;
-
-                        int nRow = ny * width;
-                        for (int ox = -radius; ox <= radius; ox++)
-                        {
-                            int nx = x + ox;
-                            if ((uint)nx >= (uint)width) continue;
-
-                            uint c = src[nRow + nx];
-                            ColorUtil.Unpack(c, out byte a, out byte r, out byte g, out byte b);
-                            sumA += a;
-                            sumR += r;
-                            sumG += g;
-                            sumB += b;
-                            count++;
-                        }
-                    }
-
-                    if (count > 0)
-                    {
-                        byte a = (byte)(sumA / count);
-                        byte r = (byte)(sumR / count);
-                        byte g = (byte)(sumG / count);
-                        byte b = (byte)(sumB / count);
-                        tmp[idx] = ColorUtil.Pack(a, r, g, b);
-                    }
-                    else
-                    {
-                        tmp[idx] = src[idx];
-                    }
+                    // Store the averaged pixel
+                    tmp[rowBase + x] = ColorUtil.Pack(
+                        (byte)(sumA / count),
+                        (byte)(sumR / count),
+                        (byte)(sumG / count),
+                        (byte)(sumB / count));
+                    
+                    // Slide the window: remove left edge, add right edge
+                    int leftEdge = Math.Clamp(x - radius, 0, width - 1);
+                    int rightEdge = Math.Clamp(x + radius + 1, 0, width - 1);
+                    
+                    uint cLeft = src[rowBase + leftEdge];
+                    uint cRight = src[rowBase + rightEdge];
+                    
+                    ColorUtil.Unpack(cLeft, out byte la, out byte lr, out byte lg, out byte lb);
+                    ColorUtil.Unpack(cRight, out byte ra, out byte rr, out byte rg, out byte rb);
+                    
+                    sumA += ra - la;
+                    sumR += rr - lr;
+                    sumG += rg - lg;
+                    sumB += rb - lb;
                 }
             }
-
-            // Second pass (can reuse same kernel)
-            for (int y = 0; y < height; y++)
+            
+            // PASS 2: Vertical blur using running sum
+            for (int x = 0; x < width; x++)
             {
-                int rowBase = y * width;
-                for (int x = 0; x < width; x++)
+                // Running sums for ARGB channels
+                int sumA = 0, sumR = 0, sumG = 0, sumB = 0;
+                
+                // Initialize running sum for first pixel (top edge handling)
+                for (int ry = -radius; ry <= radius; ry++)
                 {
-                    int idx = rowBase + x;
-
-                    int sumA = 0, sumR = 0, sumG = 0, sumB = 0, count = 0;
-                    for (int oy = -radius; oy <= radius; oy++)
-                    {
-                        int ny = y + oy;
-                        if ((uint)ny >= (uint)height) continue;
-
-                        int nRow = ny * width;
-                        for (int ox = -radius; ox <= radius; ox++)
-                        {
-                            int nx = x + ox;
-                            if ((uint)nx >= (uint)width) continue;
-
-                            uint c = tmp[nRow + nx];
-                            ColorUtil.Unpack(c, out byte a, out byte r, out byte g, out byte b);
-                            sumA += a;
-                            sumR += r;
-                            sumG += g;
-                            sumB += b;
-                            count++;
-                        }
-                    }
-
-                    if (count > 0)
-                    {
-                        byte a = (byte)(sumA / count);
-                        byte r = (byte)(sumR / count);
-                        byte g = (byte)(sumG / count);
-                        byte b = (byte)(sumB / count);
-                        dst[idx] = ColorUtil.Pack(a, r, g, b);
-                    }
-                    else
-                    {
-                        dst[idx] = tmp[idx];
-                    }
+                    int py = Math.Clamp(ry, 0, height - 1);
+                    uint c = tmp[py * width + x];
+                    ColorUtil.Unpack(c, out byte a, out byte r, out byte g, out byte b);
+                    sumA += a; sumR += r; sumG += g; sumB += b;
+                }
+                
+                int count = radius * 2 + 1;
+                
+                for (int y = 0; y < height; y++)
+                {
+                    // Store the averaged pixel
+                    dst[y * width + x] = ColorUtil.Pack(
+                        (byte)(sumA / count),
+                        (byte)(sumR / count),
+                        (byte)(sumG / count),
+                        (byte)(sumB / count));
+                    
+                    // Slide the window: remove top edge, add bottom edge
+                    int topEdge = Math.Clamp(y - radius, 0, height - 1);
+                    int bottomEdge = Math.Clamp(y + radius + 1, 0, height - 1);
+                    
+                    uint cTop = tmp[topEdge * width + x];
+                    uint cBottom = tmp[bottomEdge * width + x];
+                    
+                    ColorUtil.Unpack(cTop, out byte ta, out byte tr, out byte tg, out byte tb);
+                    ColorUtil.Unpack(cBottom, out byte ba, out byte br, out byte bg, out byte bb);
+                    
+                    sumA += ba - ta;
+                    sumR += br - tr;
+                    sumG += bg - tg;
+                    sumB += bb - tb;
                 }
             }
-
+            
             return dst;
         }
     }

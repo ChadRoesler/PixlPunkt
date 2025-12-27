@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Constants;
 using PixlPunkt.Core.Brush;
+using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Export;
 using PixlPunkt.Core.FIleOps;
@@ -71,77 +73,88 @@ namespace PixlPunkt.UI
             var result = await ShowDialogGuardedAsync(dialog);
             if (result != ContentDialogResult.Primary) return;
 
+            var settings = dialog.BuildSettings();
+            string format = dialog.SelectedFormat;
+
+            // Pick file location BEFORE starting the export
+            string baseName = $"{doc.Name ?? "timelapse"}_timelapse";
+            string? outputPath = null;
+
+            switch (format)
+            {
+                case "gif":
+                    var gifPicker = WindowHost.CreateFileSavePicker(this, baseName, ".gif");
+                    gifPicker.DefaultFileExtension = ".gif";
+                    var gifFile = await gifPicker.PickSaveFileAsync();
+                    if (gifFile is null) return;
+                    outputPath = gifFile.Path;
+                    break;
+
+                case "mp4":
+                    var mp4Picker = WindowHost.CreateFileSavePicker(this, baseName, ".mp4");
+                    mp4Picker.DefaultFileExtension = ".mp4";
+                    var mp4File = await mp4Picker.PickSaveFileAsync();
+                    if (mp4File is null) return;
+                    outputPath = mp4File.Path;
+                    break;
+
+                case "png":
+                    var folderPicker = new Windows.Storage.Pickers.FolderPicker();
+                    WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+                    folderPicker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.PicturesLibrary;
+                    var folder = await folderPicker.PickSingleFolderAsync();
+                    if (folder is null) return;
+                    outputPath = folder.Path;
+                    break;
+            }
+
+            // Create and show progress dialog
+            var progressDialog = new PixlPunkt.UI.Dialogs.Export.ExportProgressDialog
+            {
+                XamlRoot = Content.XamlRoot
+            };
+
+            // Start showing the dialog (fire-and-forget, will be awaited later)
+            var dialogTask = ShowDialogGuardedAsync(progressDialog);
+
+            // Wait for dialog to be visible on screen before starting export
+            await progressDialog.WaitUntilShownAsync();
+            progressDialog.Start();
+
+            // Now start the export (dialog is visible, progress will show correctly)
+            var exportTask = RunTimelapseExportAsync(doc, settings, format, outputPath!, baseName, progressDialog);
+
             try
             {
-                var exportService = new TimelapseExportService();
-                var settings = dialog.BuildSettings();
-                string format = dialog.SelectedFormat;
+                await exportTask;
 
-                // Render timelapse frames
-                var frames = await exportService.RenderTimelapseAsync(doc, settings);
-
-                if (frames.Count == 0)
+                if (!progressDialog.WasCancelled)
                 {
+                    // Wait for progress dialog to close
+                    await dialogTask;
+
                     await ShowDialogGuardedAsync(new ContentDialog
                     {
-                        Title = "No frames",
-                        Content = "No frames were generated. Try adjusting the range or settings.",
+                        Title = "Export complete",
+                        Content = $"Timelapse exported successfully!",
                         CloseButtonText = DialogMessages.ButtonOK,
                         XamlRoot = Content.XamlRoot
                     });
-                    return;
                 }
-
-                // Convert to AnimationExportService.RenderedFrame for reuse of export methods
-                var animFrames = new List<AnimationExportService.RenderedFrame>();
-                foreach (var frame in frames)
+                else
                 {
-                    animFrames.Add(new AnimationExportService.RenderedFrame
-                    {
-                        Pixels = frame.Pixels,
-                        Width = frame.Width,
-                        Height = frame.Height,
-                        DurationMs = frame.DurationMs,
-                        Index = frame.Index
-                    });
+                    await dialogTask;
                 }
-
-                // Export based on format
-                string baseName = $"{doc.Name ?? "timelapse"}_timelapse";
-                switch (format)
-                {
-                    case "gif":
-                        await ExportAsGifAsync(animFrames, baseName, loop: true);
-                        break;
-
-                    case "mp4":
-                        // Calculate effective FPS from first frame duration
-                        int effectiveFps = frames.Count > 0 && frames[0].DurationMs > 0
-                            ? Math.Max(1, 1000 / frames[0].DurationMs)
-                            : 12;
-                        await ExportAsVideoAsync(animFrames, baseName, "mp4", 80, effectiveFps);
-                        break;
-
-                    case "png":
-                        await ExportAsImageSequenceAsync(animFrames, baseName, "png");
-                        break;
-                }
-
-                await ShowDialogGuardedAsync(new ContentDialog
-                {
-                    Title = "Export complete",
-                    Content = $"Timelapse exported successfully!\n\n" +
-                              $"{frames.Count} frames from {settings.RangeEnd - settings.RangeStart} history steps.",
-                    CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
-                });
             }
             catch (OperationCanceledException)
             {
                 // User cancelled, no message needed
+                await dialogTask;
             }
             catch (Exception ex)
             {
+                progressDialog.Complete(false);
+                await dialogTask;
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
                     Title = "Export failed",
@@ -150,6 +163,80 @@ namespace PixlPunkt.UI
                     XamlRoot = Content.XamlRoot
                 });
             }
+        }
+
+        /// <summary>
+        /// Runs the timelapse export with progress updates.
+        /// </summary>
+        private async Task RunTimelapseExportAsync(
+            CanvasDocument doc,
+            TimelapseExportSettings settings,
+            string format,
+            string outputPath,
+            string baseName,
+            PixlPunkt.UI.Dialogs.Export.ExportProgressDialog progressDialog)
+        {
+            var exportService = new TimelapseExportService();
+
+            // Phase 1: Render frames (0-50%)
+            progressDialog.UpdateProgress(0, "Rendering timelapse frames...", "Preparing...");
+
+            var renderProgress = new Progress<double>(p =>
+            {
+                int frameNum = (int)(p * (settings.RangeEnd - settings.RangeStart));
+                progressDialog.UpdateProgress(p * 0.5, "Rendering timelapse frames...", $"Frame {frameNum}");
+            });
+
+            var frames = await exportService.RenderTimelapseAsync(
+                doc, settings, renderProgress, progressDialog.CancellationToken);
+
+            if (frames.Count == 0)
+            {
+                progressDialog.Complete(false);
+                throw new InvalidOperationException("No frames were generated. Try adjusting the range or settings.");
+            }
+
+            // Convert to AnimationExportService.RenderedFrame
+            var animFrames = new List<AnimationExportService.RenderedFrame>();
+            foreach (var frame in frames)
+            {
+                animFrames.Add(new AnimationExportService.RenderedFrame
+                {
+                    Pixels = frame.Pixels,
+                    Width = frame.Width,
+                    Height = frame.Height,
+                    DurationMs = frame.DurationMs,
+                    Index = frame.Index
+                });
+            }
+
+            // Phase 2: Encode output (50-100%)
+            progressDialog.UpdateProgress(0.5, "Encoding output...", $"{frames.Count} frames");
+
+            var encodeProgress = new Progress<double>(p =>
+            {
+                progressDialog.UpdateProgress(0.5 + p * 0.5, "Encoding output...");
+            });
+
+            switch (format)
+            {
+                case "gif":
+                    await GifEncoder.EncodeAsync(animFrames, outputPath, loop: true);
+                    break;
+
+                case "mp4":
+                    int effectiveFps = frames.Count > 0 && frames[0].DurationMs > 0
+                        ? Math.Max(1, 1000 / frames[0].DurationMs)
+                        : 12;
+                    await VideoEncoder.EncodeAsync(animFrames, outputPath, VideoFormat.Mp4, effectiveFps, 80, encodeProgress, progressDialog.CancellationToken);
+                    break;
+
+                case "png":
+                    await ImageSequenceExporter.ExportAsync(animFrames, outputPath, baseName, ImageSequenceFormat.Png);
+                    break;
+            }
+
+            progressDialog.Complete(true);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -204,71 +291,96 @@ namespace PixlPunkt.UI
             var result = await ShowDialogGuardedAsync(dialog);
             if (result != ContentDialogResult.Primary) return;
 
+            var options = dialog.GetExportOptions();
+            string format = dialog.SelectedFormat;
+            bool separateLayers = dialog.SeparateLayers;
+            bool exportTileAnim = dialog.ExportTileAnimation;
+            bool loop = dialog.Loop;
+            int videoQuality = dialog.VideoQuality;
+            int fps = dialog.Fps;
+
+            // Pick file/folder location BEFORE starting export
+            string baseName = doc.Name ?? "animation";
+            string? outputPath = null;
+            StorageFolder? outputFolder = null;
+
+            switch (format)
+            {
+                case "gif":
+                    var gifPicker = WindowHost.CreateFileSavePicker(this, baseName, ".gif");
+                    gifPicker.DefaultFileExtension = ".gif";
+                    var gifFile = await gifPicker.PickSaveFileAsync();
+                    if (gifFile is null) return;
+                    outputPath = gifFile.Path;
+                    break;
+
+                case "mp4":
+                case "wmv":
+                case "avi":
+                    var videoFormat = format switch
+                    {
+                        "mp4" => VideoFormat.Mp4,
+                        "wmv" => VideoFormat.Wmv,
+                        "avi" => VideoFormat.Avi,
+                        _ => VideoFormat.Mp4
+                    };
+                    string extension = VideoEncoder.GetExtension(videoFormat);
+                    var videoPicker = WindowHost.CreateFileSavePicker(this, baseName, extension);
+                    videoPicker.DefaultFileExtension = extension;
+                    var videoFile = await videoPicker.PickSaveFileAsync();
+                    if (videoFile is null) return;
+                    outputPath = videoFile.Path;
+                    break;
+
+                case "png":
+                case "jpg":
+                    var folderPicker = new FolderPicker();
+                    WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+                    folderPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
+                    outputFolder = await folderPicker.PickSingleFolderAsync();
+                    if (outputFolder is null) return;
+                    outputPath = outputFolder.Path;
+                    break;
+            }
+
+            // Create and show progress dialog
+            var progressDialog = new PixlPunkt.UI.Dialogs.Export.ExportProgressDialog
+            {
+                XamlRoot = Content.XamlRoot
+            };
+
+            // Start export in background
+            var exportTask = RunAnimationExportAsync(
+                doc, options, format, outputPath!, baseName,
+                exportTileAnim, separateLayers, loop, videoQuality, fps,
+                progressDialog);
+
+            // Show progress dialog
+            progressDialog.Start();
+            _ = ShowDialogGuardedAsync(progressDialog);
+
             try
             {
-                var exportService = new AnimationExportService();
-                var options = dialog.GetExportOptions();
-                string format = dialog.SelectedFormat;
+                await exportTask;
 
-                // Render frames based on source selection
-                List<AnimationExportService.RenderedFrame> frames;
-                Dictionary<string, List<AnimationExportService.RenderedFrame>>? framesByLayer = null;
-
-                if (dialog.ExportTileAnimation && doc.TileAnimationState.SelectedReel != null)
+                if (!progressDialog.WasCancelled)
                 {
-                    frames = await exportService.RenderTileAnimationAsync(
-                        doc, doc.TileAnimationState.SelectedReel, options);
+                    await ShowDialogGuardedAsync(new ContentDialog
+                    {
+                        Title = "Export complete",
+                        Content = "Animation exported successfully!",
+                        CloseButtonText = DialogMessages.ButtonOK,
+                        XamlRoot = Content.XamlRoot
+                    });
                 }
-                else if (dialog.SeparateLayers && (format == "png" || format == "jpg"))
-                {
-                    framesByLayer = await exportService.RenderCanvasAnimationByLayerAsync(doc, options);
-                    frames = []; // Not used for per-layer export
-                }
-                else
-                {
-                    frames = await exportService.RenderCanvasAnimationAsync(doc, options);
-                }
-
-                // Export based on format
-                switch (format)
-                {
-                    case "gif":
-                        await ExportAsGifAsync(frames, doc.Name ?? "animation", dialog.Loop);
-                        break;
-
-                    case "mp4":
-                    case "wmv":
-                    case "avi":
-                        await ExportAsVideoAsync(frames, doc.Name ?? "animation", format, dialog.VideoQuality, dialog.Fps);
-                        break;
-
-                    case "png":
-                    case "jpg":
-                        if (framesByLayer != null && framesByLayer.Count > 0)
-                        {
-                            await ExportAsImageSequenceByLayerAsync(framesByLayer, doc.Name ?? "animation", format);
-                        }
-                        else
-                        {
-                            await ExportAsImageSequenceAsync(frames, doc.Name ?? "animation", format);
-                        }
-                        break;
-                }
-
-                await ShowDialogGuardedAsync(new ContentDialog
-                {
-                    Title = "Export complete",
-                    Content = "Animation exported successfully!",
-                    CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
-                });
             }
             catch (OperationCanceledException)
             {
-                // User cancelled, no message needed
+                // User cancelled
             }
             catch (Exception ex)
             {
+                progressDialog.Complete(false);
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
                     Title = "Export failed",
@@ -279,68 +391,349 @@ namespace PixlPunkt.UI
             }
         }
 
-        private async Task ExportAsGifAsync(List<AnimationExportService.RenderedFrame> frames, string baseName, bool loop)
+        /// <summary>
+        /// Runs the animation export with progress updates.
+        /// </summary>
+        private async Task RunAnimationExportAsync(
+            Core.Document.CanvasDocument doc,
+            AnimationExportService.ExportOptions options,
+            string format,
+            string outputPath,
+            string baseName,
+            bool exportTileAnim,
+            bool separateLayers,
+            bool loop,
+            int videoQuality,
+            int fps,
+            PixlPunkt.UI.Dialogs.Export.ExportProgressDialog progressDialog)
         {
-            var savePicker = WindowHost.CreateFileSavePicker(this, baseName, ".gif");
-            savePicker.DefaultFileExtension = ".gif";
-            var file = await savePicker.PickSaveFileAsync();
-            if (file is null) return;
+            var exportService = new AnimationExportService();
 
-            await GifEncoder.EncodeAsync(frames, file.Path, loop);
+            // Phase 1: Render frames (0-50%)
+            progressDialog.UpdateProgress(0, "Rendering animation frames...", "Preparing...");
+
+            List<AnimationExportService.RenderedFrame> frames;
+            Dictionary<string, List<AnimationExportService.RenderedFrame>>? framesByLayer = null;
+
+            if (exportTileAnim && doc.TileAnimationState.SelectedReel != null)
+            {
+                frames = await exportService.RenderTileAnimationAsync(
+                    doc, doc.TileAnimationState.SelectedReel, options);
+                progressDialog.UpdateProgress(0.5, "Rendering complete", $"{frames.Count} frames");
+            }
+            else if (separateLayers && (format == "png" || format == "jpg"))
+            {
+                framesByLayer = await exportService.RenderCanvasAnimationByLayerAsync(doc, options);
+                frames = [];
+                int totalFrames = 0;
+                foreach (var layerFrames in framesByLayer.Values)
+                    totalFrames += layerFrames.Count;
+                progressDialog.UpdateProgress(0.5, "Rendering complete", $"{totalFrames} frames across {framesByLayer.Count} layers");
+            }
+            else
+            {
+                frames = await exportService.RenderCanvasAnimationAsync(doc, options);
+                progressDialog.UpdateProgress(0.5, "Rendering complete", $"{frames.Count} frames");
+            }
+
+            progressDialog.CancellationToken.ThrowIfCancellationRequested();
+
+            // Phase 2: Encode output (50-100%)
+            progressDialog.UpdateProgress(0.5, "Encoding output...");
+
+            var encodeProgress = new Progress<double>(p =>
+            {
+                progressDialog.UpdateProgress(0.5 + p * 0.5, "Encoding output...");
+            });
+
+            switch (format)
+            {
+                case "gif":
+                    await GifEncoder.EncodeAsync(frames, outputPath, loop);
+                    break;
+
+                case "mp4":
+                case "wmv":
+                case "avi":
+                    var videoFormat = format switch
+                    {
+                        "mp4" => VideoFormat.Mp4,
+                        "wmv" => VideoFormat.Wmv,
+                        "avi" => VideoFormat.Avi,
+                        _ => VideoFormat.Mp4
+                    };
+                    await VideoEncoder.EncodeAsync(frames, outputPath, videoFormat, fps, videoQuality, encodeProgress, progressDialog.CancellationToken);
+                    break;
+
+                case "png":
+                case "jpg":
+                    var imageFormat = format == "jpg" ? ImageSequenceFormat.Jpeg : ImageSequenceFormat.Png;
+                    if (framesByLayer != null && framesByLayer.Count > 0)
+                    {
+                        await ImageSequenceExporter.ExportByLayerAsync(framesByLayer, outputPath, imageFormat);
+                    }
+                    else
+                    {
+                        await ImageSequenceExporter.ExportAsync(frames, outputPath, baseName, imageFormat);
+                    }
+                    break;
+            }
+
+            progressDialog.Complete(true);
         }
 
-        private async Task ExportAsVideoAsync(
-            List<AnimationExportService.RenderedFrame> frames,
-            string baseName,
-            string format,
-            int quality,
-            int fps)
+        /// <summary>
+        /// Menu handler: Batch Export Tile Animations
+        /// </summary>
+        private async void File_Export_BatchTileAnimation_Click(object sender, RoutedEventArgs e)
         {
-            var videoFormat = format switch
+            var doc = CurrentHost?.Document;
+            if (doc is null)
             {
-                "mp4" => VideoFormat.Mp4,
-                "wmv" => VideoFormat.Wmv,
-                "avi" => VideoFormat.Avi,
-                _ => VideoFormat.Mp4
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    Title = "No document",
+                    Content = "Open a document before exporting.",
+                    CloseButtonText = DialogMessages.ButtonOK,
+                    XamlRoot = Content.XamlRoot
+                });
+                return;
+            }
+
+            // Check if there are any tile animation reels
+            var reels = doc.TileAnimationState.Reels;
+            if (reels.Count == 0 || !reels.Any(r => r.FrameCount > 0))
+            {
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    Title = "No tile animations",
+                    Content = "No tile animation reels with frames found.\n\n" +
+                              "Create some tile animations first, then try again.",
+                    CloseButtonText = DialogMessages.ButtonOK,
+                    XamlRoot = Content.XamlRoot
+                });
+                return;
+            }
+
+            // Show batch export dialog
+            var dialog = new PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog(doc)
+            {
+                XamlRoot = Content.XamlRoot
             };
 
-            string extension = VideoEncoder.GetExtension(videoFormat);
-            var savePicker = WindowHost.CreateFileSavePicker(this, baseName, extension);
-            savePicker.DefaultFileExtension = extension;
-            var file = await savePicker.PickSaveFileAsync();
-            if (file is null) return;
+            var result = await ShowDialogGuardedAsync(dialog);
+            if (result != ContentDialogResult.Primary) return;
 
-            await VideoEncoder.EncodeAsync(frames, file.Path, videoFormat, fps, quality);
-        }
+            var selectedReels = dialog.SelectedReels;
+            if (selectedReels.Count == 0) return;
 
-        private async Task ExportAsImageSequenceAsync(
-            List<AnimationExportService.RenderedFrame> frames,
-            string baseName,
-            string format)
-        {
+            var options = dialog.GetExportOptions();
+            string format = dialog.SelectedFormat;
+            bool loop = dialog.Loop;
+            int videoQuality = dialog.VideoQuality;
+            int fps = dialog.Fps;
+            bool isImageSequence = dialog.IsImageSequence;
+            bool isSpriteStrip = dialog.IsSpriteStrip;
+
+            // Pick output folder
             var folderPicker = new FolderPicker();
             WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, WinRT.Interop.WindowNative.GetWindowHandle(this));
             folderPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-            var folder = await folderPicker.PickSingleFolderAsync();
-            if (folder is null) return;
+            var outputFolder = await folderPicker.PickSingleFolderAsync();
+            if (outputFolder is null) return;
 
-            var imageFormat = format == "jpg" ? ImageSequenceFormat.Jpeg : ImageSequenceFormat.Png;
-            await ImageSequenceExporter.ExportAsync(frames, folder.Path, baseName, imageFormat);
+            // Create and show progress dialog
+            var progressDialog = new PixlPunkt.UI.Dialogs.Export.ExportProgressDialog
+            {
+                XamlRoot = Content.XamlRoot
+            };
+
+            // Start showing the dialog (fire-and-forget, will be awaited later)
+            var dialogTask = ShowDialogGuardedAsync(progressDialog);
+
+            // Wait for dialog to be visible on screen before starting export
+            await progressDialog.WaitUntilShownAsync();
+            progressDialog.Start();
+
+            // Now start the batch export (dialog is visible, progress will show correctly)
+            var exportTask = RunBatchTileAnimationExportAsync(
+                doc, selectedReels, options, format, outputFolder.Path,
+                loop, videoQuality, fps, isImageSequence, isSpriteStrip,
+                progressDialog);
+
+            try
+            {
+                await exportTask;
+
+                if (!progressDialog.WasCancelled)
+                {
+                    // Wait for progress dialog to close
+                    await dialogTask;
+
+                    await ShowDialogGuardedAsync(new ContentDialog
+                    {
+                        Title = "Batch export complete",
+                        Content = $"Successfully exported {selectedReels.Count} animation{(selectedReels.Count > 1 ? "s" : "")}!\n\n" +
+                                  $"Location: {outputFolder.Path}",
+                        CloseButtonText = DialogMessages.ButtonOK,
+                        XamlRoot = Content.XamlRoot
+                    });
+                }
+                else
+                {
+                    await dialogTask;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // User cancelled
+                await dialogTask;
+            }
+            catch (Exception ex)
+            {
+                progressDialog.Complete(false);
+                await dialogTask;
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    Title = "Export failed",
+                    Content = $"Could not complete batch export: {ex.Message}",
+                    CloseButtonText = DialogMessages.ButtonOK,
+                    XamlRoot = Content.XamlRoot
+                });
+            }
         }
 
-        private async Task ExportAsImageSequenceByLayerAsync(
-            Dictionary<string, List<AnimationExportService.RenderedFrame>> framesByLayer,
-            string baseName,
-            string format)
+        /// <summary>
+        /// Runs the batch tile animation export with progress updates.
+        /// </summary>
+        private async Task RunBatchTileAnimationExportAsync(
+            Core.Document.CanvasDocument doc,
+            IReadOnlyList<Core.Animation.TileAnimationReel> reels,
+            AnimationExportService.ExportOptions options,
+            string format,
+            string outputFolderPath,
+            bool loop,
+            int videoQuality,
+            int fps,
+            bool isImageSequence,
+            bool isSpriteStrip,
+            PixlPunkt.UI.Dialogs.Export.ExportProgressDialog progressDialog)
         {
-            var folderPicker = new FolderPicker();
-            WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, WinRT.Interop.WindowNative.GetWindowHandle(this));
-            folderPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-            var folder = await folderPicker.PickSingleFolderAsync();
-            if (folder is null) return;
+            var exportService = new AnimationExportService();
+            int totalReels = reels.Count;
+            int completedReels = 0;
 
-            var imageFormat = format == "jpg" ? ImageSequenceFormat.Jpeg : ImageSequenceFormat.Png;
-            await ImageSequenceExporter.ExportByLayerAsync(framesByLayer, folder.Path, imageFormat);
+            foreach (var reel in reels)
+            {
+                progressDialog.CancellationToken.ThrowIfCancellationRequested();
+
+                string reelName = SanitizeFileName(reel.Name);
+                progressDialog.UpdateProgress(
+                    (double)completedReels / totalReels,
+                    $"Exporting: {reel.Name}",
+                    $"Animation {completedReels + 1} of {totalReels}");
+
+                // Render frames for this reel
+                var frames = await exportService.RenderTileAnimationAsync(doc, reel, options);
+
+                if (frames.Count == 0)
+                {
+                    completedReels++;
+                    continue;
+                }
+
+                // Calculate effective FPS
+                int effectiveFps = fps > 0 ? fps : Math.Max(1, 1000 / reel.DefaultFrameTimeMs);
+
+                // Encode based on format
+                switch (format)
+                {
+                    case "gif":
+                        string gifPath = Path.Combine(outputFolderPath, $"{reelName}.gif");
+                        await GifEncoder.EncodeAsync(frames, gifPath, loop);
+                        break;
+
+                    case "mp4":
+                        string mp4Path = Path.Combine(outputFolderPath, $"{reelName}.mp4");
+                        await VideoEncoder.EncodeAsync(frames, mp4Path, VideoFormat.Mp4, effectiveFps, videoQuality, 
+                            cancellationToken: progressDialog.CancellationToken);
+                        break;
+
+                    case "png":
+                        string pngFolder = Path.Combine(outputFolderPath, reelName);
+                        Directory.CreateDirectory(pngFolder);
+                        await ImageSequenceExporter.ExportAsync(frames, pngFolder, reelName, ImageSequenceFormat.Png);
+                        break;
+
+                    case "strip":
+                        string stripPath = Path.Combine(outputFolderPath, $"{reelName}.png");
+                        await ExportSpriteStripAsync(frames, stripPath);
+                        break;
+                }
+
+                completedReels++;
+                progressDialog.UpdateProgress(
+                    (double)completedReels / totalReels,
+                    completedReels == totalReels ? "Export complete!" : $"Exported: {reel.Name}");
+            }
+
+            progressDialog.Complete(true);
+        }
+
+        /// <summary>
+        /// Exports animation frames as a horizontal sprite strip PNG.
+        /// </summary>
+        private static async Task ExportSpriteStripAsync(List<AnimationExportService.RenderedFrame> frames, string outputPath)
+        {
+            if (frames.Count == 0) return;
+
+            // All frames should have the same dimensions
+            int frameWidth = frames[0].Width;
+            int frameHeight = frames[0].Height;
+            int frameCount = frames.Count;
+
+            // Create the sprite strip - all frames side by side horizontally
+            int stripWidth = frameWidth * frameCount;
+            int stripHeight = frameHeight;
+
+            byte[] stripPixels = new byte[stripWidth * stripHeight * 4];
+
+            // Copy each frame into the strip
+            for (int f = 0; f < frameCount; f++)
+            {
+                var frame = frames[f];
+                int offsetX = f * frameWidth;
+
+                // Copy row by row
+                for (int y = 0; y < frameHeight; y++)
+                {
+                    int srcRowStart = y * frameWidth * 4;
+                    int dstRowStart = (y * stripWidth + offsetX) * 4;
+
+                    Array.Copy(frame.Pixels, srcRowStart, stripPixels, dstRowStart, frameWidth * 4);
+                }
+            }
+
+            // Save as PNG - create file if it doesn't exist
+            StorageFile file;
+            try
+            {
+                file = await StorageFile.GetFileFromPathAsync(outputPath);
+            }
+            catch
+            {
+                // File doesn't exist, create it
+                var folder = Path.GetDirectoryName(outputPath)!;
+                var fileName = Path.GetFileName(outputPath);
+                var storageFolder = await StorageFolder.GetFolderFromPathAsync(folder);
+                file = await storageFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+            }
+
+            using IRandomAccessStream stream = await file.OpenAsync(FileAccessMode.ReadWrite);
+            var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+            encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied,
+                (uint)stripWidth, (uint)stripHeight, 96, 96, stripPixels);
+            await encoder.FlushAsync();
         }
 
         // ═══════════════════════════════════════════════════════════════

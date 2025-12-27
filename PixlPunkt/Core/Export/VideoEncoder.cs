@@ -76,16 +76,14 @@ namespace PixlPunkt.Core.Export
             LoggingService.Info("Encoding video: {FrameCount} frames, {Width}x{Height}, {FPS} fps, format={Format}",
                 frames.Count, width, height, fps, format);
 
-            // Ensure directory exists
+            // Ensure output directory exists
             var dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir))
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
                 Directory.CreateDirectory(dir);
+            }
 
-            // Use a temporary approach: encode frames to PNG sequence, then use MediaTranscoder
-            // Note: Full MediaFoundation sink writer requires native interop
-            // For simplicity, we'll create a GIF first and note that video export needs FFmpeg
-
-            // Alternative: Use Windows.Media.Editing (MediaComposition)
+            // Use Windows.Media.Editing (MediaComposition)
             await EncodeWithMediaCompositionAsync(frames, outputPath, format, fps, quality, progress, cancellationToken);
         }
 
@@ -153,21 +151,33 @@ namespace PixlPunkt.Core.Export
                     composition.Clips.Add(clip);
                 }
 
-                // Create output file
-                var outputFile = await StorageFile.GetFileFromPathAsync(outputPath)
-                    .AsTask()
-                    .ContinueWith(async t =>
+                // Create output file using direct file creation (more reliable than StorageFile APIs for arbitrary paths)
+                StorageFile outputFile;
+                try
+                {
+                    // First, ensure the file exists by creating it with System.IO
+                    // This handles paths that aren't in known folders
+                    if (File.Exists(outputPath))
                     {
-                        if (t.IsFaulted)
-                        {
-                            // File doesn't exist, create it
-                            var folder = await StorageFolder.GetFolderFromPathAsync(Path.GetDirectoryName(outputPath)!);
-                            return await folder.CreateFileAsync(Path.GetFileName(outputPath), CreationCollisionOption.ReplaceExisting);
-                        }
-                        return t.Result;
-                    }).Unwrap();
+                        File.Delete(outputPath);
+                    }
+                    
+                    // Create empty file
+                    await using (File.Create(outputPath)) { }
+                    
+                    // Now get the StorageFile reference
+                    outputFile = await StorageFile.GetFileFromPathAsync(outputPath);
+                }
+                catch (Exception ex)
+                {
+                    LoggingService.Error("Failed to create output file at {Path}: {Error}", outputPath, ex.Message);
+                    throw new IOException($"Cannot create output file at '{outputPath}'. Please ensure the path is valid and you have write permissions.", ex);
+                }
 
                 // Configure encoding profile
+                // IMPORTANT: Set output dimensions to match frame dimensions exactly
+                // This prevents MediaComposition from scaling (which uses bilinear interpolation)
+                // and preserves crisp pixel art edges
                 var profile = GetEncodingProfile(format, width, height, fps, quality);
 
                 // Render the composition
@@ -196,9 +206,9 @@ namespace PixlPunkt.Core.Export
                 {
                     await tempFolder.DeleteAsync(StorageDeleteOption.PermanentDelete);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore cleanup errors
+                    LoggingService.Debug("Failed to clean up temp folder: {Error}", ex.Message);
                 }
             }
         }
@@ -225,9 +235,10 @@ namespace PixlPunkt.Core.Export
             MediaEncodingProfile profile;
 
             // Map quality (0-100) to video bitrate
-            uint baseBitrate = (uint)(width * height * fps / 10); // Base calculation
+            // For pixel art, use higher bitrate to preserve sharp edges
+            uint baseBitrate = (uint)(width * height * fps / 5); // Higher base for crisp output
             uint bitrate = (uint)(baseBitrate * (0.5 + quality / 100.0)); // Scale by quality
-            bitrate = Math.Max(500_000u, Math.Min(bitrate, 50_000_000u)); // Clamp to reasonable range
+            bitrate = Math.Max(1_000_000u, Math.Min(bitrate, 100_000_000u)); // Higher minimum for quality
 
             switch (format)
             {
@@ -253,7 +264,7 @@ namespace PixlPunkt.Core.Export
                     break;
             }
 
-            // Override video properties
+            // Override video properties - MUST match frame dimensions exactly for crisp pixel art
             if (profile.Video != null)
             {
                 profile.Video.Width = (uint)width;

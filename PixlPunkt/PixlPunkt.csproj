@@ -237,6 +237,12 @@
     <None Update="UI\Layers\ReferenceLayerSettingsWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
     </None>
+    <Page Update="UI\Dialogs\Export\BatchTileAnimationExportDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="UI\Dialogs\Export\ExportProgressDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Update="UI\History\HistoryPanel.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -380,6 +386,8 @@
     <None Remove="UI\Animation\ReelListPanel.xaml" />
     <None Remove="UI\Animation\TileFrameEditorCanvas.xaml" />
     <None Remove="UI\Ascii\GlyphSetEditorWindow.xaml" />
+    <None Remove="UI\Dialogs\Export\BatchTileAnimationExportDialog.xaml" />
+    <None Remove="UI\Dialogs\Export\ExportProgressDialog.xaml" />
     <Page Include="UI\Controls\CollapsibleSplitter.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -44,6 +44,19 @@
             <!-- Main canvas -->
             <win2d:CanvasControl x:Name="CanvasView"
                                  Grid.Row="1" Grid.Column="1" />
+            
+            <!-- Locked layer warning InfoBar - overlays at top of canvas area -->
+            <InfoBar x:Name="LockedLayerWarning"
+                     Grid.Row="1" Grid.Column="1"
+                     IsOpen="False"
+                     Severity="Warning"
+                     Title="Layer is locked"
+                     Message="Unlock the layer in the Layers panel to edit it."
+                     IsClosable="True"
+                     VerticalAlignment="Top"
+                     HorizontalAlignment="Center"
+                     Margin="0,8,0,0"
+                     Closed="LockedLayerWarning_Closed"/>
         </Grid>
         
         <!-- Bottom status bar -->

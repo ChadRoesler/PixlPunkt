@@ -127,6 +127,7 @@
                     <MenuFlyoutSubItem Text="Export To…">
                         <MenuFlyoutItem Text="Image" Click="File_Export_Image_Click"/>
                         <MenuFlyoutItem Text="Animation" Click="File_Export_Animation_Click"/>
+                        <MenuFlyoutItem Text="Batch Tile Animations" Click="File_Export_BatchTileAnimation_Click"/>
                         <MenuFlyoutItem Text="Timelapse (from History)" Click="File_Export_Timelapse_Click"/>
                         <MenuFlyoutSeparator/>
                         <MenuFlyoutItem Text="Icon" Click="File_Export_Icon_Click"/>
