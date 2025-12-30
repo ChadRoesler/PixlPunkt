@@ -15,6 +15,7 @@ namespace PixlPunkt.Core.Tools
     /// <item><strong>Pan</strong>: Scrolls the canvas viewport via <see cref="PanHandler"/></item>
     /// <item><strong>Zoom</strong>: Changes canvas magnification via <see cref="ZoomHandler"/></item>
     /// <item><strong>Dropper</strong>: Samples colors from the canvas via <see cref="DropperHandler"/></item>
+    /// <item><strong>Symmetry</strong>: Toggles live stroke mirroring modes</item>
     /// </list>
     /// <para>
     /// Each utility tool provides an <see cref="IUtilityHandler"/> that encapsulates its
@@ -46,6 +47,13 @@ namespace PixlPunkt.Core.Tools
                 .WithDisplayName("Dropper")
                 .WithSettings(toolState.Dropper)
                 .WithHandler(ctx => new DropperHandler(ctx))
+                .Register();
+
+            // Symmetry tool - controls live stroke mirroring
+            // Note: Symmetry doesn't need a handler because it modifies stroke behavior, not input handling
+            registry.AddUtilityTool(ToolIds.Symmetry)
+                .WithDisplayName("Symmetry")
+                .WithSettings(toolState.SymmetryTool)
                 .Register();
         }
     }

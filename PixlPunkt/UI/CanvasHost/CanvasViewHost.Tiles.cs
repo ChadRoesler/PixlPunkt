@@ -1504,41 +1504,79 @@ namespace PixlPunkt.UI.CanvasHost
             var mapping = rl.TileMapping;
             var tileSet = Document.TileSet;
 
-            // Create tile-mapped history item
-            var tileMappedItem = new TileMappedPixelChangeItem(rl, tileSet!, description);
+            // If there's no tile mapping, return null to use the painter's result instead
+            // This ensures symmetry strokes (and all non-tile painting) use the painter's Accum dictionary
+            if (mapping == null || tileSet == null || _liveTileBeforeStates == null)
+            {
+                _liveTileBeforeStates = null;
+                _liveLayerBeforeSnapshot = null;
+                return null;
+            }
+
+            // Check if ANY tiles were actually affected during this stroke
+            bool anyTilesAffected = false;
+            if (_liveStrokeHasBounds)
+            {
+                int tileW = tileSet.TileWidth;
+                int tileH = tileSet.TileHeight;
+
+                int startTileX = Math.Max(0, _liveStrokeMinX / tileW);
+                int startTileY = Math.Max(0, _liveStrokeMinY / tileH);
+                int endTileX = Math.Min(mapping.Width - 1, _liveStrokeMaxX / tileW);
+                int endTileY = Math.Min(mapping.Height - 1, _liveStrokeMaxY / tileH);
+
+                for (int ty = startTileY; ty <= endTileY && !anyTilesAffected; ty++)
+                {
+                    for (int tx = startTileX; tx <= endTileX && !anyTilesAffected; tx++)
+                    {
+                        if (mapping.GetTileId(tx, ty) >= 0)
+                        {
+                            anyTilesAffected = true;
+                        }
+                    }
+                }
+            }
+
+            // If no tiles were affected, return null to use the painter's result
+            if (!anyTilesAffected)
+            {
+                _liveTileBeforeStates = null;
+                _liveLayerBeforeSnapshot = null;
+                return null;
+            }
+
+            // Create tile-mapped history item (only when tiles are affected)
+            var tileMappedItem = new TileMappedPixelChangeItem(rl, tileSet, description);
             bool hasTileChanges = false;
             bool hasNonTileChanges = false;
 
             // Build a set of all pixels covered by mapped tiles
             var mappedPixelSet = new HashSet<int>();
-            if (mapping != null && tileSet != null)
+            int tileWidth = tileSet.TileWidth;
+            int tileHeight = tileSet.TileHeight;
+            int layerW = rl.Surface.Width;
+
+            for (int ty = 0; ty < mapping.Height; ty++)
             {
-                int tileW = tileSet.TileWidth;
-                int tileH = tileSet.TileHeight;
-                int layerW = rl.Surface.Width;
-
-                for (int ty = 0; ty < mapping.Height; ty++)
+                for (int tx = 0; tx < mapping.Width; tx++)
                 {
-                    for (int tx = 0; tx < mapping.Width; tx++)
+                    if (mapping.GetTileId(tx, ty) >= 0)
                     {
-                        if (mapping.GetTileId(tx, ty) >= 0)
+                        int tileDocX = tx * tileWidth;
+                        int tileDocY = ty * tileHeight;
+
+                        for (int py = 0; py < tileHeight; py++)
                         {
-                            int tileDocX = tx * tileW;
-                            int tileDocY = ty * tileH;
+                            int docY = tileDocY + py;
+                            if (docY >= rl.Surface.Height) continue;
 
-                            for (int py = 0; py < tileH; py++)
+                            for (int px = 0; px < tileWidth; px++)
                             {
-                                int docY = tileDocY + py;
-                                if (docY >= rl.Surface.Height) continue;
+                                int docX = tileDocX + px;
+                                if (docX >= layerW) continue;
 
-                                for (int px = 0; px < tileW; px++)
-                                {
-                                    int docX = tileDocX + px;
-                                    if (docX >= layerW) continue;
-
-                                    int idx = (docY * layerW + docX) * 4;
-                                    mappedPixelSet.Add(idx);
-                                }
+                                int idx = (docY * layerW + docX) * 4;
+                                mappedPixelSet.Add(idx);
                             }
                         }
                     }
@@ -1549,7 +1587,6 @@ namespace PixlPunkt.UI.CanvasHost
             if (_liveStrokeHasBounds)
             {
                 var layerPixels = rl.Surface.Pixels;
-                int layerW = rl.Surface.Width;
 
                 // Clamp bounds to layer
                 int minX = Math.Max(0, _liveStrokeMinX);
@@ -1588,41 +1625,38 @@ namespace PixlPunkt.UI.CanvasHost
             }
 
             // Find tiles that changed
-            if (_liveTileBeforeStates != null && mapping != null && tileSet != null)
+            foreach (var (tileId, beforePixels) in _liveTileBeforeStates)
             {
-                foreach (var (tileId, beforePixels) in _liveTileBeforeStates)
+                var afterPixels = tileSet.GetTilePixels(tileId);
+                if (afterPixels == null)
+                    continue;
+
+                // Check if tile changed
+                bool changed = false;
+                for (int i = 0; i < beforePixels.Length && !changed; i++)
                 {
-                    var afterPixels = tileSet.GetTilePixels(tileId);
-                    if (afterPixels == null)
-                        continue;
+                    if (beforePixels[i] != afterPixels[i])
+                        changed = true;
+                }
 
-                    // Check if tile changed
-                    bool changed = false;
-                    for (int i = 0; i < beforePixels.Length && !changed; i++)
+                if (!changed)
+                    continue;
+
+                // Collect all positions mapped to this tile
+                var allPositions = new List<(int tileX, int tileY)>();
+                for (int ty = 0; ty < mapping.Height; ty++)
+                {
+                    for (int tx = 0; tx < mapping.Width; tx++)
                     {
-                        if (beforePixels[i] != afterPixels[i])
-                            changed = true;
-                    }
-
-                    if (!changed)
-                        continue;
-
-                    // Collect all positions mapped to this tile
-                    var allPositions = new List<(int tileX, int tileY)>();
-                    for (int ty = 0; ty < mapping.Height; ty++)
-                    {
-                        for (int tx = 0; tx < mapping.Width; tx++)
+                        if (mapping.GetTileId(tx, ty) == tileId)
                         {
-                            if (mapping.GetTileId(tx, ty) == tileId)
-                            {
-                                allPositions.Add((tx, ty));
-                            }
+                            allPositions.Add((tx, ty));
                         }
                     }
-
-                    tileMappedItem.RecordTileChange(tileId, beforePixels, (byte[])afterPixels.Clone(), allPositions);
-                    hasTileChanges = true;
                 }
+
+                tileMappedItem.RecordTileChange(tileId, beforePixels, (byte[])afterPixels.Clone(), allPositions);
+                hasTileChanges = true;
             }
 
             _liveTileBeforeStates = null;
@@ -1631,9 +1665,9 @@ namespace PixlPunkt.UI.CanvasHost
             return (hasTileChanges || hasNonTileChanges) ? tileMappedItem : null;
         }
 
-        // ────────────────────────────────────────────────────────────────────
+        // ====================================================================
         // ITILEANIMATIONCONTEXT IMPLEMENTATION
-        // ────────────────────────────────────────────────────────────────────
+        // ====================================================================
 
         /// <inheritdoc/>
         object? ITileAnimationContext.GetAnimationStateObject()
@@ -1641,9 +1675,9 @@ namespace PixlPunkt.UI.CanvasHost
             return Document?.TileAnimationState;
         }
 
-        // ────────────────────────────────────────────────────────────────────
+        // ====================================================================
         // ITILEMODIFIERHISTORYCONTEXT IMPLEMENTATION
-        // ────────────────────────────────────────────────────────────────────
+        // ====================================================================
 
         /// <inheritdoc/>
         void ITileModifierHistoryContext.PushTileModifierHistory(

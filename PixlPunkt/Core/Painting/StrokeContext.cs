@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Painting.Painters;
+using PixlPunkt.Core.Symmetry;
 using PixlPunkt.UI.CanvasHost;
 
 namespace PixlPunkt.Core.Painting
@@ -34,6 +35,12 @@ namespace PixlPunkt.Core.Painting
     /// When <see cref="SelectionMask"/> is provided, painters should check each pixel
     /// against the mask before applying paint. Use <see cref="IsInSelection"/> for
     /// convenient checking that handles null masks.
+    /// </para>
+    /// <para><strong>Symmetry Support:</strong></para>
+    /// <para>
+    /// When <see cref="SymmetryService"/> is provided and active, stroke operations
+    /// automatically apply to mirrored positions. Use <see cref="GetSymmetryPoints"/>
+    /// to obtain all target coordinates for a given input point.
     /// </para>
     /// </remarks>
     public sealed class StrokeContext
@@ -165,6 +172,47 @@ namespace PixlPunkt.Core.Painting
         /// </para>
         /// </remarks>
         public Func<int, int, bool>? SelectionMask { get; init; }
+
+        // ????????????????????????????????????????????????????????????????????
+        // SYMMETRY SUPPORT
+        // ????????????????????????????????????????????????????????????????????
+
+        /// <summary>
+        /// Gets the optional symmetry service for live stroke mirroring.
+        /// </summary>
+        /// <remarks>
+        /// When non-null and active, use <see cref="GetSymmetryPoints"/> to obtain
+        /// all positions where a stroke should be applied.
+        /// </remarks>
+        public SymmetryService? SymmetryService { get; init; }
+
+        /// <summary>
+        /// Gets all symmetry points for a given input coordinate.
+        /// </summary>
+        /// <param name="x">Input X coordinate.</param>
+        /// <param name="y">Input Y coordinate.</param>
+        /// <returns>
+        /// Enumerable of all points to paint, including the original point.
+        /// If symmetry is disabled, returns only the original point.
+        /// </returns>
+        public IEnumerable<(int x, int y)> GetSymmetryPoints(int x, int y)
+        {
+            if (SymmetryService == null || !SymmetryService.IsActive)
+            {
+                yield return (x, y);
+                yield break;
+            }
+
+            foreach (var pt in SymmetryService.GetSymmetryPoints(x, y, Surface.Width, Surface.Height))
+            {
+                yield return pt;
+            }
+        }
+
+        /// <summary>
+        /// Gets whether symmetry is currently active.
+        /// </summary>
+        public bool IsSymmetryActive => SymmetryService?.IsActive ?? false;
 
         /// <summary>
         /// Checks if the given document coordinates are within surface bounds.

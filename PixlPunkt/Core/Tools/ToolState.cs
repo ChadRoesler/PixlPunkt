@@ -5,6 +5,7 @@ using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Tools.Settings;
 using PixlPunkt.Core.Plugins;
+using PixlPunkt.Core.Symmetry;
 
 namespace PixlPunkt.Core.Tools
 {
@@ -505,6 +506,20 @@ namespace PixlPunkt.Core.Tools
         public TileAnimationToolSettings TileAnimation { get; } = new TileAnimationToolSettings();
 
         // ════════════════════════════════════════════════════════════════════
+        // SYMMETRY SETTINGS
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Gets the shared symmetry settings that control live stroke mirroring.
+        /// </summary>
+        public SymmetrySettings Symmetry { get; } = new SymmetrySettings();
+
+        /// <summary>
+        /// Gets the symmetry tool settings.
+        /// </summary>
+        public SymmetryToolSettings SymmetryTool { get; private set; } = null!;
+
+        // ════════════════════════════════════════════════════════════════════
         // COLOR STATE
         // ════════════════════════════════════════════════════════════════════
 
@@ -572,6 +587,9 @@ namespace PixlPunkt.Core.Tools
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
+            // Initialize symmetry tool settings with the shared symmetry settings
+            SymmetryTool = new SymmetryToolSettings(Symmetry);
+
             // Initialize selection settings first (shared across all selection tools)
             Selection = new SelectionToolSettings();
 
@@ -611,6 +629,7 @@ namespace PixlPunkt.Core.Tools
             TileStamper.Changed += () => OptionsChanged?.Invoke();
             TileModifier.Changed += () => OptionsChanged?.Invoke();
             TileAnimation.Changed += () => OptionsChanged?.Invoke();
+            SymmetryTool.Changed += () => OptionsChanged?.Invoke();
 
             // Wire selection commit/cancel events
             Selection.CommitRequested += () => SelectionCommitRequested?.Invoke();
@@ -656,6 +675,7 @@ namespace PixlPunkt.Core.Tools
             ToolIds.TileStamper => TileStamper,
             ToolIds.TileModifier => TileModifier,
             ToolIds.TileAnimation => TileAnimation,
+            ToolIds.Symmetry => SymmetryTool,
             _ => GetPluginToolSettings(toolId)
         };
 
@@ -723,6 +743,7 @@ namespace PixlPunkt.Core.Tools
             yield return (ToolIds.Pan, Pan);
             yield return (ToolIds.Zoom, Zoom);
             yield return (ToolIds.Dropper, Dropper);
+            yield return (ToolIds.Symmetry, SymmetryTool);
         }
 
         /// <summary>

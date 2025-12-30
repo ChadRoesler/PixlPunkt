@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Serialization;
 
 namespace PixlPunkt.Core.Settings
@@ -79,6 +80,15 @@ namespace PixlPunkt.Core.Settings
         /// or a custom palette name. If the palette is not found, falls back to "PixlPunkt Default".
         /// </remarks>
         public string DefaultPalette { get; set; } = FallbackPaletteName;
+
+        /// <summary>
+        /// Gets or sets the default sort mode to apply when a palette is loaded.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="PaletteSortMode.Default"/> keeps the original palette order.
+        /// Other modes automatically sort the palette when loaded at app launch or when changing palettes.
+        /// </remarks>
+        public PaletteSortMode DefaultPaletteSortMode { get; set; } = PaletteSortMode.Default;
 
         /// <summary>
         /// Gets or sets the tile swatch size in pixels for the tile panel.

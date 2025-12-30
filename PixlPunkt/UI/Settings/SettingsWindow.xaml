@@ -222,6 +222,22 @@
                                 <ComboBox x:Name="DefaultPaletteCombo" Width="280" PlaceholderText="Select a palette..."/>
                             </StackPanel>
                             
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="Default sort order:" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ComboBox x:Name="DefaultPaletteSortCombo" Width="200">
+                                    <ComboBoxItem Content="Default (from palette)"/>
+                                    <ComboBoxItem Content="Hue"/>
+                                    <ComboBoxItem Content="Saturation"/>
+                                    <ComboBoxItem Content="Lightness"/>
+                                    <ComboBoxItem Content="Luminance"/>
+                                    <ComboBoxItem Content="Red Channel"/>
+                                    <ComboBoxItem Content="Green Channel"/>
+                                    <ComboBoxItem Content="Blue Channel"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <TextBlock Text="Automatically sort the palette colors when loading a palette at startup or when switching palettes." 
+                                       Opacity="0.5" FontSize="11" TextWrapping="Wrap" Margin="0,-4,0,0"/>
+                            
                             <TextBlock Text="If the selected palette is unavailable (custom palette deleted), the default PixlPunkt palette will be loaded instead." 
                                        Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                         </StackPanel>

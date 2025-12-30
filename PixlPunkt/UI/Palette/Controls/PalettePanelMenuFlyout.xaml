@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:PixlPunkt.UI.Palette.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <UserControl.Resources>
+        <MenuFlyout x:Name="PanelMenuFlyout" Placement="RightEdgeAlignedTop">
+            <MenuFlyoutItem Text="Add FG to palette" Click="AddFgPalette_Click"/>
+            <MenuFlyoutItem Text="Add BG to palette" Click="AddBgPalette_Click"/>
+            <MenuFlyoutSeparator/>
+            <MenuFlyoutItem Text="Clear palette…" Click="ClearPalette_Click"/>
+        </MenuFlyout>
+    </UserControl.Resources>
+    <!-- Empty visual - this control just hosts the MenuFlyout resource -->
+    <Grid Height="0" Width="0"/>
+</UserControl>

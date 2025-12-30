@@ -8294,6 +8294,60 @@
             Windows cursor file format containing one or more images with hotspot information.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.Enums.PaletteSortMode">
+            <summary>
+            Defines the sorting mode for palette colors.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Default">
+            <summary>
+            Keep colors in their original order (as defined in the palette file or as added).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Hue">
+            <summary>
+            Sort colors by hue (0-360 degrees on the color wheel).
+            Groups colors by their base color family (reds, oranges, yellows, greens, etc.).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Saturation">
+            <summary>
+            Sort colors by saturation (0-100%).
+            Orders from grayscale/muted colors to vivid/pure colors.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Lightness">
+            <summary>
+            Sort colors by lightness/brightness (0-100%).
+            Orders from dark to light.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Luminance">
+            <summary>
+            Sort colors by luminance (perceived brightness using WCAG formula).
+            Orders from dark to light based on human perception.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Red">
+            <summary>
+            Sort colors by red channel value (0-255).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Green">
+            <summary>
+            Sort colors by green channel value (0-255).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Blue">
+            <summary>
+            Sort colors by blue channel value (0-255).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.PaletteSortMode.Reverse">
+            <summary>
+            Reverse the current palette order.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Enums.RotationMode">
             <summary>
             Defines the interpolation algorithms used for rotating pixel art.
@@ -8376,6 +8430,65 @@
             Analyzes more neighbors than EPX to produce cleaner edges and better diagonal
             line interpolation. Only works for 2x upscaling.
             </remarks>
+        </member>
+        <member name="T:PixlPunkt.Core.Enums.SymmetryMode">
+            <summary>
+            Defines the symmetry drawing mode for stroke mirroring.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.SymmetryMode.None">
+            <summary>
+            No symmetry - strokes are not mirrored.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.SymmetryMode.Horizontal">
+            <summary>
+            Horizontal axis symmetry - strokes are mirrored across a vertical line.
+            Creates left/right mirroring.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.SymmetryMode.Vertical">
+            <summary>
+            Vertical axis symmetry - strokes are mirrored across a horizontal line.
+            Creates top/bottom mirroring.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.SymmetryMode.Both">
+            <summary>
+            Both horizontal and vertical symmetry - strokes are mirrored across both axes.
+            Creates four-way mirroring (quadrants).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.SymmetryMode.Radial">
+            <summary>
+            Radial symmetry - strokes are rotated around a center point.
+            Number of segments is controlled by RadialSegments setting.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Enums.SymmetryMode.Kaleidoscope">
+            <summary>
+            Kaleidoscope symmetry - radial with mirroring within each segment.
+            Creates kaleidoscope-like patterns.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Enums.SymmetryModeExtensions">
+            <summary>
+            Extension methods for <see cref="T:PixlPunkt.Core.Enums.SymmetryMode"/>.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Enums.SymmetryModeExtensions.IsRadial(PixlPunkt.Core.Enums.SymmetryMode)">
+            <summary>
+            Gets whether the mode is a radial (mandala) symmetry mode.
+            </summary>
+            <param name="mode">The symmetry mode.</param>
+            <returns>True if the mode is radial.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Enums.SymmetryModeExtensions.GetDisplayName(PixlPunkt.Core.Enums.SymmetryMode)">
+            <summary>
+            Gets a human-readable display name for the symmetry mode.
+            </summary>
+            <param name="mode">The symmetry mode.</param>
+            <returns>The display name.</returns>
         </member>
         <member name="T:PixlPunkt.Core.Enums.WindowPlacement">
             <summary>
@@ -13071,6 +13184,12 @@
             against the mask before applying paint. Use <see cref="M:PixlPunkt.Core.Painting.StrokeContext.IsInSelection(System.Int32,System.Int32)"/> for
             convenient checking that handles null masks.
             </para>
+            <para><strong>Symmetry Support:</strong></para>
+            <para>
+            When <see cref="P:PixlPunkt.Core.Painting.StrokeContext.SymmetryService"/> is provided and active, stroke operations
+            automatically apply to mirrored positions. Use <see cref="M:PixlPunkt.Core.Painting.StrokeContext.GetSymmetryPoints(System.Int32,System.Int32)"/>
+            to obtain all target coordinates for a given input point.
+            </para>
             </remarks>
         </member>
         <member name="P:PixlPunkt.Core.Painting.StrokeContext.Surface">
@@ -13201,6 +13320,31 @@
             </para>
             </remarks>
         </member>
+        <member name="P:PixlPunkt.Core.Painting.StrokeContext.SymmetryService">
+            <summary>
+            Gets the optional symmetry service for live stroke mirroring.
+            </summary>
+            <remarks>
+            When non-null and active, use <see cref="M:PixlPunkt.Core.Painting.StrokeContext.GetSymmetryPoints(System.Int32,System.Int32)"/> to obtain
+            all positions where a stroke should be applied.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Painting.StrokeContext.GetSymmetryPoints(System.Int32,System.Int32)">
+            <summary>
+            Gets all symmetry points for a given input coordinate.
+            </summary>
+            <param name="x">Input X coordinate.</param>
+            <param name="y">Input Y coordinate.</param>
+            <returns>
+            Enumerable of all points to paint, including the original point.
+            If symmetry is disabled, returns only the original point.
+            </returns>
+        </member>
+        <member name="P:PixlPunkt.Core.Painting.StrokeContext.IsSymmetryActive">
+            <summary>
+            Gets whether symmetry is currently active.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Core.Painting.StrokeContext.IsInBounds(System.Int32,System.Int32)">
             <summary>
             Checks if the given document coordinates are within surface bounds.
@@ -13232,228 +13376,6 @@
         <member name="T:PixlPunkt.Core.Painting.StrokeEngine">
             <summary>
             Manages interactive brush stroke painting operations.
-            </summary>
-            <remarks>
-            <para>
-            StrokeEngine is the central system for brush-based pixel manipulation in PixlPunkt. It handles:
-            </para>
-            <list type="bullet">
-            <item><strong>Brush painting</strong>: Normal painting with opacity, blending, and brush shapes (circle/square).</item>
-            <item><strong>Special modes</strong>: Eraser, replacer, blur, jumble (pixel shuffling), gradient cycling, smudge.</item>
-            <item><strong>History integration</strong>: All operations return <see cref="T:PixlPunkt.Core.History.PixelChangeItem"/> for direct push to history.</item>
-            </list>
-            <para>
-            The engine operates in stroke sessions: call <see cref="M:PixlPunkt.Core.Painting.StrokeEngine.BeginWithPainter(PixlPunkt.Core.Painting.IStrokePainter,PixlPunkt.Core.Document.Layer.RasterLayer)"/> to start, perform paint operations,
-            then <see cref="M:PixlPunkt.Core.Painting.StrokeEngine.CommitPainter(System.String,FluentIcons.Common.Icon)"/> to finalize changes into history.
-            </para>
-            <para>
-            Shape drawing (Rectangle, Ellipse) is handled by <see cref="T:PixlPunkt.Core.Painting.IShapeRenderer"/> implementations.
-            Fill operations (Flood fill, Global fill) are handled by <see cref="T:PixlPunkt.Core.Painting.IFillPainter"/> implementations.
-            </para>
-            </remarks>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._activePainter">
-            <summary>The currently active painter for IStrokePainter-based strokes.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._activeLayer">
-            <summary>The layer being painted on during a painter stroke.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._inPainterStroke">
-            <summary>Indicates if a painter-based stroke is active.</summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.BeginWithPainter(PixlPunkt.Core.Painting.IStrokePainter,PixlPunkt.Core.Document.Layer.RasterLayer)">
-            <summary>
-            Begins a stroke using the provided <see cref="T:PixlPunkt.Core.Painting.IStrokePainter"/>.
-            </summary>
-            <param name="painter">The painter to use for this stroke.</param>
-            <param name="layer">The target layer for painting.</param>
-            <remarks>
-            <para>
-            This method initializes a painter-based stroke session. The painter's
-            <see cref="M:PixlPunkt.Core.Painting.IStrokePainter.Begin(PixlPunkt.Core.Document.Layer.RasterLayer,System.Byte[])"/> method is called with the layer
-            and optional snapshot (if <see cref="P:PixlPunkt.Core.Painting.IStrokePainter.NeedsSnapshot"/> is true).
-            </para>
-            <para>
-            Use <see cref="M:PixlPunkt.Core.Painting.StrokeEngine.StampAtWithPainter(System.Int32,System.Int32,System.UInt32,System.UInt32,PixlPunkt.PluginSdk.Settings.IStrokeSettings)"/> and <see cref="M:PixlPunkt.Core.Painting.StrokeEngine.StampLineWithPainter(System.Int32,System.Int32,System.Int32,System.Int32,System.UInt32,System.UInt32,PixlPunkt.PluginSdk.Settings.IStrokeSettings)"/>
-            to apply strokes, then <see cref="M:PixlPunkt.Core.Painting.StrokeEngine.CommitPainter(System.String,FluentIcons.Common.Icon)"/> to finalize.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.StampAtWithPainter(System.Int32,System.Int32,System.UInt32,System.UInt32,PixlPunkt.PluginSdk.Settings.IStrokeSettings)">
-            <summary>
-            Stamps at a single point using the active painter.
-            </summary>
-            <param name="cx">Center X coordinate.</param>
-            <param name="cy">Center Y coordinate.</param>
-            <param name="foreground">Foreground color (BGRA).</param>
-            <param name="background">Background/target color (BGRA) for replacer.</param>
-            <param name="strokeSettings">Stroke configuration implementing <see cref="T:PixlPunkt.PluginSdk.Settings.IStrokeSettings"/>.</param>
-            <exception cref="T:System.InvalidOperationException">Thrown if no painter stroke is active.</exception>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.StampLineWithPainter(System.Int32,System.Int32,System.Int32,System.Int32,System.UInt32,System.UInt32,PixlPunkt.PluginSdk.Settings.IStrokeSettings)">
-            <summary>
-            Stamps along a line using the active painter.
-            </summary>
-            <param name="x0">Start X coordinate.</param>
-            <param name="y0">Start Y coordinate.</param>
-            <param name="x1">End X coordinate.</param>
-            <param name="y1">End Y coordinate.</param>
-            <param name="foreground">Foreground color (BGRA).</param>
-            <param name="background">Background/target color (BGRA) for replacer.</param>
-            <param name="strokeSettings">Stroke configuration implementing <see cref="T:PixlPunkt.PluginSdk.Settings.IStrokeSettings"/>.</param>
-            <exception cref="T:System.InvalidOperationException">Thrown if no painter stroke is active.</exception>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.CommitPainter(System.String,FluentIcons.Common.Icon)">
-            <summary>
-            Commits the active painter stroke, returning the accumulated changes.
-            </summary>
-            <param name="description">Description of the operation for undo/redo UI.</param>
-            <param name="icon">Icon representing the tool for history display.</param>
-            <returns>
-            An <see cref="T:PixlPunkt.Core.History.IRenderResult"/> containing all pixel modifications, or null if no changes.
-            Typically returns <see cref="T:PixlPunkt.Core.History.PixelChangeItem"/> which can be cast to <see cref="T:PixlPunkt.Core.History.IHistoryItem"/>
-            for history integration.
-            </returns>
-            <remarks>
-            <para>
-            This method calls <see cref="M:PixlPunkt.Core.Painting.IStrokePainter.End(System.String,FluentIcons.Common.Icon)"/> to collect all pixel changes.
-            The returned result can be checked with <see cref="P:PixlPunkt.Core.History.IRenderResult.CanPushToHistory"/>
-            and cast to <see cref="T:PixlPunkt.Core.History.IHistoryItem"/> if appropriate.
-            </para>
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.Core.Painting.StrokeEngine.HasActivePainterStroke">
-            <summary>
-            Gets whether a painter-based stroke is currently active.
-            </summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._surface">
-            <summary>Target pixel surface for all painting operations.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._fg">
-            <summary>Foreground color (BGRA) used for painting.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._size">
-            <summary>Brush size (diameter or side length depending on shape).</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._shape">
-            <summary>Brush shape (circle, square, etc.).</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._density">
-            <summary>Brush density (0-255): controls soft falloff thickness.</summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.#ctor(PixlPunkt.Core.Imaging.PixelSurface)">
-            <summary>
-            Constructs a stroke engine bound to a pixel surface.
-            </summary>
-            <param name="surface">Target pixel surface for painting.</param>
-        </member>
-        <member name="P:PixlPunkt.Core.Painting.StrokeEngine.Surface">
-            <summary>
-            Gets the surface this engine operates on.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.SetForeground(System.UInt32)">
-            <summary>
-            Sets the current foreground color (BGRA).
-            </summary>
-            <param name="bgra">BGRA packed 32-bit color value.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.SetBrushSize(System.Int32)">
-            <summary>
-            Sets the brush size (diameter / side depending on shape). Minimum is 1.
-            </summary>
-            <param name="s">Desired size (clamped to ≥1).</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.SetBrushShape(PixlPunkt.PluginSdk.Imaging.BrushShape)">
-            <summary>
-            Sets active brush shape for stamping (circle / square / custom).
-            </summary>
-            <param name="shape">Brush shape enum value.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.SetOpacity(System.Byte)">
-            <summary>
-            Overrides foreground alpha (opacity) channel.
-            </summary>
-            <param name="a">Alpha byte (0–255).</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.SetDensity(System.Byte)">
-            <summary>
-            Sets brush density controlling soft falloff thickness.
-            </summary>
-            <param name="d">Density (0–255). Lower values expand fade region.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.GetCurrentBrushOffsets">
-            <summary>
-            Gets current brush footprint offsets relative to center.
-            </summary>
-            <returns>List of (dx, dy) offsets used for stamping.</returns>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.ComputeBrushAlphaAtOffset(System.Int32,System.Int32)">
-            <summary>
-            Computes effective per-pixel alpha for the current brush at an offset.
-            </summary>
-            <param name="dx">X offset from center.</param>
-            <param name="dy">Y offset from center.</param>
-            <returns>Alpha (0–255) contributed by this offset.</returns>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.ComputePerPixelAlpha(System.Int32,System.Int32)">
-            <returns>Alpha byte.</returns>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.DistanceForCurrentShape(System.Int32,System.Int32,System.Int32)">
-            <summary>
-            Computes distance metric for current brush shape (circle: Euclidean, square: Chebyshev).
-            </summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Painting.StrokeEngine._selectionMask">
-            <summary>
-            Optional selection mask delegate. When set, painting is constrained to pixels
-            where this delegate returns true.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.SetSelectionMask(System.Func{System.Int32,System.Int32,System.Boolean})">
-            <summary>
-            Sets the selection mask delegate for constraining paint operations.
-            </summary>
-            <param name="mask">
-            A delegate that returns true if the pixel at (x, y) is inside the selection,
-            or null to disable selection masking.
-            </param>
-            <remarks>
-            <para>
-            When a selection mask is active, all painting operations (brush, eraser, fill, etc.)
-            will only affect pixels where the mask returns true.
-            </para>
-            <para>
-            Typically bound to <see cref="M:PixlPunkt.Core.Selection.SelectionRegion.Contains(System.Int32,System.Int32)"/> from the
-            active selection subsystem.
-            </para>
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.Core.Painting.StrokeEngine.SelectionMask">
-            <summary>
-            Gets the current selection mask delegate.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.BuildStrokeContext(System.UInt32,System.UInt32,PixlPunkt.PluginSdk.Settings.IStrokeSettings)">
-            <summary>
-            Builds a <see cref="T:PixlPunkt.Core.Painting.StrokeContext"/> from the current stroke settings.
-            Supports both built-in shapes and custom brushes.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.ComputeCustomBrushAlphaForContext(System.Int32,System.Int32,System.Int32,System.Byte,System.Byte)">
-            <summary>
-            Computes per-pixel alpha for custom brushes using radial density-based falloff.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.ComputePerPixelAlphaForContext(System.Int32,System.Int32,System.Int32,PixlPunkt.PluginSdk.Imaging.BrushShape,System.Byte,System.Byte)">
-            <summary>
-            Computes per-pixel alpha for StrokeContext, using the same density/opacity logic as brush stamping.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Painting.StrokeEngine.DistanceForShape(System.Int32,System.Int32,System.Int32,PixlPunkt.PluginSdk.Imaging.BrushShape)">
-            <summary>
-            Computes distance metric for a brush shape (circle: Euclidean, square: Chebyshev).
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Palette.CustomPalette">
@@ -14139,6 +14061,88 @@
             </para>
             </remarks>
         </member>
+        <member name="T:PixlPunkt.Core.Palette.Helpers.PaletteSorter">
+            <summary>
+            Provides sorting algorithms for palette colors.
+            </summary>
+            <remarks>
+            <para>
+            PaletteSorter offers various sorting strategies for organizing palette colors in meaningful ways.
+            Sorting can be based on color properties (hue, saturation, lightness), individual channels (RGB),
+            or perceptual brightness (luminance).
+            </para>
+            <para><strong>Sort Modes:</strong></para>
+            <list type="bullet">
+            <item><strong>Hue</strong>: Groups colors by their position on the color wheel (reds ? oranges ? yellows ? greens ? etc.)</item>
+            <item><strong>Saturation</strong>: Orders from grayscale/muted to vivid/pure colors</item>
+            <item><strong>Lightness</strong>: Orders from dark to light (HSL lightness)</item>
+            <item><strong>Luminance</strong>: Orders by perceived brightness (WCAG relative luminance)</item>
+            <item><strong>Red/Green/Blue</strong>: Orders by individual color channel values</item>
+            <item><strong>Reverse</strong>: Reverses the current order</item>
+            </list>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.Sort(System.Collections.Generic.IReadOnlyList{System.UInt32},PixlPunkt.Core.Enums.PaletteSortMode)">
+            <summary>
+            Sorts a list of colors according to the specified sort mode.
+            </summary>
+            <param name="colors">The colors to sort (packed BGRA uint values).</param>
+            <param name="mode">The sorting algorithm to apply.</param>
+            <returns>A new sorted list of colors.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.SortByHue(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Sorts colors by hue (position on the color wheel, 0-360 degrees).
+            </summary>
+            <remarks>
+            Groups colors by their base color family. Grays (low saturation) are sorted by lightness
+            and placed at the end to keep chromatic colors together.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.SortBySaturation(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Sorts colors by saturation (0% grayscale to 100% vivid).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.SortByLightness(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Sorts colors by lightness (0% black to 100% white).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.SortByLuminance(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Sorts colors by relative luminance (perceived brightness using WCAG formula).
+            </summary>
+            <remarks>
+            Uses the WCAG 2.0 relative luminance formula which accounts for human perception.
+            Green contributes most to perceived brightness, followed by red, then blue.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.SortByRed(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Sorts colors by red channel value (0-255).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.SortByGreen(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Sorts colors by green channel value (0-255).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.SortByBlue(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Sorts colors by blue channel value (0-255).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.Reverse(System.Collections.Generic.IReadOnlyList{System.UInt32})">
+            <summary>
+            Reverses the order of colors.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.Helpers.PaletteSorter.GetDisplayName(PixlPunkt.Core.Enums.PaletteSortMode)">
+            <summary>
+            Gets a human-readable display name for a sort mode.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Palette.PaletteService">
             <summary>
             Manages the active color palette, foreground/background colors, and palette import/export.
@@ -14239,9 +14243,21 @@
             <summary>
             Loads a palette by name, checking both built-in and custom palettes.
             Falls back to PixlPunkt Default if not found.
+            Applies the configured default sort mode after loading.
             </summary>
             <param name="paletteName">Name of the palette to load.</param>
             <returns>True if the named palette was loaded, false if fallback was used.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.PaletteService.ApplyDefaultSort">
+            <summary>
+            Applies the default sort mode from settings to the current palette.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Palette.PaletteService.SortPalette(PixlPunkt.Core.Enums.PaletteSortMode)">
+            <summary>
+            Sorts the current palette colors using the specified sort mode.
+            </summary>
+            <param name="mode">The sorting algorithm to apply.</param>
         </member>
         <member name="M:PixlPunkt.Core.Palette.PaletteService.SetDefault">
             <summary>
@@ -17432,6 +17448,11 @@
             Source-generated JSON serializer context for application settings.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.PaletteSortMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.AppSettings">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
@@ -18115,6 +18136,15 @@
             or a custom palette name. If the palette is not found, falls back to "PixlPunkt Default".
             </remarks>
         </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.DefaultPaletteSortMode">
+            <summary>
+            Gets or sets the default sort mode to apply when a palette is loaded.
+            </summary>
+            <remarks>
+            <see cref="F:PixlPunkt.Core.Enums.PaletteSortMode.Default"/> keeps the original palette order.
+            Other modes automatically sort the palette when loaded at app launch or when changing palettes.
+            </remarks>
+        </member>
         <member name="P:PixlPunkt.Core.Settings.AppSettings.TileSwatchSize">
             <summary>
             Gets or sets the tile swatch size in pixels for the tile panel.
@@ -18586,6 +18616,198 @@
         <member name="P:PixlPunkt.Core.Structs.BrushOverlaySnapshot.Empty">
             <summary>
             Gets an empty/invisible brush overlay snapshot.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Symmetry.SymmetryService">
+            <summary>
+            Service for computing symmetry-mirrored points during stroke painting.
+            </summary>
+            <remarks>
+            <para>
+            SymmetryService transforms input coordinates into multiple output coordinates
+            based on the active symmetry mode. This enables live mirroring during painting
+            operations.
+            </para>
+            <para>
+            Supported transformations:
+            - Horizontal: Mirror across a vertical axis (left/right)
+            - Vertical: Mirror across a horizontal axis (top/bottom)
+            - Both: Mirror across both axes (four quadrants)
+            - Radial: Rotate points around a center with n-fold symmetry
+            - Kaleidoscope: Radial with additional mirroring within each segment
+            </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetryService.#ctor(PixlPunkt.Core.Symmetry.SymmetrySettings)">
+            <summary>
+            Creates a new SymmetryService instance.
+            </summary>
+            <param name="settings">The symmetry settings to use.</param>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetryService.IsActive">
+            <summary>
+            Gets whether symmetry is currently active.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetryService.GetSymmetryPoints(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Gets all symmetry points for a given input coordinate.
+            </summary>
+            <param name="x">Input X coordinate (document space).</param>
+            <param name="y">Input Y coordinate (document space).</param>
+            <param name="canvasWidth">Canvas width in pixels.</param>
+            <param name="canvasHeight">Canvas height in pixels.</param>
+            <returns>
+            Enumerable of all points to paint, including the original point.
+            If symmetry is disabled, returns only the original point.
+            </returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetryService.MirrorHorizontal(System.Int32,System.Int32,System.Double)">
+            <summary>
+            Mirrors a point horizontally across a vertical axis.
+            </summary>
+            <param name="x">Input X.</param>
+            <param name="y">Input Y.</param>
+            <param name="axisX">X position of the vertical axis.</param>
+            <returns>Mirrored point.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetryService.MirrorVertical(System.Int32,System.Int32,System.Double)">
+            <summary>
+            Mirrors a point vertically across a horizontal axis.
+            </summary>
+            <param name="x">Input X.</param>
+            <param name="y">Input Y.</param>
+            <param name="axisY">Y position of the horizontal axis.</param>
+            <returns>Mirrored point.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetryService.GetRadialPoints(System.Int32,System.Int32,System.Double,System.Double,System.Int32,System.Boolean)">
+            <summary>
+            Gets radially symmetric points around a center.
+            </summary>
+            <param name="x">Input X.</param>
+            <param name="y">Input Y.</param>
+            <param name="centerX">Center X.</param>
+            <param name="centerY">Center Y.</param>
+            <param name="segments">Number of radial segments.</param>
+            <param name="withMirror">Whether to add mirroring within each segment (kaleidoscope).</param>
+            <returns>All radial points (excluding the original).</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetryService.GetAxisLines(System.Int32,System.Int32)">
+            <summary>
+            Gets the axis line segments for rendering the symmetry overlay.
+            </summary>
+            <param name="canvasWidth">Canvas width in pixels.</param>
+            <param name="canvasHeight">Canvas height in pixels.</param>
+            <returns>
+            Enumerable of line segments as (x1, y1, x2, y2) tuples.
+            </returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetryService.GetAxisCenter(System.Int32,System.Int32)">
+            <summary>
+            Gets the center point of the symmetry axis.
+            </summary>
+            <param name="canvasWidth">Canvas width.</param>
+            <param name="canvasHeight">Canvas height.</param>
+            <returns>Center point (x, y) in document coordinates.</returns>
+        </member>
+        <member name="T:PixlPunkt.Core.Symmetry.SymmetrySettings">
+            <summary>
+            Manages symmetry drawing state for the canvas.
+            </summary>
+            <remarks>
+            <para>
+            SymmetrySettings provides the central configuration for live symmetry drawing,
+            supporting horizontal/vertical mirroring and radial (mandala) modes.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.Enabled">
+            <summary>
+            Gets or sets whether symmetry drawing is enabled.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.Mode">
+            <summary>
+            Gets or sets the symmetry mode.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.AxisX">
+            <summary>
+            Gets or sets the X position of the symmetry axis (0-1 normalized).
+            </summary>
+            <remarks>
+            For horizontal symmetry, this is the vertical line position.
+            For radial symmetry, this is the center X coordinate.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.AxisY">
+            <summary>
+            Gets or sets the Y position of the symmetry axis (0-1 normalized).
+            </summary>
+            <remarks>
+            For vertical symmetry, this is the horizontal line position.
+            For radial symmetry, this is the center Y coordinate.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.RadialSegments">
+            <summary>
+            Gets or sets the number of radial segments for Radial/Kaleidoscope modes.
+            </summary>
+            <remarks>
+            Valid range is 2-16 segments.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.ShowAxisLines">
+            <summary>
+            Gets or sets whether to show the symmetry axis lines on the canvas.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.EffectiveRadialSegments">
+            <summary>
+            Gets the effective number of radial segments based on the current mode.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.IsRadialMode">
+            <summary>
+            Gets whether the current mode uses radial symmetry.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Symmetry.SymmetrySettings.HasRadialMirror">
+            <summary>
+            Gets whether the current mode includes mirroring within radial segments.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetrySettings.SetMode(PixlPunkt.Core.Enums.SymmetryMode)">
+            <summary>
+            Sets the symmetry mode without triggering individual change events.
+            </summary>
+            <param name="mode">The symmetry mode.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetrySettings.SetAxisPosition(System.Double,System.Double)">
+            <summary>
+            Sets the axis position without triggering individual change events.
+            </summary>
+            <param name="x">X position (0-1).</param>
+            <param name="y">Y position (0-1).</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetrySettings.CenterAxis">
+            <summary>
+            Centers the symmetry axis on the canvas.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetrySettings.Toggle">
+            <summary>
+            Toggles symmetry on/off.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Symmetry.SymmetrySettings.CycleMode">
+            <summary>
+            Cycles to the next symmetry mode.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.Core.Symmetry.SymmetrySettings.Changed">
+            <summary>
+            Occurs when any symmetry setting changes.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Tile.TileDefinition">
@@ -20010,6 +20232,7 @@
             <item><strong>Pan</strong>: Scrolls the canvas viewport via <see cref="T:PixlPunkt.Core.Tools.Utility.PanHandler"/></item>
             <item><strong>Zoom</strong>: Changes canvas magnification via <see cref="T:PixlPunkt.Core.Tools.Utility.ZoomHandler"/></item>
             <item><strong>Dropper</strong>: Samples colors from the canvas via <see cref="T:PixlPunkt.Core.Tools.Utility.DropperHandler"/></item>
+            <item><strong>Symmetry</strong>: Toggles live stroke mirroring modes</item>
             </list>
             <para>
             Each utility tool provides an <see cref="T:PixlPunkt.Core.Tools.Utility.IUtilityHandler"/> that encapsulates its
@@ -22760,6 +22983,62 @@
             Sets whether smudge blends on transparent pixels.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings">
+            <summary>
+            Settings for the Symmetry utility tool.
+            </summary>
+            <remarks>
+            <para>
+            The symmetry tool controls live stroke mirroring during painting operations.
+            When active, all brush strokes are automatically mirrored across the configured axes.
+            </para>
+            <para>
+            Supports horizontal/vertical axis mirroring, both axes combined, and radial (mandala)
+            symmetry with configurable segment counts.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.#ctor(PixlPunkt.Core.Symmetry.SymmetrySettings)">
+            <summary>
+            Creates a new SymmetryToolSettings instance.
+            </summary>
+            <param name="settings">The shared symmetry settings to control.</param>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.Icon">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.DisplayName">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.Description">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.Shortcut">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.Settings">
+            <summary>
+            Gets the underlying symmetry settings.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.GetOptions">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.SetModeFromIndex(System.Int32)">
+            <summary>
+            Sets the symmetry mode from a dropdown index.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.Toggle">
+            <summary>
+            Toggles symmetry on/off.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.SymmetryToolSettings.CycleMode">
+            <summary>
+            Cycles through symmetry modes.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings">
             <summary>
             Settings for the Tile Animation tool.
@@ -23886,6 +24165,9 @@
         <member name="F:PixlPunkt.Core.Tools.ToolIds.Dropper">
             <summary>Color picker (dropper) tool for sampling colors.</summary>
         </member>
+        <member name="F:PixlPunkt.Core.Tools.ToolIds.Symmetry">
+            <summary>Symmetry tool for live stroke mirroring.</summary>
+        </member>
         <member name="F:PixlPunkt.Core.Tools.ToolIds.SelectRect">
             <summary>Rectangle selection tool.</summary>
         </member>
@@ -24518,6 +24800,16 @@
         <member name="P:PixlPunkt.Core.Tools.ToolState.TileAnimation">
             <summary>
             Gets the tile animation tool settings.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.ToolState.Symmetry">
+            <summary>
+            Gets the shared symmetry settings that control live stroke mirroring.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.ToolState.SymmetryTool">
+            <summary>
+            Gets the symmetry tool settings.
             </summary>
         </member>
         <member name="P:PixlPunkt.Core.Tools.ToolState.LastKnownFgRgb">
@@ -26692,9 +26984,54 @@
             Redoes the last undone operation from the unified history stack.
             </summary>
         </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._symmetryAxisDragging">
+            <summary>Whether we're currently dragging a symmetry axis line.</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._symmetryAxisDragType">
+            <summary>Which axis component is being dragged: 'x' for horizontal axis, 'y' for vertical, 'c' for center point.</summary>
+        </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.GetUtilityHandler(System.String)">
             <summary>
             Gets a utility handler by tool ID from the handlers dictionary.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.SymmetryAxisHitRadius">
+            <summary>Hit test radius for symmetry axis lines (in screen pixels).</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.SymmetryCenterHitRadius">
+            <summary>Hit test radius for symmetry center point (in screen pixels).</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.GetSymmetryAxisCursor(Windows.Foundation.Point)">
+            <summary>
+            Gets the cursor for symmetry axis interaction based on pointer position.
+            Returns resize cursor when hovering over draggable axis.
+            Only allows interaction when Symmetry tool is active.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.HitTestSymmetryAxis(Windows.Foundation.Point)">
+            <summary>
+            Hit tests for symmetry axis interaction.
+            Returns 'x' for horizontal axis (vertical line), 'y' for vertical axis (horizontal line),
+            'c' for center point, or '\0' for no hit.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Symmetry_TryHandlePointerPressed(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs)">
+            <summary>
+            Handles pointer pressed for symmetry axis dragging.
+            Returns true if the event was handled.
+            Only allows interaction when Symmetry tool is active.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Symmetry_TryHandlePointerMoved(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs)">
+            <summary>
+            Handles pointer moved for symmetry axis dragging.
+            Returns true if the event was handled.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Symmetry_TryHandlePointerReleased(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs)">
+            <summary>
+            Handles pointer released for symmetry axis dragging.
+            Returns true if the event was handled.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.UpdateCursorCoordinatesDisplay(System.Int32,System.Int32)">
@@ -27021,6 +27358,21 @@
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawTileAnimationLabel(Microsoft.Graphics.Canvas.CanvasDrawingSession,System.Single,System.Single,System.Single,System.Single,System.Collections.Generic.List{System.Int32},System.Boolean)">
             <summary>
             Draws frame number labels on a tile animation frame.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSymmetryOverlay(Microsoft.Graphics.Canvas.CanvasDrawingSession,Windows.Foundation.Rect)">
+            <summary>
+            Draws the symmetry axis lines when symmetry drawing is enabled.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSymmetryAxisIndicator(Microsoft.Graphics.Canvas.CanvasDrawingSession,Windows.Foundation.Rect,System.Single,System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            Draws a small indicator showing the symmetry axis position.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSymmetryLabel(Microsoft.Graphics.Canvas.CanvasDrawingSession,System.Single,System.Single,System.String)">
+            <summary>
+            Draws a small label for symmetry axis position.
             </summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.ShowRulers">
@@ -27534,6 +27886,11 @@
         <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.CurrentBrushOverlay">
             <summary>Current brush overlay snapshot (for preview/minimap).</summary>
         </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._symmetryService">
+            <summary>
+            Symmetry service for live stroke mirroring.
+            </summary>
+        </member>
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._externalDropperActive">
             <summary>
             When true, all canvas pointer input is routed to the external dropper callback.
@@ -27651,6 +28008,12 @@
             <summary>
             Handles effective tool changes (including temporary overrides).
             Syncs brush preview from the new tool's settings.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnSymmetryChanged">
+            <summary>
+            Handles symmetry settings changes.
+            Invalidates the canvas to update the symmetry overlay.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnOptionsChanged">
@@ -31320,6 +31683,57 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout">
+            <summary>
+            Reusable MenuFlyout for LayerFolder context menu.
+            Exposes events for actions so the parent can wire up handlers.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.VisibleToggled">
+            <summary>Raised when "Visible" is toggled.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.LockedToggled">
+            <summary>Raised when "Locked" is toggled.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.DuplicateRequested">
+            <summary>Raised when "Duplicate Folder" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.FlattenFolderRequested">
+            <summary>Raised when "Flatten Folder" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.RemoveRequested">
+            <summary>Raised when "Remove Folder" is clicked.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.Flyout">
+            <summary>
+            Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.TargetFolder">
+            <summary>
+            The target folder for the context menu actions.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,PixlPunkt.Core.Document.Layer.LayerFolder,Microsoft.UI.Xaml.XamlRoot)">
+            <summary>
+            Shows the flyout at the specified element for the given folder.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Layers.Controls.LayerPreviewHost.InitializeComponent">
             <summary>
             InitializeComponent()
@@ -31331,6 +31745,172 @@
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Layers.Controls.LayerPreviewHost.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout">
+            <summary>
+            Reusable MenuFlyout for the Layers panel background (empty area).
+            Exposes events for actions so the parent can wire up handlers.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.AddLayerRequested">
+            <summary>Raised when "Add Layer" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.AddFolderRequested">
+            <summary>Raised when "Add Folder" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.AddReferenceLayerRequested">
+            <summary>Raised when "Add Reference Image" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.RemoveSelectedRequested">
+            <summary>Raised when "Remove Selected" is clicked.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.Flyout">
+            <summary>
+            Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,Microsoft.UI.Xaml.XamlRoot)">
+            <summary>
+            Shows the flyout at the specified element with the given XamlRoot.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout">
+            <summary>
+            Reusable MenuFlyout for RasterLayer context menu.
+            Exposes events for actions so the parent can wire up handlers.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.SettingsRequested">
+            <summary>Raised when "Open Settings" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.CopyEffectsRequested">
+            <summary>Raised when "Copy Effects" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.PasteEffectsRequested">
+            <summary>Raised when "Paste Effects" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.AddMaskRequested">
+            <summary>Raised when "Add Mask" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.DeleteMaskRequested">
+            <summary>Raised when "Delete Mask" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.ApplyMaskRequested">
+            <summary>Raised when "Apply Mask" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.VisibleToggled">
+            <summary>Raised when "Visible" is toggled.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.LockedToggled">
+            <summary>Raised when "Locked" is toggled.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.DuplicateRequested">
+            <summary>Raised when "Duplicate Layer" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.MergeDownRequested">
+            <summary>Raised when "Merge Down" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.RemoveRequested">
+            <summary>Raised when "Remove Layer" is clicked.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.Flyout">
+            <summary>
+            Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.TargetLayer">
+            <summary>
+            The target layer for the context menu actions.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,PixlPunkt.Core.Document.Layer.RasterLayer,Microsoft.UI.Xaml.XamlRoot)">
+            <summary>
+            Shows the flyout at the specified element for the given layer.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout">
+            <summary>
+            Reusable MenuFlyout for ReferenceLayer context menu.
+            Exposes events for actions so the parent can wire up handlers.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.SettingsRequested">
+            <summary>Raised when "Open Settings" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.VisibleToggled">
+            <summary>Raised when "Visible" is toggled.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.LockedToggled">
+            <summary>Raised when "Locked" is toggled.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.FitToCanvasRequested">
+            <summary>Raised when "Fit to Canvas" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.ResetTransformRequested">
+            <summary>Raised when "Reset Transform" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.RemoveRequested">
+            <summary>Raised when "Remove Reference" is clicked.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.Flyout">
+            <summary>
+            Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.TargetLayer">
+            <summary>
+            The target reference layer for the context menu actions.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,PixlPunkt.Core.Document.Layer.ReferenceLayer,Microsoft.UI.Xaml.XamlRoot)">
+            <summary>
+            Shows the flyout at the specified element for the given reference layer.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.ReferenceLayerMenuFlyout.GetBindingConnector(System.Int32,System.Object)">
             <summary>
             GetBindingConnector(int connectionId, object target)
             </summary>
@@ -31599,6 +32179,11 @@
             Updates the active layer indicator for all visible layer items.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Layers.LayersPanel.LayersList_RightTapped(System.Object,Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs)">
+            <summary>
+            Handles right-click on the ListView itself (empty area).
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.InitializeComponent">
             <summary>
             InitializeComponent()
@@ -31642,6 +32227,66 @@
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Layers.ReferenceLayerSettingsWindow.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout">
+            <summary>
+            Reusable MenuFlyout for the Palette panel background (empty area).
+            Exposes events for actions so the parent can wire up handlers.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.AddFgPalette">
+            <summary>Raised when "Add Fg to Palette" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.AddBgPalette">
+            <summary>Raised when "Add Bg to Palette" is clicked.</summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.ClearPalette">
+            <summary>Raised when "Clear Palette" is clicked.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.Flyout">
+            <summary>
+            Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,Microsoft.UI.Xaml.XamlRoot)">
+            <summary>
+            Shows the flyout at the specified element with the given XamlRoot.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,Microsoft.UI.Xaml.Controls.Border,Microsoft.UI.Xaml.XamlRoot)">
+            <summary>
+            Shows the flyout at the specified element for the given layer.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout.GetBindingConnector(System.Int32,System.Object)">
             <summary>
             GetBindingConnector(int connectionId, object target)
             </summary>
@@ -31703,18 +32348,6 @@
             Updates the selection ring visibility for a single swatch cell.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Palette.PalettePanel.EnsurePanelFlyout">
-            <summary>
-            Ensures the panel-level context flyout is created and attached.
-            Shown when right-clicking empty space in the palette.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Palette.PalettePanel.AttachSwatchFlyout(Microsoft.UI.Xaml.Controls.Border)">
-            <summary>
-            Attaches a context menu to an individual color swatch.
-            Provides Edit, Remove, Set FG, and Set BG options.
-            </summary>
-        </member>
         <member name="M:PixlPunkt.UI.Palette.PalettePanel.AddBtn_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
             <summary>
             Handles the "+" button to add a new color via color picker.
@@ -31745,27 +32378,22 @@
             Handles right-click on a swatch to show its context menu.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Palette.PalettePanel.SwatchList_RightTapped(System.Object,Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs)">
-            <summary>
-            Handles right-click on empty palette area to show panel menu.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_Edit_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_Edit_Click(System.Object,Microsoft.UI.Xaml.Controls.Border)">
             <summary>
             Opens the color picker to edit the selected palette color.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_SetFg_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_SetFg_Click(System.Object,Microsoft.UI.Xaml.Controls.Border)">
             <summary>
             Sets the clicked swatch as the foreground color.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_SetBg_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_SetBg_Click(System.Object,Microsoft.UI.Xaml.Controls.Border)">
             <summary>
             Sets the clicked swatch as the background color.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_Remove_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+        <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_Remove_Click(System.Object,Microsoft.UI.Xaml.Controls.Border)">
             <summary>
             Removes the clicked swatch from the palette.
             </summary>
@@ -32002,6 +32630,9 @@
             </summary>
             <summary>
             Partial class for session state management (crash recovery).
+            </summary>
+            <summary>
+            Partial class for symmetry menu handlers.
             </summary>
             <summary>
             Partial class for tab and document management:

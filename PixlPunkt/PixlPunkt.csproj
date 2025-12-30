@@ -71,8 +71,12 @@
     <None Remove="UI\Dialogs\System\NewCanvasDialog.xaml" />
     <None Remove="UI\Dialogs\System\EditCanvasWindow.xaml" />
     <None Remove="UI\History\HistoryPanel.xaml" />
+    <None Remove="UI\Layers\Controls\LayerFolderMenuFlyout.xaml" />
     <None Remove="UI\Layers\Controls\LayerPreviewHost.xaml" />
+    <None Remove="UI\Layers\Controls\LayersPanelMenuFlyout.xaml" />
+    <None Remove="UI\Layers\Controls\ReferenceLayerMenuFlyout.xaml" />
     <None Remove="UI\Layers\LayerSettingsWindow.xaml" />
+    <None Remove="UI\Palette\Controls\SwatchMenuFlyout.xaml" />
     <None Remove="UI\Palette\QuickSwatches.xaml" />
     <None Remove="UI\Preview\CanvasPreview.xaml" />
     <None Remove="UI\Tiles\TilePanel.xaml" />
@@ -234,6 +238,24 @@
     <None Update="UI\Dialogs\Export\BrushExportDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
     </None>
+    <Page Update="UI\Palette\Controls\PalettePanelMenuFlyout.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="UI\Palette\Controls\SwatchMenuFlyout.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="UI\Layers\Controls\ReferenceLayerMenuFlyout.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="UI\Layers\Controls\LayersPanelMenuFlyout.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="UI\Layers\Controls\LayerFolderMenuFlyout.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="UI\Layers\Controls\RasterLayerMenuFlyout.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <None Update="UI\Layers\ReferenceLayerSettingsWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
     </None>

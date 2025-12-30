@@ -13,6 +13,7 @@ using PixlPunkt.Core.Painting;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Structs;
+using PixlPunkt.Core.Symmetry;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Viewport;
 using PixlPunkt.UI.Helpers;
@@ -105,6 +106,11 @@ namespace PixlPunkt.UI.CanvasHost
         private StrokeEngine _stroke;
         private PixelSurface? _composite;
         private SelectionEngine _selectionEngine;
+
+        /// <summary>
+        /// Symmetry service for live stroke mirroring.
+        /// </summary>
+        private SymmetryService? _symmetryService;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - EXTERNAL STATE BINDINGS
@@ -526,6 +532,7 @@ namespace PixlPunkt.UI.CanvasHost
             _stroke.SetOpacity(_brushOpacity);
             _stroke.SetDensity(_brushDensity);
             _stroke.SetBrushShape(_toolState?.Brush.Shape ?? BrushShape.Square);
+            _stroke.SetSymmetryService(_symmetryService);
         }
 
         private void SyncBrushPreviewFromToolSettings()
@@ -577,6 +584,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _toolState.SelectionCancelRequested -= CancelSelection;
                 _toolState.SelectionFlipHorizontalRequested -= FlipSelectionHorizontal;
                 _toolState.SelectionFlipVerticalRequested -= FlipSelectionVertical;
+                _toolState.Symmetry.Changed -= OnSymmetryChanged;
             }
 
             if (_palette != null)
@@ -588,6 +596,10 @@ namespace PixlPunkt.UI.CanvasHost
             // Assign new state
             _toolState = toolState;
             _palette = palette;
+
+            // Initialize symmetry service
+            _symmetryService = new SymmetryService(_toolState.Symmetry);
+            _stroke.SetSymmetryService(_symmetryService);
 
             // Seed local flags
             _shapeFilled = _toolState.Brush.Filled;
@@ -606,6 +618,7 @@ namespace PixlPunkt.UI.CanvasHost
             _toolState.SelectionCancelRequested += CancelSelection;
             _toolState.SelectionFlipHorizontalRequested += FlipSelectionHorizontal;
             _toolState.SelectionFlipVerticalRequested += FlipSelectionVertical;
+            _toolState.Symmetry.Changed += OnSymmetryChanged;
 
             _palette.ForegroundChanged += OnFgChanged;
             _palette.BackgroundChanged += OnBgChanged;
@@ -677,6 +690,22 @@ namespace PixlPunkt.UI.CanvasHost
             SyncBrushPreviewFromToolSettings();
         }
 
+        /// <summary>
+        /// Handles symmetry settings changes.
+        /// Invalidates the canvas to update the symmetry overlay.
+        /// </summary>
+        private void OnSymmetryChanged()
+        {
+            // Update symmetry service with new settings
+            if (_symmetryService != null && _toolState?.Symmetry != null)
+            {
+                _symmetryService = new SymmetryService(_toolState.Symmetry);
+                _stroke.SetSymmetryService(_symmetryService);
+            }
+
+            // Redraw canvas to update symmetry overlay
+            CanvasView?.Invalidate();
+        }
 
         /// <summary>
         /// Synchronizes tool options with the stroke engine and updates selection transform state.

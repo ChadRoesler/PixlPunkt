@@ -115,7 +115,7 @@ namespace PixlPunkt.UI.Layers.Controls
             if (PreviewImage != null && PreviewImage.RenderTransform != null)
             {
                 PreviewImage.RenderTransform = null;
-                PreviewImage.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+                PreviewImage.RenderTransformOrigin = new Point(0.5, 0.5);
             }
         }
     }

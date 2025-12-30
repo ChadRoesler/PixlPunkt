@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Core.Coloring.Helpers;
+using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.IO;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Palette.Helpers;
@@ -646,6 +647,34 @@ namespace PixlPunkt.UI
         }
 
         private void Palette_Reset_Click(object sender, RoutedEventArgs e) => _palette.ResetToDefault();
+
+        //////////////////////////////////////////////////////////////////
+        // PALETTE SORTING
+        //////////////////////////////////////////////////////////////////
+
+        private void Palette_SortBy_Hue_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Hue);
+
+        private void Palette_SortBy_Saturation_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Saturation);
+
+        private void Palette_SortBy_Lightness_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Lightness);
+
+        private void Palette_SortBy_Luminance_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Luminance);
+
+        private void Palette_SortBy_Red_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Red);
+
+        private void Palette_SortBy_Green_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Green);
+
+        private void Palette_SortBy_Blue_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Blue);
+
+        private void Palette_SortBy_Reverse_Click(object sender, RoutedEventArgs e)
+            => _palette?.SortPalette(PaletteSortMode.Reverse);
 
         private void Palette_EditFg_Click(object sender, RoutedEventArgs e) { /* reserved */ }
         private void Palette_EditBg_Click(object sender, RoutedEventArgs e) { /* reserved */ }

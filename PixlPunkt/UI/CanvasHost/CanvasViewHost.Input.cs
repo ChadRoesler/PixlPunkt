@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
+using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Tools.Utility;
 using Windows.Foundation;
@@ -16,6 +17,16 @@ namespace PixlPunkt.UI.CanvasHost
     /// </summary>
     public sealed partial class CanvasViewHost
     {
+        // ════════════════════════════════════════════════════════════════════
+        // SYMMETRY AXIS INTERACTION STATE
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>Whether we're currently dragging a symmetry axis line.</summary>
+        private bool _symmetryAxisDragging;
+
+        /// <summary>Which axis component is being dragged: 'x' for horizontal axis, 'y' for vertical, 'c' for center point.</summary>
+        private char _symmetryAxisDragType;
+
         // ════════════════════════════════════════════════════════════════════
         // CANVAS EVENT WIRING
         // ════════════════════════════════════════════════════════════════════
@@ -62,6 +73,9 @@ namespace PixlPunkt.UI.CanvasHost
             // Reset utility handlers
             GetUtilityHandler(ToolIds.Pan)?.Reset();
             GetUtilityHandler(ToolIds.Dropper)?.Reset();
+
+            // Reset symmetry drag
+            _symmetryAxisDragging = false;
         }
 
         private void CanvasView_PointerEntered(object sender, PointerRoutedEventArgs e)
@@ -93,6 +107,187 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ════════════════════════════════════════════════════════════════════
+        // SYMMETRY AXIS INTERACTION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>Hit test radius for symmetry axis lines (in screen pixels).</summary>
+        private const float SymmetryAxisHitRadius = 8f;
+
+        /// <summary>Hit test radius for symmetry center point (in screen pixels).</summary>
+        private const float SymmetryCenterHitRadius = 12f;
+
+        /// <summary>
+        /// Gets the cursor for symmetry axis interaction based on pointer position.
+        /// Returns resize cursor when hovering over draggable axis.
+        /// Only allows interaction when Symmetry tool is active.
+        /// </summary>
+        private InputSystemCursorShape? GetSymmetryAxisCursor(Point screenPos)
+        {
+            if (_toolState?.Symmetry == null || !_toolState.Symmetry.Enabled || !_toolState.Symmetry.ShowAxisLines)
+                return null;
+
+            // Only allow axis dragging when Symmetry tool is active
+            if (_toolState?.ActiveToolId != ToolIds.Symmetry)
+                return null;
+
+            var hitType = HitTestSymmetryAxis(screenPos);
+            return hitType switch
+            {
+                'x' => InputSystemCursorShape.SizeWestEast,     // Vertical axis line - drag left/right
+                'y' => InputSystemCursorShape.SizeNorthSouth,  // Horizontal axis line - drag up/down  
+                'c' => InputSystemCursorShape.SizeAll,         // Center point - drag any direction
+                _ => null
+            };
+        }
+
+        /// <summary>
+        /// Hit tests for symmetry axis interaction.
+        /// Returns 'x' for horizontal axis (vertical line), 'y' for vertical axis (horizontal line),
+        /// 'c' for center point, or '\0' for no hit.
+        /// </summary>
+        private char HitTestSymmetryAxis(Point screenPos)
+        {
+            var settings = _toolState?.Symmetry;
+            if (settings == null || !settings.Enabled || !settings.ShowAxisLines)
+                return '\0';
+
+            var dest = _zoom.GetDestRect();
+            float scale = (float)_zoom.Scale;
+
+            // Get axis positions in document space
+            int docWidth = Document.PixelWidth;
+            int docHeight = Document.PixelHeight;
+
+            // Canvas-wide symmetry
+            double axisX = settings.AxisX * docWidth;
+            double axisY = settings.AxisY * docHeight;
+            double lineStartX = 0;
+            double lineStartY = 0;
+            double lineEndX = docWidth;
+            double lineEndY = docHeight;
+
+            // Convert to screen coordinates
+            float screenAxisX = (float)(dest.X + axisX * scale);
+            float screenAxisY = (float)(dest.Y + axisY * scale);
+
+            // For radial modes, check center point first
+            if (settings.IsRadialMode)
+            {
+                float dx = (float)screenPos.X - screenAxisX;
+                float dy = (float)screenPos.Y - screenAxisY;
+                if (dx * dx + dy * dy <= SymmetryCenterHitRadius * SymmetryCenterHitRadius)
+                    return 'c';
+            }
+
+            // For horizontal/both modes, check vertical line (X axis)
+            if (settings.Mode == SymmetryMode.Horizontal || settings.Mode == SymmetryMode.Both)
+            {
+                float screenLineStartY = (float)(dest.Y + lineStartY * scale);
+                float screenLineEndY = (float)(dest.Y + lineEndY * scale);
+
+                // Check if near the vertical axis line
+                if (Math.Abs(screenPos.X - screenAxisX) <= SymmetryAxisHitRadius &&
+                    screenPos.Y >= screenLineStartY - SymmetryAxisHitRadius &&
+                    screenPos.Y <= screenLineEndY + SymmetryAxisHitRadius)
+                {
+                    return 'x';
+                }
+            }
+
+            // For vertical/both modes, check horizontal line (Y axis)
+            if (settings.Mode == SymmetryMode.Vertical || settings.Mode == SymmetryMode.Both)
+            {
+                float screenLineStartX = (float)(dest.X + lineStartX * scale);
+                float screenLineEndX = (float)(dest.X + lineEndX * scale);
+
+                // Check if near the horizontal axis line
+                if (Math.Abs(screenPos.Y - screenAxisY) <= SymmetryAxisHitRadius &&
+                    screenPos.X >= screenLineStartX - SymmetryAxisHitRadius &&
+                    screenPos.X <= screenLineEndX + SymmetryAxisHitRadius)
+                {
+                    return 'y';
+                }
+            }
+
+            return '\0';
+        }
+
+        /// <summary>
+        /// Handles pointer pressed for symmetry axis dragging.
+        /// Returns true if the event was handled.
+        /// Only allows interaction when Symmetry tool is active.
+        /// </summary>
+        private bool Symmetry_TryHandlePointerPressed(PointerRoutedEventArgs e)
+        {
+            var settings = _toolState?.Symmetry;
+            if (settings == null || !settings.Enabled || !settings.ShowAxisLines)
+                return false;
+
+            // Only allow axis dragging when Symmetry tool is active
+            if (_toolState?.ActiveToolId != ToolIds.Symmetry)
+                return false;
+
+            var pt = e.GetCurrentPoint(CanvasView);
+            if (!pt.Properties.IsLeftButtonPressed) return false;
+
+            var hitType = HitTestSymmetryAxis(pt.Position);
+            if (hitType == '\0') return false;
+
+            _symmetryAxisDragging = true;
+            _symmetryAxisDragType = hitType;
+            CanvasView.CapturePointer(e.Pointer);
+            return true;
+        }
+
+        /// <summary>
+        /// Handles pointer moved for symmetry axis dragging.
+        /// Returns true if the event was handled.
+        /// </summary>
+        private bool Symmetry_TryHandlePointerMoved(PointerRoutedEventArgs e)
+        {
+            if (!_symmetryAxisDragging) return false;
+
+            var settings = _toolState?.Symmetry;
+            if (settings == null) return false;
+
+            var pt = e.GetCurrentPoint(CanvasView);
+            var docPos = _zoom.ScreenToDoc(pt.Position);
+
+            int docWidth = Document.PixelWidth;
+            int docHeight = Document.PixelHeight;
+
+            // Canvas-wide symmetry
+            switch (_symmetryAxisDragType)
+            {
+                case 'x': // Vertical line (horizontal position)
+                    settings.AxisX = Math.Clamp(docPos.X / docWidth, 0.0, 1.0);
+                    break;
+                case 'y': // Horizontal line (vertical position)
+                    settings.AxisY = Math.Clamp(docPos.Y / docHeight, 0.0, 1.0);
+                    break;
+                case 'c': // Center point
+                    settings.SetAxisPosition(docPos.X / docWidth, docPos.Y / docHeight);
+                    break;
+            }
+
+            CanvasView.Invalidate();
+            return true;
+        }
+
+        /// <summary>
+        /// Handles pointer released for symmetry axis dragging.
+        /// Returns true if the event was handled.
+        /// </summary>
+        private bool Symmetry_TryHandlePointerReleased(PointerRoutedEventArgs e)
+        {
+            if (!_symmetryAxisDragging) return false;
+
+            _symmetryAxisDragging = false;
+            CanvasView.ReleasePointerCaptures();
+            return true;
+        }
+
+        // ════════════════════════════════════════════════════════════════════
         // INPUT - POINTER PRESSED
         // ════════════════════════════════════════════════════════════════════
 
@@ -119,6 +314,15 @@ namespace PixlPunkt.UI.CanvasHost
                     _externalDropperCallback(sampled);
                 }
 
+                e.Handled = true;
+                return;
+            }
+
+            // ════════════════════════════════════════════════════════════════════
+            // SYMMETRY AXIS INTERACTION - drag axis lines (only when Symmetry tool is active)
+            // ════════════════════════════════════════════════════════════════════
+            if (Symmetry_TryHandlePointerPressed(e))
+            {
                 e.Handled = true;
                 return;
             }
@@ -340,6 +544,19 @@ namespace PixlPunkt.UI.CanvasHost
             var screenPos = pt.Position;
 
             // ════════════════════════════════════════════════════════════════════
+            // SYMMETRY AXIS DRAGGING
+            // ════════════════════════════════════════════════════════════════════
+            if (Symmetry_TryHandlePointerMoved(e))
+            {
+                var symCursor = GetSymmetryAxisCursor(screenPos);
+                ProtectedCursor = symCursor.HasValue
+                    ? InputSystemCursor.Create(symCursor.Value)
+                    : _targetCursor;
+                e.Handled = true;
+                return;
+            }
+
+            // ════════════════════════════════════════════════════════════════════
             // CURSOR PRIORITY SYSTEM
             // Each subsystem returns a cursor if it wants to override, or null.
             // First non-null cursor wins. Default is _targetCursor (Cross).
@@ -347,7 +564,16 @@ namespace PixlPunkt.UI.CanvasHost
 
             InputCursor? desiredCursor = null;
 
-            // 1. Guide interaction (highest priority when dragging)
+            // 1. Symmetry axis hover (when symmetry is enabled)
+            var symAxisCursor = GetSymmetryAxisCursor(screenPos);
+            if (symAxisCursor.HasValue)
+            {
+                ProtectedCursor = InputSystemCursor.Create(symAxisCursor.Value);
+                UpdateHover(screenPos);
+                return;
+            }
+
+            // 2. Guide interaction (highest priority when dragging)
             Guide_TryHandlePointerMoved(e);
             if (_isDraggingGuideOnCanvas)
             {
@@ -360,7 +586,7 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
-            // 2. Stage (camera) interaction
+            // 3. Stage (camera) interaction
             if (Stage_TryHandlePointerMoved(e))
             {
                 var stageCursor = GetStageCursor(e);
@@ -372,7 +598,7 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
-            // 3. Reference layer interaction
+            // 4. Reference layer interaction
             if (RefLayer_TryHandlePointerMoved(e))
             {
                 // RefLayer handler sets its own cursor during active manipulation
@@ -380,7 +606,7 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
-            // 4. Selection tool interaction
+            // 5. Selection tool interaction
             if (Selection_PointerMoved(e))
             {
                 // Selection handler manages its own cursor via UpdateSelectionCursor
@@ -514,6 +740,15 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void CanvasView_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
+            // ════════════════════════════════════════════════════════════════════
+            // SYMMETRY AXIS INTERACTION - release axis drag
+            // ════════════════════════════════════════════════════════════════════
+            if (Symmetry_TryHandlePointerReleased(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
             // ════════════════════════════════════════════════════════════════════
             // GUIDE INTERACTION - release guide drag
             // ════════════════════════════════════════════════════════════════════

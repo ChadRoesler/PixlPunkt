@@ -37,33 +37,7 @@
         <!-- Template for RasterLayer -->
         <DataTemplate x:Key="RasterLayerTemplate" x:DataType="layer:RasterLayer">
             <Grid ColumnSpacing="8"
-                  RightTapped="Item_RightTapped"
-                  ContextRequested="LayersList_ContextRequested">
-                <Grid.ContextFlyout>
-                    <MenuFlyout Placement="RightEdgeAlignedTop">
-                        <MenuFlyoutItem Text="Open Settings" Click="Settings_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Copy Effects" Click="CopyEffects_Click"/>
-                        <MenuFlyoutItem Text="Paste Effects" Click="PasteEffects_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Add Mask" Click="AddMask_Click"/>
-                        <MenuFlyoutItem Text="Delete Mask" Click="DeleteMask_Click"/>
-                        <MenuFlyoutItem Text="Apply Mask" Click="ApplyMask_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <ToggleMenuFlyoutItem Text="Visible"
-                                              IsChecked="{Binding Visible, Mode=TwoWay}"
-                                              Click="ItemFlyout_Vis_Toggled"/>
-                        <ToggleMenuFlyoutItem Text="Locked"
-                                              IsChecked="{Binding Locked, Mode=TwoWay}"
-                                              Click="ItemFlyout_Lock_Toggled"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Duplicate Layer" Click="ItemFlyout_Duplicate_Click"/>
-                        <MenuFlyoutItem Text="Merge Down" Click="ItemFlyout_MergeDown_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Remove Layer" Click="ItemFlyout_Remove_Click"/>
-                    </MenuFlyout>
-                </Grid.ContextFlyout>
-
+                  RightTapped="Item_RightTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Active indicator -->
                     <ColumnDefinition Width="Auto"/> <!-- indent -->
@@ -270,22 +244,6 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Grid.ContextFlyout>
-                    <MenuFlyout Placement="RightEdgeAlignedTop">
-                        <ToggleMenuFlyoutItem Text="Visible"
-                                              IsChecked="{Binding Visible, Mode=TwoWay}"
-                                              Click="ItemFlyout_Vis_Toggled"/>
-                        <ToggleMenuFlyoutItem Text="Locked"
-                                              IsChecked="{Binding Locked, Mode=TwoWay}"
-                                              Click="ItemFlyout_Lock_Toggled"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Duplicate Folder" Click="ItemFlyout_Duplicate_Click" />
-                        <MenuFlyoutItem Text="Flatten Folder" Click="ItemFlyout_FlattenFolder_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Remove Folder" Click="ItemFlyout_Remove_Click"/>
-                    </MenuFlyout>
-                </Grid.ContextFlyout>
-
                 <!-- Drop target background -->
                 <Border x:Name="DropTargetBorder"
                         Grid.ColumnSpan="6"
@@ -388,26 +346,7 @@
         <!-- Template for ReferenceLayer -->
         <DataTemplate x:Key="ReferenceLayerTemplate" x:DataType="layer:ReferenceLayer">
             <Grid ColumnSpacing="8"
-                  RightTapped="Item_RightTapped"
-                  ContextRequested="LayersList_ContextRequested">
-                <Grid.ContextFlyout>
-                    <MenuFlyout Placement="RightEdgeAlignedTop">
-                        <MenuFlyoutItem Text="Open Settings" Click="RefLayerSettings_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <ToggleMenuFlyoutItem Text="Visible"
-                                              IsChecked="{Binding Visible, Mode=TwoWay}"
-                                              Click="ItemFlyout_Vis_Toggled"/>
-                        <ToggleMenuFlyoutItem Text="Locked"
-                                              IsChecked="{Binding Locked, Mode=TwoWay}"
-                                              Click="ItemFlyout_Lock_Toggled"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Fit to Canvas" Click="RefLayer_FitToCanvas_Click"/>
-                        <MenuFlyoutItem Text="Reset Transform" Click="RefLayer_ResetTransform_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Remove Reference" Click="ItemFlyout_Remove_Click"/>
-                    </MenuFlyout>
-                </Grid.ContextFlyout>
-
+                  RightTapped="Item_RightTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Active indicator spacer -->
                     <ColumnDefinition Width="Auto"/> <!-- indent -->
@@ -525,6 +464,12 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <!-- Flyout control instances (zero-size, just host the MenuFlyout resources) -->
+        <lctl:LayersPanelMenuFlyout x:Name="PanelMenuFlyout"/>
+        <lctl:RasterLayerMenuFlyout x:Name="RasterLayerMenuFlyout"/>
+        <lctl:LayerFolderMenuFlyout x:Name="FolderMenuFlyout"/>
+        <lctl:ReferenceLayerMenuFlyout x:Name="RefLayerMenuFlyout"/>
+
         <!-- header -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
@@ -567,29 +512,43 @@
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
                           SelectionChanged="LayersList_SelectionChanged"
-                          ContextRequested="LayersList_ContextRequested"
+                          RightTapped="LayersList_RightTapped"
                           ItemContainerStyleSelector="{StaticResource LayerRowStyleSelector}">
-                            
-
-
-                    <ListView.ContextFlyout>
-                        <MenuFlyout>
-                            <MenuFlyoutItem Text="Add Layer" Icon="Add" Click="Add_Click"/>
-                            <MenuFlyoutItem Text="Add Folder" Click="AddFolder_Click">
-                                <MenuFlyoutItem.Icon>
-                                    <FontIcon Glyph="&#xE8B7;"/>
-                                </MenuFlyoutItem.Icon>
-                            </MenuFlyoutItem>
-                            <MenuFlyoutItem Text="Add Reference Image" Click="AddReferenceLayer_Click">
-                                <MenuFlyoutItem.Icon>
-                                    <ic:FluentIcon Icon="ImageSparkle"/>
-                                </MenuFlyoutItem.Icon>
-                            </MenuFlyoutItem>
-                            <MenuFlyoutSeparator/>
-                            <MenuFlyoutItem Text="Remove Selected" Icon="Delete" Click="Remove_Click"/>
-                        </MenuFlyout>
-                    </ListView.ContextFlyout>
                 </ListView>
+
+                <!-- Root drop zone - appears at bottom during drag to allow moving items to root -->
+                <Border x:Name="RootDropZone"
+                        Height="44"
+                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                        BorderBrush="{ThemeResource SystemAccentColor}"
+                        BorderThickness="2"
+                        CornerRadius="6"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Bottom"
+                        Margin="4,0,4,4"
+                        Visibility="Collapsed"
+                        AllowDrop="True"
+                        DragOver="RootDropZone_DragOver"
+                        Drop="RootDropZone_Drop"
+                        DragLeave="RootDropZone_DragLeave">
+                    <Border x:Name="RootDropZoneHighlight"
+                            Background="Transparent"
+                            CornerRadius="4"
+                            Opacity="1">
+                        <StackPanel Orientation="Horizontal" 
+                                    HorizontalAlignment="Center" 
+                                    VerticalAlignment="Center"
+                                    Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" 
+                                           FontSize="16"
+                                           Foreground="{ThemeResource SystemAccentColor}"/>
+                            <TextBlock Text="Drop here to move to root level"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                </Border>
 
                 <!-- Insertion indicator bar (Photoshop-style) -->
                 <Border x:Name="InsertionIndicator"

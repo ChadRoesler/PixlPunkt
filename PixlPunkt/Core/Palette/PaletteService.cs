@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Logging;
+using PixlPunkt.Core.Palette.Helpers;
 using PixlPunkt.Core.Palette.Helpers.Defaults;
 using PixlPunkt.Core.Serialization;
 using PixlPunkt.Core.Settings;
@@ -123,6 +125,7 @@ namespace PixlPunkt.Core.Palette
         /// <summary>
         /// Loads a palette by name, checking both built-in and custom palettes.
         /// Falls back to PixlPunkt Default if not found.
+        /// Applies the configured default sort mode after loading.
         /// </summary>
         /// <param name="paletteName">Name of the palette to load.</param>
         /// <returns>True if the named palette was loaded, false if fallback was used.</returns>
@@ -130,44 +133,82 @@ namespace PixlPunkt.Core.Palette
         {
             _colors.Clear();
 
+            bool found = false;
+
             // Try built-in palettes first
             if (DefaultPalettes.ByName.TryGetValue(paletteName, out var builtIn))
             {
                 _colors.AddRange(builtIn.Colors);
                 LoggingService.Debug("Loaded built-in palette: {PaletteName}", paletteName);
-                PaletteChanged?.Invoke();
-                return true;
-            }
-
-            // Try custom palettes
-            CustomPaletteService.Instance.Initialize();
-            var customPalette = CustomPaletteService.Instance.GetPalette(paletteName);
-            if (customPalette != null)
-            {
-                var colors = customPalette.GetBgraColors();
-                _colors.AddRange(colors);
-                LoggingService.Debug("Loaded custom palette: {PaletteName}", paletteName);
-                PaletteChanged?.Invoke();
-                return true;
-            }
-
-            // Fallback to default
-            LoggingService.Warning("Palette '{PaletteName}' not found, falling back to {FallbackName}",
-                paletteName, AppSettings.FallbackPaletteName);
-
-            if (DefaultPalettes.ByName.TryGetValue(AppSettings.FallbackPaletteName, out var fallback))
-            {
-                _colors.AddRange(fallback.Colors);
+                found = true;
             }
             else
             {
-                // Ultimate fallback - hardcoded colors
-                _colors.Add(0xFF000000); // Black
-                _colors.Add(0xFFFFFFFF); // White
+                // Try custom palettes
+                CustomPaletteService.Instance.Initialize();
+                var customPalette = CustomPaletteService.Instance.GetPalette(paletteName);
+                if (customPalette != null)
+                {
+                    var colors = customPalette.GetBgraColors();
+                    _colors.AddRange(colors);
+                    LoggingService.Debug("Loaded custom palette: {PaletteName}", paletteName);
+                    found = true;
+                }
             }
 
+            if (!found)
+            {
+                // Fallback to default
+                LoggingService.Warning("Palette '{PaletteName}' not found, falling back to {FallbackName}",
+                    paletteName, AppSettings.FallbackPaletteName);
+
+                if (DefaultPalettes.ByName.TryGetValue(AppSettings.FallbackPaletteName, out var fallback))
+                {
+                    _colors.AddRange(fallback.Colors);
+                }
+                else
+                {
+                    // Ultimate fallback - hardcoded colors
+                    _colors.Add(0xFF000000); // Black
+                    _colors.Add(0xFFFFFFFF); // White
+                }
+            }
+
+            // Apply default sort mode if configured
+            ApplyDefaultSort();
+
             PaletteChanged?.Invoke();
-            return false;
+            return found;
+        }
+
+        /// <summary>
+        /// Applies the default sort mode from settings to the current palette.
+        /// </summary>
+        private void ApplyDefaultSort()
+        {
+            var sortMode = AppSettings.Instance.DefaultPaletteSortMode;
+            if (sortMode != PaletteSortMode.Default && _colors.Count > 1)
+            {
+                var sorted = PaletteSorter.Sort(_colors, sortMode);
+                _colors.Clear();
+                _colors.AddRange(sorted);
+                LoggingService.Debug("Applied default sort mode: {SortMode}", sortMode);
+            }
+        }
+
+        /// <summary>
+        /// Sorts the current palette colors using the specified sort mode.
+        /// </summary>
+        /// <param name="mode">The sorting algorithm to apply.</param>
+        public void SortPalette(PaletteSortMode mode)
+        {
+            if (_colors.Count <= 1)
+                return;
+
+            var sorted = PaletteSorter.Sort(_colors, mode);
+            _colors.Clear();
+            _colors.AddRange(sorted);
+            PaletteChanged?.Invoke();
         }
 
         /// <summary>

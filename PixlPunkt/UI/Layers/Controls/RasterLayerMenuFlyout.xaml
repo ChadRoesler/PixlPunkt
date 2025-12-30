@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PixlPunkt.UI.Layers.Controls.RasterLayerMenuFlyout"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:PixlPunkt.UI.Layers.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <MenuFlyout x:Name="LayerMenuFlyout" Placement="RightEdgeAlignedTop">
+            <MenuFlyoutItem Text="Open Settings" Click="Settings_Click"/>
+            <MenuFlyoutSeparator/>
+            <MenuFlyoutItem Text="Copy Effects" Click="CopyEffects_Click"/>
+            <MenuFlyoutItem Text="Paste Effects" Click="PasteEffects_Click"/>
+            <MenuFlyoutSeparator/>
+            <MenuFlyoutItem Text="Add Mask" Click="AddMask_Click"/>
+            <MenuFlyoutItem Text="Delete Mask" Click="DeleteMask_Click"/>
+            <MenuFlyoutItem Text="Apply Mask" Click="ApplyMask_Click"/>
+            <MenuFlyoutSeparator/>
+            <ToggleMenuFlyoutItem x:Name="VisibleToggle" Text="Visible" Click="Visible_Toggled"/>
+            <ToggleMenuFlyoutItem x:Name="LockedToggle" Text="Locked" Click="Locked_Toggled"/>
+            <MenuFlyoutSeparator/>
+            <MenuFlyoutItem Text="Duplicate Layer" Click="Duplicate_Click"/>
+            <MenuFlyoutItem Text="Merge Down" Click="MergeDown_Click"/>
+            <MenuFlyoutSeparator/>
+            <MenuFlyoutItem Text="Remove Layer" Click="Remove_Click"/>
+        </MenuFlyout>
+    </UserControl.Resources>
+
+    <!-- Empty visual - this control just hosts the MenuFlyout resource -->
+    <Grid Height="0" Width="0"/>
+</UserControl>

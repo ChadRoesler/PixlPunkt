@@ -115,6 +115,7 @@ namespace PixlPunkt.Core.Painting
         {
             if (Layer == null)
             {
+                Logging.LoggingService.Warning("PainterBase.End called with null Layer, Accum has {AccumCount} entries", Accum.Count);
                 Accum.Clear();
                 Touched.Clear();
                 Surface = null;
@@ -124,11 +125,38 @@ namespace PixlPunkt.Core.Painting
 
             var item = new PixelChangeItem(Layer, description, icon);
 
+            int changedCount = 0;
+            int minX = int.MaxValue, maxX = int.MinValue;
+            int minY = int.MaxValue, maxY = int.MinValue;
+            int surfaceWidth = Surface?.Width ?? 1;
+            
             foreach (var kv in Accum)
             {
                 var rec = kv.Value;
                 if (rec.before != rec.after)
+                {
                     item.Add(kv.Key, rec.before, rec.after);
+                    changedCount++;
+                    
+                    // Track pixel bounds for logging
+                    int pixelIndex = kv.Key / 4;
+                    int x = pixelIndex % surfaceWidth;
+                    int y = pixelIndex / surfaceWidth;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            if (changedCount > 0)
+            {
+                Logging.LoggingService.Info("PainterBase.End: {ChangedCount} changes, bounds X=[{MinX},{MaxX}] Y=[{MinY},{MaxY}]", 
+                    changedCount, minX, maxX, minY, maxY);
+            }
+            else
+            {
+                Logging.LoggingService.Info("PainterBase.End: No pixel changes recorded (Accum had {AccumCount} entries)", Accum.Count);
             }
 
             // Cleanup

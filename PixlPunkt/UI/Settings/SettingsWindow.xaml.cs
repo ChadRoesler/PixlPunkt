@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Core.Brush;
 using PixlPunkt.Core.Canvas;
+using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Palette.Helpers.Defaults;
@@ -107,6 +108,7 @@ namespace PixlPunkt.UI.Settings
             DefaultTileSetPathBox.Text = s.DefaultTileSetPath;
             AppThemeChoice.SelectedIndex = (int)s.AppTheme;
             StripeChoice.SelectedIndex = (int)s.StripeTheme;
+            DefaultPaletteSortCombo.SelectedIndex = (int)s.DefaultPaletteSortMode;
 
             // Initialize log path display
             LogPathBox.Text = LoggingService.LogDirectory;
@@ -656,6 +658,7 @@ namespace PixlPunkt.UI.Settings
                 s.AppTheme = (AppThemeChoice)AppThemeChoice.SelectedIndex;
                 s.StripeTheme = (StripeThemeChoice)StripeChoice.SelectedIndex;
                 s.DefaultPalette = GetSelectedDefaultPalette();
+                s.DefaultPaletteSortMode = (PaletteSortMode)DefaultPaletteSortCombo.SelectedIndex;
 
                 // Apply log level
                 if (LogLevelCombo.SelectedItem is ComboBoxItem item && item.Content is string selected)

@@ -4,6 +4,8 @@ using FluentIcons.Common;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.UI.Controls;
+using PixlPunkt.UI.Layers;
+using PixlPunkt.UI.Palette;
 
 namespace PixlPunkt.UI.Panels
 {
@@ -130,14 +132,20 @@ namespace PixlPunkt.UI.Panels
             {
                 // Remove the SectionCard from the sidebar grid
                 _sidebarGrid.Children.Remove(panel.DockedContainer);
-
                 // Set floating state on SectionCard
                 if (panel.DockedContainer is SectionCard card)
                 {
                     card.IsFloating = true;
                     card.IsMinimized = false;
+                    if (card.CustomControl is LayersPanel layersPanel)
+                    {
+                        layersPanel.WireFlyoutEvents();
+                    }
+                    else if (card.CustomControl is PalettePanel palettePanel)
+                    {
+                        palettePanel.WireFlyoutEvents();
+                    }
                 }
-
                 // Create floating window with the SectionCard as content
                 var window = new PanelWindow(panelId, panel.Title, panel.DockedContainer);
                 panel.FloatingWindow = window;

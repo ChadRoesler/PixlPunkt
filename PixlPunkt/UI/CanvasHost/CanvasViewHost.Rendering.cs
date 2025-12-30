@@ -7,6 +7,7 @@ using Microsoft.UI;
 using PixlPunkt.Core.Coloring.Helpers;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
+using PixlPunkt.Core.Symmetry;
 using Windows.Foundation;
 using Windows.Graphics.DirectX;
 using Windows.UI;
@@ -39,6 +40,11 @@ namespace PixlPunkt.UI.CanvasHost
         private static readonly Color TileAnimCurrentFrameColor = Color.FromArgb(180, 255, 200, 100); // Yellow fill for current frame
         private static readonly Color TileAnimFrameOutline = Color.FromArgb(200, 100, 150, 255);    // Blue outline
         private static readonly Color TileAnimCurrentOutline = Color.FromArgb(255, 255, 180, 0);    // Orange outline for current
+
+        // Symmetry overlay colors
+        private static readonly Color SymmetryAxisColor = Color.FromArgb(180, 255, 100, 200); // Magenta/pink
+        private static readonly Color SymmetryAxisColorSecondary = Color.FromArgb(120, 200, 100, 255); // Purple for secondary lines
+        private static readonly Color SymmetryCenterColor = Color.FromArgb(255, 255, 200, 100); // Yellow for center point
 
         // Stage visibility
         private bool _showStageOverlay = true;
@@ -137,6 +143,9 @@ namespace PixlPunkt.UI.CanvasHost
             if (_showTileGrid) DrawTileGrid(ds, dest);
             if (_showTileMappings) DrawTileMappings(ds, dest);
             if (_showTileAnimationMappings) DrawTileAnimationFrames(ds, dest);
+
+            // Draw symmetry overlay
+            DrawSymmetryOverlay(ds, dest);
 
             // Draw stage overlay (camera viewport)
             if (_showStageOverlay) DrawStageOverlay(ds, dest);
@@ -1505,6 +1514,124 @@ namespace PixlPunkt.UI.CanvasHost
             // Draw text
             var textColor = isCurrent ? Colors.White : Color.FromArgb(255, 200, 220, 255);
             ds.DrawText(label, labelX + 2, labelY + 1, textColor, format);
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // RENDERING - SYMMETRY OVERLAY
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Draws the symmetry axis lines when symmetry drawing is enabled.
+        /// </summary>
+        private void DrawSymmetryOverlay(CanvasDrawingSession ds, Rect dest)
+        {
+            if (_symmetryService == null || !_symmetryService.IsActive)
+                return;
+
+            var settings = _toolState?.Symmetry;
+            if (settings == null || !settings.ShowAxisLines)
+                return;
+
+            float scale = (float)_zoom.Scale;
+            int docWidth = Document.PixelWidth;
+            int docHeight = Document.PixelHeight;
+
+            // Get axis lines from the symmetry service
+            foreach (var (x1, y1, x2, y2) in _symmetryService.GetAxisLines(docWidth, docHeight))
+            {
+                // Convert to screen coordinates
+                float screenX1 = (float)(dest.X + x1 * scale);
+                float screenY1 = (float)(dest.Y + y1 * scale);
+                float screenX2 = (float)(dest.X + x2 * scale);
+                float screenY2 = (float)(dest.Y + y2 * scale);
+
+                // Draw the line
+                ds.DrawLine(screenX1, screenY1, screenX2, screenY2, SymmetryAxisColor, 2f);
+            }
+
+            // Draw center point for radial symmetry
+            if (settings.IsRadialMode)
+            {
+                var (centerX, centerY) = _symmetryService.GetAxisCenter(docWidth, docHeight);
+                float screenCenterX = (float)(dest.X + centerX * scale);
+                float screenCenterY = (float)(dest.Y + centerY * scale);
+
+                // Draw center crosshair
+                float crossSize = 8f;
+                ds.DrawLine(screenCenterX - crossSize, screenCenterY, screenCenterX + crossSize, screenCenterY, SymmetryCenterColor, 2f);
+                ds.DrawLine(screenCenterX, screenCenterY - crossSize, screenCenterX, screenCenterY + crossSize, SymmetryCenterColor, 2f);
+
+                // Draw center circle
+                ds.DrawEllipse(screenCenterX, screenCenterY, 6f, 6f, SymmetryCenterColor, 2f);
+            }
+
+            // Draw axis position indicators for horizontal/vertical modes
+            if (settings.Mode == SymmetryMode.Horizontal || settings.Mode == SymmetryMode.Both)
+            {
+                DrawSymmetryAxisIndicator(ds, dest, scale, docWidth, docHeight, isHorizontalAxis: true);
+            }
+
+            if (settings.Mode == SymmetryMode.Vertical || settings.Mode == SymmetryMode.Both)
+            {
+                DrawSymmetryAxisIndicator(ds, dest, scale, docWidth, docHeight, isHorizontalAxis: false);
+            }
+        }
+
+        /// <summary>
+        /// Draws a small indicator showing the symmetry axis position.
+        /// </summary>
+        private void DrawSymmetryAxisIndicator(CanvasDrawingSession ds, Rect dest, float scale, int docWidth, int docHeight, bool isHorizontalAxis)
+        {
+            var settings = _toolState?.Symmetry;
+            if (settings == null)
+                return;
+
+            if (isHorizontalAxis)
+            {
+                // Vertical line for horizontal symmetry (mirrors left/right)
+                float axisX = (float)(settings.AxisX * docWidth);
+                float screenX = (float)(dest.X + axisX * scale);
+
+                // Draw position label near the top
+                string label = $"X:{(int)axisX}";
+                DrawSymmetryLabel(ds, screenX + 4f, (float)dest.Y + 4f, label);
+            }
+            else
+            {
+                // Horizontal line for vertical symmetry (mirrors top/bottom)
+                float axisY = (float)(settings.AxisY * docHeight);
+                float screenY = (float)(dest.Y + axisY * scale);
+
+                // Draw position label near the left
+                string label = $"Y:{(int)axisY}";
+                DrawSymmetryLabel(ds, (float)dest.X + 4f, screenY + 4f, label);
+            }
+        }
+
+        /// <summary>
+        /// Draws a small label for symmetry axis position.
+        /// </summary>
+        private void DrawSymmetryLabel(CanvasDrawingSession ds, float x, float y, string text)
+        {
+            using var format = new Microsoft.Graphics.Canvas.Text.CanvasTextFormat
+            {
+                FontSize = 10,
+                FontFamily = "Segoe UI",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+
+            using var textLayout = new Microsoft.Graphics.Canvas.Text.CanvasTextLayout(ds.Device, text, format, 100, 20);
+            float textW = (float)textLayout.LayoutBounds.Width;
+            float textH = (float)textLayout.LayoutBounds.Height;
+            float padding = 3f;
+
+            // Draw background
+            var bgRect = new Rect(x - padding, y - padding / 2, textW + padding * 2, textH + padding);
+            ds.FillRoundedRectangle(bgRect, 2, 2, Color.FromArgb(200, 0, 0, 0));
+            ds.DrawRoundedRectangle(bgRect, 2, 2, SymmetryAxisColor, 1f);
+
+            // Draw text
+            ds.DrawText(text, x, y, SymmetryAxisColor, format);
         }
     }
 }

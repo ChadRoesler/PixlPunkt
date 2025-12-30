@@ -36,7 +36,12 @@ namespace PixlPunkt.Core.Painting.Painters
         /// <inheritdoc/>
         public override void StampAt(int cx, int cy, StrokeContext ctx)
         {
+            // Use the painter's Surface for both bounds checking and pixel operations
+            // to ensure consistency with symmetry support.
             if (Surface == null) return;
+
+            int surfaceWidth = Surface.Width;
+            int surfaceHeight = Surface.Height;
 
             foreach (var (dx, dy) in ctx.BrushOffsets)
             {
@@ -44,12 +49,15 @@ namespace PixlPunkt.Core.Painting.Painters
                 if (effA == 0) continue;
 
                 int x = cx + dx, y = cy + dy;
-                if (!ctx.IsInBounds(x, y)) continue;
+                
+                // Use painter's surface dimensions for bounds checking
+                if ((uint)x >= (uint)surfaceWidth || (uint)y >= (uint)surfaceHeight) continue;
 
                 // Check selection mask - skip pixels outside selection
                 if (!ctx.IsInSelection(x, y)) continue;
 
-                int idx = ctx.IndexOf(x, y);
+                // Compute index using painter's surface dimensions
+                int idx = (y * surfaceWidth + x) * 4;
 
                 uint before = ReadPixel(Surface.Pixels, idx);
                 var rec = GetOrCreateAccumRec(idx, before);

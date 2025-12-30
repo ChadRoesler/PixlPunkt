@@ -31,6 +31,9 @@ namespace PixlPunkt.Core.Tools
         /// <summary>Color picker (dropper) tool for sampling colors.</summary>
         public const string Dropper = "pixlpunkt.utility.dropper";
 
+        /// <summary>Symmetry tool for live stroke mirroring.</summary>
+        public const string Symmetry = "pixlpunkt.utility.symmetry";
+
         //////////////////////////////////////////////////////////////////
         // SELECTION TOOLS
         //////////////////////////////////////////////////////////////////
