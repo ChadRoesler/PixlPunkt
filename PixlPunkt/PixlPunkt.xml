@@ -32269,11 +32269,6 @@
         <member name="E:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.ClearPalette">
             <summary>Raised when "Clear Palette" is clicked.</summary>
         </member>
-        <member name="P:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.Flyout">
-            <summary>
-            Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
-            </summary>
-        </member>
         <member name="M:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,Microsoft.UI.Xaml.XamlRoot)">
             <summary>
             Shows the flyout at the specified element with the given XamlRoot.
@@ -32294,9 +32289,15 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout">
+            <summary>
+            Reusable MenuFlyout for individual swatch items.
+            Exposes events for actions so the parent can wire up handlers.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout.ShowAt(Microsoft.UI.Xaml.FrameworkElement,Microsoft.UI.Xaml.Controls.Border,Microsoft.UI.Xaml.XamlRoot)">
             <summary>
-            Shows the flyout at the specified element for the given layer.
+            Shows the flyout at the specified element for the given swatch.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout.InitializeComponent">

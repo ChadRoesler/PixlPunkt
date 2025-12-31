@@ -17,10 +17,6 @@ namespace PixlPunkt.UI.Palette.Controls
         /// <summary>Raised when "Clear Palette" is clicked.</summary>
         public event EventHandler? ClearPalette;
 
-        /// <summary>
-        /// Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
-        /// </summary>
-        public MenuFlyout Flyout => PanelMenuFlyout;
         public PalettePanelMenuFlyout()
         {
             InitializeComponent();
@@ -31,24 +27,25 @@ namespace PixlPunkt.UI.Palette.Controls
         /// </summary>
         public void ShowAt(FrameworkElement target, XamlRoot xamlRoot)
         {
-            if (PanelMenuFlyout.XamlRoot != xamlRoot)
-                PanelMenuFlyout.XamlRoot = xamlRoot;
-            PanelMenuFlyout.ShowAt(target);
-        }
+            // Create a fresh MenuFlyout each time to avoid XamlRoot conflicts
+            var flyout = new MenuFlyout();
+            flyout.XamlRoot = xamlRoot;
 
-        private void AddFgPalette_Click(object sender, RoutedEventArgs e)
-        {
-            AddFgPalette?.Invoke(this, EventArgs.Empty);
-        }
+            var miAddFg = new MenuFlyoutItem { Text = "Add FG to palette" };
+            miAddFg.Click += (s, e) => AddFgPalette?.Invoke(this, EventArgs.Empty);
+            flyout.Items.Add(miAddFg);
 
-        private void AddBgPalette_Click(object sender, RoutedEventArgs e)
-        {
-            AddBgPalette?.Invoke(this, EventArgs.Empty);
-        }
+            var miAddBg = new MenuFlyoutItem { Text = "Add BG to palette" };
+            miAddBg.Click += (s, e) => AddBgPalette?.Invoke(this, EventArgs.Empty);
+            flyout.Items.Add(miAddBg);
 
-        private void ClearPalette_Click(object sender, RoutedEventArgs e)
-        {
-            ClearPalette?.Invoke(this, EventArgs.Empty);
+            flyout.Items.Add(new MenuFlyoutSeparator());
+
+            var miClear = new MenuFlyoutItem { Text = "Clear palette…" };
+            miClear.Click += (s, e) => ClearPalette?.Invoke(this, EventArgs.Empty);
+            flyout.Items.Add(miClear);
+
+            flyout.ShowAt(target);
         }
     }
 }

@@ -8,6 +8,10 @@ using System;
 
 namespace PixlPunkt.UI.Palette.Controls
 {
+    /// <summary>
+    /// Reusable MenuFlyout for individual swatch items.
+    /// Exposes events for actions so the parent can wire up handlers.
+    /// </summary>
     public sealed partial class SwatchMenuFlyout : UserControl
     {
         public event EventHandler<Border?>? RemoveSwatch;
@@ -17,40 +21,41 @@ namespace PixlPunkt.UI.Palette.Controls
 
         public Border? TargetSwatch { get; private set; }
 
-        public MenuFlyout Flyout => SwatchBorderMenuFlyout;
         public SwatchMenuFlyout()
         {
             InitializeComponent();
         }
 
         /// <summary>
-        /// Shows the flyout at the specified element for the given layer.
+        /// Shows the flyout at the specified element for the given swatch.
         /// </summary>
         public void ShowAt(FrameworkElement target, Border swatch, XamlRoot xamlRoot)
         {
             TargetSwatch = swatch;
 
-            if (SwatchBorderMenuFlyout.XamlRoot != xamlRoot)
-                SwatchBorderMenuFlyout.XamlRoot = xamlRoot;
+            // Create a fresh MenuFlyout each time to avoid XamlRoot conflicts
+            var flyout = new MenuFlyout();
+            flyout.XamlRoot = xamlRoot;
 
-            SwatchBorderMenuFlyout.ShowAt(target);
-        }
+            var miEdit = new MenuFlyoutItem { Text = "Edit" };
+            miEdit.Click += (s, e) => EditSwatch?.Invoke(this, TargetSwatch);
+            flyout.Items.Add(miEdit);
 
-        private void SwatchRemove_Click(object sender, RoutedEventArgs e)
-        {
-            RemoveSwatch?.Invoke(this, TargetSwatch);
-        }
-        private void SwatchSetFg_Click(object sender, RoutedEventArgs e)
-        {
-            SetAsForeground?.Invoke(this, TargetSwatch);
-        }
-        private void SwatchSetBg_Click(object sender, RoutedEventArgs e)
-        {
-            SetAsBackground?.Invoke(this, TargetSwatch);
-        }
-        private void SwatchEdit_Click(object sender, RoutedEventArgs e)
-        {
-            EditSwatch?.Invoke(this, TargetSwatch);
+            var miRemove = new MenuFlyoutItem { Text = "Remove" };
+            miRemove.Click += (s, e) => RemoveSwatch?.Invoke(this, TargetSwatch);
+            flyout.Items.Add(miRemove);
+
+            flyout.Items.Add(new MenuFlyoutSeparator());
+
+            var miFg = new MenuFlyoutItem { Text = "Set as FG" };
+            miFg.Click += (s, e) => SetAsForeground?.Invoke(this, TargetSwatch);
+            flyout.Items.Add(miFg);
+
+            var miBg = new MenuFlyoutItem { Text = "Set as BG" };
+            miBg.Click += (s, e) => SetAsBackground?.Invoke(this, TargetSwatch);
+            flyout.Items.Add(miBg);
+
+            flyout.ShowAt(target);
         }
     }
 }

@@ -7,6 +7,7 @@ using PixlPunkt.Core.Palette;
 using PixlPunkt.UI.ColorPick;
 using PixlPunkt.UI.Helpers;
 using PixlPunkt.UI.Layers.Controls;
+using PixlPunkt.UI.Palette.Controls;
 using System;
 using System.Collections.Generic;
 
@@ -65,7 +66,8 @@ namespace PixlPunkt.UI.Palette
         // ════════════════════════════════════════════════════════════════════
 
         private readonly List<(Border Swatch, Border FgRing, Border BgRing, uint Value)> _cells = new();
-
+        private readonly PalettePanelMenuFlyout _panelMenuFlyout = new();
+        private readonly SwatchMenuFlyout _swatchMenuFlyout = new();
         // ════════════════════════════════════════════════════════════════════
         // CONSTRUCTOR
         // ════════════════════════════════════════════════════════════════════
@@ -79,7 +81,6 @@ namespace PixlPunkt.UI.Palette
             Loaded += (_, __) =>
             {
                 Rebuild();
-                //EnsurePanelFlyout();
                 WireFlyoutEvents();
             };
             SwatchList.UpdateLayout();
@@ -204,17 +205,15 @@ namespace PixlPunkt.UI.Palette
         public void WireFlyoutEvents()
         {
             // Panel menu flyout (empty area right-click)
-            //PanelMenuFlyout.AddFgPalette += (s, e) => { if (Service is not null) Service.AddColor(Service.Foreground); };
-            //PanelMenuFlyout.AddBgPalette += (s, e) => { if (Service is not null) Service.AddColor(Service.Background); };
-            //PanelMenuFlyout.ClearPalette += (s, e) => Panel_Clear_Click(s, new RoutedEventArgs());
+            _panelMenuFlyout.AddFgPalette += (s, e) => { if (Service is not null) Service.AddColor(Service.Foreground); };
+            _panelMenuFlyout.AddBgPalette += (s, e) => { if (Service is not null) Service.AddColor(Service.Background); };
+            _panelMenuFlyout.ClearPalette += (s, e) => Panel_Clear_Click(null, new RoutedEventArgs());
 
-            
-
-            //// Reference layer flyout
-            //SwatchMenuFlyout.EditSwatch += Swatch_Edit_Click;
-            //SwatchMenuFlyout.RemoveSwatch += Swatch_Remove_Click;
-            //SwatchMenuFlyout.SetAsBackground += Swatch_SetBg_Click;
-            //SwatchMenuFlyout.SetAsForeground += Swatch_SetFg_Click;
+            // Swatch flyout
+            _swatchMenuFlyout.EditSwatch += Swatch_Edit_Click;
+            _swatchMenuFlyout.RemoveSwatch += Swatch_Remove_Click;
+            _swatchMenuFlyout.SetAsForeground += Swatch_SetFg_Click;
+            _swatchMenuFlyout.SetAsBackground += Swatch_SetBg_Click;
         }
         /// <summary>
         /// Ensures the panel-level context flyout is created and attached.
@@ -417,11 +416,16 @@ namespace PixlPunkt.UI.Palette
         /// </summary>
         private void Swatch_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe)
+            if (sender is not FrameworkElement fe) return;
+
+            if (fe is Border swatch && ColorUtil.TryGetBGRA(swatch.Tag, out _))
             {
-                // Ensure a flyout exists (defensive, in case cell re-templated)
-                //if (fe is Border b) AttachSwatchFlyout(b);
-                fe.ContextFlyout?.ShowAt(fe);
+                // Get XamlRoot from element (works correctly in both docked and undocked scenarios)
+                var xamlRoot = fe.XamlRoot ?? this.XamlRoot;
+                if (xamlRoot != null)
+                {
+                    _swatchMenuFlyout.ShowAt(fe, swatch, xamlRoot);
+                }
                 e.Handled = true;
             }
         }
@@ -431,11 +435,19 @@ namespace PixlPunkt.UI.Palette
         /// </summary>
         private void SwatchList_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
         {
+            if (sender is not FrameworkElement fe) return;
+
             // If the tap is on a swatch, its own RightTapped handler will show its menu
             if (FindAncestorNamed(e.OriginalSource as DependencyObject, "Swatch") is not null)
                 return;
 
-            SwatchList.ContextFlyout?.ShowAt(SwatchList);
+            // Get XamlRoot from element (works correctly in both docked and undocked scenarios)
+            var xamlRoot = fe.XamlRoot ?? this.XamlRoot;
+            if (xamlRoot != null)
+            {
+                _panelMenuFlyout.ShowAt(fe, xamlRoot);
+            }
+
             e.Handled = true;
         }
 
@@ -448,11 +460,11 @@ namespace PixlPunkt.UI.Palette
         /// </summary>
         private void Swatch_Edit_Click(object sender, Border? e)
         {
-            if (Service is null) return;
-            int idx = GetIndexFromSender(sender);
-            if (idx < 0 || idx >= Service.Colors.Count) return;
+            if (Service is null || e == null) return;
+            if (!ColorUtil.TryGetBGRA(e.Tag, out uint original)) return;
 
-            uint original = Service.Colors[idx];
+            int idx = IndexOf(Service.Colors, original);
+            if (idx < 0 || idx >= Service.Colors.Count) return;
 
             var win = new ColorPickerWindow
             {
@@ -505,13 +517,11 @@ namespace PixlPunkt.UI.Palette
         /// </summary>
         private void Swatch_SetFg_Click(object sender, Border? e)
         {
-            if (Service is null) return;
-            int idx = GetIndexFromSender(sender);
-            if (idx < 0) return;
+            if (Service is null || e == null) return;
+            if (!ColorUtil.TryGetBGRA(e.Tag, out uint value)) return;
 
-            var c = Service.Colors[idx];
-            Service.SetForeground(c);
-            ForegroundPicked?.Invoke(c);
+            Service.SetForeground(value);
+            ForegroundPicked?.Invoke(value);
             UpdateAllRings();
         }
 
@@ -520,13 +530,11 @@ namespace PixlPunkt.UI.Palette
         /// </summary>
         private void Swatch_SetBg_Click(object sender, Border? e)
         {
-            if (Service is null) return;
-            int idx = GetIndexFromSender(sender);
-            if (idx < 0) return;
+            if (Service is null || e == null) return;
+            if (!ColorUtil.TryGetBGRA(e.Tag, out uint value)) return;
 
-            var c = Service.Colors[idx];
-            Service.SetBackground(c);
-            BackgroundPicked?.Invoke(c);
+            Service.SetBackground(value);
+            BackgroundPicked?.Invoke(value);
             UpdateAllRings();
         }
 
@@ -535,11 +543,12 @@ namespace PixlPunkt.UI.Palette
         /// </summary>
         private void Swatch_Remove_Click(object sender, Border? e)
         {
-            if (Service is null) return;
-            int idx = GetIndexFromSender(sender);
-            if (idx < 0) return;
+            if (Service is null || e == null) return;
+            if (!ColorUtil.TryGetBGRA(e.Tag, out uint value)) return;
 
-            Service.RemoveAt(idx);
+            int idx = IndexOf(Service.Colors, value);
+            if (idx >= 0)
+                Service.RemoveAt(idx);
         }
 
         // ════════════════════════════════════════════════════════════════════

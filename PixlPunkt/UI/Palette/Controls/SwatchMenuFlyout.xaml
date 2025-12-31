@@ -3,19 +3,9 @@
     x:Class="PixlPunkt.UI.Palette.Controls.SwatchMenuFlyout"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:PixlPunkt.UI.Palette.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
-    <UserControl.Resources>
-        <MenuFlyout x:Name="SwatchBorderMenuFlyout" Placement="RightEdgeAlignedTop">
-            <MenuFlyoutItem Text="Edit" Click="SwatchEdit_Click"/>
-            <MenuFlyoutItem Text="Remove" Click="SwatchRemove_Click"/>
-            <MenuFlyoutSeparator/>
-            <MenuFlyoutItem Text="Set as FG" Click="SwatchSetFg_Click"/>
-            <MenuFlyoutItem Text="Set as BG" Click="SwatchSetBg_Click"/>
-        </MenuFlyout>
-    </UserControl.Resources>
-    <!-- Empty visual - this control just hosts the MenuFlyout resource -->
+    <!-- Empty visual - this control just hosts the flyout creation logic -->
     <Grid Height="0" Width="0"/>
 </UserControl>

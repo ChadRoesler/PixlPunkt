@@ -2126,6 +2126,7 @@ namespace PixlPunkt.UI.Layers
             {
                 try
                 {
+                    var accentColor = (Windows.UI.Color)Application.Current.Resources["SystemAccentColor"];
                     var accentLight = (Windows.UI.Color)Application.Current.Resources["SystemAccentColor"];
 
                     rootDropZone.Background = new SolidColorBrush(accentLight);
@@ -2135,8 +2136,8 @@ namespace PixlPunkt.UI.Layers
                 catch (Exception ex)
                 {
                     LoggingService.Warning("Failed to apply accent colors to RootDropZone: {Exception}", ex.Message);
-                    rootDropZone.Background = new SolidColorBrush(Colors.LightBlue);
-                    rootDropZone.BorderBrush = new SolidColorBrush(Colors.DodgerBlue);
+                    rootDropZone.Background = new SolidColorBrush(Microsoft.UI.Colors.LightBlue);
+                    rootDropZone.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.DodgerBlue);
                     rootDropZone.BorderThickness = new Thickness(2);
                 }
 
@@ -2150,6 +2151,9 @@ namespace PixlPunkt.UI.Layers
 
             // Clear other drag visuals since we're over the drop zone
             ClearDragVisuals();
+            
+            // IMPORTANT: Mark as handled so ListViewDragOver doesn't override our caption
+            e.Handled = true;
         }
 
         private void RootDropZone_Drop(object sender, DragEventArgs e)
