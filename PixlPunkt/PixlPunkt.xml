@@ -26713,6 +26713,110 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Animation.SubRoutineListItem">
+            <summary>
+            Represents a single sub-routine item in the animation sub-routine list.
+            Shows reel name, timing, and provides quick actions (enable/disable, delete).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.SubRoutineListItem.SubRoutine">
+            <summary>
+            Gets or sets the sub-routine this item represents.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Animation.SubRoutineListItem.DeleteRequested">
+            <summary>
+            Raised when the user requests to delete this sub-routine.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Animation.SubRoutineListItem.SelectionChanged">
+            <summary>
+            Raised when the user selects this sub-routine.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.SubRoutineListItem.IsSelected">
+            <summary>
+            Gets or sets whether this item is selected.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Animation.SubRoutineDeletedEventArgs">
+            <summary>
+            Event args for sub-routine deletion.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Animation.SubRoutineSelectedEventArgs">
+            <summary>
+            Event args for sub-routine selection.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Animation.SubRoutineListPanel">
+            <summary>
+            Panel that displays all animation sub-routines in a list.
+            Handles add/remove/selection operations.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.SubRoutineListPanel.Track">
+            <summary>
+            Gets or sets the sub-routine track being displayed.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Animation.SubRoutineListPanel.SubRoutineSelected">
+            <summary>
+            Raised when a sub-routine is selected.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.SubRoutineListPanel.SelectedSubRoutine">
+            <summary>
+            Gets the currently selected sub-routine, if any.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.SubRoutineListPanel.RefreshList">
+            <summary>
+            Refreshes the list display from the current track.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Animation.SubRoutinePropertyPanel">
+            <summary>
+            Panel for editing animation sub-routine properties.
+            Allows configuration of timing, transforms, and interpolation modes.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Animation.SubRoutinePropertyPanel.SubRoutinePropertyChanged">
+            <summary>
+            Raised when properties change.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Animation.SubRoutineTimelineViewer">
+            <summary>
+            Renders animation sub-routines on an interactive timeline.
+            Shows sub-routines as bars with drag handles for timing adjustment.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.SubRoutineTimelineViewer.TotalFrames">
+            <summary>
+            Gets or sets the total frame count for the animation.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.SubRoutineTimelineViewer.CurrentFrame">
+            <summary>
+            Gets or sets the current playhead frame position (for visual indicator).
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Animation.SubRoutineTimelineViewer.TimingChanged">
+            <summary>
+            Raised when user modifies a sub-routine's timing via drag.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.SubRoutineTimelineViewer.Redraw">
+            <summary>
+            Redraws the timeline with current sub-routines.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Animation.SubRoutineTimingChangedEventArgs">
+            <summary>
+            Event args for sub-routine timing changes.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Animation.TileFrameEditorCanvas">
             <summary>
             A portal/viewport into the main canvas, locked to a specific tile region.
