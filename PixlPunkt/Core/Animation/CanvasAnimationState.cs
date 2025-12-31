@@ -122,6 +122,21 @@ namespace PixlPunkt.Core.Animation
         }
 
         // ====================================================================
+        // ANIMATION SUB-ROUTINES
+        // ====================================================================
+
+        /// <summary>
+        /// Gets the collection of animation sub-routines embedded in this canvas animation.
+        /// Sub-routines allow tile animations to be played as nested animations with transform interpolation.
+        /// </summary>
+        public AnimationSubRoutineTrack SubRoutines { get; } = new();
+
+        /// <summary>
+        /// Raised when sub-routines collection or properties change.
+        /// </summary>
+        public event Action? SubRoutinesChanged;
+
+        // ====================================================================
         // TRACKS
         // ====================================================================
 
@@ -143,6 +158,12 @@ namespace PixlPunkt.Core.Animation
         /// Gets the stage animation track for camera keyframes.
         /// </summary>
         public StageAnimationTrack StageTrack { get; } = new();
+
+        /// <summary>
+        /// Gets the animation sub-routine playback state manager.
+        /// </summary>
+        [JsonIgnore]
+        public AnimationSubRoutineState SubRoutineState { get; private set; }
 
         /// <summary>
         /// Gets the interpolated stage transform at the current frame.
@@ -481,6 +502,14 @@ namespace PixlPunkt.Core.Animation
             AudioTracks.CollectionChanged += () => AudioTracksChanged?.Invoke();
             AudioTracks.TrackLoadedChanged += (_, __) => AudioTracksChanged?.Invoke();
             AudioTracks.CollapsedStateChanged += (_) => AudioTracksChanged?.Invoke();
+
+            // Wire up sub-routines collection events
+            SubRoutines.SubRoutineAdded += (_) => SubRoutinesChanged?.Invoke();
+            SubRoutines.SubRoutineRemoved += (_) => SubRoutinesChanged?.Invoke();
+            SubRoutines.SubRoutineChanged += (_) => SubRoutinesChanged?.Invoke();
+
+            // Initialize sub-routine playback state manager
+            SubRoutineState = new AnimationSubRoutineState(SubRoutines);
         }
 
         // ====================================================================
@@ -761,6 +790,10 @@ namespace PixlPunkt.Core.Animation
             if (CurrentFrameIndex != newIndex)
             {
                 CurrentFrameIndex = newIndex;
+                
+                // Update sub-routine state for this frame
+                SubRoutineState.UpdateForFrame(CurrentFrameIndex);
+                
                 CurrentFrameChanged?.Invoke(CurrentFrameIndex);
 
                 // Scrub all audio tracks to match frame position (only when not playing)
