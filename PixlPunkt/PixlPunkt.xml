@@ -32043,6 +32043,11 @@
             Template for ReferenceLayer items (reference image with transform controls).
             </summary>
         </member>
+        <member name="P:PixlPunkt.UI.Layers.LayerItemTemplateSelector.RootDropZoneFooterTemplate">
+            <summary>
+            Template for RootDropZoneFooterItem (drag-to-root footer for list).
+            </summary>
+        </member>
         <member name="P:PixlPunkt.UI.Layers.LayerSettingsViewModel.Effects">
             Live list of effects for this layer (already pre-created on the layer)
         </member>
@@ -32184,6 +32189,17 @@
             Handles right-click on the ListView itself (empty area).
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Layers.LayersPanel.ShowRootDropZoneIfNeeded">
+            <summary>
+            Shows the root drop zone if the dragged item is inside a folder.
+            This provides a target area for users to drag items out of folders.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.LayersPanel.HideRootDropZone">
+            <summary>
+            Hides the root drop zone highlight and text (but keeps the space reserved).
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.InitializeComponent">
             <summary>
             InitializeComponent()
@@ -32229,6 +32245,13 @@
         <member name="M:PixlPunkt.UI.Layers.ReferenceLayerSettingsWindow.GetBindingConnector(System.Int32,System.Object)">
             <summary>
             GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Layers.RootDropZoneFooterItem">
+            <summary>
+            Marker class for the root drop zone footer item in the layers list.
+            This is a virtual UI-only item that appears at the bottom of the layers ListView
+            and is never saved to the document.
             </summary>
         </member>
         <member name="T:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout">
@@ -32376,6 +32399,11 @@
         <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_RightTapped(System.Object,Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs)">
             <summary>
             Handles right-click on a swatch to show its context menu.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Palette.PalettePanel.SwatchList_RightTapped(System.Object,Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs)">
+            <summary>
+            Handles right-click on empty palette area to show panel menu.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Palette.PalettePanel.Swatch_Edit_Click(System.Object,Microsoft.UI.Xaml.Controls.Border)">

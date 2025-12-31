@@ -31,10 +31,8 @@ namespace PixlPunkt.UI.Palette.Controls
         /// </summary>
         public void ShowAt(FrameworkElement target, XamlRoot xamlRoot)
         {
-            if (PanelMenuFlyout.XamlRoot == null)
-            {
+            if (PanelMenuFlyout.XamlRoot != xamlRoot)
                 PanelMenuFlyout.XamlRoot = xamlRoot;
-            }
             PanelMenuFlyout.ShowAt(target);
         }
 

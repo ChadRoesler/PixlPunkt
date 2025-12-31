@@ -24,10 +24,16 @@ namespace PixlPunkt.UI.Layers
         /// </summary>
         public DataTemplate? ReferenceLayerTemplate { get; set; }
 
+        /// <summary>
+        /// Template for RootDropZoneFooterItem (drag-to-root footer for list).
+        /// </summary>
+        public DataTemplate? RootDropZoneFooterTemplate { get; set; }
+
         protected override DataTemplate? SelectTemplateCore(object item)
         {
             return item switch
             {
+                RootDropZoneFooterItem => RootDropZoneFooterTemplate,
                 ReferenceLayer => ReferenceLayerTemplate,
                 RasterLayer => RasterLayerTemplate,
                 LayerFolder => FolderTemplate,

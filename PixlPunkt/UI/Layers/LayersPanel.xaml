@@ -29,10 +29,18 @@
             <Setter Property="Padding" Value="6,4"/>
         </Style>
 
+        <Style x:Key="RootDropZoneFooterItemStyle" TargetType="ListViewItem">
+            <Setter Property="MinHeight" Value="44"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="IsEnabled" Value="False"/>
+        </Style>
+
         <local:LayerItemContainerStyleSelector x:Key="LayerRowStyleSelector"
                                           RasterStyle="{StaticResource RasterItemStyle}"
                                           FolderStyle="{StaticResource FolderItemStyle}"
-                                          ReferenceStyle="{StaticResource ReferenceItemStyle}" />
+                                          ReferenceStyle="{StaticResource ReferenceItemStyle}"
+                                          RootDropZoneFooterStyle="{StaticResource RootDropZoneFooterItemStyle}" />
 
         <!-- Template for RasterLayer -->
         <DataTemplate x:Key="RasterLayerTemplate" x:DataType="layer:RasterLayer">
@@ -451,11 +459,45 @@
             </Grid>
         </DataTemplate>
 
+        <!-- Template for RootDropZoneFooterItem -->
+        <DataTemplate x:Key="RootDropZoneFooterTemplate" x:DataType="local:RootDropZoneFooterItem">
+            <Border x:Name="RootDropZoneBorder"
+                    Height="44"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    HorizontalAlignment="Stretch"
+                    Margin="0,4,0,0"
+                    AllowDrop="True"
+                    DragOver="RootDropZone_DragOver"
+                    Drop="RootDropZone_Drop"
+                    DragLeave="RootDropZone_DragLeave" >
+                <Border x:Name="RootDropZoneHighlight"
+                        Background="Transparent"
+                        CornerRadius="4"
+                        Opacity="0">
+                    <StackPanel Orientation="Horizontal" 
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center"
+                                Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" />
+                        <TextBlock Text="Drop here to move to root level"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorPrimary}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+            </Border>
+        </DataTemplate>
+
         <!-- Template Selector -->
         <local:LayerItemTemplateSelector x:Key="LayerTemplateSelector"
                                          RasterLayerTemplate="{StaticResource RasterLayerTemplate}"
                                          FolderTemplate="{StaticResource FolderTemplate}"
-                                         ReferenceLayerTemplate="{StaticResource ReferenceLayerTemplate}"/>
+                                         ReferenceLayerTemplate="{StaticResource ReferenceLayerTemplate}"
+                                         RootDropZoneFooterTemplate="{StaticResource RootDropZoneFooterTemplate}"/>
     </UserControl.Resources>
 
     <Grid RowSpacing="4">
@@ -466,7 +508,7 @@
 
         <!-- Flyout control instances (zero-size, just host the MenuFlyout resources) -->
         <lctl:LayersPanelMenuFlyout x:Name="PanelMenuFlyout"/>
-        <lctl:RasterLayerMenuFlyout x:Name="RasterLayerMenuFlyout"/>
+        <lctl:RasterLayerMenuFlyout x:Name="LayerMenuFlyout"/>
         <lctl:LayerFolderMenuFlyout x:Name="FolderMenuFlyout"/>
         <lctl:ReferenceLayerMenuFlyout x:Name="RefLayerMenuFlyout"/>
 
@@ -515,40 +557,6 @@
                           RightTapped="LayersList_RightTapped"
                           ItemContainerStyleSelector="{StaticResource LayerRowStyleSelector}">
                 </ListView>
-
-                <!-- Root drop zone - appears at bottom during drag to allow moving items to root -->
-                <Border x:Name="RootDropZone"
-                        Height="44"
-                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                        BorderBrush="{ThemeResource SystemAccentColor}"
-                        BorderThickness="2"
-                        CornerRadius="6"
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Bottom"
-                        Margin="4,0,4,4"
-                        Visibility="Collapsed"
-                        AllowDrop="True"
-                        DragOver="RootDropZone_DragOver"
-                        Drop="RootDropZone_Drop"
-                        DragLeave="RootDropZone_DragLeave">
-                    <Border x:Name="RootDropZoneHighlight"
-                            Background="Transparent"
-                            CornerRadius="4"
-                            Opacity="1">
-                        <StackPanel Orientation="Horizontal" 
-                                    HorizontalAlignment="Center" 
-                                    VerticalAlignment="Center"
-                                    Spacing="8">
-                            <ic:FluentIcon Icon="ArrowUpload" 
-                                           FontSize="16"
-                                           Foreground="{ThemeResource SystemAccentColor}"/>
-                            <TextBlock Text="Drop here to move to root level"
-                                       VerticalAlignment="Center"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       FontSize="12"/>
-                        </StackPanel>
-                    </Border>
-                </Border>
 
                 <!-- Insertion indicator bar (Photoshop-style) -->
                 <Border x:Name="InsertionIndicator"

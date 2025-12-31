@@ -30,10 +30,8 @@ namespace PixlPunkt.UI.Palette.Controls
         {
             TargetSwatch = swatch;
 
-            if (SwatchBorderMenuFlyout.XamlRoot == null)
-            {
+            if (SwatchBorderMenuFlyout.XamlRoot != xamlRoot)
                 SwatchBorderMenuFlyout.XamlRoot = xamlRoot;
-            }
 
             SwatchBorderMenuFlyout.ShowAt(target);
         }
