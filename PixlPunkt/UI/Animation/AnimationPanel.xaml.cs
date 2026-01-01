@@ -227,6 +227,7 @@ namespace PixlPunkt.UI.Animation
                 _canvasAnimationState.FpsChanged += OnCanvasFpsChanged;
                 _canvasAnimationState.StageSettingsChanged += OnStageSettingsChanged;
                 _canvasAnimationState.AudioTracksChanged += OnAudioTracksChanged;
+                _canvasAnimationState.SubRoutinesChanged += OnSubRoutinesChanged;
             }
 
             // Bind document structure events (for layer add/remove/reorder)
@@ -592,6 +593,31 @@ namespace PixlPunkt.UI.Animation
                 }
             }
 
+            // Add Sub-Routines track if there are any sub-routines
+            if (_canvasAnimationState.SubRoutines.SubRoutines.Count > 0)
+            {
+                var subRoutineBorder = new Border
+                {
+                    Height = CellHeight,
+                    BorderBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 },
+                    BorderThickness = new Thickness(0, 0, 1, 1),
+                    Padding = new Thickness(4, 0, 4, 0),
+                    Background = new SolidColorBrush(Color.FromArgb(40, 200, 100, 50)) // Brown tint for sub-routines
+                };
+
+                var subRoutineText = new TextBlock
+                {
+                    Text = $"🎬 Sub-Routines ({_canvasAnimationState.SubRoutines.SubRoutines.Count})",
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = new SolidColorBrush(Colors.SandyBrown)
+                };
+
+                subRoutineBorder.Child = subRoutineText;
+                subRoutineBorder.Tag = "SubRoutines";
+                CanvasLayerNamesPanel.Children.Add(subRoutineBorder);
+            }
+
             // Add Stage track if enabled
             if (_canvasAnimationState.Stage.Enabled)
             {
@@ -657,6 +683,7 @@ namespace PixlPunkt.UI.Animation
 
                 CanvasLayerNamesPanel.Children.Add(border);
             }
+
         }
 
         private void AudioHeader_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -1064,7 +1091,7 @@ namespace PixlPunkt.UI.Animation
         {
             if (_canvasAnimationState == null) return;
             _canvasAnimationState.Stage.Enabled = StageEnabledToggle.IsChecked ?? false;
-            
+
             // Update visibility of the quick add keyframe button
             UpdateStageQuickButtonVisibility();
         }
@@ -1075,18 +1102,18 @@ namespace PixlPunkt.UI.Animation
         private void UpdateStageQuickButtonVisibility()
         {
             bool stageEnabled = _canvasAnimationState?.Stage.Enabled ?? false;
-            
+
             if (StageAddKeyframeQuickButton != null)
             {
-                StageAddKeyframeQuickButton.Visibility = stageEnabled 
-                    ? Visibility.Visible 
+                StageAddKeyframeQuickButton.Visibility = stageEnabled
+                    ? Visibility.Visible
                     : Visibility.Collapsed;
             }
-            
+
             if (StageRemoveKeyframeQuickButton != null)
             {
-                StageRemoveKeyframeQuickButton.Visibility = stageEnabled 
-                    ? Visibility.Visible 
+                StageRemoveKeyframeQuickButton.Visibility = stageEnabled
+                    ? Visibility.Visible
                     : Visibility.Collapsed;
             }
         }
@@ -1096,7 +1123,7 @@ namespace PixlPunkt.UI.Animation
             if (_canvasAnimationState == null) return;
             _canvasAnimationState.CaptureStageKeyframe(_canvasAnimationState.CurrentFrameIndex);
             RefreshCanvasKeyframeGrid();
-            
+
             // Clear pending edits since we just saved them
             _canvasHost?.ClearStagePendingEdits();
             _canvasHost?.InvalidateCanvas();
@@ -1244,7 +1271,7 @@ namespace PixlPunkt.UI.Animation
             if (_canvasAnimationState == null) return;
             _canvasAnimationState.CaptureStageKeyframe(_canvasAnimationState.CurrentFrameIndex);
             RefreshCanvasKeyframeGrid();
-            
+
             // Clear pending edits since we just saved them
             _canvasHost?.ClearStagePendingEdits();
             _canvasHost?.InvalidateCanvas();
@@ -1431,7 +1458,7 @@ namespace PixlPunkt.UI.Animation
 
             // Update menu item enabled states
             bool hasTrack = _contextMenuTrack != null || _isContextMenuForStage;
-            bool hasKeyframe = _isContextMenuForStage 
+            bool hasKeyframe = _isContextMenuForStage
                 ? _canvasAnimationState.StageTrack.HasKeyframeAt(_contextMenuFrameIndex)
                 : (_contextMenuTrack?.HasKeyframeAt(_contextMenuFrameIndex) ?? false);
             bool hasClipboard = KeyframeClipboard.Instance.HasContent;
@@ -1477,7 +1504,7 @@ namespace PixlPunkt.UI.Animation
                 // Add stage keyframe
                 _canvasAnimationState.CaptureStageKeyframe(_contextMenuFrameIndex);
                 RefreshCanvasKeyframeGrid();
-                
+
                 // Clear pending edits if this is the current frame
                 if (_contextMenuFrameIndex == _canvasAnimationState.CurrentFrameIndex)
                 {
@@ -1657,7 +1684,7 @@ namespace PixlPunkt.UI.Animation
         {
             if (_suppressSettingsValueChanges || _canvasAnimationState == null) return;
             _canvasAnimationState.OnionSkinEnabled = OnionSkinEnabledToggle.IsOn;
-            
+
             // Also update the toolbar toggle to stay in sync
             CanvasOnionSkinToggle.IsChecked = OnionSkinEnabledToggle.IsOn;
         }
@@ -1792,8 +1819,9 @@ namespace PixlPunkt.UI.Animation
             // Calculate row counts for special tracks
             int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
             int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
+            int subRoutineRows = _canvasAnimationState.SubRoutines.SubRoutines.Count > 0 ? 1 : 0;
             int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
-            int totalRows = audioHeaderRows + audioTrackRows + stageRows + trackCount;
+            int totalRows = audioHeaderRows + audioTrackRows + subRoutineRows + stageRows + trackCount;
 
             CanvasKeyframeCanvas.Width = frameCount * CellWidth;
             CanvasKeyframeCanvas.Height = Math.Max(totalRows * CellHeight, 24);
@@ -1811,8 +1839,9 @@ namespace PixlPunkt.UI.Animation
             // Calculate row counts
             int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
             int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
+            int subRoutineRows = _canvasAnimationState.SubRoutines.SubRoutines.Count > 0 ? 1 : 0;
             int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
-            int totalRows = audioHeaderRows + audioTrackRows + stageRows + trackCount;
+            int totalRows = audioHeaderRows + audioTrackRows + subRoutineRows + stageRows + trackCount;
 
             var gridBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.2 };
 
@@ -1870,6 +1899,13 @@ namespace PixlPunkt.UI.Animation
                 }
             }
 
+            // Draw sub-routines track if there are any sub-routines
+            if (subRoutineRows > 0)
+            {
+                DrawSubRoutineTrack(currentRow);
+                currentRow++;
+            }
+
             // Draw stage keyframes if enabled
             if (_canvasAnimationState.Stage.Enabled)
             {
@@ -1885,6 +1921,77 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
+        /// <summary>
+        /// Draws all sub-routine bars in the sub-routine track row.
+        /// Each sub-routine is displayed as a horizontal bar showing its start frame and duration.
+        /// </summary>
+        private void DrawSubRoutineTrack(int rowIndex)
+        {
+            if (_canvasAnimationState == null) return;
+
+            int frameCount = _canvasAnimationState.FrameCount;
+
+            // Background for sub-routine track
+            var bgRect = new Rectangle
+            {
+                Width = frameCount * CellWidth,
+                Height = CellHeight,
+                Fill = new SolidColorBrush(Color.FromArgb(20, 200, 100, 50))
+            };
+            Canvas.SetLeft(bgRect, 0);
+            Canvas.SetTop(bgRect, rowIndex * CellHeight);
+            CanvasKeyframeCanvas.Children.Add(bgRect);
+
+            // Draw each sub-routine as a bar
+            foreach (var subRoutine in _canvasAnimationState.SubRoutines.SubRoutines)
+            {
+                if (!subRoutine.IsEnabled)
+                    continue; // Skip disabled sub-routines
+
+                int startFrame = subRoutine.StartFrame;
+                int endFrame = subRoutine.EndFrame;
+
+                // Clamp to visible range
+                if (endFrame < 0 || startFrame >= frameCount)
+                    continue;
+
+                int visibleStart = Math.Max(0, startFrame);
+                int visibleEnd = Math.Min(frameCount, endFrame);
+
+                // Draw sub-routine bar
+                var bar = new Rectangle
+                {
+                    Width = (visibleEnd - visibleStart) * CellWidth,
+                    Height = CellHeight - 4,
+                    Fill = new SolidColorBrush(Color.FromArgb(180, 200, 100, 50)),
+                    RadiusX = 2,
+                    RadiusY = 2,
+                    StrokeThickness = 1,
+                    Stroke = new SolidColorBrush(Colors.SandyBrown)
+                };
+                Canvas.SetLeft(bar, visibleStart * CellWidth);
+                Canvas.SetTop(bar, rowIndex * CellHeight + 2);
+                CanvasKeyframeCanvas.Children.Add(bar);
+
+                // Draw reel name label if bar is wide enough
+                if ((visibleEnd - visibleStart) >= 2)
+                {
+                    var label = new TextBlock
+                    {
+                        Text = subRoutine.DisplayName,
+                        FontSize = 9,
+                        Foreground = new SolidColorBrush(Colors.White),
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        Margin = new Thickness(2, 0, 2, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        MaxWidth = (visibleEnd - visibleStart) * CellWidth - 4
+                    };
+                    Canvas.SetLeft(label, visibleStart * CellWidth + 2);
+                    Canvas.SetTop(label, rowIndex * CellHeight + 4);
+                    CanvasKeyframeCanvas.Children.Add(label);
+                }
+            }
+        }
         /// <summary>
         /// Draws the audio section header row (shows collapsed/expanded indicator).
         /// </summary>
@@ -2312,24 +2419,23 @@ namespace PixlPunkt.UI.Animation
                 Canvas.SetLeft(CanvasPlayheadLine, visibleX);
             }
 
-            // Calculate height including audio header, audio tracks, stage row, and layer rows
+            // Calculate height including audio header, audio tracks, sub-routines, stage row, and layer rows
             int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
             int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
+            int subRoutineRows = _canvasAnimationState.SubRoutines.SubRoutines.Count > 0 ? 1 : 0;
             int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
-            int totalRows = audioHeaderRows + audioTrackRows + stageRows + _canvasAnimationState.Tracks.Count;
+            int totalRows = audioHeaderRows + audioTrackRows + subRoutineRows + stageRows + _canvasAnimationState.Tracks.Count;
             CanvasPlayheadLine.Height = Math.Max(24, totalRows * CellHeight);
         }
-    }
 
-    /// <summary>
-    /// Animation mode selection.
-    /// </summary>
-    public enum AnimationMode
-    {
-        /// <summary>Tile-based animation (Pyxel Edit style).</summary>
-        Tile,
-
-        /// <summary>Canvas/layer-based animation (Aseprite style).</summary>
-        Canvas
+        private void OnSubRoutinesChanged()
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RefreshCanvasLayerNames();
+                RefreshCanvasKeyframeGrid();
+                UpdateCanvasPlayhead();
+            });
+        }
     }
 }

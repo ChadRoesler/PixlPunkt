@@ -339,5 +339,58 @@ namespace PixlPunkt.UI
                 }
             }
         }
+
+        // ------------- Import SubRoutine ------------
+
+        private async void File_Import_SubRoutine(object sender, RoutedEventArgs e)
+        {
+            var host = CurrentHost;
+            if (host?.Document == null) return;
+
+            var openPicker = WindowHost.CreateFileOpenPicker(this, ".pxpr");
+            StorageFile? file = await openPicker.PickSingleFileAsync();
+            if (file is null)
+                return;
+
+            try
+            {
+                // Load the PXPR reel file
+                var reel = PixlPunkt.Core.Animation.TileAnimationReelIO.Load(file.Path);
+                
+                if (reel == null || reel.FrameCount == 0)
+                {
+                    await ShowImportErrorAsync("The PXPR file is empty or invalid.");
+                    return;
+                }
+
+                // Create an AnimationSubRoutine that references this reel
+                var subRoutine = new PixlPunkt.Core.Animation.AnimationSubRoutine
+                {
+                    ReelFilePath = file.Path,
+                    StartFrame = host.Document.CanvasAnimationState.FrameCount,
+                    DurationFrames = reel.FrameCount
+                };
+
+                // Add position keyframe at start and end (no movement by default)
+                subRoutine.PositionKeyframes[0f] = (0, 0);
+                subRoutine.PositionKeyframes[1f] = (0, 0);
+
+                // Add to canvas animation state
+                host.Document.CanvasAnimationState.SubRoutines.Add(subRoutine);
+
+                // Extend canvas animation frame count if needed
+                int requiredFrames = subRoutine.EndFrame;
+                if (host.Document.CanvasAnimationState.FrameCount < requiredFrames)
+                {
+                    host.Document.CanvasAnimationState.FrameCount = requiredFrames;
+                }
+
+                host.Document.RaiseDocumentModified();
+            }
+            catch (Exception ex)
+            {
+                await ShowImportErrorAsync($"Could not import sub-routine.\n{ex.Message}");
+            }
+        }
     }
 }

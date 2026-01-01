@@ -40,6 +40,7 @@
                     <ComboBoxItem Tag="avi" Content="AVI Video (.avi)"/>
                     <ComboBoxItem Tag="png" Content="PNG Image Sequence"/>
                     <ComboBoxItem Tag="jpg" Content="JPEG Image Sequence"/>
+                    <ComboBoxItem Tag="pxpr" Content="Animation SubRoutine (.pxpr)"/>
                 </ComboBox>
             </StackPanel>
 

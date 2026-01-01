@@ -26188,6 +26188,21 @@
             getting the corresponding pixel coordinate for editing operations.
             </remarks>
         </member>
+        <member name="T:PixlPunkt.UI.Animation.AnimationMode">
+            <summary>
+            Defines the animation mode for the animation panel.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.Animation.AnimationMode.Tile">
+            <summary>
+            Tile-based animation using tile reels and frame sequences.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.Animation.AnimationMode.Canvas">
+            <summary>
+            Canvas-based animation using layer keyframes and canvas frames.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Animation.AnimationPanel">
             <summary>
             Main animation panel that hosts both Tile and Canvas animation modes.
@@ -26343,6 +26358,12 @@
             Updates the selection highlight in the animation timeline.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawSubRoutineTrack(System.Int32)">
+            <summary>
+            Draws all sub-routine bars in the sub-routine track row.
+            Each sub-routine is displayed as a horizontal bar showing its start frame and duration.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawAudioHeaderRow(System.Int32,System.Int32)">
             <summary>
             Draws the audio section header row (shows collapsed/expanded indicator).
@@ -26399,17 +26420,6 @@
             <summary>
             GetBindingConnector(int connectionId, object target)
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Animation.AnimationMode">
-            <summary>
-            Animation mode selection.
-            </summary>
-        </member>
-        <member name="F:PixlPunkt.UI.Animation.AnimationMode.Tile">
-            <summary>Tile-based animation (Pyxel Edit style).</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.Animation.AnimationMode.Canvas">
-            <summary>Canvas/layer-based animation (Aseprite style).</summary>
         </member>
         <member name="T:PixlPunkt.UI.Animation.AudioWaveformRenderer">
             <summary>
@@ -33248,6 +33258,13 @@
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.File_Export_Brush_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
             <summary>
             Menu handler: Export to custom brush (.mrk)
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.File_Export_Animation_SubRoutine_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Menu handler: Export Tile Animation as Sub-Routine (.pxpr)
+            Exports the currently selected tile animation reel as a .pxpr file
+            that can be imported into canvas animations.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.File_Import_Image(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">

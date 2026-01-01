@@ -116,6 +116,8 @@
                         <MenuFlyoutItem Text="Tiled Map (.tmx)" Click="File_Import_Tmx"/>
                         <MenuFlyoutItem Text="Tiled Tileset (.tsx)" Click="File_Import_Tsx"/>
                         <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Animation Sub-Routine (.pxpr)" Click="File_Import_SubRoutine"/>
+                        <MenuFlyoutSeparator/>
                         <MenuFlyoutItem Text="Sprite Sheet" />
                         <MenuFlyoutItem Text="Tile Sheet" />
                         <MenuFlyoutSeparator/>
