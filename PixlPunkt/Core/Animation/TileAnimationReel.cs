@@ -31,6 +31,14 @@ namespace PixlPunkt.Core.Animation
         public int? DurationMs { get; set; }
 
         /// <summary>
+        /// Gets or sets the embedded pixel data for this frame (BGRA format).
+        /// If null, pixels must be extracted from the document at runtime.
+        /// When saved in PXPR v2+ format, this contains the actual frame pixels.
+        /// </summary>
+        [JsonIgnore]
+        public byte[]? EmbeddedPixels { get; set; }
+
+        /// <summary>
         /// Creates a new reel frame at the specified tile position.
         /// </summary>
         /// <param name="tileX">The tile grid X position.</param>
@@ -40,6 +48,21 @@ namespace PixlPunkt.Core.Animation
         {
             TileX = tileX;
             TileY = tileY;
+            DurationMs = durationMs;
+        }
+
+        /// <summary>
+        /// Creates a new reel frame with embedded pixel data.
+        /// </summary>
+        /// <param name="tileX">The tile grid X position (for reference).</param>
+        /// <param name="tileY">The tile grid Y position (for reference).</param>
+        /// <param name="pixels">The embedded pixel data (BGRA format).</param>
+        /// <param name="durationMs">Optional custom duration in milliseconds.</param>
+        public ReelFrame(int tileX, int tileY, byte[] pixels, int? durationMs = null)
+        {
+            TileX = tileX;
+            TileY = tileY;
+            EmbeddedPixels = pixels;
             DurationMs = durationMs;
         }
 
@@ -81,6 +104,29 @@ namespace PixlPunkt.Core.Animation
                 }
             }
         }
+
+        // ====================================================================
+        // FRAME DIMENSIONS (for embedded pixel data)
+        // ====================================================================
+
+        /// <summary>
+        /// Gets or sets the width of each frame in pixels.
+        /// Used when frames have embedded pixel data.
+        /// </summary>
+        public int FrameWidth { get; set; }
+
+        /// <summary>
+        /// Gets or sets the height of each frame in pixels.
+        /// Used when frames have embedded pixel data.
+        /// </summary>
+        public int FrameHeight { get; set; }
+
+        /// <summary>
+        /// Gets whether this reel has embedded pixel data.
+        /// </summary>
+        [JsonIgnore]
+        public bool HasEmbeddedPixels => FrameWidth > 0 && FrameHeight > 0 &&
+            Frames.Count > 0 && Frames[0].EmbeddedPixels != null;
 
         // ====================================================================
         // FRAMES

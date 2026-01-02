@@ -667,6 +667,9 @@ namespace PixlPunkt.UI
 
                     // Reload audio tracks from stored file paths
                     await doc.CanvasAnimationState.ReloadAudioTracksAsync();
+
+                    // Reload sub-routine reels from stored file paths
+                    doc.CanvasAnimationState.ReloadSubRoutineReels(doc);
                 }
                 else if (file.FileType.Equals(".png", StringComparison.OrdinalIgnoreCase))
                 {

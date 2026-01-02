@@ -367,13 +367,40 @@ namespace PixlPunkt.UI
                 var subRoutine = new PixlPunkt.Core.Animation.AnimationSubRoutine
                 {
                     ReelFilePath = file.Path,
-                    StartFrame = host.Document.CanvasAnimationState.FrameCount,
+                    StartFrame = 0,
                     DurationFrames = reel.FrameCount
                 };
 
                 // Add position keyframe at start and end (no movement by default)
                 subRoutine.PositionKeyframes[0f] = (0, 0);
                 subRoutine.PositionKeyframes[1f] = (0, 0);
+
+                // Try to load the reel
+                // If reel has embedded pixels (v2), it will use those
+                // Otherwise it will try to render from the current document
+                bool loaded = subRoutine.LoadReel(host.Document);
+                
+                if (!loaded || !subRoutine.IsLoaded)
+                {
+                    // Show warning but still add the sub-routine
+                    string warningMessage = reel.HasEmbeddedPixels
+                        ? $"Sub-routine '{reel.Name}' has embedded pixel data but failed to load frames."
+                        : $"Sub-routine '{reel.Name}' imported, but frames could not be rendered.\n\n" +
+                          "This reel was saved in the old format (v1) without embedded pixel data. " +
+                          "It references tile positions that may not contain the expected content in this document.\n\n" +
+                          "To fix this, re-export the reel from the original document to save it with embedded pixel data.";
+
+                    await new ContentDialog
+                    {
+                        XamlRoot = Content.XamlRoot,
+                        Title = "Import Warning",
+                        Content = warningMessage + $"\n\nReel Info:\n" +
+                                  $"  • Name: {reel.Name}\n" +
+                                  $"  • Frames: {reel.FrameCount}\n" +
+                                  $"  • Format: {(reel.HasEmbeddedPixels ? "v2 (with pixels)" : "v1 (coordinates only)")}",
+                        CloseButtonText = "OK"
+                    }.ShowAsync();
+                }
 
                 // Add to canvas animation state
                 host.Document.CanvasAnimationState.SubRoutines.Add(subRoutine);
@@ -386,6 +413,9 @@ namespace PixlPunkt.UI
                 }
 
                 host.Document.RaiseDocumentModified();
+                
+                // Invalidate canvas to show the sub-routine
+                host.InvalidateCanvas();
             }
             catch (Exception ex)
             {

@@ -693,6 +693,11 @@
             </para>
             </remarks>
         </member>
+        <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.Id">
+            <summary>
+            Gets the unique identifier for this sub-routine.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.ReelFilePath">
             <summary>
             Gets or sets the path to the tile animation reel file (.pxpr).
@@ -710,6 +715,37 @@
         <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.DisplayName">
             <summary>
             Gets the reel file name (without path) for display.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.LoadedReel">
+            <summary>
+            Gets the loaded tile animation reel, or null if not loaded.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.RenderedFrames">
+            <summary>
+            Gets the pre-rendered frames from the loaded reel.
+            Key = frame index, Value = pixel data (BGRA bytes).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.FrameWidth">
+            <summary>
+            Gets the width of the rendered frames in pixels.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.FrameHeight">
+            <summary>
+            Gets the height of the rendered frames in pixels.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.IsLoaded">
+            <summary>
+            Gets whether the reel is loaded and frames are rendered.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.Core.Animation.AnimationSubRoutine.ReelLoadedChanged">
+            <summary>
+            Raised when the reel is loaded or unloaded.
             </summary>
         </member>
         <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.StartFrame">
@@ -768,10 +804,64 @@
             Gets or sets the interpolation mode for rotation keyframes.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.ZOrder">
+            <summary>
+            Gets or sets the Z-order for this sub-routine relative to layers.
+            Lower values render first (behind), higher values render last (in front).
+            A value of 0 places the sub-routine at the bottom of the layer stack.
+            Use negative values to place behind all layers.
+            </summary>
+            <remarks>
+            The Z-order determines where this sub-routine appears in the timeline
+            and in what order it's composited during rendering. Sub-routines can
+            be interleaved with layers to create foreground/background effects.
+            </remarks>
+        </member>
         <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutine.IsEnabled">
             <summary>
             Gets or sets whether this sub-routine is active and should be played.
             </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.LoadReel(PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Loads the tile animation reel from the file path.
+            If the reel has embedded pixel data (v2 format), uses that directly.
+            Otherwise, pre-renders frames from the provided document.
+            </summary>
+            <param name="document">The document to use for rendering frames (only needed for v1 format without embedded pixels).</param>
+            <returns>True if the reel was loaded successfully.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.LoadFramesFromEmbeddedData">
+            <summary>
+            Loads frames from the embedded pixel data in the reel (v2 format).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.RenderFramesFromDocument(PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Pre-renders all frames from the tile animation reel using the document's tile data.
+            Used for v1 format reels that don't have embedded pixel data.
+            </summary>
+            <param name="document">The document containing the tile pixel data.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.UnloadReel">
+            <summary>
+            Unloads the reel and clears all rendered frames.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.GetTileFrameIndex(System.Int32)">
+            <summary>
+            Gets the tile animation frame index for a given canvas animation frame.
+            The animation loops automatically when the duration extends beyond the reel's frame count.
+            </summary>
+            <param name="canvasFrame">The canvas animation frame index.</param>
+            <returns>The tile animation frame index to display, or -1 if none.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.GetFramePixels(System.Int32)">
+            <summary>
+            Gets the pixel data for the current frame at the given canvas frame index.
+            </summary>
+            <param name="canvasFrame">The canvas animation frame index.</param>
+            <returns>The pixel data (BGRA), or null if not available.</returns>
         </member>
         <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.Clear">
             <summary>
@@ -800,6 +890,7 @@
         <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.InterpolatePosition(System.Single)">
             <summary>
             Interpolates a position value based on the normalized progress.
+            Returns pixel-snapped values (rounded to nearest integer) to avoid sub-pixel rendering.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.InterpolateScale(System.Single)">
@@ -851,6 +942,44 @@
         <member name="F:PixlPunkt.Core.Animation.InterpolationMode.EaseInOutCubic">
             <summary>Cubic ease-in-out (slow at both ends).</summary>
         </member>
+        <member name="T:PixlPunkt.Core.Animation.SubRoutineRenderInfo">
+            <summary>
+            Represents render information for an active sub-routine at a given frame.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.SubRoutine">
+            <summary>The sub-routine being rendered.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.FramePixels">
+            <summary>The pixel data for the current frame (BGRA).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.FrameWidth">
+            <summary>The width of the frame in pixels.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.FrameHeight">
+            <summary>The height of the frame in pixels.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.PositionX">
+            <summary>The interpolated X position in canvas coordinates.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.PositionY">
+            <summary>The interpolated Y position in canvas coordinates.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.Scale">
+            <summary>The interpolated scale factor.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.Rotation">
+            <summary>The interpolated rotation in degrees.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.NormalizedProgress">
+            <summary>The normalized progress (0.0 to 1.0) within the sub-routine.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.SubRoutineRenderInfo.ZOrder">
+            <summary>
+            The Z-order of this sub-routine for rendering priority.
+            Higher values render on top (in front).
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Animation.AnimationSubRoutineState">
             <summary>
             Manages animation sub-routine playback state and transform interpolation.
@@ -873,6 +1002,13 @@
             Updates the sub-routine state for a specific animation frame.
             </summary>
             <param name="frameIndex">The current frame index in the canvas animation.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutineState.GetRenderInfo(System.Int32)">
+            <summary>
+            Gets render information for all active sub-routines at the current frame.
+            </summary>
+            <param name="frameIndex">The frame index to render.</param>
+            <returns>Collection of render info for each active sub-routine with loaded frames.</returns>
         </member>
         <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutineState.GetInterpolatedPosition">
             <summary>
@@ -901,6 +1037,11 @@
         <member name="P:PixlPunkt.Core.Animation.AnimationSubRoutineState.HasActiveSubRoutines">
             <summary>
             Checks if any sub-routines are currently active.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutineState.GetActiveSubRoutines">
+            <summary>
+            Gets the active sub-routines list for external access.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutineState.GetActiveSubRoutineInfo">
@@ -1502,6 +1643,14 @@
             Called after loading a document from file.
             </summary>
             <returns>Task that completes when all audio tracks are reloaded.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.CanvasAnimationState.ReloadSubRoutineReels(PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Reloads all sub-routine reels from their stored file paths.
+            Called after loading a document from file.
+            </summary>
+            <param name="document">The document to use for rendering frames (for v1 format reels without embedded pixels).</param>
+            <returns>Number of sub-routines successfully loaded.</returns>
         </member>
         <member name="P:PixlPunkt.Core.Animation.CanvasAnimationState.SubRoutines">
             <summary>
@@ -2589,12 +2738,28 @@
             If null, uses the reel's default frame time.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Animation.ReelFrame.EmbeddedPixels">
+            <summary>
+            Gets or sets the embedded pixel data for this frame (BGRA format).
+            If null, pixels must be extracted from the document at runtime.
+            When saved in PXPR v2+ format, this contains the actual frame pixels.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Core.Animation.ReelFrame.#ctor(System.Int32,System.Int32,System.Nullable{System.Int32})">
             <summary>
             Creates a new reel frame at the specified tile position.
             </summary>
             <param name="tileX">The tile grid X position.</param>
             <param name="tileY">The tile grid Y position.</param>
+            <param name="durationMs">Optional custom duration in milliseconds.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.ReelFrame.#ctor(System.Int32,System.Int32,System.Byte[],System.Nullable{System.Int32})">
+            <summary>
+            Creates a new reel frame with embedded pixel data.
+            </summary>
+            <param name="tileX">The tile grid X position (for reference).</param>
+            <param name="tileY">The tile grid Y position (for reference).</param>
+            <param name="pixels">The embedded pixel data (BGRA format).</param>
             <param name="durationMs">Optional custom duration in milliseconds.</param>
         </member>
         <member name="M:PixlPunkt.Core.Animation.ReelFrame.#ctor">
@@ -2616,6 +2781,23 @@
         <member name="P:PixlPunkt.Core.Animation.TileAnimationReel.Name">
             <summary>
             Gets or sets the display name of this reel.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.TileAnimationReel.FrameWidth">
+            <summary>
+            Gets or sets the width of each frame in pixels.
+            Used when frames have embedded pixel data.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.TileAnimationReel.FrameHeight">
+            <summary>
+            Gets or sets the height of each frame in pixels.
+            Used when frames have embedded pixel data.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Animation.TileAnimationReel.HasEmbeddedPixels">
+            <summary>
+            Gets whether this reel has embedded pixel data.
             </summary>
         </member>
         <member name="P:PixlPunkt.Core.Animation.TileAnimationReel.Frames">
@@ -2758,10 +2940,22 @@
             Handles reading and writing tile animation reel files (.pxpr).
             Allows tile animations to be exported and imported for use as animation sub-routines.
             </summary>
+            <remarks>
+            <para><strong>File Format Versions:</strong></para>
+            <list type="bullet">
+            <item><strong>Version 1:</strong> Stores tile coordinates only (requires original document)</item>
+            <item><strong>Version 2:</strong> Stores embedded pixel data (portable, self-contained)</item>
+            </list>
+            </remarks>
         </member>
         <member name="F:PixlPunkt.Core.Animation.TileAnimationReelIO.ReelExtension">
             <summary>
             File extension for tile animation reel files.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Animation.TileAnimationReelIO.CurrentFormatVersion">
+            <summary>
+            Current file format version for new saves.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.GetReelsDirectory">
@@ -2774,17 +2968,34 @@
             Ensures the tile animation reels directory exists.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.Save(PixlPunkt.Core.Animation.TileAnimationReel,System.String,PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Saves a tile animation reel to a file with embedded pixel data.
+            </summary>
+            <param name="reel">The reel to save.</param>
+            <param name="filePath">The path where to save the reel file.</param>
+            <param name="document">The document to extract pixel data from.</param>
+            <returns>True if save succeeded.</returns>
+        </member>
         <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.Save(PixlPunkt.Core.Animation.TileAnimationReel,System.String)">
             <summary>
-            Saves a tile animation reel to a file.
+            Saves a tile animation reel to a file (legacy format without pixels).
             </summary>
             <param name="reel">The reel to save.</param>
             <param name="filePath">The path where to save the reel file.</param>
             <returns>True if save succeeded.</returns>
         </member>
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.Save(PixlPunkt.Core.Animation.TileAnimationReel,System.IO.Stream,PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Saves a tile animation reel to a stream with embedded pixel data (v2 format).
+            </summary>
+            <param name="reel">The reel to save.</param>
+            <param name="stream">The stream to write to.</param>
+            <param name="document">The document to extract pixel data from.</param>
+        </member>
         <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.Save(PixlPunkt.Core.Animation.TileAnimationReel,System.IO.Stream)">
             <summary>
-            Saves a tile animation reel to a stream.
+            Saves a tile animation reel to a stream (legacy v1 format without pixels).
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.Load(System.String)">
@@ -2799,13 +3010,22 @@
             Loads a tile animation reel from a stream.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.ExportReel(PixlPunkt.Core.Animation.TileAnimationReel,System.String)">
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.ExportReel(PixlPunkt.Core.Animation.TileAnimationReel,System.String,PixlPunkt.Core.Document.CanvasDocument)">
             <summary>
-            Exports a tile animation reel as a .pxpr file to a user-selected location.
+            Exports a tile animation reel as a .pxpr file with embedded pixel data.
             </summary>
             <param name="reel">The reel to export.</param>
-            <param name="suggestedFileName">Suggested file name (without extension).</param>
-            <returns>The full path to the saved reel, or empty string if cancelled/failed.</returns>
+            <param name="targetPath">The target file path.</param>
+            <param name="document">The document to extract pixel data from.</param>
+            <returns>The full path to the saved reel, or empty string if failed.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.ExportReel(PixlPunkt.Core.Animation.TileAnimationReel,System.String)">
+            <summary>
+            Exports a tile animation reel as a .pxpr file (legacy format without pixels).
+            </summary>
+            <param name="reel">The reel to export.</param>
+            <param name="targetPath">The target file path.</param>
+            <returns>The full path to the saved reel, or empty string if failed.</returns>
         </member>
         <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.ImportReel(System.String)">
             <summary>
@@ -2817,6 +3037,21 @@
         <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.EnumerateReels">
             <summary>
             Enumerates all saved reel files in the reels directory.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.ExtractTilePixels(PixlPunkt.Core.Imaging.PixelSurface,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Extracts pixel data for a single tile from the composite surface.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.CompressPixels(System.Byte[])">
+            <summary>
+            Compresses pixel data using DEFLATE.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationReelIO.DecompressPixels(System.Byte[],System.Int32)">
+            <summary>
+            Decompresses pixel data from DEFLATE format.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Animation.PlaybackState">
@@ -5793,6 +6028,7 @@
             Version 7: Added audio track settings
             Version 8: Added multiple audio tracks support
             Version 9: Added layer masks
+            Version 10: Added animation sub-routines
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.DocumentIO.Save(PixlPunkt.Core.Document.CanvasDocument,System.String)">
@@ -5816,27 +6052,17 @@
         </member>
         <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteAudioTracksCollection(System.IO.BinaryWriter,PixlPunkt.Core.Animation.AudioTracksCollection)">
             <summary>
-            Writes the audio tracks collection to the stream.
+            Writers the audio tracks collection to the stream.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteAudioTrackSettings(System.IO.BinaryWriter,PixlPunkt.Core.Animation.AudioTrackSettings)">
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteSubRoutineTrack(System.IO.BinaryWriter,PixlPunkt.Core.Animation.AnimationSubRoutineTrack)">
             <summary>
-            Writes audio track settings to the stream.
+            Writes the animation sub-routine track to the stream.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteStageSettings(System.IO.BinaryWriter,PixlPunkt.Core.Animation.StageSettings)">
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteAnimationSubRoutine(System.IO.BinaryWriter,PixlPunkt.Core.Animation.AnimationSubRoutine)">
             <summary>
-            Writes stage settings to the stream.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteStageAnimationTrack(System.IO.BinaryWriter,PixlPunkt.Core.Animation.StageAnimationTrack)">
-            <summary>
-            Writes stage animation track to the stream.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteStageKeyframe(System.IO.BinaryWriter,PixlPunkt.Core.Animation.StageKeyframeData)">
-            <summary>
-            Writes a stage keyframe to the stream.
+            Writes a single animation sub-routine to the stream.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteTileAnimationState(System.IO.BinaryWriter,PixlPunkt.Core.Animation.TileAnimationState)">
@@ -5901,19 +6127,14 @@
             Reads audio track settings from the stream.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadStageSettings(System.IO.BinaryReader,PixlPunkt.Core.Animation.StageSettings)">
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadSubRoutineTrack(System.IO.BinaryReader,PixlPunkt.Core.Animation.AnimationSubRoutineTrack)">
             <summary>
-            Reads stage settings from the stream.
+            Reads the animation sub-routine track from the stream.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadStageAnimationTrack(System.IO.BinaryReader,PixlPunkt.Core.Animation.StageAnimationTrack)">
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadAnimationSubRoutine(System.IO.BinaryReader)">
             <summary>
-            Reads stage animation track from the stream.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadStageKeyframe(System.IO.BinaryReader)">
-            <summary>
-            Reads a stage keyframe from the stream.
+            Reads a single animation sub-routine from the stream.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteCanvasAnimationTrack(System.IO.BinaryWriter,PixlPunkt.Core.Animation.CanvasAnimationTrack)">
@@ -5974,6 +6195,41 @@
         <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadLayerMask(System.IO.BinaryReader)">
             <summary>
             Reads a layer mask from the stream.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteAudioTrackSettings(System.IO.BinaryWriter,PixlPunkt.Core.Animation.AudioTrackSettings)">
+            <summary>
+            Writes audio track settings to the stream.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteStageSettings(System.IO.BinaryWriter,PixlPunkt.Core.Animation.StageSettings)">
+            <summary>
+            Writes stage settings to the stream.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteStageAnimationTrack(System.IO.BinaryWriter,PixlPunkt.Core.Animation.StageAnimationTrack)">
+            <summary>
+            Writes stage animation track to the stream.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteStageKeyframe(System.IO.BinaryWriter,PixlPunkt.Core.Animation.StageKeyframeData)">
+            <summary>
+            Writes a stage keyframe to the stream.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadStageSettings(System.IO.BinaryReader,PixlPunkt.Core.Animation.StageSettings)">
+            <summary>
+            Reads stage settings from the stream.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadStageAnimationTrack(System.IO.BinaryReader,PixlPunkt.Core.Animation.StageAnimationTrack)">
+            <summary>
+            Reads stage animation track from the stream.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadStageKeyframe(System.IO.BinaryReader)">
+            <summary>
+            Reads a stage keyframe from the stream.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Document.DocumentWorkspace">
@@ -26209,6 +26465,136 @@
             Docked at the bottom of the main window.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawAudioHeaderRow(System.Int32,System.Int32)">
+            <summary>
+            Draws the audio section header row (shows collapsed/expanded indicator).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawAudioTrackWaveform(System.Int32,PixlPunkt.Core.Animation.AudioTrackState,System.Int32)">
+            <summary>
+            Draws a simplified waveform representation in the audio track row.
+            Respects the audio start frame offset so the waveform appears at the correct timeline position.
+            The waveform can be dragged left/right to adjust the offset.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Animation.AnimationPanel.StageSelectionChanged">
+            <summary>
+            Raised when the Stage track is selected or deselected.
+            Parameter is true when selected, false when deselected.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.AnimationPanel.IsStageSelected">
+            <summary>
+            Gets whether the Stage track is currently selected.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.RefreshStagePreview">
+            <summary>
+            Refreshes the stage preview to reflect canvas changes.
+            Call this after painting or other canvas modifications.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.GetStagePreviewContainer">
+            <summary>
+            Gets the StagePreviewContainer grid for undocking purposes.
+            Returns null if the container doesn't exist.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.GetStagePreviewColumn">
+            <summary>
+            Gets the stage preview column definition for hiding when undocked.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.GetStagePreviewSplitterColumn">
+            <summary>
+            Gets the stage preview splitter column for hiding when undocked.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.UpdateStageQuickButtonVisibility">
+            <summary>
+            Updates the visibility of the Stage quick-add keyframe button.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.SelectStage(System.Boolean)">
+            <summary>
+            Selects or deselects the Stage track.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DeselectStage">
+            <summary>
+            Deselects the stage (called when a layer is selected).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawStageTrackKeyframes(System.Int32)">
+            <summary>
+            Draws keyframes for the stage track.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawStageKeyframeDiamond(System.Int32,System.Int32)">
+            <summary>
+            Draws a stage keyframe diamond (orange color).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.AnimationPanel.SelectedSubRoutine">
+            <summary>
+            Gets the currently selected sub-routine, or null if none selected.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Animation.AnimationPanel.IsSubRoutineSelected">
+            <summary>
+            Gets whether a sub-routine is currently selected.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.UI.Animation.AnimationPanel.SubRoutineSelectionChanged">
+            <summary>
+            Raised when the sub-routine selection changes.
+            Parameter is the selected sub-routine (null if deselected).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.SelectSubRoutine(PixlPunkt.Core.Animation.AnimationSubRoutine)">
+            <summary>
+            Selects a sub-routine for editing.
+            </summary>
+            <param name="subRoutine">The sub-routine to select, or null to deselect.</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DeselectSubRoutine">
+            <summary>
+            Deselects the current sub-routine (called when a layer or stage is selected).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawSubRoutineTrack(System.Int32)">
+            <summary>
+            Draws all sub-routine bars in the sub-routine track row(s).
+            Each sub-routine is displayed as a horizontal bar showing its start frame and duration.
+            Each sub-routine gets its own dedicated track row.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawSubRoutineTrackRow(System.Int32,PixlPunkt.Core.Animation.AnimationSubRoutine)">
+            <summary>
+            Draws a single sub-routine track row at the specified row index.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawSubRoutineKeyframesForRow(PixlPunkt.Core.Animation.AnimationSubRoutine,System.Int32)">
+            <summary>
+            Draws keyframe diamonds for a sub-routine at a specific row index.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.CalculateSubRoutineStackHeight(System.Collections.Generic.List{PixlPunkt.Core.Animation.AnimationSubRoutine})">
+            <summary>
+            Calculates how many vertical stack rows are needed for sub-routines.
+            Sub-routines that overlap in time share the same row.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.CalculateStackPosition(PixlPunkt.Core.Animation.AnimationSubRoutine,System.Collections.Generic.List{PixlPunkt.Core.Animation.AnimationSubRoutine})">
+            <summary>
+            Calculates which stack row (vertical position) a sub-routine belongs in.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.CreateSubRoutineContextMenu(PixlPunkt.Core.Animation.AnimationSubRoutine)">
+            <summary>
+            Creates a context menu for a sub-routine with all available options.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.UI.Animation.AnimationPanel.CurrentMode">
             <summary>
             Gets the current animation mode.
@@ -26251,12 +26637,6 @@
             Parameter is the layer's Guid.
             </summary>
         </member>
-        <member name="E:PixlPunkt.UI.Animation.AnimationPanel.StageSelectionChanged">
-            <summary>
-            Raised when the Stage track is selected or deselected.
-            Parameter is true when selected, false when deselected.
-            </summary>
-        </member>
         <member name="E:PixlPunkt.UI.Animation.AnimationPanel.AnimationPreviewUndockRequested">
             <summary>
             Raised when the user clicks the undock button for the animation preview.
@@ -26271,11 +26651,6 @@
             <summary>
             Raised when the user interacts with the animation panel (clicks, drags, etc.).
             Used to track focus for keyboard shortcut routing.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.Animation.AnimationPanel.IsStageSelected">
-            <summary>
-            Gets whether the Stage track is currently selected.
             </summary>
         </member>
         <member name="P:PixlPunkt.UI.Animation.AnimationPanel.IsAnimationPreviewFloating">
@@ -26297,6 +26672,12 @@
         <member name="M:PixlPunkt.UI.Animation.AnimationPanel.BindCanvasHost(PixlPunkt.UI.CanvasHost.CanvasViewHost)">
             <summary>
             Binds the canvas host for synchronization with the main canvas.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.OnCanvasSubRoutineSelected(PixlPunkt.Core.Animation.AnimationSubRoutine)">
+            <summary>
+            Called when a sub-routine is selected on the canvas.
+            Syncs the selection back to the animation panel.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Animation.AnimationPanel.SetForegroundColor(System.UInt32)">
@@ -26325,75 +26706,34 @@
             Call this after layer structure changes (add, remove, reorder).
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.RefreshStagePreview">
+        <member name="T:PixlPunkt.UI.Animation.AnimationPanel.OrderedTrackItem">
             <summary>
-            Refreshes the stage preview to reflect canvas changes.
-            Call this after painting or other canvas modifications.
+            Represents an item in the ordered track list (either a layer or sub-routine).
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.GetStagePreviewContainer">
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.OrderedTrackItem.#ctor(System.Int32,System.Boolean,PixlPunkt.Core.Animation.CanvasAnimationTrack,PixlPunkt.Core.Animation.AnimationSubRoutine)">
             <summary>
-            Gets the StagePreviewContainer grid for undocking purposes.
-            Returns null if the container doesn't exist.
+            Represents an item in the ordered track list (either a layer or sub-routine).
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.GetStagePreviewColumn">
+        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.BuildOrderedTrackList">
             <summary>
-            Gets the stage preview column definition for hiding when undocked.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.GetStagePreviewSplitterColumn">
-            <summary>
-            Gets the stage preview splitter column for hiding when undocked.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.UpdateStageQuickButtonVisibility">
-            <summary>
-            Updates the visibility of the Stage quick-add keyframe button.
+            Builds an ordered list of layers and sub-routines for display.
+            
+            Tracks in CanvasAnimationState are stored in UI order (top-to-bottom, matching the Layers panel).
+            Track 0 = top layer (e.g., Foreground), last track = bottom layer (e.g., Background).
+            
+            For Z-ordering: higher Z = renders on top = should appear at TOP of timeline list.
+            So we invert the track indices: last track (Background) gets Z=0, first track (Foreground) gets Z=N-1.
+            Sub-routines use their explicit ZOrder property.
+            
+            Final sort is DESCENDING by Z-order so highest Z appears first in the list.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Animation.AnimationPanel.OnActiveLayerChanged">
             <summary>
             Called when the active layer changes externally (e.g., from LayersPanel).
             Updates the selection highlight in the animation timeline.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawSubRoutineTrack(System.Int32)">
-            <summary>
-            Draws all sub-routine bars in the sub-routine track row.
-            Each sub-routine is displayed as a horizontal bar showing its start frame and duration.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawAudioHeaderRow(System.Int32,System.Int32)">
-            <summary>
-            Draws the audio section header row (shows collapsed/expanded indicator).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawAudioTrackWaveform(System.Int32,PixlPunkt.Core.Animation.AudioTrackState,System.Int32)">
-            <summary>
-            Draws a simplified waveform representation in the audio track row.
-            Respects the audio start frame offset so the waveform appears at the correct timeline position.
-            The waveform can be dragged left/right to adjust the offset.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.SelectStage(System.Boolean)">
-            <summary>
-            Selects or deselects the Stage track.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DeselectStage">
-            <summary>
-            Deselects the stage (called when a layer is selected).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawStageTrackKeyframes(System.Int32)">
-            <summary>
-            Draws keyframes for the stage track.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawStageKeyframeDiamond(System.Int32,System.Int32)">
-            <summary>
-            Draws a stage keyframe diamond (orange color).
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Animation.AnimationPanel.DrawCanvasTrackKeyframes(PixlPunkt.Core.Animation.CanvasAnimationTrack,System.Int32)">
@@ -26697,6 +27037,11 @@
             Binds the panel to a document and its canvas animation state.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Animation.StagePreviewPanel.LoadSubRoutineReels">
+            <summary>
+            Loads all sub-routine reels from their file paths.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Animation.StagePreviewPanel.RefreshPreview">
             <summary>
             Refreshes the preview to reflect current document state.
@@ -26706,6 +27051,22 @@
         <member name="P:PixlPunkt.UI.Animation.StagePreviewPanel.IsExpanded">
             <summary>
             Gets or sets whether the panel is in expanded mode.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.StagePreviewPanel.CompositeSubRoutines(System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Composites all active sub-routines onto the preview buffer.
+            </summary>
+            <param name="pixels">The destination pixel buffer (BGRA).</param>
+            <param name="destWidth">The width of the destination buffer.</param>
+            <param name="destHeight">The height of the destination buffer.</param>
+            <param name="offsetX">The X offset (stage position) to subtract from sub-routine positions.</param>
+            <param name="offsetY">The Y offset (stage position) to subtract from sub-routine positions.</param>
+            <param name="frameIndex">The current animation frame index.</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.StagePreviewPanel.CompositeFrame(System.Byte[],System.Int32,System.Int32,System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32,System.Single)">
+            <summary>
+            Composites a single frame onto the destination buffer with alpha blending.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Animation.StagePreviewPanel.InitializeComponent">
@@ -27245,6 +27606,52 @@
             - Cursor management
             </summary>
             <summary>
+            Partial class for interleaved rendering of layers and sub-routines.
+            </summary>
+            <remarks>
+            <para>
+            This partial class extends <see cref="T:PixlPunkt.UI.CanvasHost.CanvasViewHost"/> with functionality to composite
+            animation sub-routines at the correct Z-order relative to document layers. Sub-routines
+            are tile animations that can be embedded within canvas animations with transform keyframes.
+            </para>
+            <para><strong>Z-Order System:</strong></para>
+            <para>
+            The Z-order system determines the visual stacking order of layers and sub-routines:
+            </para>
+            <list type="bullet">
+            <item><strong>Lower Z = Behind:</strong> Items with lower Z-order values render first and appear behind items with higher Z values.</item>
+            <item><strong>Higher Z = In Front:</strong> Items with higher Z-order values render last and appear in front of items with lower Z values.</item>
+            </list>
+            <para><strong>Layer Z-Order Calculation:</strong></para>
+            <para>
+            Layer Z-orders are derived from their track position in <see cref="P:PixlPunkt.Core.Animation.CanvasAnimationState.Tracks"/>:
+            </para>
+            <list type="bullet">
+            <item>Track 0 (top of UI, e.g., "Foreground") ? Z = trackCount - 1 (highest)</item>
+            <item>Track N-1 (bottom of UI, e.g., "Background") ? Z = 0 (lowest)</item>
+            </list>
+            <para><strong>Sub-Routine Z-Order:</strong></para>
+            <para>
+            Sub-routines have an explicit <see cref="P:PixlPunkt.Core.Animation.AnimationSubRoutine.ZOrder"/> property
+            that can be modified via context menu (Move Up/Down, Bring to Front/Send to Back).
+            </para>
+            <para><strong>Tie-Breaking Rules (Same Z-Order):</strong></para>
+            <para>
+            When items share the same Z-order value:
+            </para>
+            <list type="number">
+            <item>Sub-routines render BEFORE (behind) layers at the same Z level.</item>
+            <item>Among multiple sub-routines at the same Z, items lower in the timeline UI render first (behind).</item>
+            </list>
+            <para>
+            This ensures the visual timeline order matches the rendered output: items appearing lower
+            in the timeline panel are rendered behind items appearing higher.
+            </para>
+            </remarks>
+            <seealso cref="T:PixlPunkt.Core.Animation.AnimationSubRoutine"/>
+            <seealso cref="T:PixlPunkt.Core.Animation.SubRoutineRenderInfo"/>
+            <seealso cref="T:PixlPunkt.UI.Animation.AnimationPanel"/>
+            <summary>
             Painting subsystem for CanvasViewHost:
             - Painting state machine
             - Stroke begin/commit
@@ -27582,6 +27989,164 @@
             <summary>
             Handles pointer released for stage dragging and resizing.
             Returns true if the event was handled.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.GetSubRoutineCursor(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs)">
+            <summary>
+            Gets the appropriate cursor for sub-routine interaction based on pointer position.
+            Returns move cursor only when hovering over the SELECTED sub-routine.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.HitTestSubRoutine(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Hit tests for sub-routines at the given document position.
+            Returns the sub-routine if found, null otherwise.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.SubRoutine_TryHandlePointerPressed(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs)">
+            <summary>
+            Handles pointer pressed for sub-routine dragging (only when already selected).
+            Returns true if the event was handled.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.SubRoutine_TryHandlePointerMoved(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs)">
+            <summary>
+            Handles pointer moved for sub-routine dragging.
+            Returns true if the event was handled.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.SubRoutine_TryHandlePointerReleased(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs)">
+            <summary>
+            Handles pointer released for sub-routine dragging.
+            Returns true if the event was handled.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawDocumentWithInterleavedSubRoutines(Microsoft.Graphics.Canvas.CanvasDrawingSession,Microsoft.Graphics.Canvas.CanvasDevice,Windows.Foundation.Rect)">
+            <summary>
+            Draws the document surface with sub-routines interleaved based on Z-order.
+            </summary>
+            <param name="ds">The canvas drawing session.</param>
+            <param name="device">The canvas device for bitmap creation.</param>
+            <param name="dest">The destination rectangle in screen coordinates.</param>
+            <remarks>
+            <para>
+            This method serves as the entry point for interleaved rendering. It determines whether
+            complex interleaving is needed based on the current animation mode and active sub-routines.
+            </para>
+            <para>
+            Call this instead of simple <c>CompositeTo + DrawDocumentSurface</c> when sub-routines
+            need to respect layer Z-ordering.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSimpleCompositeInternal(Microsoft.Graphics.Canvas.CanvasDrawingSession,Microsoft.Graphics.Canvas.CanvasDevice,Windows.Foundation.Rect)">
+            <summary>
+            Simple composite rendering: all layers composited together, then drawn.
+            </summary>
+            <param name="ds">The canvas drawing session.</param>
+            <param name="device">The canvas device for bitmap creation.</param>
+            <param name="dest">The destination rectangle in screen coordinates.</param>
+            <remarks>
+            Used when no sub-routines are active or when not in canvas animation mode.
+            This is the fast path that delegates to <see cref="M:PixlPunkt.Core.Document.CanvasDocument.CompositeTo(PixlPunkt.Core.Imaging.PixelSurface)"/>.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawInterleavedCompositeInternal(Microsoft.Graphics.Canvas.CanvasDrawingSession,Microsoft.Graphics.Canvas.CanvasDevice,Windows.Foundation.Rect,System.Collections.Generic.List{PixlPunkt.Core.Animation.SubRoutineRenderInfo})">
+            <summary>
+            Interleaved composite rendering: layers and sub-routines composited in Z-order.
+            </summary>
+            <param name="ds">The canvas drawing session.</param>
+            <param name="device">The canvas device for bitmap creation.</param>
+            <param name="dest">The destination rectangle in screen coordinates.</param>
+            <param name="activeSubRoutines">List of active sub-routines with their render info.</param>
+            <remarks>
+            <para>
+            This method implements the core Z-order interleaving algorithm. It builds a unified
+            list of layers and sub-routines, sorts them by Z-order, and composites them in order.
+            </para>
+            <para><strong>Algorithm:</strong></para>
+            <list type="number">
+            <item>Collect all visible layers with their computed Z-orders (inverted track index).</item>
+            <item>Collect all active sub-routines with their explicit Z-order values.</item>
+            <item>Sort all items by Z-order ascending (lowest first = rendered behind).</item>
+            <item>Apply tie-breaking: sub-routines before layers; among sub-routines, reverse collection order.</item>
+            <item>Composite each item onto the output surface in sorted order.</item>
+            </list>
+            <para><strong>Consistency with UI:</strong></para>
+            <para>
+            This method uses the same Z-order logic as <c>AnimationPanel.BuildOrderedTrackList()</c>
+            but sorts in ascending order for rendering (vs. descending for UI display). This ensures
+            the rendered output matches what users see in the timeline panel.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSubRoutineOverlayInternal(Microsoft.Graphics.Canvas.CanvasDrawingSession,Windows.Foundation.Rect)">
+            <summary>
+            Draws sub-routine selection overlay when no interleaved rendering is needed.
+            </summary>
+            <param name="ds">The canvas drawing session.</param>
+            <param name="dest">The destination rectangle in screen coordinates.</param>
+            <remarks>
+            Called after simple compositing to draw selection handles for any selected sub-routine,
+            even when the sub-routine isn't currently active (e.g., current frame outside its range).
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CompositeLayerToComposite(PixlPunkt.Core.Document.Layer.RasterLayer)">
+            <summary>
+            Composites a single layer onto the internal composite surface.
+            </summary>
+            <param name="layer">The raster layer to composite.</param>
+            <remarks>
+            Uses standard alpha compositing (Porter-Duff "over" operator) with the layer's opacity.
+            The layer must have the same dimensions as the composite surface.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CompositeSubRoutineToComposite(PixlPunkt.Core.Animation.SubRoutineRenderInfo)">
+            <summary>
+            Composites a sub-routine's current frame onto the composite surface.
+            </summary>
+            <param name="renderInfo">The sub-routine render info containing frame data and transform.</param>
+            <remarks>
+            <para>
+            Applies the sub-routine's interpolated transform (position, scale, rotation) when compositing.
+            Uses nearest-neighbor sampling to preserve pixel art sharpness.
+            </para>
+            <para>
+            Position values are pixel-snapped (rounded) to avoid sub-pixel rendering artifacts.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CompositeSubRoutineUnrotated(System.Byte[],System.Int32,System.Int32,System.Single,System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            Composites an unrotated sub-routine sprite using nearest-neighbor sampling.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CompositeSubRoutineRotated(System.Byte[],System.Int32,System.Int32,System.Single,System.Single,System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            Composites a rotated sub-routine sprite using nearest-neighbor sampling.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSubRoutineSelectionOverlayForInterleaved(Microsoft.Graphics.Canvas.CanvasDrawingSession,Windows.Foundation.Rect,System.Single,PixlPunkt.Core.Animation.SubRoutineRenderInfo)">
+            <summary>
+            Draws selection handles for a sub-routine as an overlay (not composited).
+            </summary>
+            <param name="ds">The canvas drawing session.</param>
+            <param name="dest">The destination rectangle in screen coordinates.</param>
+            <param name="scale">The current zoom scale.</param>
+            <param name="renderInfo">The sub-routine render info.</param>
+            <remarks>
+            Selection handles are drawn as screen-space overlays after compositing,
+            so they always appear on top regardless of Z-order.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSubRoutineSelectionInternal(Microsoft.Graphics.Canvas.CanvasDrawingSession,System.Single,System.Single,System.Single,System.Single,System.Single)">
+            <summary>
+            Draws selection handles around a selected sub-routine.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawSubRoutineHandle(Microsoft.Graphics.Canvas.CanvasDrawingSession,System.Single,System.Single,System.Single,Windows.UI.Color,Windows.UI.Color)">
+            <summary>
+            Draws a single sub-routine selection handle (square).
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.GetPaintTargetSurface">
@@ -28488,6 +29053,27 @@
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._refLayerDragPointerStartY">
             <summary>The pointer document position when drag started.</summary>
         </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._selectedSubRoutine">
+            <summary>The currently selected sub-routine for interaction.</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._subRoutineDragging">
+            <summary>Whether we're currently dragging a sub-routine.</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._subRoutineDragStartX">
+            <summary>The sub-routine position when drag started (X).</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._subRoutineDragStartY">
+            <summary>The sub-routine position when drag started (Y).</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._subRoutineDragPointerStartX">
+            <summary>The pointer document position when drag started (X).</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._subRoutineDragPointerStartY">
+            <summary>The pointer document position when drag started (Y).</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._subRoutineEditProgress">
+            <summary>The normalized progress at which we're editing the sub-routine position.</summary>
+        </member>
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._targetCursor">
             <summary>
             The default cursor used for canvas painting operations.
@@ -28579,6 +29165,27 @@
             Sets the current animation mode. Stage overlay is only shown in Canvas mode.
             </summary>
             <param name="mode">The animation mode.</param>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.IsSubRoutineSelected">
+            <summary>
+            Gets whether a sub-routine is currently selected.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.SelectedSubRoutine">
+            <summary>
+            Gets the currently selected sub-routine.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.SetSelectedSubRoutine(PixlPunkt.Core.Animation.AnimationSubRoutine)">
+            <summary>
+            Sets the sub-routine selection state.
+            </summary>
+            <param name="subRoutine">The sub-routine to select, or null to deselect.</param>
+        </member>
+        <member name="E:PixlPunkt.UI.CanvasHost.CanvasViewHost.SubRoutineSelected">
+            <summary>
+            Raised when a sub-routine is selected on the canvas.
+            </summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.IsExternalDropperActive">
             <summary>
@@ -31194,6 +31801,11 @@
             Returns true if the format exports as a sprite strip (single horizontal image).
             </summary>
         </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.IsSubRoutine">
+            <summary>
+            Returns true if the format exports as a sub-routine (.pxpr).
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog.InitializeComponent">
             <summary>
             InitializeComponent()
@@ -31774,28 +32386,6 @@
         <member name="M:PixlPunkt.UI.Dialogs.ImportTilesDialog.GetBindingConnector(System.Int32,System.Object)">
             <summary>
             GetBindingConnector(int connectionId, object target)
-            </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Helpers.CursorUtilities">
-            <summary>
-            Provides utilities for loading custom cursor files and applying them to XAML elements in WinUI 3.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Helpers.CursorUtilities.ChangeCursor(Microsoft.UI.Xaml.UIElement,Microsoft.UI.Input.InputCursor)">
-            <summary>
-            Changes the cursor for a XAML element using reflection.
-            </summary>
-            <param name="element">Target UIElement to modify.</param>
-            <param name="cursor">InputCursor to apply, or null to reset to default.</param>
-        </member>
-        <member name="M:PixlPunkt.UI.Helpers.CursorUtilities.LoadCursorFromFile(System.String)">
-            <summary>
-            Loads a cursor from a .cur file on disk.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Helpers.CursorUtilities.CreateCursorFromHCURSOR(System.IntPtr)">
-            <summary>
-            Creates an InputCursor from a native cursor handle (HCURSOR).
             </summary>
         </member>
         <member name="T:PixlPunkt.UI.Helpers.LayerTreeTemplateSelector">

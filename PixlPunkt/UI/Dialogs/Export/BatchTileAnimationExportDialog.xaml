@@ -81,6 +81,7 @@
                     <ComboBoxItem Tag="mp4" Content="MP4 Video (.mp4)"/>
                     <ComboBoxItem Tag="png" Content="PNG Image Sequence"/>
                     <ComboBoxItem Tag="strip" Content="Sprite Strip (.png) - Horizontal"/>
+                    <ComboBoxItem Tag="pxpr" Content="Sub-Routine (.pxpr) - For Canvas Animation"/>
                 </ComboBox>
             </StackPanel>
 

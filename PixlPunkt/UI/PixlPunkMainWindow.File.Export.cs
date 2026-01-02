@@ -469,12 +469,13 @@ namespace PixlPunkt.UI
                     break;
 
                 case "pxpr":
-                    // Export as .pxpr sub-routine (tile animation only)
+                    // Export as .pxpr sub-routine with embedded pixel data (v2 format)
                     if (exportTileAnim && doc.TileAnimationState.SelectedReel != null)
                     {
                         PixlPunkt.Core.Animation.TileAnimationReelIO.ExportReel(
                             doc.TileAnimationState.SelectedReel, 
-                            outputPath);
+                            outputPath,
+                            doc); // Pass document for embedded pixel data
                     }
                     else
                     {
@@ -668,42 +669,51 @@ namespace PixlPunkt.UI
                     $"Exporting: {reel.Name}",
                     $"Animation {completedReels + 1} of {totalReels}");
 
-                // Render frames for this reel
-                var frames = await exportService.RenderTileAnimationAsync(doc, reel, options);
-
-                if (frames.Count == 0)
+                // For pxpr format, save the reel with embedded pixel data
+                if (format == "pxpr")
                 {
-                    completedReels++;
-                    continue;
+                    string pxprPath = Path.Combine(outputFolderPath, $"{reelName}.pxpr");
+                    PixlPunkt.Core.Animation.TileAnimationReelIO.ExportReel(reel, pxprPath, doc);
                 }
-
-                // Calculate effective FPS
-                int effectiveFps = fps > 0 ? fps : Math.Max(1, 1000 / reel.DefaultFrameTimeMs);
-
-                // Encode based on format
-                switch (format)
+                else
                 {
-                    case "gif":
-                        string gifPath = Path.Combine(outputFolderPath, $"{reelName}.gif");
-                        await GifEncoder.EncodeAsync(frames, gifPath, loop);
-                        break;
+                    // Render frames for this reel
+                    var frames = await exportService.RenderTileAnimationAsync(doc, reel, options);
 
-                    case "mp4":
-                        string mp4Path = Path.Combine(outputFolderPath, $"{reelName}.mp4");
-                        await VideoEncoder.EncodeAsync(frames, mp4Path, VideoFormat.Mp4, effectiveFps, videoQuality, 
-                            cancellationToken: progressDialog.CancellationToken);
-                        break;
+                    if (frames.Count == 0)
+                    {
+                        completedReels++;
+                        continue;
+                    }
 
-                    case "png":
-                        string pngFolder = Path.Combine(outputFolderPath, reelName);
-                        Directory.CreateDirectory(pngFolder);
-                        await ImageSequenceExporter.ExportAsync(frames, pngFolder, reelName, ImageSequenceFormat.Png);
-                        break;
+                    // Calculate effective FPS
+                    int effectiveFps = fps > 0 ? fps : Math.Max(1, 1000 / reel.DefaultFrameTimeMs);
 
-                    case "strip":
-                        string stripPath = Path.Combine(outputFolderPath, $"{reelName}.png");
-                        await ExportSpriteStripAsync(frames, stripPath);
-                        break;
+                    // Encode based on format
+                    switch (format)
+                    {
+                        case "gif":
+                            string gifPath = Path.Combine(outputFolderPath, $"{reelName}.gif");
+                            await GifEncoder.EncodeAsync(frames, gifPath, loop);
+                            break;
+
+                        case "mp4":
+                            string mp4Path = Path.Combine(outputFolderPath, $"{reelName}.mp4");
+                            await VideoEncoder.EncodeAsync(frames, mp4Path, VideoFormat.Mp4, effectiveFps, videoQuality, 
+                                cancellationToken: progressDialog.CancellationToken);
+                            break;
+
+                        case "png":
+                            string pngFolder = Path.Combine(outputFolderPath, reelName);
+                            Directory.CreateDirectory(pngFolder);
+                            await ImageSequenceExporter.ExportAsync(frames, pngFolder, reelName, ImageSequenceFormat.Png);
+                            break;
+
+                        case "strip":
+                            string stripPath = Path.Combine(outputFolderPath, $"{reelName}.png");
+                            await ExportSpriteStripAsync(frames, stripPath);
+                            break;
+                    }
                 }
 
                 completedReels++;
@@ -1094,9 +1104,9 @@ namespace PixlPunkt.UI
                 var file = await savePicker.PickSaveFileAsync();
                 if (file is null) return;
 
-                // Export using TileAnimationReelIO
+                // Export using TileAnimationReelIO with embedded pixel data (v2 format)
                 string exportPath = file.Path;
-                PixlPunkt.Core.Animation.TileAnimationReelIO.ExportReel(selectedReel, exportPath);
+                PixlPunkt.Core.Animation.TileAnimationReelIO.ExportReel(selectedReel, exportPath, doc);
 
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
@@ -1104,8 +1114,9 @@ namespace PixlPunkt.UI
                     Content = $"Sub-routine exported successfully!\n\n" +
                               $"File: {selectedReel.Name}.pxpr\n" +
                               $"Frames: {selectedReel.FrameCount}\n" +
+                              $"Tile Size: {doc.TileSize.Width}×{doc.TileSize.Height} pixels\n" +
                               $"Timing: {selectedReel.DefaultFrameTimeMs}ms per frame\n\n" +
-                              $"You can now import this into any canvas animation.",
+                              $"This file contains embedded pixel data and can be imported into any document.",
                     CloseButtonText = DialogMessages.ButtonOK,
                     XamlRoot = Content.XamlRoot
                 });
@@ -1529,7 +1540,7 @@ namespace PixlPunkt.UI
             int hotspotX,
             int hotspotY)
         {
-            if (pixels32 is null) throw new ArgumentNullException(nameof(pixels32));
+            ArgumentNullException.ThrowIfNull(pixels32);
             if (pixels32.Length < width * height * 4)
                 throw new ArgumentException("pixels32 too small for width/height");
 
@@ -1570,7 +1581,7 @@ namespace PixlPunkt.UI
             int hotspotX,
             int hotspotY)
         {
-            if (sourcePixels is null) throw new ArgumentNullException(nameof(sourcePixels));
+            ArgumentNullException.ThrowIfNull(sourcePixels);
 
             // Generate all cursor sizes using the selected scaling algorithm
             var cursorImages = new List<byte[]>();

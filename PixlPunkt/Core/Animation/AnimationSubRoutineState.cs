@@ -5,6 +5,45 @@ using System.Linq;
 namespace PixlPunkt.Core.Animation
 {
     /// <summary>
+    /// Represents render information for an active sub-routine at a given frame.
+    /// </summary>
+    public sealed class SubRoutineRenderInfo
+    {
+        /// <summary>The sub-routine being rendered.</summary>
+        public required AnimationSubRoutine SubRoutine { get; init; }
+
+        /// <summary>The pixel data for the current frame (BGRA).</summary>
+        public required byte[] FramePixels { get; init; }
+
+        /// <summary>The width of the frame in pixels.</summary>
+        public int FrameWidth { get; init; }
+
+        /// <summary>The height of the frame in pixels.</summary>
+        public int FrameHeight { get; init; }
+
+        /// <summary>The interpolated X position in canvas coordinates.</summary>
+        public double PositionX { get; init; }
+
+        /// <summary>The interpolated Y position in canvas coordinates.</summary>
+        public double PositionY { get; init; }
+
+        /// <summary>The interpolated scale factor.</summary>
+        public float Scale { get; init; }
+
+        /// <summary>The interpolated rotation in degrees.</summary>
+        public float Rotation { get; init; }
+
+        /// <summary>The normalized progress (0.0 to 1.0) within the sub-routine.</summary>
+        public float NormalizedProgress { get; init; }
+
+        /// <summary>
+        /// The Z-order of this sub-routine for rendering priority.
+        /// Higher values render on top (in front).
+        /// </summary>
+        public int ZOrder { get; init; }
+    }
+
+    /// <summary>
     /// Manages animation sub-routine playback state and transform interpolation.
     /// Handles stepping through active sub-routines and computing interpolated transforms.
     /// </summary>
@@ -50,6 +89,47 @@ namespace PixlPunkt.Core.Animation
             {
                 float progress = subRoutine.GetNormalizedProgress(frameIndex);
                 _activeSubRoutines.Add(new ActiveSubRoutine(subRoutine, progress));
+            }
+        }
+
+        /// <summary>
+        /// Gets render information for all active sub-routines at the current frame.
+        /// </summary>
+        /// <param name="frameIndex">The frame index to render.</param>
+        /// <returns>Collection of render info for each active sub-routine with loaded frames.</returns>
+        public IEnumerable<SubRoutineRenderInfo> GetRenderInfo(int frameIndex)
+        {
+            foreach (var active in _activeSubRoutines)
+            {
+                var subRoutine = active.SubRoutine;
+
+                // Skip if not loaded or no frames
+                if (!subRoutine.IsLoaded)
+                    continue;
+
+                // Get the frame pixels for this canvas frame
+                var framePixels = subRoutine.GetFramePixels(frameIndex);
+                if (framePixels == null)
+                    continue;
+
+                // Get interpolated transform values
+                var (posX, posY) = subRoutine.InterpolatePosition(active.NormalizedProgress);
+                float scale = subRoutine.InterpolateScale(active.NormalizedProgress);
+                float rotation = subRoutine.InterpolateRotation(active.NormalizedProgress);
+
+                yield return new SubRoutineRenderInfo
+                {
+                    SubRoutine = subRoutine,
+                    FramePixels = framePixels,
+                    FrameWidth = subRoutine.FrameWidth,
+                    FrameHeight = subRoutine.FrameHeight,
+                    PositionX = posX,
+                    PositionY = posY,
+                    Scale = scale,
+                    Rotation = rotation,
+                    NormalizedProgress = active.NormalizedProgress,
+                    ZOrder = subRoutine.ZOrder
+                };
             }
         }
 
@@ -146,6 +226,14 @@ namespace PixlPunkt.Core.Animation
         /// Checks if any sub-routines are currently active.
         /// </summary>
         public bool HasActiveSubRoutines => _activeSubRoutines.Count > 0;
+
+        /// <summary>
+        /// Gets the active sub-routines list for external access.
+        /// </summary>
+        public IEnumerable<AnimationSubRoutine> GetActiveSubRoutines()
+        {
+            return _activeSubRoutines.Select(a => a.SubRoutine);
+        }
 
         /// <summary>
         /// Gets information about all active sub-routines for debugging/visualization.

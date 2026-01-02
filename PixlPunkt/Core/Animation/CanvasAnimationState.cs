@@ -121,6 +121,34 @@ namespace PixlPunkt.Core.Animation
             await AudioTracks.ReloadAllFromSettingsAsync();
         }
 
+        /// <summary>
+        /// Reloads all sub-routine reels from their stored file paths.
+        /// Called after loading a document from file.
+        /// </summary>
+        /// <param name="document">The document to use for rendering frames (for v1 format reels without embedded pixels).</param>
+        /// <returns>Number of sub-routines successfully loaded.</returns>
+        public int ReloadSubRoutineReels(Document.CanvasDocument? document)
+        {
+            int loadedCount = 0;
+            foreach (var subRoutine in SubRoutines.SubRoutines)
+            {
+                if (!string.IsNullOrEmpty(subRoutine.ReelFilePath))
+                {
+                    if (subRoutine.LoadReel(document))
+                    {
+                        loadedCount++;
+                    }
+                    else
+                    {
+                        Logging.LoggingService.Warning(
+                            "Failed to reload sub-routine reel from {FilePath}", 
+                            subRoutine.ReelFilePath);
+                    }
+                }
+            }
+            return loadedCount;
+        }
+
         // ====================================================================
         // ANIMATION SUB-ROUTINES
         // ====================================================================
