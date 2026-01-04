@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Compositing.Serialization;
@@ -271,9 +272,15 @@ namespace PixlPunkt.Core.Document
             bw.Write((int)subRoutine.ScaleInterpolation);
             bw.Write((int)subRoutine.RotationInterpolation);
             
+            // Snapshot keyframes to prevent "collection was modified" during save
+            // if another thread is editing the animation while saving
+            var positionKeyframes = subRoutine.PositionKeyframes.ToArray();
+            var scaleKeyframes = subRoutine.ScaleKeyframes.ToArray();
+            var rotationKeyframes = subRoutine.RotationKeyframes.ToArray();
+            
             // Position keyframes
-            bw.Write(subRoutine.PositionKeyframes.Count);
-            foreach (var kvp in subRoutine.PositionKeyframes)
+            bw.Write(positionKeyframes.Length);
+            foreach (var kvp in positionKeyframes)
             {
                 bw.Write(kvp.Key);      // float - normalized time
                 bw.Write(kvp.Value.X);  // double - X position
@@ -281,16 +288,16 @@ namespace PixlPunkt.Core.Document
             }
             
             // Scale keyframes
-            bw.Write(subRoutine.ScaleKeyframes.Count);
-            foreach (var kvp in subRoutine.ScaleKeyframes)
+            bw.Write(scaleKeyframes.Length);
+            foreach (var kvp in scaleKeyframes)
             {
                 bw.Write(kvp.Key);    // float - normalized time
                 bw.Write(kvp.Value);  // float - scale factor
             }
             
             // Rotation keyframes
-            bw.Write(subRoutine.RotationKeyframes.Count);
-            foreach (var kvp in subRoutine.RotationKeyframes)
+            bw.Write(rotationKeyframes.Length);
+            foreach (var kvp in rotationKeyframes)
             {
                 bw.Write(kvp.Key);    // float - normalized time
                 bw.Write(kvp.Value);  // float - rotation degrees

@@ -2566,6 +2566,7 @@
         <member name="M:PixlPunkt.Core.Animation.StageKeyframeData.LerpAngle(System.Single,System.Single,System.Single)">
             <summary>
             Interpolates between two angles, taking the shortest path.
+            Handles the wraparound at ±180 degrees correctly.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Animation.StageKeyframeData.ApplyEasing(System.Single,PixlPunkt.Core.Animation.EasingType)">
@@ -34380,6 +34381,12 @@
             <summary>
             Forces focus back to the main content area to ensure shortcuts work.
             Call this after interactions with panels that might steal focus.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.PixlPunktMainWindow.DialogGateTimeout">
+            <summary>
+            Timeout for waiting on the dialog gate semaphore (30 seconds).
+            Prevents infinite blocking if a dialog hangs.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.ShowDialogGuardedAsync(Microsoft.UI.Xaml.Controls.ContentDialog)">

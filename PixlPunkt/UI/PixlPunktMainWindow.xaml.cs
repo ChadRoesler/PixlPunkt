@@ -595,6 +595,12 @@ namespace PixlPunkt.UI
         // ─────────────────────────────────────────────────────────────
 
         private readonly SemaphoreSlim _dialogGate = new(1, 1);
+        
+        /// <summary>
+        /// Timeout for waiting on the dialog gate semaphore (30 seconds).
+        /// Prevents infinite blocking if a dialog hangs.
+        /// </summary>
+        private static readonly TimeSpan DialogGateTimeout = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// Centralized, guarded dialog show to prevent multiple dialogs.
@@ -622,7 +628,14 @@ namespace PixlPunkt.UI
             // Apply the app's theme setting to the dialog
             dlg.RequestedTheme = Root.RequestedTheme;
 
-            await _dialogGate.WaitAsync();
+            // Use timeout to prevent infinite blocking if dialog hangs
+            bool acquired = await _dialogGate.WaitAsync(DialogGateTimeout);
+            if (!acquired)
+            {
+                LoggingService.Warning("ShowDialogGuardedAsync: Timed out waiting for dialog gate after {Timeout}s", DialogGateTimeout.TotalSeconds);
+                return ContentDialogResult.None;
+            }
+            
             try
             {
                 return await dlg.ShowAsync();

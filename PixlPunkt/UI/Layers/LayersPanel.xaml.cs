@@ -599,6 +599,18 @@ namespace PixlPunkt.UI.Layers
                 _doc.StructureChanged -= OnDocStructureChanged;
             }
 
+            // Defensive cleanup: reset any stuck drag state when switching documents
+            // This prevents _draggedItem from blocking RebuildFromDoc indefinitely
+            if (_draggedItem != null)
+            {
+                _draggedItem = null;
+                _needsRebuildAfterDrag = false;
+                ClearDragVisuals();
+                StopDragScroll();
+                EnableInteractiveElementsAfterDrag();
+                HideRootDropZone();
+            }
+
             _doc = doc;
 
             if (_doc is null)

@@ -270,7 +270,22 @@ namespace PixlPunkt.Core.Plugins
             if (string.IsNullOrEmpty(name))
                 return string.Empty;
 
-            // Remove any path separators and parent directory references
+            // First, extract just the filename component to strip any embedded paths
+            // This handles cases like "..\..\malicious" -> "malicious" or "foo/bar" -> "bar"
+            try
+            {
+                name = Path.GetFileName(name);
+            }
+            catch
+            {
+                // If GetFileName fails, fall through to manual sanitization
+            }
+
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            // Remove any remaining path separators and parent directory references
+            // These shouldn't exist after GetFileName, but defense in depth
             name = name.Replace("..", "")
                        .Replace("/", "")
                        .Replace("\\", "")
@@ -282,8 +297,23 @@ namespace PixlPunkt.Core.Plugins
                 name = name.Replace(c.ToString(), "");
             }
 
-            // Trim and ensure non-empty
-            name = name.Trim();
+            // Trim whitespace and dots (which could be used for extension manipulation)
+            name = name.Trim().Trim('.');
+
+            // Final check: ensure the result doesn't match reserved Windows names
+            string upper = name.ToUpperInvariant();
+            string[] reservedNames = ["CON", "PRN", "AUX", "NUL", 
+                "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
+            
+            foreach (var reserved in reservedNames)
+            {
+                if (upper == reserved || upper.StartsWith(reserved + "."))
+                {
+                    name = "_" + name; // Prefix to make it safe
+                    break;
+                }
+            }
             
             return name;
         }

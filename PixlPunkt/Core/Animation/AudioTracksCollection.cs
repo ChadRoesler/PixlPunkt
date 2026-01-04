@@ -90,7 +90,8 @@ namespace PixlPunkt.Core.Animation
             if (_isDisposed) throw new ObjectDisposedException(nameof(AudioTracksCollection));
 
             var track = new AudioTrackState();
-            track.AudioLoadedChanged += OnTrackLoadedChanged;
+            // Use closure to capture track reference for proper identification
+            track.AudioLoadedChanged += loaded => OnTrackLoadedChanged(track, loaded);
             _tracks.Add(track);
 
             TrackAdded?.Invoke(track);
@@ -110,7 +111,8 @@ namespace PixlPunkt.Core.Animation
 
             if (_tracks.Remove(track))
             {
-                track.AudioLoadedChanged -= OnTrackLoadedChanged;
+                // Note: We can't easily unsubscribe the closure, but track.Dispose() will
+                // clear the event handlers anyway
                 track.Dispose();
 
                 TrackRemoved?.Invoke(track);
@@ -130,7 +132,6 @@ namespace PixlPunkt.Core.Animation
             if (index < 0 || index >= _tracks.Count) return;
 
             var track = _tracks[index];
-            track.AudioLoadedChanged -= OnTrackLoadedChanged;
             _tracks.RemoveAt(index);
             track.Dispose();
 
@@ -171,7 +172,7 @@ namespace PixlPunkt.Core.Animation
 
             foreach (var track in _tracks)
             {
-                track.AudioLoadedChanged -= OnTrackLoadedChanged;
+                // Dispose clears the track's event handlers internally
                 track.Dispose();
             }
             _tracks.Clear();
@@ -208,18 +209,10 @@ namespace PixlPunkt.Core.Animation
             }
         }
 
-        private void OnTrackLoadedChanged(bool loaded)
+        private void OnTrackLoadedChanged(AudioTrackState track, bool loaded)
         {
-            // Find which track changed (we need to iterate since the event doesn't tell us)
-            // This could be optimized with a dictionary but with few tracks it's fine
-            foreach (var track in _tracks)
-            {
-                if (track.IsLoaded == loaded)
-                {
-                    TrackLoadedChanged?.Invoke(track, loaded);
-                    break;
-                }
-            }
+            // Track is now properly identified via closure capture
+            TrackLoadedChanged?.Invoke(track, loaded);
         }
 
         // ====================================================================
@@ -362,7 +355,7 @@ namespace PixlPunkt.Core.Animation
 
             foreach (var track in _tracks)
             {
-                track.AudioLoadedChanged -= OnTrackLoadedChanged;
+                // Dispose clears the track's event handlers internally
                 track.Dispose();
             }
             _tracks.Clear();

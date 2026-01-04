@@ -181,12 +181,18 @@ namespace PixlPunkt.Core.Animation
 
         /// <summary>
         /// Interpolates between two angles, taking the shortest path.
+        /// Handles the wraparound at ±180 degrees correctly.
         /// </summary>
         private static float LerpAngle(float from, float to, float t)
         {
-            // Normalize angles to -180 to 180 range
-            float diff = ((to - from + 180) % 360) - 180;
-            if (diff < -180) diff += 360;
+            // Calculate the difference, wrapping to find shortest path
+            float diff = to - from;
+            
+            // Normalize difference to range (-180, 180]
+            // This handles the modulo of negative numbers correctly in C#
+            while (diff > 180f) diff -= 360f;
+            while (diff <= -180f) diff += 360f;
+            
             return from + diff * t;
         }
 
