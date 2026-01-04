@@ -33376,6 +33376,32 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Layers.LayersPanel">
+            <summary>
+            LayersPanel partial: Drag-and-drop logic, insertion indicators, folder highlighting, and auto-scroll.
+            </summary>
+            <summary>
+            LayersPanel partial: Flyout event wiring and handlers for raster layers, folders, and reference layers.
+            </summary>
+            <summary>
+            LayersPanel partial: Visual tree helpers and UI utility methods.
+            </summary>
+            <summary>
+            LayersPanel partial: Layer mask operations and effects clipboard.
+            </summary>
+            <summary>
+            LayersPanel partial: Root drop zone for moving items out of folders to root level.
+            </summary>
+            <summary>
+            Main partial class for LayersPanel containing fields, constructor, document binding, and core event handlers.
+            Other functionality is split into partial files:
+            - LayersPanel.Flyouts.cs: Flyout event wiring and handlers
+            - LayersPanel.DragDrop.cs: Drag and drop logic
+            - LayersPanel.RootDropZone.cs: Root drop zone for moving items out of folders
+            - LayersPanel.Helpers.cs: Visual tree helpers and UI utilities
+            - LayersPanel.Masks.cs: Layer mask operations
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.GetLayersListScrollViewer">
             <summary>
             Gets the ScrollViewer from the ListView.
@@ -33386,30 +33412,24 @@
             Finds a visual child of the specified type.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Layers.LayersPanel.RefreshAllPreviews">
-            <summary>
-            Forces all layer previews to refresh. Call after canvas resize operations.
-            </summary>
-        </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.UpdateActiveLayerIndicators">
             <summary>
             Updates the active layer indicator for all visible layer items.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Layers.LayersPanel.LayersList_RightTapped(System.Object,Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs)">
-            <summary>
-            Handles right-click on the ListView itself (empty area).
-            </summary>
-        </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.ShowRootDropZoneIfNeeded">
             <summary>
             Shows the root drop zone if the dragged item is inside a folder.
-            This provides a target area for users to drag items out of folders.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.HideRootDropZone">
             <summary>
-            Hides the root drop zone highlight and text (but keeps the space reserved).
+            Hides the root drop zone highlight and text.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.LayersPanel.RefreshAllPreviews">
+            <summary>
+            Forces all layer previews to refresh. Call after canvas resize operations.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.InitializeComponent">

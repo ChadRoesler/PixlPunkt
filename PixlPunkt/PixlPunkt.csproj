@@ -435,7 +435,4 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="UI\Reference\" />
-  </ItemGroup>
 </Project>

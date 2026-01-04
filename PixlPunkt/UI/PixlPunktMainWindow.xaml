@@ -195,26 +195,6 @@
                     </MenuFlyoutSubItem>
                 </MenuBarItem>
 
-                <MenuBarItem Title="Symmetry">
-                    <MenuFlyoutItem Text="Toggle Symmetry (Y)" Click="Symmetry_Toggle_Click"/>
-                    <MenuFlyoutItem Text="Cycle Mode" Click="Symmetry_CycleMode_Click"/>
-                    <MenuFlyoutSeparator/>
-                    <MenuFlyoutSubItem Text="Mode">
-                        <MenuFlyoutItem Text="Horizontal" Click="Symmetry_SetHorizontal_Click"/>
-                        <MenuFlyoutItem Text="Vertical" Click="Symmetry_SetVertical_Click"/>
-                        <MenuFlyoutItem Text="Both Axes" Click="Symmetry_SetBoth_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Radial (4)" Click="Symmetry_SetRadial4_Click"/>
-                        <MenuFlyoutItem Text="Radial (6)" Click="Symmetry_SetRadial6_Click"/>
-                        <MenuFlyoutItem Text="Radial (8)" Click="Symmetry_SetRadial8_Click"/>
-                        <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem Text="Kaleidoscope" Click="Symmetry_SetKaleidoscope_Click"/>
-                    </MenuFlyoutSubItem>
-                    <MenuFlyoutSeparator/>
-                    <MenuFlyoutItem Text="Center Axis" Click="Symmetry_CenterAxis_Click"/>
-                    <MenuFlyoutItem Text="Show Axis Lines" Click="Symmetry_ToggleAxisLines_Click"/>
-                </MenuBarItem>
-
                 <MenuBarItem Title="Palette">
                     <MenuFlyoutItem Text="Edit FG…" Click="Palette_EditFg_Click"/>
                     <MenuFlyoutItem Text="Edit BG…" Click="Palette_EditBg_Click"/>
