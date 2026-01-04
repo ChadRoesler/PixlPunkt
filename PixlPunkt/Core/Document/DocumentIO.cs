@@ -154,6 +154,18 @@ namespace PixlPunkt.Core.Document
             // Layer structure
             var rootItems = doc.RootItems;
             bw.Write(rootItems.Count);
+            
+            // DEBUG: Log what we're saving
+            LoggingService.Info("Saving layer structure: {RootCount} root items", rootItems.Count);
+            for (int i = 0; i < rootItems.Count; i++)
+            {
+                var item = rootItems[i];
+                if (item is LayerFolder folder)
+                    LoggingService.Info("  [{Index}] Folder '{Name}' children={ChildCount}", i, folder.Name, folder.Children.Count);
+                else if (item is RasterLayer layer)
+                    LoggingService.Info("  [{Index}] Layer '{Name}' Parent={Parent}", i, layer.Name, layer.Parent?.Name ?? "null");
+            }
+            
             foreach (var item in rootItems)
             {
                 WriteLayerItem(bw, item);
@@ -397,6 +409,15 @@ namespace PixlPunkt.Core.Document
                 bw.Write(folder.Visible);
                 bw.Write(folder.Locked);
                 bw.Write(folder.IsExpanded);
+
+                // DEBUG: Log folder children details
+                LoggingService.Info("    Writing folder '{FolderName}' with {ChildCount} children:", folder.Name ?? "unnamed", folder.Children.Count);
+                foreach (var child in folder.Children)
+                {
+                    LoggingService.Info("      - Child: '{ChildName}' (Parent={ParentName})", 
+                        child.Name ?? "unnamed", 
+                        child.Parent?.Name ?? "null");
+                }
 
                 bw.Write(folder.Children.Count);
                 foreach (var child in folder.Children)
@@ -1180,12 +1201,18 @@ namespace PixlPunkt.Core.Document
                 bool isExpanded = br.ReadBoolean();
                 int childCount = br.ReadInt32();
 
-                LayerFolder folder = parent != null
-                    ? new LayerFolder(folderName) { Parent = parent }
-                    : doc.AddFolder(folderName, insertAt: doc.RootItems.Count);
-
+                LayerFolder folder;
                 if (parent != null)
+                {
+                    // Nested folder - create and add to parent
+                    folder = new LayerFolder(folderName);
                     parent.AddChild(folder);
+                }
+                else
+                {
+                    // Root-level folder - use direct insertion to avoid active layer context issues
+                    folder = doc.AddFolderAtRootWithoutHistory(folderName, doc.RootItems.Count);
+                }
 
                 // Restore folder ID for animation track binding (only if we have saved IDs)
                 if (hasLayerIds && folderId != Guid.Empty)

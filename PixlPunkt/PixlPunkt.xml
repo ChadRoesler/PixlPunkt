@@ -5790,10 +5790,30 @@
             is created inside that same parent folder. Otherwise, creates at root level.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Document.CanvasDocument.MoveLayerToFolder(PixlPunkt.Core.Document.Layer.LayerBase,PixlPunkt.Core.Document.Layer.LayerFolder)">
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.AddFolderAtRootWithoutHistory(System.String,System.Int32)">
             <summary>
-            Moves a layer into a folder or back to root.
+            Adds a folder directly without history and without considering the active layer's parent.
+            Used during document loading to ensure folders are placed exactly where specified.
             </summary>
+            <param name="name">The folder name.</param>
+            <param name="insertAt">The index at which to insert in root items.</param>
+            <returns>The created folder.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.MoveLayerToFolder(PixlPunkt.Core.Document.Layer.LayerBase,PixlPunkt.Core.Document.Layer.LayerFolder,System.Nullable{System.Int32})">
+            <summary>
+            Moves a layer into a folder or back to root, with history support.
+            </summary>
+            <param name="layer">The layer to move.</param>
+            <param name="targetFolder">The target folder, or null to move to root.</param>
+            <param name="targetIndex">Optional target index within the folder or root. If null, appends to the end.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.MoveLayerToFolderWithoutHistory(PixlPunkt.Core.Document.Layer.LayerBase,PixlPunkt.Core.Document.Layer.LayerFolder,System.Int32)">
+            <summary>
+            Moves a layer into a folder or back to root without pushing to history (used by undo/redo).
+            </summary>
+            <param name="layer">The layer to move.</param>
+            <param name="targetFolder">The target folder, or null to move to root.</param>
+            <param name="targetIndex">The target index within the folder or root.</param>
         </member>
         <member name="M:PixlPunkt.Core.Document.CanvasDocument.MoveRootItem(PixlPunkt.Core.Document.Layer.LayerBase,System.Int32)">
             <summary>
@@ -10365,6 +10385,46 @@
         <member name="P:PixlPunkt.Core.History.LayerMergeDownItem.HistoryIcon">
             <summary>
             Gets a quick reference icon of the opperation (for UI display).
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.LayerMoveToFolderItem">
+            <summary>
+            History item for moving a layer between folders (or to/from root).
+            </summary>
+            <remarks>
+            Captures the layer that was moved, its original parent and index, and its new parent and index.
+            Undo moves the layer back to its original parent; Redo moves it to the new parent.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.History.LayerMoveToFolderItem.HistoryIcon">
+            <summary>
+            Gets a quick reference icon of the operation (for UI display).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.LayerMoveToFolderItem.Description">
+            <summary>
+            Gets a human-readable description of the action.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.LayerMoveToFolderItem.#ctor(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Document.Layer.LayerBase,PixlPunkt.Core.Document.Layer.LayerFolder,System.Int32,PixlPunkt.Core.Document.Layer.LayerFolder,System.Int32)">
+            <summary>
+            Creates a new layer move to folder history item.
+            </summary>
+            <param name="document">The document containing the layer.</param>
+            <param name="layer">The layer that was moved.</param>
+            <param name="originalParent">The original parent folder (null if was at root).</param>
+            <param name="originalIndex">The original index within the parent (or root items).</param>
+            <param name="newParent">The new parent folder (null if moved to root).</param>
+            <param name="newIndex">The new index within the parent (or root items).</param>
+        </member>
+        <member name="M:PixlPunkt.Core.History.LayerMoveToFolderItem.Undo">
+            <summary>
+            Undoes the move by moving the layer back to its original parent and position.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.LayerMoveToFolderItem.Redo">
+            <summary>
+            Redoes the move by moving the layer to its new parent and position.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.History.LayerRemoveItem">

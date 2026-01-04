@@ -1629,7 +1629,7 @@ namespace PixlPunkt.UI.Layers
                     {
                         int to = ComputeNewInternalIndexFromUiOrder(count, from, tgt, insertBefore);
                         if (from != to)
-                            _doc.MoveRootItem(_draggedItem, to);
+                            _doc.MoveRootItemWithHistory(_draggedItem, to);
                         handled = true;
                     }
                 }
@@ -1678,7 +1678,7 @@ namespace PixlPunkt.UI.Layers
                         {
                             desiredInternal = Math.Clamp(desiredInternal, 0, _doc.RootItems.Count - 1);
                             if (from != desiredInternal)
-                                _doc.MoveRootItem(_draggedItem, desiredInternal);
+                                _doc.MoveRootItemWithHistory(_draggedItem, desiredInternal);
                         }
                     }
 
