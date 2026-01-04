@@ -5,6 +5,7 @@ using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
@@ -269,6 +270,31 @@ namespace PixlPunkt.UI.CanvasHost
 
         /// <summary>The pointer document position when drag started.</summary>
         private float _refLayerDragPointerStartX, _refLayerDragPointerStartY;
+
+        // ════════════════════════════════════════════════════════════════════
+        // FIELDS - SUB-ROUTINE INTERACTION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>The currently selected sub-routine for interaction.</summary>
+        private AnimationSubRoutine? _selectedSubRoutine;
+
+        /// <summary>Whether we're currently dragging a sub-routine.</summary>
+        private bool _subRoutineDragging;
+
+        /// <summary>The sub-routine position when drag started (X).</summary>
+        private double _subRoutineDragStartX;
+
+        /// <summary>The sub-routine position when drag started (Y).</summary>
+        private double _subRoutineDragStartY;
+
+        /// <summary>The pointer document position when drag started (X).</summary>
+        private int _subRoutineDragPointerStartX;
+
+        /// <summary>The pointer document position when drag started (Y).</summary>
+        private int _subRoutineDragPointerStartY;
+
+        /// <summary>The normalized progress at which we're editing the sub-routine position.</summary>
+        private float _subRoutineEditProgress;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - CROSSFADE / COMPOSITE SCRATCH
@@ -986,6 +1012,50 @@ namespace PixlPunkt.UI.CanvasHost
 
             CanvasView.Invalidate();
         }
+
+        // --------------------------------------------------------------------
+        // SUB-ROUTINE SELECTION
+        // --------------------------------------------------------------------
+
+        /// <summary>
+        /// Gets whether a sub-routine is currently selected.
+        /// </summary>
+        public bool IsSubRoutineSelected => _selectedSubRoutine != null;
+
+        /// <summary>
+        /// Gets the currently selected sub-routine.
+        /// </summary>
+        public AnimationSubRoutine? SelectedSubRoutine => _selectedSubRoutine;
+
+        /// <summary>
+        /// Sets the sub-routine selection state.
+        /// </summary>
+        /// <param name="subRoutine">The sub-routine to select, or null to deselect.</param>
+        public void SetSelectedSubRoutine(AnimationSubRoutine? subRoutine)
+        {
+            if (_selectedSubRoutine == subRoutine) return;
+            _selectedSubRoutine = subRoutine;
+
+            // Cancel any active painting when selecting a sub-routine
+            if (subRoutine != null && _isPainting)
+            {
+                _isPainting = false;
+                _hasLastDocPos = false;
+            }
+
+            // Clear pending edits when deselecting
+            if (subRoutine == null)
+            {
+                _subRoutineDragging = false;
+            }
+
+            CanvasView.Invalidate();
+        }
+
+        /// <summary>
+        /// Raised when a sub-routine is selected on the canvas.
+        /// </summary>
+        public event Action<AnimationSubRoutine?>? SubRoutineSelected;
 
         // --------------------------------------------------------------------
         // EXTERNAL DROPPER MODE (for color picker windows)

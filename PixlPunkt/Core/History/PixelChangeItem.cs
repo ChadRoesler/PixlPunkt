@@ -42,6 +42,9 @@ namespace PixlPunkt.Core.History
         private Guid _offloadId = Guid.Empty;
         private bool _isOffloaded;
         private int _offloadedCount; // Track count for UI even when offloaded
+        
+        // Thread safety lock for offload/reload operations
+        private readonly object _stateLock = new();
 
         // ====================================================================
         // IHistoryItem / IRenderResult SHARED PROPERTIES
@@ -104,80 +107,107 @@ namespace PixlPunkt.Core.History
         /// <inheritdoc/>
         public bool Offload(IHistoryOffloadService offloadService)
         {
-            if (_isOffloaded || _indices == null || _indices.Count == 0)
-                return false;
-
-            try
+            lock (_stateLock)
             {
-                _offloadId = Guid.NewGuid();
-                _offloadedCount = _indices.Count;
+                if (_isOffloaded || _indices == null || _indices.Count == 0)
+                    return false;
 
-                // Serialize: [count:int][indices:int[]][before:uint[]][after:uint[]]
-                using var ms = new MemoryStream();
-                using var bw = new BinaryWriter(ms);
+                try
+                {
+                    _offloadId = Guid.NewGuid();
+                    _offloadedCount = _indices.Count;
 
-                bw.Write(_indices.Count);
-                foreach (var idx in _indices) bw.Write(idx);
-                foreach (var b in _before!) bw.Write(b);
-                foreach (var a in _after!) bw.Write(a);
+                    // Serialize: [count:int][indices:int[]][before:uint[]][after:uint[]]
+                    using var ms = new MemoryStream();
+                    using var bw = new BinaryWriter(ms);
 
-                offloadService.WriteData(_offloadId, ms.ToArray());
+                    bw.Write(_indices.Count);
+                    foreach (var idx in _indices) bw.Write(idx);
+                    foreach (var b in _before!) bw.Write(b);
+                    foreach (var a in _after!) bw.Write(a);
 
-                // Release memory
-                _indices.Clear();
-                _indices.TrimExcess();
-                _indices = null;
-                _before!.Clear();
-                _before.TrimExcess();
-                _before = null;
-                _after!.Clear();
-                _after.TrimExcess();
-                _after = null;
+                    offloadService.WriteData(_offloadId, ms.ToArray());
 
-                _isOffloaded = true;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LoggingService.Error("Failed to offload PixelChangeItem: {Error}", ex.Message);
-                return false;
+                    // Release memory
+                    _indices.Clear();
+                    _indices.TrimExcess();
+                    _indices = null;
+                    _before!.Clear();
+                    _before.TrimExcess();
+                    _before = null;
+                    _after!.Clear();
+                    _after.TrimExcess();
+                    _after = null;
+
+                    _isOffloaded = true;
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    LoggingService.Error("Failed to offload PixelChangeItem: {Error}", ex.Message);
+                    return false;
+                }
             }
         }
 
         /// <inheritdoc/>
         public bool Reload(IHistoryOffloadService offloadService)
         {
-            if (!_isOffloaded || _offloadId == Guid.Empty)
-                return true; // Already loaded
-
-            try
+            lock (_stateLock)
             {
-                var data = offloadService.ReadData(_offloadId);
-                if (data == null)
+                if (!_isOffloaded || _offloadId == Guid.Empty)
+                    return true; // Already loaded
+
+                List<int>? newIndices = null;
+                List<uint>? newBefore = null;
+                List<uint>? newAfter = null;
+
+                try
                 {
-                    LoggingService.Error("Failed to reload PixelChangeItem: data not found");
+                    var data = offloadService.ReadData(_offloadId);
+                    if (data == null)
+                    {
+                        LoggingService.Error("Failed to reload PixelChangeItem: data not found");
+                        return false;
+                    }
+
+                    using var ms = new MemoryStream(data);
+                    using var br = new BinaryReader(ms);
+
+                    int count = br.ReadInt32();
+                    
+                    // Create new lists first - don't modify state until we know reload succeeded
+                    newIndices = new List<int>(count);
+                    newBefore = new List<uint>(count);
+                    newAfter = new List<uint>(count);
+
+                    for (int i = 0; i < count; i++) newIndices.Add(br.ReadInt32());
+                    for (int i = 0; i < count; i++) newBefore.Add(br.ReadUInt32());
+                    for (int i = 0; i < count; i++) newAfter.Add(br.ReadUInt32());
+
+                    // Validate we read the expected amount of data
+                    if (newIndices.Count != count || newBefore.Count != count || newAfter.Count != count)
+                    {
+                        LoggingService.Error("Failed to reload PixelChangeItem: data corruption detected");
+                        return false;
+                    }
+
+                    // All reads succeeded - now atomically update state
+                    _indices = newIndices;
+                    _before = newBefore;
+                    _after = newAfter;
+                    _isOffloaded = false;
+                    // Clear offloadedCount since we now have live data - prevents IsEmpty confusion
+                    _offloadedCount = 0;
+                    
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    LoggingService.Error("Failed to reload PixelChangeItem: {Error}", ex.Message);
+                    // Don't leave partial state - keep offloaded status if reload failed
                     return false;
                 }
-
-                using var ms = new MemoryStream(data);
-                using var br = new BinaryReader(ms);
-
-                int count = br.ReadInt32();
-                _indices = new List<int>(count);
-                _before = new List<uint>(count);
-                _after = new List<uint>(count);
-
-                for (int i = 0; i < count; i++) _indices.Add(br.ReadInt32());
-                for (int i = 0; i < count; i++) _before.Add(br.ReadUInt32());
-                for (int i = 0; i < count; i++) _after.Add(br.ReadUInt32());
-
-                _isOffloaded = false;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LoggingService.Error("Failed to reload PixelChangeItem: {Error}", ex.Message);
-                return false;
             }
         }
 

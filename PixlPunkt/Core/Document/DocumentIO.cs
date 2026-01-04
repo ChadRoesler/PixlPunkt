@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Compositing.Serialization;
@@ -88,8 +89,9 @@ namespace PixlPunkt.Core.Document
         /// Version 7: Added audio track settings
         /// Version 8: Added multiple audio tracks support
         /// Version 9: Added layer masks
+        /// Version 10: Added animation sub-routines
         /// </summary>
-        private const int CurrentVersion = 9;
+        private const int CurrentVersion = 10;
 
         private const int NodeType_RasterLayer = 1;
         private const int NodeType_Folder = 2;
@@ -153,6 +155,18 @@ namespace PixlPunkt.Core.Document
             // Layer structure
             var rootItems = doc.RootItems;
             bw.Write(rootItems.Count);
+            
+            // DEBUG: Log what we're saving
+            LoggingService.Info("Saving layer structure: {RootCount} root items", rootItems.Count);
+            for (int i = 0; i < rootItems.Count; i++)
+            {
+                var item = rootItems[i];
+                if (item is LayerFolder folder)
+                    LoggingService.Info("  [{Index}] Folder '{Name}' children={ChildCount}", i, folder.Name, folder.Children.Count);
+                else if (item is RasterLayer layer)
+                    LoggingService.Info("  [{Index}] Layer '{Name}' Parent={Parent}", i, layer.Name, layer.Parent?.Name ?? "null");
+            }
+            
             foreach (var item in rootItems)
             {
                 WriteLayerItem(bw, item);
@@ -202,10 +216,13 @@ namespace PixlPunkt.Core.Document
 
             // Audio tracks (Version 8+) - multiple tracks with collapsed state
             WriteAudioTracksCollection(bw, animState.AudioTracks);
+
+            // Sub-routines (Version 10+)
+            WriteSubRoutineTrack(bw, animState.SubRoutines);
         }
 
         /// <summary>
-        /// Writes the audio tracks collection to the stream.
+        /// Writers the audio tracks collection to the stream.
         /// </summary>
         private static void WriteAudioTracksCollection(BinaryWriter bw, AudioTracksCollection audioTracks)
         {
@@ -219,67 +236,72 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
-        /// Writes audio track settings to the stream.
+        /// Writes the animation sub-routine track to the stream.
         /// </summary>
-        private static void WriteAudioTrackSettings(BinaryWriter bw, AudioTrackSettings settings)
+        private static void WriteSubRoutineTrack(BinaryWriter bw, AnimationSubRoutineTrack subRoutines)
         {
-            bw.Write(settings.FilePath ?? string.Empty);
-            bw.Write(settings.Volume);
-            bw.Write(settings.Muted);
-            bw.Write(settings.LoopWithAnimation);
-            bw.Write(settings.StartFrameOffset);
-            bw.Write(settings.ShowWaveform);
-            bw.Write((int)settings.WaveformColorMode);
-        }
-
-        /// <summary>
-        /// Writes stage settings to the stream.
-        /// </summary>
-        private static void WriteStageSettings(BinaryWriter bw, StageSettings stage)
-        {
-            bw.Write(stage.Enabled);
-            bw.Write(stage.OutputWidth);
-            bw.Write(stage.OutputHeight);
-            bw.Write(stage.StageX);
-            bw.Write(stage.StageY);
-            bw.Write(stage.StageWidth);
-            bw.Write(stage.StageHeight);
-            bw.Write((int)stage.ScalingAlgorithm);
-            bw.Write((int)stage.RotationInterpolation);
-            bw.Write((int)stage.BoundsMode);
-        }
-
-        /// <summary>
-        /// Writes stage animation track to the stream.
-        /// </summary>
-        private static void WriteStageAnimationTrack(BinaryWriter bw, StageAnimationTrack track)
-        {
-            bw.Write(track.Id.ToByteArray());
-            bw.Write(track.Name ?? string.Empty);
-
-            // Keyframes
-            bw.Write(track.Keyframes.Count);
-            foreach (var kf in track.Keyframes)
+            bw.Write(subRoutines.SubRoutines.Count);
+            
+            foreach (var subRoutine in subRoutines.SubRoutines)
             {
-                WriteStageKeyframe(bw, kf);
+                WriteAnimationSubRoutine(bw, subRoutine);
             }
         }
 
         /// <summary>
-        /// Writes a stage keyframe to the stream.
+        /// Writes a single animation sub-routine to the stream.
         /// </summary>
-        private static void WriteStageKeyframe(BinaryWriter bw, StageKeyframeData kf)
+        private static void WriteAnimationSubRoutine(BinaryWriter bw, AnimationSubRoutine subRoutine)
         {
-            bw.Write(kf.FrameIndex);
-            bw.Write(kf.PositionX);
-            bw.Write(kf.PositionY);
-            bw.Write(kf.ScaleX);
-            bw.Write(kf.ScaleY);
-            bw.Write(kf.UniformScale);
-            bw.Write(kf.Rotation);
-            bw.Write((int)kf.PositionEasing);
-            bw.Write((int)kf.ScaleEasing);
-            bw.Write((int)kf.RotationEasing);
+            // Identity
+            bw.Write(subRoutine.Id.ToByteArray());
+            
+            // File reference (path to the .pxpr reel file)
+            bw.Write(subRoutine.ReelFilePath ?? string.Empty);
+            
+            // Timing
+            bw.Write(subRoutine.StartFrame);
+            bw.Write(subRoutine.DurationFrames);
+            
+            // State
+            bw.Write(subRoutine.IsEnabled);
+            bw.Write(subRoutine.ZOrder);
+            
+            // Interpolation modes
+            bw.Write((int)subRoutine.PositionInterpolation);
+            bw.Write((int)subRoutine.ScaleInterpolation);
+            bw.Write((int)subRoutine.RotationInterpolation);
+            
+            // Snapshot keyframes to prevent "collection was modified" during save
+            // if another thread is editing the animation while saving
+            var positionKeyframes = subRoutine.PositionKeyframes.ToArray();
+            var scaleKeyframes = subRoutine.ScaleKeyframes.ToArray();
+            var rotationKeyframes = subRoutine.RotationKeyframes.ToArray();
+            
+            // Position keyframes
+            bw.Write(positionKeyframes.Length);
+            foreach (var kvp in positionKeyframes)
+            {
+                bw.Write(kvp.Key);      // float - normalized time
+                bw.Write(kvp.Value.X);  // double - X position
+                bw.Write(kvp.Value.Y);  // double - Y position
+            }
+            
+            // Scale keyframes
+            bw.Write(scaleKeyframes.Length);
+            foreach (var kvp in scaleKeyframes)
+            {
+                bw.Write(kvp.Key);    // float - normalized time
+                bw.Write(kvp.Value);  // float - scale factor
+            }
+            
+            // Rotation keyframes
+            bw.Write(rotationKeyframes.Length);
+            foreach (var kvp in rotationKeyframes)
+            {
+                bw.Write(kvp.Key);    // float - normalized time
+                bw.Write(kvp.Value);  // float - rotation degrees
+            }
         }
 
         private static void WriteTileSet(BinaryWriter bw, TileSet? tileSet)
@@ -394,6 +416,15 @@ namespace PixlPunkt.Core.Document
                 bw.Write(folder.Visible);
                 bw.Write(folder.Locked);
                 bw.Write(folder.IsExpanded);
+
+                // DEBUG: Log folder children details
+                LoggingService.Info("    Writing folder '{FolderName}' with {ChildCount} children:", folder.Name ?? "unnamed", folder.Children.Count);
+                foreach (var child in folder.Children)
+                {
+                    LoggingService.Info("      - Child: '{ChildName}' (Parent={ParentName})", 
+                        child.Name ?? "unnamed", 
+                        child.Parent?.Name ?? "null");
+                }
 
                 bw.Write(folder.Children.Count);
                 foreach (var child in folder.Children)
@@ -645,6 +676,12 @@ namespace PixlPunkt.Core.Document
                 var track = animState.AudioTracks.AddTrack();
                 ReadAudioTrackSettings(br, track.Settings);
             }
+
+            // Sub-routine tracks (Version 10+)
+            if (version >= 10)
+            {
+                ReadSubRoutineTrack(br, animState.SubRoutines);
+            }
         }
 
         /// <summary>
@@ -678,59 +715,76 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
-        /// Reads stage settings from the stream.
+        /// Reads the animation sub-routine track from the stream.
         /// </summary>
-        private static void ReadStageSettings(BinaryReader br, StageSettings stage)
+        private static void ReadSubRoutineTrack(BinaryReader br, AnimationSubRoutineTrack subRoutines)
         {
-            stage.Enabled = br.ReadBoolean();
-            stage.OutputWidth = br.ReadInt32();
-            stage.OutputHeight = br.ReadInt32();
-            stage.StageX = br.ReadInt32();
-            stage.StageY = br.ReadInt32();
-            stage.StageWidth = br.ReadInt32();
-            stage.StageHeight = br.ReadInt32();
-            stage.ScalingAlgorithm = (StageScalingAlgorithm)br.ReadInt32();
-            stage.RotationInterpolation = (StageRotationInterpolation)br.ReadInt32();
-            stage.BoundsMode = (StageBoundsMode)br.ReadInt32();
-        }
-
-        /// <summary>
-        /// Reads stage animation track from the stream.
-        /// </summary>
-        private static void ReadStageAnimationTrack(BinaryReader br, StageAnimationTrack track)
-        {
-            track.Id = new Guid(br.ReadBytes(16));
-            track.Name = br.ReadString();
-
-            // Clear existing keyframes and load new ones
-            track.ClearKeyframes();
-
-            int keyframeCount = br.ReadInt32();
-            for (int i = 0; i < keyframeCount; i++)
+            subRoutines.Clear();
+            
+            int count = br.ReadInt32();
+            
+            for (int i = 0; i < count; i++)
             {
-                var kf = ReadStageKeyframe(br);
-                track.Keyframes.Add(kf);
+                var subRoutine = ReadAnimationSubRoutine(br);
+                subRoutines.Add(subRoutine);
             }
         }
 
         /// <summary>
-        /// Reads a stage keyframe from the stream.
+        /// Reads a single animation sub-routine from the stream.
         /// </summary>
-        private static StageKeyframeData ReadStageKeyframe(BinaryReader br)
+        private static AnimationSubRoutine ReadAnimationSubRoutine(BinaryReader br)
         {
-            return new StageKeyframeData
+            var subRoutine = new AnimationSubRoutine();
+            
+            // Identity
+            subRoutine.Id = new Guid(br.ReadBytes(16));
+            
+            // File reference
+            subRoutine.ReelFilePath = br.ReadString();
+            
+            // Timing
+            subRoutine.StartFrame = br.ReadInt32();
+            subRoutine.DurationFrames = br.ReadInt32();
+            
+            // State
+            subRoutine.IsEnabled = br.ReadBoolean();
+            subRoutine.ZOrder = br.ReadInt32();
+            
+            // Interpolation modes
+            subRoutine.PositionInterpolation = (InterpolationMode)br.ReadInt32();
+            subRoutine.ScaleInterpolation = (InterpolationMode)br.ReadInt32();
+            subRoutine.RotationInterpolation = (InterpolationMode)br.ReadInt32();
+            
+            // Position keyframes
+            int positionKeyframeCount = br.ReadInt32();
+            for (int i = 0; i < positionKeyframeCount; i++)
             {
-                FrameIndex = br.ReadInt32(),
-                PositionX = br.ReadSingle(),
-                PositionY = br.ReadSingle(),
-                ScaleX = br.ReadSingle(),
-                ScaleY = br.ReadSingle(),
-                UniformScale = br.ReadBoolean(),
-                Rotation = br.ReadSingle(),
-                PositionEasing = (EasingType)br.ReadInt32(),
-                ScaleEasing = (EasingType)br.ReadInt32(),
-                RotationEasing = (EasingType)br.ReadInt32()
-            };
+                float time = br.ReadSingle();
+                double x = br.ReadDouble();
+                double y = br.ReadDouble();
+                subRoutine.PositionKeyframes[time] = (x, y);
+            }
+            
+            // Scale keyframes
+            int scaleKeyframeCount = br.ReadInt32();
+            for (int i = 0; i < scaleKeyframeCount; i++)
+            {
+                float time = br.ReadSingle();
+                float scale = br.ReadSingle();
+                subRoutine.ScaleKeyframes[time] = scale;
+            }
+            
+            // Rotation keyframes
+            int rotationKeyframeCount = br.ReadInt32();
+            for (int i = 0; i < rotationKeyframeCount; i++)
+            {
+                float time = br.ReadSingle();
+                float rotation = br.ReadSingle();
+                subRoutine.RotationKeyframes[time] = rotation;
+            }
+            
+            return subRoutine;
         }
 
         /// <summary>
@@ -1154,12 +1208,18 @@ namespace PixlPunkt.Core.Document
                 bool isExpanded = br.ReadBoolean();
                 int childCount = br.ReadInt32();
 
-                LayerFolder folder = parent != null
-                    ? new LayerFolder(folderName) { Parent = parent }
-                    : doc.AddFolder(folderName, insertAt: doc.RootItems.Count);
-
+                LayerFolder folder;
                 if (parent != null)
+                {
+                    // Nested folder - create and add to parent
+                    folder = new LayerFolder(folderName);
                     parent.AddChild(folder);
+                }
+                else
+                {
+                    // Root-level folder - use direct insertion to avoid active layer context issues
+                    folder = doc.AddFolderAtRootWithoutHistory(folderName, doc.RootItems.Count);
+                }
 
                 // Restore folder ID for animation track binding (only if we have saved IDs)
                 if (hasLayerIds && folderId != Guid.Empty)
@@ -1234,6 +1294,126 @@ namespace PixlPunkt.Core.Document
             };
 
             return mask;
+        }
+
+        /// <summary>
+        /// Writes audio track settings to the stream.
+        /// </summary>
+        private static void WriteAudioTrackSettings(BinaryWriter bw, AudioTrackSettings settings)
+        {
+            bw.Write(settings.FilePath ?? string.Empty);
+            bw.Write(settings.Volume);
+            bw.Write(settings.Muted);
+            bw.Write(settings.LoopWithAnimation);
+            bw.Write(settings.StartFrameOffset);
+            bw.Write(settings.ShowWaveform);
+            bw.Write((int)settings.WaveformColorMode);
+        }
+
+        /// <summary>
+        /// Writes stage settings to the stream.
+        /// </summary>
+        private static void WriteStageSettings(BinaryWriter bw, StageSettings stage)
+        {
+            bw.Write(stage.Enabled);
+            bw.Write(stage.OutputWidth);
+            bw.Write(stage.OutputHeight);
+            bw.Write(stage.StageX);
+            bw.Write(stage.StageY);
+            bw.Write(stage.StageWidth);
+            bw.Write(stage.StageHeight);
+            bw.Write((int)stage.ScalingAlgorithm);
+            bw.Write((int)stage.RotationInterpolation);
+            bw.Write((int)stage.BoundsMode);
+        }
+
+        /// <summary>
+        /// Writes stage animation track to the stream.
+        /// </summary>
+        private static void WriteStageAnimationTrack(BinaryWriter bw, StageAnimationTrack track)
+        {
+            bw.Write(track.Id.ToByteArray());
+            bw.Write(track.Name ?? string.Empty);
+
+            // Keyframes
+            bw.Write(track.Keyframes.Count);
+            foreach (var kf in track.Keyframes)
+            {
+                WriteStageKeyframe(bw, kf);
+            }
+        }
+
+        /// <summary>
+        /// Writes a stage keyframe to the stream.
+        /// </summary>
+        private static void WriteStageKeyframe(BinaryWriter bw, StageKeyframeData kf)
+        {
+            bw.Write(kf.FrameIndex);
+            bw.Write(kf.PositionX);
+            bw.Write(kf.PositionY);
+            bw.Write(kf.ScaleX);
+            bw.Write(kf.ScaleY);
+            bw.Write(kf.UniformScale);
+            bw.Write(kf.Rotation);
+            bw.Write((int)kf.PositionEasing);
+            bw.Write((int)kf.ScaleEasing);
+            bw.Write((int)kf.RotationEasing);
+        }
+
+        /// <summary>
+        /// Reads stage settings from the stream.
+        /// </summary>
+        private static void ReadStageSettings(BinaryReader br, StageSettings stage)
+        {
+            stage.Enabled = br.ReadBoolean();
+            stage.OutputWidth = br.ReadInt32();
+            stage.OutputHeight = br.ReadInt32();
+            stage.StageX = br.ReadInt32();
+            stage.StageY = br.ReadInt32();
+            stage.StageWidth = br.ReadInt32();
+            stage.StageHeight = br.ReadInt32();
+            stage.ScalingAlgorithm = (StageScalingAlgorithm)br.ReadInt32();
+            stage.RotationInterpolation = (StageRotationInterpolation)br.ReadInt32();
+            stage.BoundsMode = (StageBoundsMode)br.ReadInt32();
+        }
+
+        /// <summary>
+        /// Reads stage animation track from the stream.
+        /// </summary>
+        private static void ReadStageAnimationTrack(BinaryReader br, StageAnimationTrack track)
+        {
+            track.Id = new Guid(br.ReadBytes(16));
+            track.Name = br.ReadString();
+
+            // Clear existing keyframes and load new ones
+            track.ClearKeyframes();
+
+            int keyframeCount = br.ReadInt32();
+            for (int i = 0; i < keyframeCount; i++)
+            {
+                var kf = ReadStageKeyframe(br);
+                track.Keyframes.Add(kf);
+            }
+        }
+
+        /// <summary>
+        /// Reads a stage keyframe from the stream.
+        /// </summary>
+        private static StageKeyframeData ReadStageKeyframe(BinaryReader br)
+        {
+            return new StageKeyframeData
+            {
+                FrameIndex = br.ReadInt32(),
+                PositionX = br.ReadSingle(),
+                PositionY = br.ReadSingle(),
+                ScaleX = br.ReadSingle(),
+                ScaleY = br.ReadSingle(),
+                UniformScale = br.ReadBoolean(),
+                Rotation = br.ReadSingle(),
+                PositionEasing = (EasingType)br.ReadInt32(),
+                ScaleEasing = (EasingType)br.ReadInt32(),
+                RotationEasing = (EasingType)br.ReadInt32()
+            };
         }
     }
 }

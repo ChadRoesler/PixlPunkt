@@ -11,6 +11,7 @@ using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Reference;
 using PixlPunkt.Core.Tile;
 using Windows.Graphics;
+using PixlPunkt.Core.Logging;
 
 namespace PixlPunkt.Core.Document
 {
@@ -515,9 +516,105 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
-        /// Moves a layer into a folder or back to root.
+        /// Adds a folder directly without history and without considering the active layer's parent.
+        /// Used during document loading to ensure folders are placed exactly where specified.
         /// </summary>
-        public void MoveLayerToFolder(LayerBase layer, LayerFolder? targetFolder)
+        /// <param name="name">The folder name.</param>
+        /// <param name="insertAt">The index at which to insert in root items.</param>
+        /// <returns>The created folder.</returns>
+        internal LayerFolder AddFolderAtRootWithoutHistory(string name, int insertAt)
+        {
+            RaiseBeforeStructureChanged();
+
+            var folder = new LayerFolder(name);
+            HookLayer(folder);
+
+            // Always insert at root level, ignoring active layer's parent
+            insertAt = Math.Clamp(insertAt, 0, _rootItems.Count);
+            _rootItems.Insert(insertAt, folder);
+
+            LayersChanged?.Invoke();
+            RaiseStructureChanged();
+            return folder;
+        }
+
+        /// <summary>
+        /// Moves a layer into a folder or back to root, with history support.
+        /// </summary>
+        /// <param name="layer">The layer to move.</param>
+        /// <param name="targetFolder">The target folder, or null to move to root.</param>
+        /// <param name="targetIndex">Optional target index within the folder or root. If null, appends to the end.</param>
+        public void MoveLayerToFolder(LayerBase layer, LayerFolder? targetFolder, int? targetIndex = null)
+        {
+            if (layer == null) return;
+
+            // Capture original state for history
+            var originalParent = layer.Parent;
+            int originalIndex;
+            if (originalParent != null)
+            {
+                originalIndex = originalParent.IndexOfChild(layer);
+            }
+            else
+            {
+                originalIndex = _rootItems.IndexOf(layer);
+            }
+
+            LoggingService.Info("MoveLayerToFolder: Moving '{LayerName}' from parent='{OriginalParent}' (index {OriginalIndex}) to targetFolder='{TargetFolder}'",
+                layer.Name ?? "unnamed",
+                originalParent?.Name ?? "root",
+                originalIndex,
+                targetFolder?.Name ?? "root");
+
+            RaiseBeforeStructureChanged();
+
+            // Remove from current parent
+            if (layer.Parent != null)
+            {
+                var parentBeforeRemove = layer.Parent;
+                bool removed = layer.Parent.RemoveChild(layer);
+                LoggingService.Info("MoveLayerToFolder: RemoveChild returned {Result}, folder '{Name}' now has {Count} children", 
+                    removed, parentBeforeRemove.Name, parentBeforeRemove.Children.Count);
+            }
+            else
+            {
+                _rootItems.Remove(layer);
+                LoggingService.Info("MoveLayerToFolder: Removed from root items");
+            }
+
+            // Add to new parent
+            int newIndex;
+            if (targetFolder != null)
+            {
+                newIndex = targetIndex ?? targetFolder.Children.Count;
+                newIndex = Math.Clamp(newIndex, 0, targetFolder.Children.Count);
+                targetFolder.InsertChild(newIndex, layer);
+                LoggingService.Info("MoveLayerToFolder: Inserted into folder '{FolderName}' at index {Index}", targetFolder.Name ?? "unnamed", newIndex);
+            }
+            else
+            {
+                // Moving to root - explicitly clear Parent
+                layer.Parent = null;
+                newIndex = targetIndex ?? _rootItems.Count;
+                newIndex = Math.Clamp(newIndex, 0, _rootItems.Count);
+                _rootItems.Insert(newIndex, layer);
+                LoggingService.Info("MoveLayerToFolder: Inserted into root at index {Index}, _rootItems.Count now = {Count}", newIndex, _rootItems.Count);
+            }
+
+            // Push to history
+            History.Push(new LayerMoveToFolderItem(this, layer, originalParent, originalIndex, targetFolder, newIndex));
+
+            LayersChanged?.Invoke();
+            RaiseStructureChanged();
+        }
+
+        /// <summary>
+        /// Moves a layer into a folder or back to root without pushing to history (used by undo/redo).
+        /// </summary>
+        /// <param name="layer">The layer to move.</param>
+        /// <param name="targetFolder">The target folder, or null to move to root.</param>
+        /// <param name="targetIndex">The target index within the folder or root.</param>
+        internal void MoveLayerToFolderWithoutHistory(LayerBase layer, LayerFolder? targetFolder, int targetIndex)
         {
             if (layer == null) return;
 
@@ -533,15 +630,22 @@ namespace PixlPunkt.Core.Document
                 _rootItems.Remove(layer);
             }
 
-            // Add to new parent
+            // Add to new parent at specific index
             if (targetFolder != null)
             {
-                targetFolder.AddChild(layer);
+                targetIndex = Math.Clamp(targetIndex, 0, targetFolder.Children.Count);
+                targetFolder.InsertChild(targetIndex, layer);
             }
             else
             {
-                _rootItems.Add(layer);
+                // Moving to root - explicitly clear Parent
+                layer.Parent = null;
+                targetIndex = Math.Clamp(targetIndex, 0, _rootItems.Count);
+                _rootItems.Insert(targetIndex, layer);
             }
+
+            // Recomposite after structural change
+            CompositeTo(Surface);
 
             LayersChanged?.Invoke();
             RaiseStructureChanged();

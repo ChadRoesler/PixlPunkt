@@ -46,11 +46,7 @@ namespace PixlPunkt.UI.Animation
         private Guid _selectedLayerId;
         private bool _suppressLayerSelection;
 
-        // Audio track dragging
-        private bool _isDraggingAudioTrack;
-        private int _audioDragStartFrame;
-        private int _audioDragStartOffset;
-        private int _audioDragTrackIndex = -1;
+        
 
         // Canvas host reference for direct invalidation during scrubbing
         private CanvasHost.CanvasViewHost? _canvasHost;
@@ -105,11 +101,7 @@ namespace PixlPunkt.UI.Animation
         /// </summary>
         public event Action<Guid>? CanvasLayerSelected;
 
-        /// <summary>
-        /// Raised when the Stage track is selected or deselected.
-        /// Parameter is true when selected, false when deselected.
-        /// </summary>
-        public event Action<bool>? StageSelectionChanged;
+        
 
         /// <summary>
         /// Raised when the user clicks the undock button for the animation preview.
@@ -127,10 +119,7 @@ namespace PixlPunkt.UI.Animation
         /// </summary>
         public event Action? Interacted;
 
-        /// <summary>
-        /// Gets whether the Stage track is currently selected.
-        /// </summary>
-        public bool IsStageSelected { get; private set; }
+        
 
         /// <summary>
         /// Gets or sets whether the animation preview is currently floating (undocked).
@@ -227,6 +216,7 @@ namespace PixlPunkt.UI.Animation
                 _canvasAnimationState.FpsChanged += OnCanvasFpsChanged;
                 _canvasAnimationState.StageSettingsChanged += OnStageSettingsChanged;
                 _canvasAnimationState.AudioTracksChanged += OnAudioTracksChanged;
+                _canvasAnimationState.SubRoutinesChanged += OnSubRoutinesChanged;
             }
 
             // Bind document structure events (for layer add/remove/reorder)
@@ -272,8 +262,46 @@ namespace PixlPunkt.UI.Animation
         /// </summary>
         public void BindCanvasHost(CanvasHost.CanvasViewHost? canvasHost)
         {
+            // Unsubscribe from previous canvas host events
+            if (_canvasHost != null)
+            {
+                _canvasHost.SubRoutineSelected -= OnCanvasSubRoutineSelected;
+            }
+
             _canvasHost = canvasHost;
             FrameEditor.BindCanvasHost(canvasHost);
+
+            // Subscribe to canvas host events
+            if (_canvasHost != null)
+            {
+                _canvasHost.SubRoutineSelected += OnCanvasSubRoutineSelected;
+            }
+        }
+
+        /// <summary>
+        /// Called when a sub-routine is selected on the canvas.
+        /// Syncs the selection back to the animation panel.
+        /// </summary>
+        private void OnCanvasSubRoutineSelected(AnimationSubRoutine? subRoutine)
+        {
+            // Avoid infinite loops - only sync if it's a different selection
+            if (SelectedSubRoutine == subRoutine) return;
+
+            SelectedSubRoutine = subRoutine;
+
+            // Deselect layer and stage when sub-routine is selected
+            if (subRoutine != null)
+            {
+                _selectedLayerId = Guid.Empty;
+                DeselectStage();
+            }
+
+            // Update visual state
+            RefreshCanvasLayerNames();
+            RefreshCanvasKeyframeGrid();
+
+            // Notify listeners
+            SubRoutineSelectionChanged?.Invoke(subRoutine);
         }
 
         /// <summary>
@@ -323,79 +351,9 @@ namespace PixlPunkt.UI.Animation
             RefreshCanvasAnimationUI();
         }
 
-        /// <summary>
-        /// Refreshes the stage preview to reflect canvas changes.
-        /// Call this after painting or other canvas modifications.
-        /// </summary>
-        public void RefreshStagePreview()
-        {
-            if (CurrentMode == AnimationMode.Canvas)
-            {
-                StagePreview.RefreshPreview();
-            }
-        }
+        
 
-        // ═══════════════════════════════════════════════════════════════
-        // EVENT HANDLERS - STAGE PREVIEW
-        // ═══════════════════════════════════════════════════════════════
-
-        private void OnStagePreviewExpandRequested(bool expand)
-        {
-            // Toggle between normal (200) and expanded (350) width
-            StagePreviewColumn.Width = expand
-                ? new GridLength(350)
-                : new GridLength(200);
-        }
-
-        private void StagePreviewUndock_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isAnimationPreviewFloating)
-            {
-                AnimationPreviewDockRequested?.Invoke();
-            }
-            else
-            {
-                AnimationPreviewUndockRequested?.Invoke();
-            }
-        }
-
-        private void UpdateAnimationPreviewUndockButton()
-        {
-            if (StagePreviewUndockIcon != null)
-            {
-                StagePreviewUndockIcon.Icon = _isAnimationPreviewFloating
-                    ? FluentIcons.Common.Icon.PanelRight
-                    : FluentIcons.Common.Icon.Open;
-            }
-
-            if (StagePreviewUndockButton != null)
-            {
-                ToolTipService.SetToolTip(StagePreviewUndockButton,
-                    _isAnimationPreviewFloating
-                        ? "Dock back to animation panel"
-                        : "Undock to separate window");
-            }
-        }
-
-        /// <summary>
-        /// Gets the StagePreviewContainer grid for undocking purposes.
-        /// Returns null if the container doesn't exist.
-        /// </summary>
-        public Grid? GetStagePreviewContainer()
-        {
-            // Use FindName to be safe in case XAML isn't fully loaded
-            return FindName("StagePreviewContainer") as Grid ?? StagePreviewContainer;
-        }
-
-        /// <summary>
-        /// Gets the stage preview column definition for hiding when undocked.
-        /// </summary>
-        public ColumnDefinition GetStagePreviewColumn() => StagePreviewColumn;
-
-        /// <summary>
-        /// Gets the stage preview splitter column for hiding when undocked.
-        /// </summary>
-        public ColumnDefinition GetStagePreviewSplitterColumn() => StagePreviewSplitterColumn;
+        
 
         // ====================================================================
         // CANVAS ANIMATION UI REFRESH
@@ -457,282 +415,243 @@ namespace PixlPunkt.UI.Animation
         private void RefreshCanvasLayerNames()
         {
             CanvasLayerNamesPanel.Children.Clear();
-            if (_canvasAnimationState == null) return;
 
-            // Get the active layer's ID from the document for highlighting
-            Guid activeLayerId = _document?.ActiveLayer?.Id ?? Guid.Empty;
+            if (_canvasAnimationState == null)
+                return;
 
-            // Add Audio tracks section if there are any loaded tracks
-            if (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0)
-            {
-                // Add collapsible header for audio tracks
-                var audioHeaderBorder = new Border
-                {
-                    Height = CellHeight,
-                    BorderBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 },
-                    BorderThickness = new Thickness(0, 0, 1, 1),
-                    Padding = new Thickness(4, 0, 4, 0),
-                    Background = new SolidColorBrush(Color.FromArgb(60, 0, 200, 200))
-                };
+            // ================================================================
+            // ORDER: Stage (always on top) → Audio → Layers + Sub-routines
+            // ================================================================
 
-                var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-
-                // Collapse/Expand toggle
-                var collapseIcon = new FluentIcons.WinUI.FluentIcon
-                {
-                    Icon = _canvasAnimationState.AudioTracks.IsCollapsed
-                        ? FluentIcons.Common.Icon.ChevronRight
-                        : FluentIcons.Common.Icon.ChevronDown,
-                    FontSize = 12,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
-                var headerText = new TextBlock
-                {
-                    Text = $"🔊 Audio ({_canvasAnimationState.AudioTracks.LoadedCount})",
-                    FontSize = 11,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = new SolidColorBrush(Color.FromArgb(255, 0, 200, 200))
-                };
-
-                // Add track button
-                var addButton = new Button
-                {
-                    Content = "+",
-                    FontSize = 10,
-                    Padding = new Thickness(4, 0, 4, 0),
-                    Background = new SolidColorBrush(Colors.Transparent),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(4, 0, 0, 0)
-                };
-                addButton.Click += AudioAddTrack_Click;
-
-                headerPanel.Children.Add(collapseIcon);
-                headerPanel.Children.Add(headerText);
-                headerPanel.Children.Add(addButton);
-
-                audioHeaderBorder.Child = headerPanel;
-                audioHeaderBorder.Tag = "AudioHeader";
-                audioHeaderBorder.PointerPressed += AudioHeader_PointerPressed;
-                CanvasLayerNamesPanel.Children.Add(audioHeaderBorder);
-
-                // Add individual audio tracks if not collapsed
-                if (!_canvasAnimationState.AudioTracks.IsCollapsed)
-                {
-                    int trackIndex = 0;
-                    foreach (var audioTrack in _canvasAnimationState.AudioTracks)
-                    {
-                        if (audioTrack.IsLoaded)
-                        {
-                            var audioBorder = new Border
-                            {
-                                Height = CellHeight,
-                                BorderBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 },
-                                BorderThickness = new Thickness(0, 0, 1, 1),
-                                Padding = new Thickness(20, 0, 4, 0), // Indent for hierarchy
-                                Background = new SolidColorBrush(Color.FromArgb(30, 0, 200, 200))
-                            };
-
-                            var trackPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-
-                            var audioText = new TextBlock
-                            {
-                                Text = audioTrack.Settings.DisplayName,
-                                FontSize = 11,
-                                VerticalAlignment = VerticalAlignment.Center,
-                                Foreground = new SolidColorBrush(Color.FromArgb(255, 0, 200, 200)),
-                                TextTrimming = TextTrimming.CharacterEllipsis,
-                                MaxWidth = 100
-                            };
-
-                            // Mute button for this track
-                            var muteButton = new Button
-                            {
-                                Content = new FluentIcons.WinUI.FluentIcon
-                                {
-                                    Icon = audioTrack.Settings.Muted
-                                        ? FluentIcons.Common.Icon.SpeakerMute
-                                        : FluentIcons.Common.Icon.Speaker2,
-                                    FontSize = 10
-                                },
-                                Padding = new Thickness(2),
-                                Background = new SolidColorBrush(Colors.Transparent),
-                                VerticalAlignment = VerticalAlignment.Center,
-                                Tag = trackIndex
-                            };
-                            muteButton.Click += AudioTrackMute_Click;
-
-                            // Remove button
-                            var removeButton = new Button
-                            {
-                                Content = new FluentIcons.WinUI.FluentIcon
-                                {
-                                    Icon = FluentIcons.Common.Icon.Delete,
-                                    FontSize = 10
-                                },
-                                Padding = new Thickness(2),
-                                Background = new SolidColorBrush(Colors.Transparent),
-                                VerticalAlignment = VerticalAlignment.Center,
-                                Tag = trackIndex
-                            };
-                            removeButton.Click += AudioTrackRemove_Click;
-
-                            trackPanel.Children.Add(audioText);
-                            trackPanel.Children.Add(muteButton);
-                            trackPanel.Children.Add(removeButton);
-
-                            audioBorder.Child = trackPanel;
-                            audioBorder.Tag = $"AudioTrack:{trackIndex}";
-                            audioBorder.PointerPressed += AudioTrack_PointerPressed;
-                            CanvasLayerNamesPanel.Children.Add(audioBorder);
-                        }
-                        trackIndex++;
-                    }
-                }
-            }
-
-            // Add Stage track if enabled
+            // 1. STAGE (always first if enabled)
             if (_canvasAnimationState.Stage.Enabled)
             {
-                var stageBorder = new Border
+                var stageHeader = new Border
                 {
-                    Height = CellHeight,
-                    BorderBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 },
-                    BorderThickness = new Thickness(0, 0, 1, 1),
-                    Padding = new Thickness(4, 0, 4, 0),
-                    Background = IsStageSelected
+                    Background = IsStageSelected 
                         ? (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"]
-                        : new SolidColorBrush(Color.FromArgb(40, 255, 165, 0)) // Orange tint for stage
-                };
-
-                var stageText = new TextBlock
-                {
-                    Text = "📷 Stage",
-                    FontSize = 11,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = IsStageSelected
-                        ? (Brush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"]
-                        : new SolidColorBrush(Colors.Orange)
-                };
-
-                stageBorder.Child = stageText;
-                stageBorder.Tag = "Stage";
-                stageBorder.PointerPressed += StageTrack_PointerPressed;
-                stageBorder.PointerEntered += StageTrack_PointerEntered;
-                stageBorder.PointerExited += StageTrack_PointerExited;
-                CanvasLayerNamesPanel.Children.Add(stageBorder);
-            }
-
-            foreach (var track in _canvasAnimationState.Tracks)
-            {
-                bool isSelected = track.LayerId == activeLayerId;
-
-                var border = new Border
-                {
+                        : new SolidColorBrush(Color.FromArgb(100, 100, 150, 200)),
                     Height = CellHeight,
-                    BorderBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 },
-                    BorderThickness = new Thickness(0, 0, 1, 1),
-                    Padding = new Thickness(4 + track.Depth * 16, 0, 4, 0),
-                    Background = isSelected
-                        ? (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"]
-                        : new SolidColorBrush(Colors.Transparent),
-                    Tag = track.LayerId
+                    Child = new TextBlock
+                    {
+                        Text = "Stage",
+                        Foreground = IsStageSelected
+                            ? (Brush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"]
+                            : new SolidColorBrush(Colors.White),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        FontSize = 11
+                    }
                 };
+                stageHeader.PointerPressed += StageTrack_PointerPressed;
+                stageHeader.PointerEntered += StageTrack_PointerEntered;
+                stageHeader.PointerExited += StageTrack_PointerExited;
+                CanvasLayerNamesPanel.Children.Add(stageHeader);
+            }
 
-                var text = new TextBlock
+            // 2. AUDIO TRACKS (after stage)
+            if (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0)
+            {
+                var audioHeader = new Border
                 {
-                    Text = track.LayerName,
-                    FontSize = 11,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = isSelected
-                        ? (Brush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"]
-                        : (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"]
+                    Background = new SolidColorBrush(Color.FromArgb(100, 80, 80, 80)),
+                    Height = CellHeight,
+                    Child = new TextBlock
+                    {
+                        Text = "Audio",
+                        Foreground = new SolidColorBrush(Colors.White),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        FontSize = 11
+                    }
                 };
-
-                border.Child = text;
-                border.PointerPressed += CanvasLayerName_PointerPressed;
-                border.PointerEntered += CanvasLayerName_PointerEntered;
-                border.PointerExited += CanvasLayerName_PointerExited;
-
-                CanvasLayerNamesPanel.Children.Add(border);
+                CanvasLayerNamesPanel.Children.Add(audioHeader);
             }
-        }
 
-        private void AudioHeader_PointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            _canvasAnimationState.AudioTracks.ToggleCollapsed();
-            RefreshCanvasLayerNames();
-            RefreshCanvasKeyframeGrid();
-            UpdateCanvasPlayhead();
-        }
-
-        private void AudioAddTrack_Click(object sender, RoutedEventArgs e)
-        {
-            // Load a new audio file into a new track
-            _ = AddNewAudioTrackAsync();
-        }
-
-        private async System.Threading.Tasks.Task AddNewAudioTrackAsync()
-        {
-            if (_canvasAnimationState == null) return;
-
-            var picker = new Windows.Storage.Pickers.FileOpenPicker();
-            picker.FileTypeFilter.Add(".mp3");
-            picker.FileTypeFilter.Add(".wav");
-            picker.FileTypeFilter.Add(".ogg");
-            picker.FileTypeFilter.Add(".flac");
-            picker.FileTypeFilter.Add(".m4a");
-            picker.FileTypeFilter.Add(".wma");
-
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.PixlPunktMainWindow);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-            var file = await picker.PickSingleFileAsync();
-            if (file != null)
+            // Add audio track rows
+            if (!_canvasAnimationState.AudioTracks.IsCollapsed)
             {
-                var newTrack = _canvasAnimationState.AudioTracks.AddTrack();
-                bool success = await newTrack.LoadAsync(file.Path);
-                if (!success)
+                for (int i = 0; i < _canvasAnimationState.AudioTracks.LoadedCount; i++)
                 {
-                    _canvasAnimationState.AudioTracks.RemoveTrack(newTrack);
+                    var trackHeader = new Border
+                    {
+                        Background = new SolidColorBrush(Color.FromArgb(80, 100, 100, 100)),
+                        Height = CellHeight,
+                        Child = new TextBlock
+                        {
+                            Text = $"Audio {i + 1}",
+                            Foreground = new SolidColorBrush(Colors.LightGray),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            Margin = new Thickness(4, 0, 0, 0),
+                            FontSize = 10
+                        }
+                    };
+                    CanvasLayerNamesPanel.Children.Add(trackHeader);
                 }
-                else
+            }
+
+            // 3. LAYERS AND SUB-ROUTINES (interleaved by ZOrder)
+            // Build a merged list of items to display
+            var displayItems = BuildOrderedTrackList();
+
+            foreach (var item in displayItems)
+            {
+                if (item.IsSubRoutine && item.SubRoutine != null)
                 {
-                    RefreshCanvasLayerNames();
-                    RefreshCanvasKeyframeGrid();
+                    // Sub-routine track header
+                    var subRoutine = item.SubRoutine;
+                    bool isEnabled = subRoutine.IsEnabled;
+                    bool isSelected = subRoutine == SelectedSubRoutine;
+
+                    // Create a grid to hold the eye icon and text
+                    var grid = new Grid();
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                    // Eye icon button
+                    var eyeButton = new Button
+                    {
+                        Width = 18,
+                        Height = 18,
+                        Padding = new Thickness(0),
+                        Background = new SolidColorBrush(Colors.Transparent),
+                        BorderThickness = new Thickness(0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Tag = subRoutine,
+                        Content = new FluentIcons.WinUI.SymbolIcon
+                        {
+                            Symbol = (FluentIcons.Common.Symbol)(isEnabled ? Icon.Eye : Icon.EyeOff),
+                            FontSize = 12,
+                            Foreground = new SolidColorBrush(isEnabled ? Colors.White : Colors.Gray)
+                        }
+                    };
+                    eyeButton.Click += SubRoutineEyeButton_Click;
+                    Grid.SetColumn(eyeButton, 0);
+                    grid.Children.Add(eyeButton);
+
+                    // Track name text
+                    var nameText = new TextBlock
+                    {
+                        Text = subRoutine.DisplayName,
+                        Foreground = new SolidColorBrush(isEnabled ? Colors.White : Colors.Gray),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        FontSize = 10,
+                        TextTrimming = TextTrimming.CharacterEllipsis
+                    };
+                    Grid.SetColumn(nameText, 1);
+                    grid.Children.Add(nameText);
+
+                    // Highlight if selected
+                    Color bgColor;
+                    if (isSelected)
+                        bgColor = Color.FromArgb(255, 200, 140, 60); // Selected orange
+                    else if (isEnabled)
+                        bgColor = Color.FromArgb(80, 180, 120, 60); // Normal tan
+                    else
+                        bgColor = Color.FromArgb(40, 180, 120, 60); // Disabled dim
+
+                    var trackHeader = new Border
+                    {
+                        Background = new SolidColorBrush(bgColor),
+                        Height = CellHeight,
+                        Child = grid,
+                        Tag = subRoutine
+                    };
+                    trackHeader.PointerPressed += SubRoutineTrackHeader_PointerPressed;
+                    trackHeader.RightTapped += SubRoutineTrackHeader_RightTapped;
+                    CanvasLayerNamesPanel.Children.Add(trackHeader);
+                }
+                else if (item.Track != null)
+                {
+                    // Layer track header
+                    var track = item.Track;
+                    Guid activeLayerId = _document?.ActiveLayer?.Id ?? Guid.Empty;
+                    bool isSelected = track.LayerId == activeLayerId;
+
+                    var border = new Border
+                    {
+                        Background = isSelected
+                            ? (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"]
+                            : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)),
+                        Height = CellHeight,
+                        Tag = track.LayerId,
+                        Child = new TextBlock
+                        {
+                            Text = new string(' ', track.Depth * 2) + track.LayerName,
+                            Foreground = isSelected
+                                ? (Brush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"]
+                                : new SolidColorBrush(Colors.White),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            Margin = new Thickness(4, 0, 0, 0),
+                            FontSize = 10,
+                            TextTrimming = TextTrimming.CharacterEllipsis
+                        }
+                    };
+                    border.PointerPressed += CanvasLayerName_PointerPressed;
+                    border.PointerEntered += CanvasLayerName_PointerEntered;
+                    border.PointerExited += CanvasLayerName_PointerExited;
+                    CanvasLayerNamesPanel.Children.Add(border);
                 }
             }
         }
 
-        private void AudioTrackMute_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Represents an item in the ordered track list (either a layer or sub-routine).
+        /// </summary>
+        private record struct OrderedTrackItem(
+            int DisplayIndex,
+            bool IsSubRoutine,
+            CanvasAnimationTrack? Track,
+            AnimationSubRoutine? SubRoutine);
+
+        /// <summary>
+        /// Builds an ordered list of layers and sub-routines for display.
+        /// 
+        /// Tracks in CanvasAnimationState are stored in UI order (top-to-bottom, matching the Layers panel).
+        /// Track 0 = top layer (e.g., Foreground), last track = bottom layer (e.g., Background).
+        /// 
+        /// For Z-ordering: higher Z = renders on top = should appear at TOP of timeline list.
+        /// So we invert the track indices: last track (Background) gets Z=0, first track (Foreground) gets Z=N-1.
+        /// Sub-routines use their explicit ZOrder property.
+        /// 
+        /// Final sort is DESCENDING by Z-order so highest Z appears first in the list.
+        /// </summary>
+        private List<OrderedTrackItem> BuildOrderedTrackList()
         {
-            if (_canvasAnimationState == null) return;
-            if (sender is Button btn && btn.Tag is int trackIndex)
+            var items = new List<OrderedTrackItem>();
+
+            if (_canvasAnimationState == null)
+                return items;
+
+            int trackCount = _canvasAnimationState.Tracks.Count;
+
+            // Add layers with inverted index as Z-order
+            // Track 0 (Foreground/top in UI) should have highest Z, track N-1 (Background) should have Z=0
+            for (int i = 0; i < trackCount; i++)
             {
-                if (trackIndex >= 0 && trackIndex < _canvasAnimationState.AudioTracks.Count)
-                {
-                    var track = _canvasAnimationState.AudioTracks[trackIndex];
-                    track.Settings.Muted = !track.Settings.Muted;
-                    RefreshCanvasLayerNames();
-                }
+                // Invert: track at index 0 gets Z = trackCount-1, track at index N-1 gets Z = 0
+                int zOrder = trackCount - 1 - i;
+                items.Add(new OrderedTrackItem(zOrder, false, _canvasAnimationState.Tracks[i], null));
             }
+
+            // Add sub-routines with their ZOrder as display order
+            foreach (var subRoutine in _canvasAnimationState.SubRoutines.SubRoutines)
+            {
+                items.Add(new OrderedTrackItem(subRoutine.ZOrder, true, null, subRoutine));
+            }
+
+            // Sort by Z-order in DESCENDING order
+            // Higher Z-order = appears at TOP of UI list = rendered LAST (on top)
+            items.Sort((a, b) => b.DisplayIndex.CompareTo(a.DisplayIndex));
+
+            return items;
         }
 
-        private void AudioTrackRemove_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            if (sender is Button btn && btn.Tag is int trackIndex)
-            {
-                if (trackIndex >= 0 && trackIndex < _canvasAnimationState.AudioTracks.Count)
-                {
-                    _canvasAnimationState.AudioTracks.RemoveTrackAt(trackIndex);
-                    RefreshCanvasLayerNames();
-                    RefreshCanvasKeyframeGrid();
-                }
-            }
-        }
+        
 
         // ====================================================================
         // EVENT HANDLERS - TILE ANIMATION
@@ -785,35 +704,7 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
-        // ════════════════════════════════════════════════════════════════════
-        // EVENT HANDLERS - AUDIO TRACK STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        private void OnAudioLoadedChanged(bool loaded)
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                UpdateAudioUI();
-            });
-        }
-
-        private void OnAudioWaveformUpdated()
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                RefreshCanvasKeyframeGrid();
-            });
-        }
-
-        private void OnAudioTracksChanged()
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                RefreshCanvasLayerNames();
-                RefreshCanvasKeyframeGrid();
-                UpdateCanvasPlayhead();
-            });
-        }
+        
 
         // ════════════════════════════════════════════════════════════════════
         // EVENT HANDLERS - CANVAS ANIMATION STATE
@@ -952,313 +843,9 @@ namespace PixlPunkt.UI.Animation
             _canvasAnimationState.OnionSkinEnabled = CanvasOnionSkinToggle.IsChecked ?? false;
         }
 
-        // ════════════════════════════════════════════════════════════════════
-        // EVENT HANDLERS - AUDIO CONTROLS
-        // ════════════════════════════════════════════════════════════════════
+        
 
-        private bool _suppressAudioValueChanges;
-
-        private async void AudioLoad_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-
-            var picker = new Windows.Storage.Pickers.FileOpenPicker();
-            picker.FileTypeFilter.Add(".mp3");
-            picker.FileTypeFilter.Add(".wav");
-            picker.FileTypeFilter.Add(".ogg");
-            picker.FileTypeFilter.Add(".flac");
-            picker.FileTypeFilter.Add(".m4a");
-            picker.FileTypeFilter.Add(".wma");
-
-            // Get the window handle for the picker
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.PixlPunktMainWindow);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-            var file = await picker.PickSingleFileAsync();
-            if (file != null)
-            {
-                bool success = await _canvasAnimationState.AudioTrack.LoadAsync(file.Path);
-                if (success)
-                {
-                    UpdateAudioUI();
-                }
-            }
-        }
-
-        private void AudioMute_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-
-            // Find the toggle button from sender
-            if (sender is Microsoft.UI.Xaml.Controls.Primitives.ToggleButton toggle)
-            {
-                _canvasAnimationState.AudioTrack.Settings.Muted = toggle.IsChecked ?? false;
-                UpdateAudioMuteIcon();
-            }
-        }
-
-        private void AudioVolume_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (_suppressAudioValueChanges || _canvasAnimationState == null) return;
-            _canvasAnimationState.AudioTrack.Settings.Volume = (float)(e.NewValue / 100.0);
-        }
-
-        private void AudioRemove_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            _canvasAnimationState.AudioTrack.Unload();
-            UpdateAudioUI();
-        }
-
-        private void UpdateAudioUI()
-        {
-            if (_canvasAnimationState == null) return;
-
-            var audioTrack = _canvasAnimationState.AudioTrack;
-
-            _suppressAudioValueChanges = true;
-
-            // Find and update UI controls by name
-            if (FindName("AudioVolumeSlider") is Slider volumeSlider)
-            {
-                volumeSlider.Value = audioTrack.Settings.Volume * 100;
-            }
-
-            if (FindName("AudioMuteToggle") is Microsoft.UI.Xaml.Controls.Primitives.ToggleButton muteToggle)
-            {
-                muteToggle.IsChecked = audioTrack.Settings.Muted;
-            }
-
-            UpdateAudioMuteIcon();
-
-            if (FindName("AudioRemoveButton") is Button removeButton)
-            {
-                removeButton.Visibility = audioTrack.IsLoaded ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            // Refresh timeline to show/hide audio track row
-            RefreshCanvasLayerNames();
-            RefreshCanvasKeyframeGrid();
-
-            _suppressAudioValueChanges = false;
-        }
-
-        private void UpdateAudioMuteIcon()
-        {
-            if (_canvasAnimationState == null) return;
-            bool muted = _canvasAnimationState.AudioTrack.Settings.Muted;
-
-            if (FindName("AudioMuteIcon") is FluentIcons.WinUI.FluentIcon icon)
-            {
-                icon.Icon = muted ? FluentIcons.Common.Icon.SpeakerMute : FluentIcons.Common.Icon.Speaker2;
-            }
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // EVENT HANDLERS - STAGE (CAMERA) CONTROLS
-        // ════════════════════════════════════════════════════════════════════
-
-        private bool _suppressStageValueChanges;
-
-        private void StageEnabled_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            _canvasAnimationState.Stage.Enabled = StageEnabledToggle.IsChecked ?? false;
-            
-            // Update visibility of the quick add keyframe button
-            UpdateStageQuickButtonVisibility();
-        }
-
-        /// <summary>
-        /// Updates the visibility of the Stage quick-add keyframe button.
-        /// </summary>
-        private void UpdateStageQuickButtonVisibility()
-        {
-            bool stageEnabled = _canvasAnimationState?.Stage.Enabled ?? false;
-            
-            if (StageAddKeyframeQuickButton != null)
-            {
-                StageAddKeyframeQuickButton.Visibility = stageEnabled 
-                    ? Visibility.Visible 
-                    : Visibility.Collapsed;
-            }
-            
-            if (StageRemoveKeyframeQuickButton != null)
-            {
-                StageRemoveKeyframeQuickButton.Visibility = stageEnabled 
-                    ? Visibility.Visible 
-                    : Visibility.Collapsed;
-            }
-        }
-
-        private void StageAddKeyframeQuick_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            _canvasAnimationState.CaptureStageKeyframe(_canvasAnimationState.CurrentFrameIndex);
-            RefreshCanvasKeyframeGrid();
-            
-            // Clear pending edits since we just saved them
-            _canvasHost?.ClearStagePendingEdits();
-            _canvasHost?.InvalidateCanvas();
-            StagePreview.RefreshPreview();
-        }
-
-        private void StageRemoveKeyframeQuick_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            _canvasAnimationState.RemoveStageKeyframe(_canvasAnimationState.CurrentFrameIndex);
-            RefreshCanvasKeyframeGrid();
-            _canvasHost?.InvalidateCanvas();
-            StagePreview.RefreshPreview();
-        }
-
-        private void StageSettings_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            RefreshStageSettingsUI();
-        }
-
-        private void RefreshStageSettingsUI()
-        {
-            if (_canvasAnimationState == null) return;
-            var stage = _canvasAnimationState.Stage;
-
-            _suppressStageValueChanges = true;
-
-            StageXBox.Value = stage.StageX;
-            StageYBox.Value = stage.StageY;
-            StageWidthBox.Value = stage.StageWidth;
-            StageHeightBox.Value = stage.StageHeight;
-            StageOutputWidthBox.Value = stage.OutputWidth;
-            StageOutputHeightBox.Value = stage.OutputHeight;
-
-            // Set maximum values based on canvas dimensions
-            if (_document != null)
-            {
-                StageXBox.Maximum = _document.PixelWidth - 1;
-                StageYBox.Maximum = _document.PixelHeight - 1;
-                StageWidthBox.Maximum = _document.PixelWidth;
-                StageHeightBox.Maximum = _document.PixelHeight;
-                StageOutputWidthBox.Maximum = _document.PixelWidth * 4; // Allow upscaling
-                StageOutputHeightBox.Maximum = _document.PixelHeight * 4;
-            }
-
-            // Scaling algorithm
-            int scalingIndex = stage.ScalingAlgorithm switch
-            {
-                StageScalingAlgorithm.NearestNeighbor => 0,
-                StageScalingAlgorithm.Bilinear => 1,
-                StageScalingAlgorithm.Bicubic => 2,
-                _ => 0
-            };
-            StageScalingCombo.SelectedIndex = scalingIndex;
-
-            // Bounds mode
-            int boundsIndex = stage.BoundsMode switch
-            {
-                StageBoundsMode.Free => 0,
-                StageBoundsMode.Constrained => 1,
-                StageBoundsMode.CenterLocked => 2,
-                _ => 1
-            };
-            StageBoundsCombo.SelectedIndex = boundsIndex;
-
-            _suppressStageValueChanges = false;
-        }
-
-        private void StageX_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null || double.IsNaN(args.NewValue)) return;
-            _canvasAnimationState.Stage.StageX = (int)args.NewValue;
-        }
-
-        private void StageY_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null || double.IsNaN(args.NewValue)) return;
-            _canvasAnimationState.Stage.StageY = (int)args.NewValue;
-        }
-
-        private void StageWidth_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null || double.IsNaN(args.NewValue)) return;
-            _canvasAnimationState.Stage.StageWidth = (int)args.NewValue;
-        }
-
-        private void StageHeight_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null || double.IsNaN(args.NewValue)) return;
-            _canvasAnimationState.Stage.StageHeight = (int)args.NewValue;
-        }
-
-        private void StageOutputWidth_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null || double.IsNaN(args.NewValue)) return;
-            _canvasAnimationState.Stage.OutputWidth = (int)args.NewValue;
-        }
-
-        private void StageOutputHeight_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null || double.IsNaN(args.NewValue)) return;
-            _canvasAnimationState.Stage.OutputHeight = (int)args.NewValue;
-        }
-
-        private void StageScaling_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null) return;
-            if (StageScalingCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag)
-            {
-                _canvasAnimationState.Stage.ScalingAlgorithm = tag switch
-                {
-                    "NearestNeighbor" => StageScalingAlgorithm.NearestNeighbor,
-                    "Bilinear" => StageScalingAlgorithm.Bilinear,
-                    "Bicubic" => StageScalingAlgorithm.Bicubic,
-                    _ => StageScalingAlgorithm.NearestNeighbor
-                };
-            }
-        }
-
-        private void StageBounds_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressStageValueChanges || _canvasAnimationState == null) return;
-            if (StageBoundsCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag)
-            {
-                _canvasAnimationState.Stage.BoundsMode = tag switch
-                {
-                    "Free" => StageBoundsMode.Free,
-                    "Constrained" => StageBoundsMode.Constrained,
-                    "CenterLocked" => StageBoundsMode.CenterLocked,
-                    _ => StageBoundsMode.Constrained
-                };
-            }
-        }
-
-        private void StageMatchCanvas_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null || _document == null) return;
-            _canvasAnimationState.Stage.MatchCanvas(_document.PixelWidth, _document.PixelHeight);
-            RefreshStageSettingsUI();
-        }
-
-        private void StageAddKeyframe_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            _canvasAnimationState.CaptureStageKeyframe(_canvasAnimationState.CurrentFrameIndex);
-            RefreshCanvasKeyframeGrid();
-            
-            // Clear pending edits since we just saved them
-            _canvasHost?.ClearStagePendingEdits();
-            _canvasHost?.InvalidateCanvas();
-            StagePreview.RefreshPreview();
-        }
-
-        private void StageRemoveKeyframe_Click(object sender, RoutedEventArgs e)
-        {
-            if (_canvasAnimationState == null) return;
-            _canvasAnimationState.RemoveStageKeyframe(_canvasAnimationState.CurrentFrameIndex);
-            RefreshCanvasKeyframeGrid();
-            _canvasHost?.InvalidateCanvas();
-            StagePreview.RefreshPreview();
-        }
+        
 
         // ====================================================================
         // EVENT HANDLERS - CANVAS ANIMATION TIMELINE
@@ -1287,13 +874,35 @@ namespace PixlPunkt.UI.Animation
             // Determine which row was clicked
             int rowIndex = (int)(pos.Y / CellHeight);
 
-            // Calculate row ranges
+            // Calculate row ranges in new order: Stage → Audio → SubRoutines → Layers
+            int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
             int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
             int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
-            int audioEndRow = audioHeaderRows + audioTrackRows;
+            int subRoutineEndRow = audioHeaderRows + audioTrackRows + _canvasAnimationState.SubRoutines.SubRoutines.Count;
 
+            // Get keyboard modifier state
+            var ctrlDown = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) 
+                & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+
+            // If Ctrl is held down, check if we're over a sub-routine track
+            // If so, skip playhead scrubbing and let the sub-routine handler take over
+            if (ctrlDown && rowIndex >= audioHeaderRows + audioTrackRows && rowIndex < subRoutineEndRow)
+            {
+                // Over sub-routine track with Ctrl held - let the sub-routine bar handler take over
+                e.Handled = true;
+                return;
+            }
+
+            // Check if clicking on stage row
+            if (stageRows > 0 && rowIndex < stageRows)
+            {
+                // Stage row - start playhead drag
+                _isDraggingPlayhead = true;
+                _canvasAnimationState.SetCurrentFrame(frameIndex);
+                CanvasKeyframeCanvas.CapturePointer(e.Pointer);
+            }
             // Check if clicking on the audio header row (collapse/expand)
-            if (audioHeaderRows > 0 && rowIndex == 0)
+            else if (audioHeaderRows > 0 && rowIndex >= stageRows && rowIndex < stageRows + audioHeaderRows)
             {
                 // Header click - toggle collapse (handled by layer names panel)
                 _isDraggingPlayhead = true;
@@ -1301,9 +910,9 @@ namespace PixlPunkt.UI.Animation
                 CanvasKeyframeCanvas.CapturePointer(e.Pointer);
             }
             // Check if clicking on an audio track row (draggable waveform)
-            else if (!_canvasAnimationState.AudioTracks.IsCollapsed && rowIndex >= audioHeaderRows && rowIndex < audioEndRow)
+            else if (!_canvasAnimationState.AudioTracks.IsCollapsed && rowIndex >= stageRows + audioHeaderRows && rowIndex < subRoutineEndRow)
             {
-                int audioRowOffset = rowIndex - audioHeaderRows;
+                int audioRowOffset = rowIndex - (stageRows + audioHeaderRows);
                 // Find which loaded track this corresponds to
                 int loadedIndex = 0;
                 _audioDragTrackIndex = -1;
@@ -1343,6 +952,68 @@ namespace PixlPunkt.UI.Animation
             if (_canvasAnimationState == null) return;
 
             var pos = e.GetCurrentPoint(CanvasKeyframeCanvas).Position;
+
+            // Handle sub-routine resize (captured from handle press)
+            if (_isSubRoutineInteracting && _resizingSubRoutine != null)
+            {
+                // Check if Ctrl is still held - cancel operation if released
+                var ctrlDown = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) 
+                    & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+
+                if (!ctrlDown)
+                {
+                    EndSubRoutineInteraction();
+                    return;
+                }
+
+                double currentX = pos.X;
+                double deltaX = currentX - _resizeStartX;
+                int framesDelta = (int)Math.Round(deltaX / CellWidth);
+
+                if (_resizeDirection == "left")
+                {
+                    // Extend left: move start frame earlier, increase duration
+                    int newStartFrame = Math.Max(0, _resizeStartFrame + framesDelta);
+                    int newDuration = _resizeStartDuration + (_resizeStartFrame - newStartFrame);
+                    
+                    if (newDuration >= 1)
+                    {
+                        _resizingSubRoutine.StartFrame = newStartFrame;
+                        _resizingSubRoutine.DurationFrames = newDuration;
+                    }
+                }
+                else if (_resizeDirection == "right")
+                {
+                    // Extend right: increase duration (no maximum limit)
+                    int newDuration = Math.Max(1, _resizeStartDuration + framesDelta);
+                    _resizingSubRoutine.DurationFrames = newDuration;
+                }
+                
+                // Don't refresh during drag - visual updates on release
+                return;
+            }
+
+            // Handle sub-routine drag/move (captured from bar press)
+            if (_isSubRoutineInteracting && _draggingSubRoutine != null)
+            {
+                var ctrlDown = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) 
+                    & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+
+                if (!ctrlDown)
+                {
+                    EndSubRoutineInteraction();
+                    return;
+                }
+
+                double currentX = pos.X;
+                double deltaX = currentX - _dragStartX;
+                int framesDelta = (int)Math.Round(deltaX / CellWidth);
+                int newStartFrame = Math.Max(0, _dragStartFrame + framesDelta);
+
+                _draggingSubRoutine.StartFrame = newStartFrame;
+                return;
+            }
+
             int frameIndex = (int)(pos.X / CellWidth);
             frameIndex = Math.Clamp(frameIndex, 0, _canvasAnimationState.FrameCount - 1);
 
@@ -1384,6 +1055,12 @@ namespace PixlPunkt.UI.Animation
 
         private void CanvasKeyframeCanvas_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
+            // Handle sub-routine interaction release
+            if (_isSubRoutineInteracting)
+            {
+                EndSubRoutineInteraction();
+            }
+
             _isDraggingPlayhead = false;
             _isDraggingAudioTrack = false;
             _audioDragTrackIndex = -1;
@@ -1431,7 +1108,7 @@ namespace PixlPunkt.UI.Animation
 
             // Update menu item enabled states
             bool hasTrack = _contextMenuTrack != null || _isContextMenuForStage;
-            bool hasKeyframe = _isContextMenuForStage 
+            bool hasKeyframe = _isContextMenuForStage
                 ? _canvasAnimationState.StageTrack.HasKeyframeAt(_contextMenuFrameIndex)
                 : (_contextMenuTrack?.HasKeyframeAt(_contextMenuFrameIndex) ?? false);
             bool hasClipboard = KeyframeClipboard.Instance.HasContent;
@@ -1477,7 +1154,7 @@ namespace PixlPunkt.UI.Animation
                 // Add stage keyframe
                 _canvasAnimationState.CaptureStageKeyframe(_contextMenuFrameIndex);
                 RefreshCanvasKeyframeGrid();
-                
+
                 // Clear pending edits if this is the current frame
                 if (_contextMenuFrameIndex == _canvasAnimationState.CurrentFrameIndex)
                 {
@@ -1657,7 +1334,7 @@ namespace PixlPunkt.UI.Animation
         {
             if (_suppressSettingsValueChanges || _canvasAnimationState == null) return;
             _canvasAnimationState.OnionSkinEnabled = OnionSkinEnabledToggle.IsOn;
-            
+
             // Also update the toolbar toggle to stay in sync
             CanvasOnionSkinToggle.IsChecked = OnionSkinEnabledToggle.IsOn;
         }
@@ -1789,11 +1466,13 @@ namespace PixlPunkt.UI.Animation
             int frameCount = _canvasAnimationState.FrameCount;
             int trackCount = _canvasAnimationState.Tracks.Count;
 
-            // Calculate row counts for special tracks
+            // Calculate row counts in new order: Stage → Audio → SubRoutines → Layers
+            int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
             int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
             int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
-            int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
-            int totalRows = audioHeaderRows + audioTrackRows + stageRows + trackCount;
+            int subRoutineRows = _canvasAnimationState.SubRoutines.SubRoutines.Count;
+            
+            int totalRows = stageRows + audioHeaderRows + audioTrackRows + subRoutineRows + trackCount;
 
             CanvasKeyframeCanvas.Width = frameCount * CellWidth;
             CanvasKeyframeCanvas.Height = Math.Max(totalRows * CellHeight, 24);
@@ -1808,11 +1487,12 @@ namespace PixlPunkt.UI.Animation
             int frameCount = _canvasAnimationState.FrameCount;
             int trackCount = _canvasAnimationState.Tracks.Count;
 
-            // Calculate row counts
+            // Calculate row counts in new order: Stage → Audio → SubRoutines → Layers
+            int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
             int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
             int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
-            int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
-            int totalRows = audioHeaderRows + audioTrackRows + stageRows + trackCount;
+            int subRoutineRows = _canvasAnimationState.SubRoutines.SubRoutines.Count;
+            int totalRows = stageRows + audioHeaderRows + audioTrackRows + subRoutineRows + trackCount;
 
             var gridBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.2 };
 
@@ -1848,7 +1528,14 @@ namespace PixlPunkt.UI.Animation
 
             int currentRow = 0;
 
-            // Draw audio header row if there are audio tracks
+            // 1. STAGE (always first if enabled)
+            if (_canvasAnimationState.Stage.Enabled)
+            {
+                DrawStageTrackKeyframes(currentRow);
+                currentRow++;
+            }
+
+            // 2. AUDIO (header + tracks)
             if (audioHeaderRows > 0)
             {
                 DrawAudioHeaderRow(currentRow, frameCount);
@@ -1870,190 +1557,62 @@ namespace PixlPunkt.UI.Animation
                 }
             }
 
-            // Draw stage keyframes if enabled
-            if (_canvasAnimationState.Stage.Enabled)
+            // 3. LAYERS AND SUB-ROUTINES (interleaved by ZOrder)
+            // Build a merged list of items to display
+            var displayItems = BuildOrderedTrackList();
+            foreach (var item in displayItems)
             {
-                DrawStageTrackKeyframes(currentRow);
+                if (item.IsSubRoutine && item.SubRoutine != null)
+                {
+                    DrawSubRoutineTrackRow(currentRow, item.SubRoutine);
+                }
+                else if (item.Track != null)
+                {
+                    DrawCanvasTrackKeyframes(item.Track, currentRow);
+                }
                 currentRow++;
             }
-
-            // Draw layer keyframes
-            for (int trackIdx = 0; trackIdx < trackCount; trackIdx++)
-            {
-                var track = _canvasAnimationState.Tracks[trackIdx];
-                DrawCanvasTrackKeyframes(track, currentRow + trackIdx);
-            }
         }
 
-        /// <summary>
-        /// Draws the audio section header row (shows collapsed/expanded indicator).
-        /// </summary>
-        private void DrawAudioHeaderRow(int rowIndex, int frameCount)
+        private void UpdateCanvasPlayhead()
         {
-            // Background for audio header
-            var bgRect = new Rectangle
+            if (_canvasAnimationState == null)
             {
-                Width = frameCount * CellWidth,
-                Height = CellHeight,
-                Fill = new SolidColorBrush(Color.FromArgb(40, 0, 200, 200))
-            };
-            Canvas.SetLeft(bgRect, 0);
-            Canvas.SetTop(bgRect, rowIndex * CellHeight);
-            CanvasKeyframeCanvas.Children.Add(bgRect);
-        }
-
-        /// <summary>
-        /// Draws a simplified waveform representation in the audio track row.
-        /// Respects the audio start frame offset so the waveform appears at the correct timeline position.
-        /// The waveform can be dragged left/right to adjust the offset.
-        /// </summary>
-        private void DrawAudioTrackWaveform(int trackIndex, AudioTrackState audioTrack, int audioTrackCollectionIndex)
-        {
-            if (_canvasAnimationState == null) return;
-
-            int frameCount = _canvasAnimationState.FrameCount;
-            int fps = _canvasAnimationState.FramesPerSecond;
-            double audioDurationMs = audioTrack.DurationMs;
-            int startFrameOffset = audioTrack.Settings.StartFrameOffset;
-
-            // Calculate audio duration in frames
-            double audioDurationFrames = (audioDurationMs * fps) / 1000.0;
-
-            // Background for audio track (full row)
-            var bgRect = new Rectangle
-            {
-                Width = frameCount * CellWidth,
-                Height = CellHeight,
-                Fill = new SolidColorBrush(Color.FromArgb(20, 0, 200, 200))
-            };
-            Canvas.SetLeft(bgRect, 0);
-            Canvas.SetTop(bgRect, trackIndex * CellHeight);
-            CanvasKeyframeCanvas.Children.Add(bgRect);
-
-            // Draw waveform points
-            float centerY = trackIndex * CellHeight + CellHeight / 2f;
-            float maxAmplitude = (CellHeight / 2f) - 2;
-
-            var waveformBrush = new SolidColorBrush(Color.FromArgb(150, 0, 200, 200));
-
-            // Calculate where audio is visible in the timeline
-            int audioStartFrame = startFrameOffset;
-            int audioEndFrame = startFrameOffset + (int)Math.Ceiling(audioDurationFrames);
-
-            // Draw waveform region background (highlight where audio actually plays)
-            if (audioEndFrame > 0 && audioStartFrame < frameCount)
-            {
-                int visibleStartFrame = Math.Max(0, audioStartFrame);
-                int visibleEndFrame = Math.Min(frameCount, audioEndFrame);
-
-                var waveformBgRect = new Rectangle
-                {
-                    Width = (visibleEndFrame - visibleStartFrame) * CellWidth,
-                    Height = CellHeight - 4,
-                    Fill = new SolidColorBrush(Color.FromArgb(50, 0, 200, 200)),
-                    RadiusX = 2,
-                    RadiusY = 2
-                };
-                Canvas.SetLeft(waveformBgRect, visibleStartFrame * CellWidth);
-                Canvas.SetTop(waveformBgRect, trackIndex * CellHeight + 2);
-                CanvasKeyframeCanvas.Children.Add(waveformBgRect);
+                CanvasPlayheadLine.Visibility = Visibility.Collapsed;
+                return;
             }
 
-            // Draw waveform points
-            foreach (var point in audioTrack.WaveformData)
+            CanvasPlayheadLine.Visibility = Visibility.Visible;
+
+            // Calculate playhead position (center of the cell) relative to content
+            double playheadX = _canvasAnimationState.CurrentFrameIndex * CellWidth + CellWidth / 2 - 1;
+
+            // Position the playhead in the overlay canvas, accounting for scroll offset
+            double visibleX = playheadX - CanvasKeyframeScrollViewer.HorizontalOffset;
+
+            // Hide playhead if it's scrolled out of view
+            double viewportWidth = CanvasKeyframeScrollViewer.ViewportWidth;
+            if (visibleX < 0 || visibleX > viewportWidth)
             {
-                double audioFrame = (point.TimeMs * fps) / 1000.0;
-                double animationFrame = audioFrame + startFrameOffset;
-
-                if (animationFrame < 0 || animationFrame >= frameCount) continue;
-
-                float x = (float)(animationFrame * CellWidth);
-                float amplitude = point.AveragePeak * maxAmplitude;
-                amplitude = Math.Max(amplitude, 1f);
-
-                var bar = new Rectangle
-                {
-                    Width = 1.5,
-                    Height = amplitude * 2,
-                    Fill = waveformBrush
-                };
-                Canvas.SetLeft(bar, x);
-                Canvas.SetTop(bar, centerY - amplitude);
-                CanvasKeyframeCanvas.Children.Add(bar);
+                CanvasPlayheadLine.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                CanvasPlayheadLine.Visibility = Visibility.Visible;
+                Canvas.SetLeft(CanvasPlayheadLine, visibleX);
             }
 
-            // Draw cutoff indicator if audio extends past animation end
-            if (audioEndFrame > frameCount)
-            {
-                float cutoffX = frameCount * CellWidth - 2;
-                var cutoffLine = new Line
-                {
-                    X1 = cutoffX,
-                    Y1 = trackIndex * CellHeight + 2,
-                    X2 = cutoffX,
-                    Y2 = trackIndex * CellHeight + CellHeight - 2,
-                    Stroke = new SolidColorBrush(Color.FromArgb(200, 255, 100, 100)),
-                    StrokeThickness = 2,
-                    StrokeDashArray = [2, 2]
-                };
-                CanvasKeyframeCanvas.Children.Add(cutoffLine);
-            }
-
-            // Draw start indicator (handle) at the beginning of the audio
-            if (audioStartFrame >= 0 && audioStartFrame < frameCount)
-            {
-                float handleX = audioStartFrame * CellWidth;
-                var handleLine = new Line
-                {
-                    X1 = handleX,
-                    Y1 = trackIndex * CellHeight + 2,
-                    X2 = handleX,
-                    Y2 = trackIndex * CellHeight + CellHeight - 2,
-                    Stroke = new SolidColorBrush(Color.FromArgb(255, 0, 200, 200)),
-                    StrokeThickness = 2
-                };
-                CanvasKeyframeCanvas.Children.Add(handleLine);
-
-                var triangle = new Polygon
-                {
-                    Points =
-                    [
-                        new Point(handleX, trackIndex * CellHeight + 2),
-                        new Point(handleX + 6, trackIndex * CellHeight + 2),
-                        new Point(handleX, trackIndex * CellHeight + 8)
-                    ],
-                    Fill = new SolidColorBrush(Color.FromArgb(255, 0, 200, 200))
-                };
-                CanvasKeyframeCanvas.Children.Add(triangle);
-            }
-
-            // Center line
-            var centerLine = new Line
-            {
-                X1 = 0,
-                Y1 = centerY,
-                X2 = frameCount * CellWidth,
-                Y2 = centerY,
-                Stroke = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
-                StrokeThickness = 0.5
-            };
-            CanvasKeyframeCanvas.Children.Add(centerLine);
+            // Calculate height in new order: Stage → Audio → SubRoutines → Layers
+            int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
+            int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
+            int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
+            int subRoutineTrackRows = _canvasAnimationState.SubRoutines.SubRoutines.Count;
+            CanvasPlayheadLine.Height = Math.Max(24, stageRows + audioHeaderRows + audioTrackRows + subRoutineTrackRows + _canvasAnimationState.Tracks.Count) * CellHeight;
         }
 
-        private void UpdateCanvasPlayPauseIcon()
-        {
-            if (_canvasAnimationState == null) return;
-            CanvasPlayPauseIcon.Icon = _canvasAnimationState.IsPlaying ? Icon.Pause : Icon.Play;
-        }
-
-        private void AudioTrack_PointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            // Audio track click - could show audio settings in the future
-            // For now, just deselect stage and layers
-            DeselectStage();
-            _selectedLayerId = Guid.Empty;
-            UpdateCanvasLayerSelection();
-        }
+        // ====================================================================
+        // CANVAS LAYER INTERACTION
+        // ====================================================================
 
         private void CanvasLayerName_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
@@ -2087,139 +1646,19 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
-        private void StageTrack_PointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            // Toggle stage selection
-            SelectStage(!IsStageSelected);
-        }
+        // ====================================================================
+        // CANVAS PLAYBACK UI
+        // ====================================================================
 
-        private void StageTrack_PointerEntered(object sender, PointerRoutedEventArgs e)
-        {
-            if (sender is Border border && !IsStageSelected)
-            {
-                border.Background = (Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"];
-            }
-        }
-
-        private void StageTrack_PointerExited(object sender, PointerRoutedEventArgs e)
-        {
-            if (sender is Border border && !IsStageSelected)
-            {
-                border.Background = new SolidColorBrush(Color.FromArgb(40, 255, 165, 0));
-            }
-        }
-
-        /// <summary>
-        /// Selects or deselects the Stage track.
-        /// </summary>
-        public void SelectStage(bool selected)
-        {
-            if (IsStageSelected == selected) return;
-
-            IsStageSelected = selected;
-
-            // Deselect any layer when stage is selected
-            if (selected)
-            {
-                _selectedLayerId = Guid.Empty;
-            }
-
-            // Update visual state
-            RefreshCanvasLayerNames();
-
-            // Notify listeners
-            StageSelectionChanged?.Invoke(selected);
-        }
-
-        /// <summary>
-        /// Deselects the stage (called when a layer is selected).
-        /// </summary>
-        public void DeselectStage()
-        {
-            if (IsStageSelected)
-            {
-                IsStageSelected = false;
-                RefreshCanvasLayerNames();
-                StageSelectionChanged?.Invoke(false);
-            }
-        }
-
-        /// <summary>
-        /// Draws keyframes for the stage track.
-        /// </summary>
-        private void DrawStageTrackKeyframes(int trackIndex)
+        private void UpdateCanvasPlayPauseIcon()
         {
             if (_canvasAnimationState == null) return;
-
-            var stageTrack = _canvasAnimationState.StageTrack;
-            var keyframeIndices = stageTrack.GetKeyframeIndices().ToList();
-
-            for (int i = 0; i < keyframeIndices.Count; i++)
-            {
-                int frameIndex = keyframeIndices[i];
-                int nextFrameIndex = (i + 1 < keyframeIndices.Count)
-                    ? keyframeIndices[i + 1]
-                    : _canvasAnimationState.FrameCount;
-
-                // Draw interpolation region (stage uses interpolation, not hold)
-                if (nextFrameIndex > frameIndex + 1)
-                {
-                    var interpRect = new Rectangle
-                    {
-                        Width = (nextFrameIndex - frameIndex - 1) * CellWidth,
-                        Height = CellHeight - 4,
-                        Fill = new SolidColorBrush(Colors.Orange) { Opacity = 0.3 },
-                        RadiusX = 2,
-                        RadiusY = 2
-                    };
-                    Canvas.SetLeft(interpRect, (frameIndex + 1) * CellWidth + 2);
-                    Canvas.SetTop(interpRect, trackIndex * CellHeight + 2);
-                    CanvasKeyframeCanvas.Children.Add(interpRect);
-
-                    // Draw interpolation line
-                    var interpLine = new Line
-                    {
-                        X1 = frameIndex * CellWidth + CellWidth / 2,
-                        Y1 = trackIndex * CellHeight + CellHeight / 2,
-                        X2 = nextFrameIndex * CellWidth + CellWidth / 2,
-                        Y2 = trackIndex * CellHeight + CellHeight / 2,
-                        Stroke = new SolidColorBrush(Colors.Orange),
-                        StrokeThickness = 2,
-                        StrokeDashArray = [2, 2]
-                    };
-                    CanvasKeyframeCanvas.Children.Add(interpLine);
-                }
-
-                // Draw keyframe diamond (orange for stage)
-                DrawStageKeyframeDiamond(frameIndex, trackIndex);
-            }
+            CanvasPlayPauseIcon.Icon = _canvasAnimationState.IsPlaying ? Icon.Pause : Icon.Play;
         }
 
-        /// <summary>
-        /// Draws a stage keyframe diamond (orange color).
-        /// </summary>
-        private void DrawStageKeyframeDiamond(int frameIndex, int trackIndex)
-        {
-            var diamond = new Polygon
-            {
-                Points =
-                [
-                    new Point(KeyframeDiamondSize / 2, 0),
-                    new Point(KeyframeDiamondSize, KeyframeDiamondSize / 2),
-                    new Point(KeyframeDiamondSize / 2, KeyframeDiamondSize),
-                    new Point(0, KeyframeDiamondSize / 2)
-                ],
-                Fill = new SolidColorBrush(Colors.Orange),
-                Stroke = new SolidColorBrush(Colors.DarkOrange),
-                StrokeThickness = 1
-            };
-
-            double x = frameIndex * CellWidth + (CellWidth - KeyframeDiamondSize) / 2;
-            double y = trackIndex * CellHeight + (CellHeight - KeyframeDiamondSize) / 2;
-            Canvas.SetLeft(diamond, x);
-            Canvas.SetTop(diamond, y);
-            CanvasKeyframeCanvas.Children.Add(diamond);
-        }
+        // ====================================================================
+        // LAYER TRACK KEYFRAME DRAWING
+        // ====================================================================
 
         /// <summary>
         /// Draws keyframes for a layer track.
@@ -2283,53 +1722,5 @@ namespace PixlPunkt.UI.Animation
             Canvas.SetTop(diamond, y);
             CanvasKeyframeCanvas.Children.Add(diamond);
         }
-
-        private void UpdateCanvasPlayhead()
-        {
-            if (_canvasAnimationState == null)
-            {
-                CanvasPlayheadLine.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            CanvasPlayheadLine.Visibility = Visibility.Visible;
-
-            // Calculate playhead position (center of the cell) relative to content
-            double playheadX = _canvasAnimationState.CurrentFrameIndex * CellWidth + CellWidth / 2 - 1;
-
-            // Position the playhead in the overlay canvas, accounting for scroll offset
-            double visibleX = playheadX - CanvasKeyframeScrollViewer.HorizontalOffset;
-
-            // Hide playhead if it's scrolled out of view
-            double viewportWidth = CanvasKeyframeScrollViewer.ViewportWidth;
-            if (visibleX < 0 || visibleX > viewportWidth)
-            {
-                CanvasPlayheadLine.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                CanvasPlayheadLine.Visibility = Visibility.Visible;
-                Canvas.SetLeft(CanvasPlayheadLine, visibleX);
-            }
-
-            // Calculate height including audio header, audio tracks, stage row, and layer rows
-            int audioHeaderRows = (_canvasAnimationState.AudioTracks.HasLoadedTracks || _canvasAnimationState.AudioTracks.Count > 0) ? 1 : 0;
-            int audioTrackRows = _canvasAnimationState.AudioTracks.IsCollapsed ? 0 : _canvasAnimationState.AudioTracks.LoadedCount;
-            int stageRows = _canvasAnimationState.Stage.Enabled ? 1 : 0;
-            int totalRows = audioHeaderRows + audioTrackRows + stageRows + _canvasAnimationState.Tracks.Count;
-            CanvasPlayheadLine.Height = Math.Max(24, totalRows * CellHeight);
-        }
-    }
-
-    /// <summary>
-    /// Animation mode selection.
-    /// </summary>
-    public enum AnimationMode
-    {
-        /// <summary>Tile-based animation (Pyxel Edit style).</summary>
-        Tile,
-
-        /// <summary>Canvas/layer-based animation (Aseprite style).</summary>
-        Canvas
     }
 }

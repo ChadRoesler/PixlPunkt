@@ -28,6 +28,11 @@ namespace PixlPunkt.UI.Animation
         private int _currentTileWidth;
         private int _currentTileHeight;
 
+        /// <summary>
+        /// Tracks the currently subscribed reel for proper event cleanup.
+        /// </summary>
+        private TileAnimationReel? _subscribedReel;
+
         // ====================================================================
         // CONSTRUCTOR
         // ====================================================================
@@ -36,6 +41,56 @@ namespace PixlPunkt.UI.Animation
         {
             InitializeComponent();
             SetupPreviewCanvas();
+            Unloaded += PlaybackPanel_Unloaded;
+        }
+
+        private void PlaybackPanel_Unloaded(object sender, RoutedEventArgs e)
+        {
+            // Clean up all subscriptions when the panel is unloaded
+            UnsubscribeAll();
+        }
+
+        /// <summary>
+        /// Unsubscribes from all event handlers to prevent memory leaks.
+        /// </summary>
+        private void UnsubscribeAll()
+        {
+            if (_state != null)
+            {
+                _state.PlaybackStateChanged -= OnPlaybackStateChanged;
+                _state.CurrentFrameChanged -= OnCurrentFrameChanged;
+                _state.SelectedReelChanged -= OnSelectedReelChanged;
+            }
+
+            UnsubscribeFromReel();
+        }
+
+        /// <summary>
+        /// Unsubscribes from the currently tracked reel's Changed event.
+        /// </summary>
+        private void UnsubscribeFromReel()
+        {
+            if (_subscribedReel != null)
+            {
+                _subscribedReel.Changed -= OnReelChanged;
+                _subscribedReel = null;
+            }
+        }
+
+        /// <summary>
+        /// Subscribes to a reel's Changed event, properly tracking for cleanup.
+        /// </summary>
+        private void SubscribeToReel(TileAnimationReel? reel)
+        {
+            // First unsubscribe from any existing reel
+            UnsubscribeFromReel();
+
+            // Subscribe to new reel if provided
+            if (reel != null)
+            {
+                reel.Changed += OnReelChanged;
+                _subscribedReel = reel;
+            }
         }
 
         private void SetupPreviewCanvas()
@@ -95,18 +150,16 @@ namespace PixlPunkt.UI.Animation
         /// </summary>
         public void Bind(TileAnimationState? state, CanvasDocument? document)
         {
-            // Unbind previous
+            // Unbind previous state
             if (_state != null)
             {
                 _state.PlaybackStateChanged -= OnPlaybackStateChanged;
                 _state.CurrentFrameChanged -= OnCurrentFrameChanged;
                 _state.SelectedReelChanged -= OnSelectedReelChanged;
-
-                if (_state.SelectedReel != null)
-                {
-                    _state.SelectedReel.Changed -= OnReelChanged;
-                }
             }
+
+            // Unsubscribe from previous reel
+            UnsubscribeFromReel();
 
             _state = state;
             _document = document;
@@ -118,10 +171,8 @@ namespace PixlPunkt.UI.Animation
                 _state.CurrentFrameChanged += OnCurrentFrameChanged;
                 _state.SelectedReelChanged += OnSelectedReelChanged;
 
-                if (_state.SelectedReel != null)
-                {
-                    _state.SelectedReel.Changed += OnReelChanged;
-                }
+                // Subscribe to selected reel
+                SubscribeToReel(_state.SelectedReel);
             }
 
             RefreshDisplay();
@@ -159,12 +210,8 @@ namespace PixlPunkt.UI.Animation
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                // Rebind reel changed event
-                if (_state?.SelectedReel != null)
-                {
-                    _state.SelectedReel.Changed -= OnReelChanged;
-                    _state.SelectedReel.Changed += OnReelChanged;
-                }
+                // Properly track and subscribe to the new reel
+                SubscribeToReel(reel);
 
                 UpdateTransportUI();
                 UpdateFrameInfo();

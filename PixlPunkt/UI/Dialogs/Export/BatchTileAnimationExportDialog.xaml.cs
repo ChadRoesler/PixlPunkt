@@ -150,6 +150,7 @@ namespace PixlPunkt.UI.Dialogs.Export
                 "mp4" => ".mp4",
                 "png" => "", // Folder-based
                 "strip" => ".png", // Single file sprite strip
+                "pxpr" => ".pxpr", // Sub-routine format
                 _ => ".gif"
             };
         }
@@ -163,6 +164,11 @@ namespace PixlPunkt.UI.Dialogs.Export
         /// Returns true if the format exports as a sprite strip (single horizontal image).
         /// </summary>
         public bool IsSpriteStrip => SelectedFormat == "strip";
+
+        /// <summary>
+        /// Returns true if the format exports as a sub-routine (.pxpr).
+        /// </summary>
+        public bool IsSubRoutine => SelectedFormat == "pxpr";
 
         //////////////////////////////////////////////////////////////////
         // EVENT HANDLERS
@@ -239,10 +245,14 @@ namespace PixlPunkt.UI.Dialogs.Export
             string format = SelectedFormat;
             bool isVideo = format == "mp4";
             bool isGif = format == "gif";
+            bool isPxpr = format == "pxpr";
 
             // Show/hide format-specific options
             LoopCheckBox.Visibility = isGif ? Visibility.Visible : Visibility.Collapsed;
             VideoQualityPanel.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;
+            
+            // Hide scale option for pxpr (it preserves original tile references)
+            ScaleNumberBox.IsEnabled = !isPxpr;
 
             UpdateOutputInfo();
         }
@@ -255,7 +265,14 @@ namespace PixlPunkt.UI.Dialogs.Export
             int tileH = _document.TileSize.Height;
             int scale = Scale;
 
-            OutputSizeText.Text = $"{tileW * scale}×{tileH * scale} pixels";
+            if (SelectedFormat == "pxpr")
+            {
+                OutputSizeText.Text = "(preserves tile references)";
+            }
+            else
+            {
+                OutputSizeText.Text = $"{tileW * scale}×{tileH * scale} pixels";
+            }
         }
 
         private void UpdateOutputInfo()
@@ -271,10 +288,16 @@ namespace PixlPunkt.UI.Dialogs.Export
             {
                 OutputInfoText.Text = "Each animation will be saved as a horizontal sprite strip:\nReelName.png (all frames side-by-side)";
             }
+            else if (IsSubRoutine)
+            {
+                OutputInfoText.Text = "Each animation will be saved as a sub-routine file:\nReelName.pxpr (can be imported into canvas animations)";
+            }
             else
             {
                 OutputInfoText.Text = $"Each animation will be saved as:\nReelName{ext}";
             }
+            
+            UpdateOutputSize();
         }
     }
 }

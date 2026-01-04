@@ -468,10 +468,9 @@ namespace PixlPunkt.Core.Reference
             // Clear the preview bitmap reference
             _previewBitmap = null;
             
-            // Notify that the image data has been cleared
-            OnPropertyChanged(nameof(Pixels));
-            OnPropertyChanged(nameof(HasPixels));
-            OnPropertyChanged(nameof(PreviewBitmap));
+            // Clear event handlers to prevent delegate leaks holding references to disposed object
+            TransformChanged = null;
+            PropertyChanged = null;
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

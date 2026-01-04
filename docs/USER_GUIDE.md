@@ -24,6 +24,9 @@
 10. [Palette](#palette)
 11. [Tiles](#tiles)
 12. [Animation](#animation)
+    - [Canvas Animation](#canvas-animation)
+    - [Tile Animation](#tile-animation)
+    - [Animation Sub-Routines](#animation-sub-routines)
 13. [Stage (Camera System)](#stage-camera-system)
 14. [Audio Reference Tracks](#audio-reference-tracks)
 15. [Keyboard Shortcuts](#keyboard-shortcuts)
@@ -192,7 +195,7 @@ Flood fills a contiguous area with the foreground color.
 
 **Options:**
 - **Tolerance** - Color matching threshold (0-255)
-- **Contiguous** - Fill only connected pixels vs. all matching pixels
+- **Contiguous** - Fill only connected pixels vs. all matching pixels globally
 
 #### Gradient Brush (D)
 Cycles through loaded gradient colors based on the pixel color under the brush.
@@ -967,6 +970,139 @@ For simpler sprite sheet workflows, Tile Animation sequences through tile grid p
 3. Name it (e.g., "Walk", "Idle", "Attack")
 4. Click tiles to add frames
 5. Adjust timing as needed
+
+---
+
+### Animation Sub-Routines
+
+Animation Sub-Routines allow you to **embed tile animations within canvas animations**. Think of them as nested animations that can be positioned, scaled, and rotated with keyframe interpolation.
+
+#### What Are Sub-Routines?
+
+A sub-routine is a tile animation reel (`.pxpr` file) that plays within your canvas animation. Unlike layers which hold static keyframes, sub-routines:
+
+- **Play their own animation** - The tile reel frames advance automatically
+- **Support smooth transforms** - Position, scale, and rotation interpolate between keyframes
+- **Respect layer Z-ordering** - Render between layers based on their Z-order
+
+#### Use Cases
+
+| Use Case | Example |
+|----------|---------|
+| **Characters** | Walking sprites that move across the scene |
+| **Effects** | Fire, explosions, sparkles that animate independently |
+| **UI Elements** | Animated icons or indicators |
+| **Parallax** | Moving background elements at different speeds |
+
+#### Creating a Sub-Routine
+
+1. First, create and save a **Tile Animation Reel** (`.pxpr` file)
+2. In Canvas Animation mode, right-click the timeline → **Add Sub-Routine**
+3. Select your `.pxpr` file
+4. The sub-routine appears in the timeline with an orange track color
+
+#### Sub-Routine Properties
+
+| Property | Description |
+|----------|-------------|
+| **Start Frame** | When the sub-routine begins playing |
+| **Duration** | How many frames the sub-routine spans |
+| **Position** | X/Y coordinates (keyframeable) |
+| **Scale** | Size multiplier (keyframeable) |
+| **Rotation** | Angle in degrees (keyframeable) |
+| **Z-Order** | Rendering depth relative to layers |
+| **Enabled** | Toggle visibility (eye icon) |
+
+#### Transform Keyframes
+
+Sub-routine transforms use **interpolation** (unlike layer keyframes which hold values):
+
+1. Navigate to a frame within the sub-routine's range
+2. Position the sub-routine on the canvas (drag or use handles)
+3. Right-click → **Add Keyframe** or use the keyframe button
+4. Navigate to another frame
+5. Change position/scale/rotation
+6. Add another keyframe
+7. The transform smoothly interpolates between keyframes!
+
+#### Interpolation Modes
+
+| Mode | Effect |
+|------|--------|
+| **Linear** | Constant speed between keyframes |
+| **EaseIn** | Start slow, speed up |
+| **EaseOut** | Start fast, slow down |
+| **EaseInOut** | Slow at both ends |
+| **Bounce** | Bouncy overshoot |
+| **Elastic** | Spring motion |
+
+Set interpolation mode via right-click → **Interpolation** on the sub-routine track.
+
+#### Z-Order and Layer Interleaving
+
+Sub-routines can render **between** layers, not just on top:
+
+```
+Timeline Order (top to bottom):          Renders As (back to front):
+┌─────────────────────────────┐          ┌─────────────────────────────┐
+│ ForeGround (layer)          │    →     │ Background                  │
+│ SideWalk (sub-routine)      │    →     │ MainGround                  │
+│ BackWalk (sub-routine)      │    →     │ BackWalk (sub-routine)      │
+│ MainGround (layer)          │    →     │ SideWalk (sub-routine)      │
+│ Background (layer)          │    →     │ ForeGround                  │
+└─────────────────────────────┘          └─────────────────────────────┘
+```
+
+**Key concept:** Items at the **TOP** of the timeline render **IN FRONT**. Items at the **BOTTOM** render **BEHIND**.
+
+#### Moving Sub-Routines in Z-Order
+
+Right-click a sub-routine track for these options:
+
+| Action | Effect |
+|--------|--------|
+| **Move Up** | Render in front of more items |
+| **Move Down** | Render behind more items |
+| **Bring to Front** | Render in front of all layers |
+| **Send to Back** | Render behind all layers |
+
+#### Selecting Sub-Routines
+
+**In the timeline:**
+- Click the sub-routine track header to select
+
+**On the canvas:**
+- Click directly on the sub-routine sprite
+- Selected sub-routines show orange handles
+
+#### Manipulating Sub-Routines on Canvas
+
+When a sub-routine is selected:
+
+| Handle/Action | Effect |
+|---------------|--------|
+| **Center dot** | Drag to move |
+| **Corner handles** | Drag to scale |
+| **Rotate handle** | Drag to rotate |
+| **Shift + drag** | Constrain movement |
+
+#### Sub-Routine Timeline Bar
+
+The orange bar in the timeline represents the sub-routine's active range:
+
+- **Left edge** → Start frame
+- **Right edge** → End frame (start + duration)
+- **Drag bar** → Move entire sub-routine in time
+- **Drag edges** → Resize duration (hold `Ctrl`)
+- **Keyframe diamonds** → Transform keyframes
+
+#### Tips for Sub-Routines
+
+1. **Pre-bake complex animations** - Create the tile reel first, then embed it
+2. **Use Z-order thoughtfully** - Place sub-routines between appropriate layers
+3. **Keyframe sparingly** - Two keyframes can create smooth motion
+4. **Match frame rates** - Align your tile reel FPS with canvas animation FPS
+5. **Test at full speed** - Sub-routines may look different at playback speed
 
 ---
 

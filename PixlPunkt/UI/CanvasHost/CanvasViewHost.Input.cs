@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Linq;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
+using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Tools.Utility;
@@ -346,6 +348,15 @@ namespace PixlPunkt.UI.CanvasHost
             }
 
             // ════════════════════════════════════════════════════════════════════
+            // SUB-ROUTINE INTERACTION - select and drag sub-routines on canvas
+            // ════════════════════════════════════════════════════════════════════
+            if (SubRoutine_TryHandlePointerPressed(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // ════════════════════════════════════════════════════════════════════
             // REFERENCE LAYER INTERACTION - drag/resize reference layers
             // ════════════════════════════════════════════════════════════════════
             if (RefLayer_TryHandlePointerPressed(e))
@@ -598,6 +609,18 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
+            // 3.5. Sub-routine interaction
+            if (SubRoutine_TryHandlePointerMoved(e))
+            {
+                var subRoutineCursor = GetSubRoutineCursor(e);
+                if (subRoutineCursor.HasValue)
+                    desiredCursor = InputSystemCursor.Create(subRoutineCursor.Value);
+                
+                ProtectedCursor = desiredCursor ?? _targetCursor;
+                e.Handled = true;
+                return;
+            }
+
             // 4. Reference layer interaction
             if (RefLayer_TryHandlePointerMoved(e))
             {
@@ -632,6 +655,15 @@ namespace PixlPunkt.UI.CanvasHost
             if (stageCursorHover.HasValue)
             {
                 ProtectedCursor = InputSystemCursor.Create(stageCursorHover.Value);
+                UpdateHover(screenPos);
+                return;
+            }
+
+            // Check sub-routine hover (when in canvas animation mode)
+            var subRoutineCursorHover = GetSubRoutineCursor(e);
+            if (subRoutineCursorHover.HasValue)
+            {
+                ProtectedCursor = InputSystemCursor.Create(subRoutineCursorHover.Value);
                 UpdateHover(screenPos);
                 return;
             }
@@ -762,6 +794,15 @@ namespace PixlPunkt.UI.CanvasHost
             // STAGE (CAMERA) INTERACTION - release stage drag
             // ════════════════════════════════════════════════════════════════════
             if (Stage_TryHandlePointerReleased(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // ════════════════════════════════════════════════════════════════════
+            // SUB-ROUTINE INTERACTION - release sub-routine drag
+            // ════════════════════════════════════════════════════════════════════
+            if (SubRoutine_TryHandlePointerReleased(e))
             {
                 e.Handled = true;
                 return;
@@ -1408,6 +1449,221 @@ namespace PixlPunkt.UI.CanvasHost
             _stageDragging = false;
             _stageResizing = false;
             CanvasView.ReleasePointerCaptures();
+            return true;
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // SUB-ROUTINE INTERACTION
+        // ════════════════════════════════════════════════════════════════════
+
+        private const float SubRoutineHandleHitRadius = 12f;
+
+        /// <summary>
+        /// Gets the appropriate cursor for sub-routine interaction based on pointer position.
+        /// Returns move cursor only when hovering over the SELECTED sub-routine.
+        /// </summary>
+        private InputSystemCursorShape? GetSubRoutineCursor(PointerRoutedEventArgs e)
+        {
+            // Only show cursor when a sub-routine is selected
+            if (_selectedSubRoutine == null)
+                return null;
+
+            if (_animationMode != Animation.AnimationMode.Canvas)
+                return null;
+
+            var animState = Document.CanvasAnimationState;
+            if (animState == null)
+                return null;
+
+            var pt = e.GetCurrentPoint(CanvasView);
+            var docPos = ScreenToDocPoint(pt.Position);
+            int docX = (int)docPos.X;
+            int docY = (int)docPos.Y;
+
+            // Check if hovering over the SELECTED sub-routine
+            var hitSubRoutine = HitTestSubRoutine(docX, docY, animState.CurrentFrameIndex);
+            if (hitSubRoutine != null && hitSubRoutine == _selectedSubRoutine)
+            {
+                return InputSystemCursorShape.SizeAll; // Move cursor
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Hit tests for sub-routines at the given document position.
+        /// Returns the sub-routine if found, null otherwise.
+        /// </summary>
+        private Core.Animation.AnimationSubRoutine? HitTestSubRoutine(int docX, int docY, int frameIndex)
+        {
+            var animState = Document.CanvasAnimationState;
+            if (animState == null)
+                return null;
+
+            // Update sub-routine state for current frame
+            animState.SubRoutineState.UpdateForFrame(frameIndex);
+
+            // Check each active sub-routine (in reverse order so topmost is hit first)
+            var renderInfos = animState.SubRoutineState.GetRenderInfo(frameIndex).ToList();
+            for (int i = renderInfos.Count - 1; i >= 0; i--)
+            {
+                var renderInfo = renderInfos[i];
+                if (renderInfo.FramePixels == null)
+                    continue;
+
+                double posX = renderInfo.PositionX;
+                double posY = renderInfo.PositionY;
+                float scale = renderInfo.Scale;
+
+                int w = (int)(renderInfo.FrameWidth * scale);
+                int h = (int)(renderInfo.FrameHeight * scale);
+
+                // Simple bounding box hit test
+                if (docX >= posX && docX < posX + w &&
+                    docY >= posY && docY < posY + h)
+                {
+                    return renderInfo.SubRoutine;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Handles pointer pressed for sub-routine dragging (only when already selected).
+        /// Returns true if the event was handled.
+        /// </summary>
+        private bool SubRoutine_TryHandlePointerPressed(PointerRoutedEventArgs e)
+        {
+            // Only allow manipulation if a sub-routine is already selected (via track header)
+            if (_selectedSubRoutine == null)
+                return false;
+
+            if (_animationMode != Animation.AnimationMode.Canvas)
+                return false;
+
+            var animState = Document.CanvasAnimationState;
+            if (animState == null)
+                return false;
+
+            var pt = e.GetCurrentPoint(CanvasView);
+            if (!pt.Properties.IsLeftButtonPressed)
+                return false;
+
+            var screenPos = pt.Position;
+            var docPos = ScreenToDocPoint(screenPos);
+            int docX = (int)docPos.X;
+            int docY = (int)docPos.Y;
+
+            // Hit test for sub-routine - but only start drag if it's the SELECTED sub-routine
+            var hitSubRoutine = HitTestSubRoutine(docX, docY, animState.CurrentFrameIndex);
+
+            if (hitSubRoutine != null && hitSubRoutine == _selectedSubRoutine)
+            {
+                // Get the current position for this sub-routine at this frame
+                float progress = _selectedSubRoutine.GetNormalizedProgress(animState.CurrentFrameIndex);
+                var (posX, posY) = _selectedSubRoutine.InterpolatePosition(progress);
+
+                // Start dragging
+                _subRoutineDragging = true;
+                _subRoutineDragStartX = posX;
+                _subRoutineDragStartY = posY;
+                _subRoutineDragPointerStartX = docX;
+                _subRoutineDragPointerStartY = docY;
+                _subRoutineEditProgress = progress;
+
+                CanvasView.CapturePointer(e.Pointer);
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Handles pointer moved for sub-routine dragging.
+        /// Returns true if the event was handled.
+        /// </summary>
+        private bool SubRoutine_TryHandlePointerMoved(PointerRoutedEventArgs e)
+        {
+            if (!_subRoutineDragging || _selectedSubRoutine == null)
+                return false;
+
+            var pt = e.GetCurrentPoint(CanvasView);
+            var screenPos = pt.Position;
+            var docPos = ScreenToDocPoint(screenPos);
+            int docX = (int)docPos.X;
+            int docY = (int)docPos.Y;
+
+            // Calculate delta from drag start
+            int deltaX = docX - _subRoutineDragPointerStartX;
+            int deltaY = docY - _subRoutineDragPointerStartY;
+
+            // Calculate new position
+            double newX = _subRoutineDragStartX + deltaX;
+            double newY = _subRoutineDragStartY + deltaY;
+
+            // Update the position keyframe for the current progress
+            // If there's no keyframe at this progress, add one
+            if (_selectedSubRoutine.PositionKeyframes.Count == 0)
+            {
+                // No keyframes yet - add start and end keyframes
+                _selectedSubRoutine.PositionKeyframes[0f] = (newX, newY);
+                _selectedSubRoutine.PositionKeyframes[1f] = (newX, newY);
+            }
+            else
+            {
+                // Find the closest keyframe to edit, or add a new one at current progress
+                float closestKey = -1f;
+                float minDist = float.MaxValue;
+
+                foreach (var key in _selectedSubRoutine.PositionKeyframes.Keys)
+                {
+                    float dist = Math.Abs(key - _subRoutineEditProgress);
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        closestKey = key;
+                    }
+                }
+
+                // If we're close to an existing keyframe (within 5%), edit it
+                // Otherwise, add/update a keyframe at the current progress
+                if (minDist < 0.05f)
+                {
+                    _selectedSubRoutine.PositionKeyframes[closestKey] = (newX, newY);
+                }
+                else
+                {
+                    // Add a new keyframe at the current progress
+                    _selectedSubRoutine.PositionKeyframes[_subRoutineEditProgress] = (newX, newY);
+                }
+            }
+
+            CanvasView.Invalidate();
+            return true;
+        }
+
+        /// <summary>
+        /// Handles pointer released for sub-routine dragging.
+        /// Returns true if the event was handled.
+        /// </summary>
+        private bool SubRoutine_TryHandlePointerReleased(PointerRoutedEventArgs e)
+        {
+            if (!_subRoutineDragging)
+                return false;
+
+            _subRoutineDragging = false;
+            CanvasView.ReleasePointerCaptures();
+
+            // Notify that the selected sub-routine has changed (for timeline refresh)
+            if (_selectedSubRoutine != null)
+            {
+                var animState = Document.CanvasAnimationState;
+                // Trigger the SubRoutineChanged event by invoking property changed
+                // The SubRoutineChanged event will fire automatically when properties change
+            }
+
+            CanvasView.Invalidate();
             return true;
         }
     }

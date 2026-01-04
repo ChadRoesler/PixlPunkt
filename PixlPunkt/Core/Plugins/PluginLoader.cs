@@ -43,7 +43,22 @@ namespace PixlPunkt.Core.Plugins
                 throw new PluginLoadException($"Invalid plugin file extension. Expected {PluginExtension}");
 
             string pluginName = Path.GetFileNameWithoutExtension(punkFilePath);
+            
+            // Security: Sanitize plugin name to prevent path traversal attacks
+            pluginName = SanitizePluginName(pluginName);
+            if (string.IsNullOrEmpty(pluginName))
+                throw new PluginLoadException("Invalid plugin name after sanitization");
+
             string extractPath = Path.Combine(_extractedDirectory, pluginName);
+            
+            // Security: Verify the extract path is actually inside our expected directory
+            string normalizedExtract = Path.GetFullPath(extractPath);
+            string normalizedBase = Path.GetFullPath(_extractedDirectory);
+            if (!normalizedExtract.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+            {
+                LoggingService.Error("Path traversal attempt detected: {Path}", extractPath);
+                throw new PluginLoadException("Invalid plugin path - possible path traversal attack");
+            }
 
             try
             {
@@ -243,6 +258,64 @@ namespace PixlPunkt.Core.Plugins
             {
                 LoggingService.Error($"[Plugin:{PluginId}] {message}", exception);
             }
+        }
+
+        /// <summary>
+        /// Sanitizes a plugin name to prevent path traversal attacks.
+        /// </summary>
+        /// <param name="name">The raw plugin name.</param>
+        /// <returns>A sanitized plugin name safe for use in file paths.</returns>
+        private static string SanitizePluginName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            // First, extract just the filename component to strip any embedded paths
+            // This handles cases like "..\..\malicious" -> "malicious" or "foo/bar" -> "bar"
+            try
+            {
+                name = Path.GetFileName(name);
+            }
+            catch
+            {
+                // If GetFileName fails, fall through to manual sanitization
+            }
+
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            // Remove any remaining path separators and parent directory references
+            // These shouldn't exist after GetFileName, but defense in depth
+            name = name.Replace("..", "")
+                       .Replace("/", "")
+                       .Replace("\\", "")
+                       .Replace(":", "");
+
+            // Remove any invalid filename characters
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(c.ToString(), "");
+            }
+
+            // Trim whitespace and dots (which could be used for extension manipulation)
+            name = name.Trim().Trim('.');
+
+            // Final check: ensure the result doesn't match reserved Windows names
+            string upper = name.ToUpperInvariant();
+            string[] reservedNames = ["CON", "PRN", "AUX", "NUL", 
+                "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
+            
+            foreach (var reserved in reservedNames)
+            {
+                if (upper == reserved || upper.StartsWith(reserved + "."))
+                {
+                    name = "_" + name; // Prefix to make it safe
+                    break;
+                }
+            }
+            
+            return name;
         }
     }
 

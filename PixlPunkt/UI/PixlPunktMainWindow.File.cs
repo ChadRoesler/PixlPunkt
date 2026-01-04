@@ -339,5 +339,88 @@ namespace PixlPunkt.UI
                 }
             }
         }
+
+        // ------------- Import SubRoutine ------------
+
+        private async void File_Import_SubRoutine(object sender, RoutedEventArgs e)
+        {
+            var host = CurrentHost;
+            if (host?.Document == null) return;
+
+            var openPicker = WindowHost.CreateFileOpenPicker(this, ".pxpr");
+            StorageFile? file = await openPicker.PickSingleFileAsync();
+            if (file is null)
+                return;
+
+            try
+            {
+                // Load the PXPR reel file
+                var reel = PixlPunkt.Core.Animation.TileAnimationReelIO.Load(file.Path);
+                
+                if (reel == null || reel.FrameCount == 0)
+                {
+                    await ShowImportErrorAsync("The PXPR file is empty or invalid.");
+                    return;
+                }
+
+                // Create an AnimationSubRoutine that references this reel
+                var subRoutine = new PixlPunkt.Core.Animation.AnimationSubRoutine
+                {
+                    ReelFilePath = file.Path,
+                    StartFrame = 0,
+                    DurationFrames = reel.FrameCount
+                };
+
+                // Add position keyframe at start and end (no movement by default)
+                subRoutine.PositionKeyframes[0f] = (0, 0);
+                subRoutine.PositionKeyframes[1f] = (0, 0);
+
+                // Try to load the reel
+                // If reel has embedded pixels (v2), it will use those
+                // Otherwise it will try to render from the current document
+                bool loaded = subRoutine.LoadReel(host.Document);
+                
+                if (!loaded || !subRoutine.IsLoaded)
+                {
+                    // Show warning but still add the sub-routine
+                    string warningMessage = reel.HasEmbeddedPixels
+                        ? $"Sub-routine '{reel.Name}' has embedded pixel data but failed to load frames."
+                        : $"Sub-routine '{reel.Name}' imported, but frames could not be rendered.\n\n" +
+                          "This reel was saved in the old format (v1) without embedded pixel data. " +
+                          "It references tile positions that may not contain the expected content in this document.\n\n" +
+                          "To fix this, re-export the reel from the original document to save it with embedded pixel data.";
+
+                    await new ContentDialog
+                    {
+                        XamlRoot = Content.XamlRoot,
+                        Title = "Import Warning",
+                        Content = warningMessage + $"\n\nReel Info:\n" +
+                                  $"  • Name: {reel.Name}\n" +
+                                  $"  • Frames: {reel.FrameCount}\n" +
+                                  $"  • Format: {(reel.HasEmbeddedPixels ? "v2 (with pixels)" : "v1 (coordinates only)")}",
+                        CloseButtonText = "OK"
+                    }.ShowAsync();
+                }
+
+                // Add to canvas animation state
+                host.Document.CanvasAnimationState.SubRoutines.Add(subRoutine);
+
+                // Extend canvas animation frame count if needed
+                int requiredFrames = subRoutine.EndFrame;
+                if (host.Document.CanvasAnimationState.FrameCount < requiredFrames)
+                {
+                    host.Document.CanvasAnimationState.FrameCount = requiredFrames;
+                }
+
+                host.Document.RaiseDocumentModified();
+                
+                // Invalidate canvas to show the sub-routine
+                host.InvalidateCanvas();
+            }
+            catch (Exception ex)
+            {
+                await ShowImportErrorAsync($"Could not import sub-routine.\n{ex.Message}");
+            }
+        }
     }
 }

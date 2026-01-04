@@ -44,12 +44,13 @@
       </uap:VisualElements>
       <Extensions>
         <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="pixlpunkproject">
+          <uap:FileTypeAssociation Name="pixlpunktproject">
             <uap:SupportedFileTypes>
               <uap:FileType ContentType="pixlpunkt/project">.pxp</uap:FileType>
             </uap:SupportedFileTypes>
             <uap:DisplayName>PixlPunktProject</uap:DisplayName>
             <uap:Logo>Assets\Icons\pxpFileIcon.png</uap:Logo>
+            <uap:InfoTip>Pixl Punkt Project</uap:InfoTip>
           </uap:FileTypeAssociation>
         </uap:Extension>
         <uap:Extension Category="windows.fileTypeAssociation">
@@ -59,6 +60,7 @@
             </uap:SupportedFileTypes>
             <uap:DisplayName>PixlPunktMarker</uap:DisplayName>
             <uap:Logo>Assets\Icons\mkrFileIcon.png</uap:Logo>
+            <uap:InfoTip>Pixl Punkt Brush</uap:InfoTip>
           </uap:FileTypeAssociation>
         </uap:Extension>
         <uap:Extension Category="windows.fileTypeAssociation">
@@ -68,6 +70,7 @@
             </uap:SupportedFileTypes>
             <uap:DisplayName>PixlPunktPlugin</uap:DisplayName>
             <uap:Logo>Assets\Icons\punkFileIcon.png</uap:Logo>
+            <uap:InfoTip>Pixl Punkt Plugin</uap:InfoTip>
           </uap:FileTypeAssociation>
         </uap:Extension>
         <uap:Extension Category="windows.fileTypeAssociation">
@@ -77,6 +80,17 @@
             </uap:SupportedFileTypes>
             <uap:DisplayName>PixlPunktTiles</uap:DisplayName>
             <uap:Logo>Assets\Icons\pxptFileIcon.png</uap:Logo>
+            <uap:InfoTip>Pixl Punkt Tiles</uap:InfoTip>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="pixlpunktreel">
+            <uap:SupportedFileTypes>
+              <uap:FileType ContentType="pixlpunkt/reel">.pxpr</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:DisplayName>PixlPunktReel</uap:DisplayName>
+            <uap:Logo>Assets\Icons\pxprFileIcon.png</uap:Logo>
+            <uap:InfoTip>Pixl Punkt Reel</uap:InfoTip>
           </uap:FileTypeAssociation>
         </uap:Extension>
       </Extensions>

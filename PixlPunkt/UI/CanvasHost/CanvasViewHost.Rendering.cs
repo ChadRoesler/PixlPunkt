@@ -120,12 +120,9 @@ namespace PixlPunkt.UI.CanvasHost
             // Draw onion skin frames (before current frame)
             DrawOnionSkinFrames(ds, sender.Device, dest);
 
-            EnsureComposite();
-            Document.CompositeTo(_composite!);
+            // Draw document surface with interleaved sub-routines (respects Z-order)
+            DrawDocumentWithInterleavedSubRoutines(ds, sender.Device, dest);
 
-            FrameReady?.Invoke(_composite!.Pixels, _composite.Width, _composite.Height);
-
-            DrawDocumentSurface(ds, sender.Device, dest);
             DrawDocumentBorder(ds, dest);
 
             // Draw reference layers that are above the current composite position

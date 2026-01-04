@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
@@ -70,6 +71,7 @@ namespace PixlPunkt.UI.Animation
             {
                 _animationState.CurrentFrameChanged -= OnFrameChanged;
                 _animationState.StageSettingsChanged -= OnStageSettingsChanged;
+                _animationState.SubRoutinesChanged -= OnSubRoutinesChanged;
             }
 
             _document = document;
@@ -80,9 +82,30 @@ namespace PixlPunkt.UI.Animation
             {
                 _animationState.CurrentFrameChanged += OnFrameChanged;
                 _animationState.StageSettingsChanged += OnStageSettingsChanged;
+                _animationState.SubRoutinesChanged += OnSubRoutinesChanged;
+
+                // Load all sub-routine reels
+                LoadSubRoutineReels();
             }
 
             RefreshPreview();
+        }
+
+        /// <summary>
+        /// Loads all sub-routine reels from their file paths.
+        /// </summary>
+        private void LoadSubRoutineReels()
+        {
+            if (_animationState == null || _document == null)
+                return;
+
+            foreach (var subRoutine in _animationState.SubRoutines.SubRoutines)
+            {
+                if (subRoutine.HasReel && !subRoutine.IsLoaded)
+                {
+                    subRoutine.LoadReel(_document);
+                }
+            }
         }
 
         /// <summary>
@@ -133,6 +156,16 @@ namespace PixlPunkt.UI.Animation
         private void OnStageSettingsChanged()
         {
             DispatcherQueue.TryEnqueue(RefreshPreview);
+        }
+
+        private void OnSubRoutinesChanged()
+        {
+            // Reload sub-routine reels when they change
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                LoadSubRoutineReels();
+                RefreshPreview();
+            });
         }
 
         private void ExpandToggle_Click(object sender, RoutedEventArgs e)
@@ -198,13 +231,13 @@ namespace PixlPunkt.UI.Animation
 
             // Check if stage is enabled
             bool useStage = _animationState?.Stage.Enabled == true;
+            int currentFrame = _animationState?.CurrentFrameIndex ?? 0;
 
             if (useStage)
             {
                 var stage = _animationState!.Stage;
 
                 // Apply any stage animation interpolation for current frame
-                int currentFrame = _animationState.CurrentFrameIndex;
                 var interpolated = _animationState.StageTrack.GetInterpolatedStateAt(currentFrame);
 
                 // Calculate effective stage position and size
@@ -281,6 +314,9 @@ namespace PixlPunkt.UI.Animation
                         }
                     }
                 }
+
+                // Composite sub-routines on top (in stage space)
+                CompositeSubRoutines(_previewPixels, stageW, stageH, stageX, stageY, currentFrame);
             }
             else
             {
@@ -288,6 +324,128 @@ namespace PixlPunkt.UI.Animation
                 _previewWidth = composite.Width;
                 _previewHeight = composite.Height;
                 _previewPixels = (byte[])composite.Pixels.Clone();
+
+                // Composite sub-routines on top (in canvas space)
+                CompositeSubRoutines(_previewPixels, _previewWidth, _previewHeight, 0, 0, currentFrame);
+            }
+        }
+
+        /// <summary>
+        /// Composites all active sub-routines onto the preview buffer.
+        /// </summary>
+        /// <param name="pixels">The destination pixel buffer (BGRA).</param>
+        /// <param name="destWidth">The width of the destination buffer.</param>
+        /// <param name="destHeight">The height of the destination buffer.</param>
+        /// <param name="offsetX">The X offset (stage position) to subtract from sub-routine positions.</param>
+        /// <param name="offsetY">The Y offset (stage position) to subtract from sub-routine positions.</param>
+        /// <param name="frameIndex">The current animation frame index.</param>
+        private void CompositeSubRoutines(byte[] pixels, int destWidth, int destHeight, int offsetX, int offsetY, int frameIndex)
+        {
+            if (_animationState == null)
+                return;
+
+            // Update sub-routine state for current frame
+            _animationState.SubRoutineState.UpdateForFrame(frameIndex);
+
+            // Get render info for all active sub-routines
+            foreach (var renderInfo in _animationState.SubRoutineState.GetRenderInfo(frameIndex))
+            {
+                // Calculate position in destination buffer
+                // The sub-routine position is in canvas coordinates, we need to convert to dest buffer coordinates
+                double posX = renderInfo.PositionX - offsetX;
+                double posY = renderInfo.PositionY - offsetY;
+
+                // Apply scale
+                int scaledWidth = (int)(renderInfo.FrameWidth * renderInfo.Scale);
+                int scaledHeight = (int)(renderInfo.FrameHeight * renderInfo.Scale);
+
+                if (scaledWidth <= 0 || scaledHeight <= 0)
+                    continue;
+
+                // For now, ignore rotation and just do position + scale
+                // TODO: Add rotation support with matrix transformation
+
+                // Composite the sub-routine frame onto the destination
+                CompositeFrame(
+                    pixels, destWidth, destHeight,
+                    renderInfo.FramePixels, renderInfo.FrameWidth, renderInfo.FrameHeight,
+                    (int)posX, (int)posY,
+                    renderInfo.Scale);
+            }
+        }
+
+        /// <summary>
+        /// Composites a single frame onto the destination buffer with alpha blending.
+        /// </summary>
+        private static void CompositeFrame(
+            byte[] dest, int destWidth, int destHeight,
+            byte[] src, int srcWidth, int srcHeight,
+            int destX, int destY,
+            float scale)
+        {
+            int scaledWidth = (int)(srcWidth * scale);
+            int scaledHeight = (int)(srcHeight * scale);
+
+            for (int dy = 0; dy < scaledHeight; dy++)
+            {
+                int targetY = destY + dy;
+                if (targetY < 0 || targetY >= destHeight)
+                    continue;
+
+                // Source Y with nearest-neighbor scaling
+                int srcY = (int)(dy / scale);
+                if (srcY >= srcHeight) srcY = srcHeight - 1;
+
+                for (int dx = 0; dx < scaledWidth; dx++)
+                {
+                    int targetX = destX + dx;
+                    if (targetX < 0 || targetX >= destWidth)
+                        continue;
+
+                    // Source X with nearest-neighbor scaling
+                    int srcX = (int)(dx / scale);
+                    if (srcX >= srcWidth) srcX = srcWidth - 1;
+
+                    int srcIdx = (srcY * srcWidth + srcX) * 4;
+                    int dstIdx = (targetY * destWidth + targetX) * 4;
+
+                    byte srcB = src[srcIdx + 0];
+                    byte srcG = src[srcIdx + 1];
+                    byte srcR = src[srcIdx + 2];
+                    byte srcA = src[srcIdx + 3];
+
+                    if (srcA == 0)
+                        continue; // Fully transparent, skip
+
+                    if (srcA == 255)
+                    {
+                        // Fully opaque, just copy
+                        dest[dstIdx + 0] = srcB;
+                        dest[dstIdx + 1] = srcG;
+                        dest[dstIdx + 2] = srcR;
+                        dest[dstIdx + 3] = 255;
+                    }
+                    else
+                    {
+                        // Alpha blend
+                        byte dstB = dest[dstIdx + 0];
+                        byte dstG = dest[dstIdx + 1];
+                        byte dstR = dest[dstIdx + 2];
+                        byte dstA = dest[dstIdx + 3];
+
+                        float srcAlpha = srcA / 255f;
+                        float dstAlpha = dstA / 255f;
+                        float outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
+
+                        if (outAlpha > 0)
+                        {
+                            dest[dstIdx + 0] = (byte)((srcB * srcAlpha + dstB * dstAlpha * (1 - srcAlpha)) / outAlpha);
+                            dest[dstIdx + 1] = (byte)((srcG * srcAlpha + dstG * dstAlpha * (1 - srcAlpha)) / outAlpha);
+                            dest[dstIdx + 2] = (byte)((srcR * srcAlpha + dstR * dstAlpha * (1 - srcAlpha)) / outAlpha);
+                            dest[dstIdx + 3] = (byte)(outAlpha * 255);
+                        }
+                    }
+                }
             }
         }
 
