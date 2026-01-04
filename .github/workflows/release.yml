@@ -164,12 +164,20 @@ jobs:
           Write-Host "  Platform: ${{ matrix.platform }}" -ForegroundColor Gray
           Write-Host "  Thumbprint: $thumbprint" -ForegroundColor Gray
           
+          # Update the Package.appxmanifest with the correct version BEFORE building
+          $manifestPath = "PixlPunkt/Package.appxmanifest"
+          $manifest = [xml](Get-Content $manifestPath)
+          $manifest.Package.Identity.Version = $msixVersion
+          $manifest.Save($manifestPath)
+          Write-Host "  Updated manifest version to: $msixVersion" -ForegroundColor Green
+          
           $buildArgs = @(
             "publish", "PixlPunkt/PixlPunkt.csproj",
             "--configuration", "Release",
             "--runtime", "${{ matrix.rid }}",
             "--self-contained", "true",
             "-p:Platform=${{ matrix.platform }}",
+            "-p:Version=$msixVersion",
             "-p:ApplicationVersion=$msixVersion",
             "-p:GenerateAppxPackageOnBuild=true",
             "-p:AppxPackageSigningEnabled=true",
@@ -402,36 +410,28 @@ jobs:
           name: PixlPunkt ${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ github.event.inputs.prerelease || false }}
+          generate_release_notes: true
           body: |
-            ## PixlPunkt ${{ steps.version.outputs.version }}
+            ## Downloads
             
-            ### Downloads
             | Platform | Download |
             |----------|----------|
             | Windows x64 | [PixlPunkt-${{ steps.version.outputs.version }}-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt-${{ steps.version.outputs.version }}-x64.zip) |
             | Windows ARM64 | [PixlPunkt-${{ steps.version.outputs.version }}-arm64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt-${{ steps.version.outputs.version }}-arm64.zip) |
             | Plugin SDK | [NuGet Package](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt.PluginSdk.${{ steps.version.outputs.version }}.nupkg) |
             
-            ### Installation
+            ## Installation
+            
             1. Download the ZIP for your platform (x64 for most Windows PCs)
             2. Extract the ZIP file
-            3. Right-click `Install-PixlPunkt.ps1` and select "Run with PowerShell"
+            3. Right-click `Install-PixlPunkt.ps1` and select **Run with PowerShell**
             4. Allow Administrator access when prompted
             
-            The installer will automatically:
-            - Install the signing certificate
-            - Install the PixlPunkt application
+            The installer will automatically install the signing certificate and the application.
             
             ### Requirements
             - Windows 10 version 1809+ or Windows 11
             - Administrator access (for certificate installation)
-            
-            ### What's Included
-            Each ZIP contains:
-            - `PixlPunkt-${{ steps.version.outputs.version }}-{platform}.msix` - The application package
-            - `PixlPunkt.cer` - Signing certificate (required for sideloading)
-            - `Install-PixlPunkt.ps1` - Automated installer script
-            - `README.txt` - Installation instructions
           files: |
             ./release-artifacts/app-x64/*.zip
             ./release-artifacts/app-arm64/*.zip

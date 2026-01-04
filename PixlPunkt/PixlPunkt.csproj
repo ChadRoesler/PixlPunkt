@@ -32,7 +32,8 @@
 
   <!-- MinVer for automatic versioning from git tags -->
   <ItemGroup>
-    <PackageReference Include="MinVer" Version="6.0.0">
+    <PackageReference Include="Markdig" Version="0.44.0" />
+    <PackageReference Include="MinVer" Version="6.1.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -238,6 +239,9 @@
     <None Update="UI\Dialogs\Export\BrushExportDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
     </None>
+    <None Update="UI\Dialogs\System\UpdateAvailableDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </None>
     <Page Update="UI\Palette\Controls\PalettePanelMenuFlyout.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -410,6 +414,7 @@
     <None Remove="UI\Ascii\GlyphSetEditorWindow.xaml" />
     <None Remove="UI\Dialogs\Export\BatchTileAnimationExportDialog.xaml" />
     <None Remove="UI\Dialogs\Export\ExportProgressDialog.xaml" />
+    <None Remove="UI\Dialogs\System\UpdateAvailableDialog.xaml" />
     <Page Include="UI\Controls\CollapsibleSplitter.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -432,6 +437,11 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="UI\Ascii\GlyphSetEditorWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Page Update="UI\Dialogs\System\UpdateAvailableDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>

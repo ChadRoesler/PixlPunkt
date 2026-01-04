@@ -21,6 +21,7 @@ using PixlPunkt.Core.Plugins;
 using PixlPunkt.Core.Session;
 using PixlPunkt.Core.Settings;
 using PixlPunkt.Core.Tools;
+using PixlPunkt.Core.Updates;
 using PixlPunkt.UI.CanvasHost;
 using PixlPunkt.UI.Dialogs;
 using PixlPunkt.UI.Helpers;
@@ -259,6 +260,9 @@ namespace PixlPunkt.UI
 
                 // Check for keyboard shortcut conflicts
                 await CheckShortcutConflictsAsync();
+
+                // Check for updates (if enabled in settings)
+                await CheckForUpdatesAsync();
             }
             catch (Exception ex)
             {
@@ -1227,6 +1231,197 @@ namespace PixlPunkt.UI
         public void EndExternalDropperMode()
         {
             CurrentHost?.EndExternalDropperMode();
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // UPDATE CHECKING
+        // ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Checks for updates on startup if enabled in settings.
+        /// </summary>
+        private async Task CheckForUpdatesAsync(bool forceCheck = false, bool showNoUpdateMessage = false)
+        {
+            // Skip if disabled and not forced
+            if (!forceCheck && !AppSettings.Instance.CheckForUpdatesOnStartup)
+            {
+                LoggingService.Debug("Update check skipped - disabled in settings");
+                return;
+            }
+
+            try
+            {
+                var updateInfo = await UpdateService.Instance.CheckForUpdateAsync(
+                    forceCheck: forceCheck,
+                    includePreReleases: AppSettings.Instance.IncludePreReleaseUpdates);
+
+                if (updateInfo != null)
+                {
+                    // Check if this version was skipped by user
+                    if (!forceCheck && 
+                        !string.IsNullOrEmpty(AppSettings.Instance.SkippedUpdateVersion) &&
+                        AppSettings.Instance.SkippedUpdateVersion == updateInfo.Version)
+                    {
+                        LoggingService.Info("Update {Version} was previously skipped by user", updateInfo.Version);
+                        return;
+                    }
+
+                    await ShowUpdateAvailableDialogAsync(updateInfo);
+                }
+                else if (showNoUpdateMessage)
+                {
+                    // Show "up to date" message when manually checking
+                    await ShowDialogGuardedAsync(new ContentDialog
+                    {
+                        XamlRoot = Content.XamlRoot,
+                        Title = "You're Up to Date!",
+                        Content = $"PixlPunkt v{UpdateService.GetCurrentVersionString()} is the latest version.",
+                        CloseButtonText = "OK",
+                        DefaultButton = ContentDialogButton.Close
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Warning("Failed to check for updates: {Error}", ex.Message);
+                
+                if (showNoUpdateMessage)
+                {
+                    await ShowDialogGuardedAsync(new ContentDialog
+                    {
+                        XamlRoot = Content.XamlRoot,
+                        Title = "Update Check Failed",
+                        Content = "Could not connect to GitHub to check for updates.\n\nPlease check your internet connection and try again.",
+                        CloseButtonText = "OK",
+                        DefaultButton = ContentDialogButton.Close
+                    });
+                }
+            }
+        }
+
+        /// <summary>
+        /// Shows the update available dialog and handles the user's response.
+        /// </summary>
+        private async Task ShowUpdateAvailableDialogAsync(UpdateInfo updateInfo)
+        {
+            var dlg = new UpdateAvailableDialog(updateInfo)
+            {
+                XamlRoot = Content.XamlRoot
+            };
+
+            var result = await ShowDialogGuardedAsync(dlg);
+
+            switch (result)
+            {
+                case ContentDialogResult.Primary:
+                    // Download Update - open in browser
+                    var downloadUrl = UpdateService.GetDownloadUrlForCurrentArchitecture(updateInfo);
+                    if (!string.IsNullOrEmpty(downloadUrl))
+                    {
+                        UpdateService.OpenReleaseUrl(downloadUrl);
+                    }
+                    else
+                    {
+                        // Fallback to release page
+                        UpdateService.OpenReleaseUrl(updateInfo.ReleaseUrl);
+                    }
+                    break;
+
+                case ContentDialogResult.Secondary:
+                    // Remind Me Later - do nothing, will check again next launch
+                    LoggingService.Info("User chose to be reminded later for update {Version}", updateInfo.Version);
+                    break;
+
+                case ContentDialogResult.None:
+                    // Skip This Version
+                    if (dlg.SkipThisVersion)
+                    {
+                        AppSettings.Instance.SkippedUpdateVersion = updateInfo.Version;
+                        AppSettings.Instance.Save();
+                        LoggingService.Info("User chose to skip update {Version}", updateInfo.Version);
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Manually check for updates (triggered from Help menu).
+        /// </summary>
+        private async void Help_CheckForUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            await CheckForUpdatesAsync(forceCheck: true, showNoUpdateMessage: true);
+        }
+
+        /// <summary>
+        /// Opens the GitHub releases page.
+        /// </summary>
+        private void Help_ViewReleases_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateService.OpenReleasesPage();
+        }
+
+        /// <summary>
+        /// Opens the GitHub repository page.
+        /// </summary>
+        private void Help_GitHub_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://github.com/ChadRoesler/PixlPunkt",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Warning("Failed to open GitHub page: {Error}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Shows an About dialog with version information.
+        /// </summary>
+        private async void Help_About_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new ContentDialog
+            {
+                XamlRoot = Content.XamlRoot,
+                Title = "About PixlPunkt",
+                Content = new StackPanel
+                {
+                    Spacing = 8,
+                    Children =
+                    {
+                        new TextBlock 
+                        { 
+                            Text = "PixlPunkt", 
+                            Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"]
+                        },
+                        new TextBlock 
+                        { 
+                            Text = $"Version {UpdateService.GetCurrentVersionString()}",
+                            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                        },
+                        new TextBlock 
+                        { 
+                            Text = "A modern pixel art editor for Windows.",
+                            TextWrapping = TextWrapping.Wrap,
+                            Margin = new Thickness(0, 8, 0, 0)
+                        },
+                        new HyperlinkButton
+                        {
+                            Content = "View on GitHub",
+                            NavigateUri = new Uri("https://github.com/ChadRoesler/PixlPunkt"),
+                            Margin = new Thickness(0, 8, 0, 0)
+                        }
+                    }
+                },
+                CloseButtonText = "OK",
+                DefaultButton = ContentDialogButton.Close
+            };
+
+            await ShowDialogGuardedAsync(dlg);
         }
     }
 }

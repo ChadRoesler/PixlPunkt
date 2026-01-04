@@ -1,0 +1,56 @@
+# GitHub Auto-Generated Release Notes Configuration
+# https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - dependencies
+      - documentation
+    authors:
+      - dependabot
+      - github-actions
+
+  categories:
+    - title: "New Features"
+      labels:
+        - enhancement
+        - feature
+        - new-feature
+
+    - title: "Bug Fixes"
+      labels:
+        - bug
+        - bugfix
+        - fix
+
+    - title: "UI/UX Improvements"
+      labels:
+        - ui
+        - ux
+        - design
+
+    - title: "Performance"
+      labels:
+        - performance
+        - optimization
+
+    - title: "Tools & Effects"
+      labels:
+        - tools
+        - effects
+        - brushes
+
+    - title: "Animation"
+      labels:
+        - animation
+        - timeline
+
+    - title: "Plugin SDK"
+      labels:
+        - plugin
+        - sdk
+
+    - title: "Other Changes"
+      labels:
+        - "*"

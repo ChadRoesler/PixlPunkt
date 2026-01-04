@@ -18192,6 +18192,11 @@
             Source-generated JSON serializer context for application settings.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.Boolean">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.PaletteSortMode">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
@@ -18906,6 +18911,21 @@
         <member name="P:PixlPunkt.Core.Settings.AppSettings.LogLevel">
             <summary>
             Minimum log level for application logging (Serilog level name).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.CheckForUpdatesOnStartup">
+            <summary>
+            Gets or sets whether to automatically check for updates on startup.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.IncludePreReleaseUpdates">
+            <summary>
+            Gets or sets whether to include pre-release versions in update checks.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.SkippedUpdateVersion">
+            <summary>
+            Gets or sets the version that the user chose to skip (won't be prompted again).
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Settings.AppSettings.Load">
@@ -26383,6 +26403,135 @@
         <member name="M:PixlPunkt.Core.Tools.Utility.ZoomHandler.Reset">
             <inheritdoc/>
         </member>
+        <member name="T:PixlPunkt.Core.Updates.UpdateInfo">
+            <summary>
+            Contains information about an available update from GitHub releases.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.Version">
+            <summary>
+            Gets the version string (e.g., "1.0.0").
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.ParsedVersion">
+            <summary>
+            Gets the parsed version for comparison.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.TagName">
+            <summary>
+            Gets the release tag name (e.g., "v1.0.0").
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.ReleaseName">
+            <summary>
+            Gets the release title/name.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.ReleaseNotes">
+            <summary>
+            Gets the release notes/body (markdown).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.ReleaseUrl">
+            <summary>
+            Gets the URL to the release page on GitHub.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.DownloadUrlX64">
+            <summary>
+            Gets the direct download URL for the x64 package.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.DownloadUrlArm64">
+            <summary>
+            Gets the direct download URL for the ARM64 package.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.PublishedAt">
+            <summary>
+            Gets the publish date of the release.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateInfo.IsPreRelease">
+            <summary>
+            Gets whether this is a pre-release.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Updates.UpdateService">
+            <summary>
+            Service for checking GitHub releases for application updates.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Updates.UpdateService.GitHubOwner">
+            <summary>
+            GitHub repository owner.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Updates.UpdateService.GitHubRepo">
+            <summary>
+            GitHub repository name.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Updates.UpdateService.LatestReleaseUrl">
+            <summary>
+            GitHub API endpoint for latest release.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Updates.UpdateService.ReleasesPageUrl">
+            <summary>
+            GitHub releases page URL.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Updates.UpdateService.MinCheckInterval">
+            <summary>
+            Minimum time between automatic update checks (1 hour).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Updates.UpdateService.Instance">
+            <summary>
+            Gets the shared UpdateService instance.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Updates.UpdateService.CheckForUpdateAsync(System.Boolean,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Checks for updates if enough time has passed since last check.
+            </summary>
+            <param name="forceCheck">If true, ignores the time interval and always checks.</param>
+            <param name="includePreReleases">If true, includes pre-release versions.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>UpdateInfo if a newer version is available, null otherwise.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Updates.UpdateService.GetDownloadUrlForCurrentArchitecture(PixlPunkt.Core.Updates.UpdateInfo)">
+            <summary>
+            Gets the appropriate download URL for the current system architecture.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Updates.UpdateService.GetCurrentVersion">
+            <summary>
+            Gets the current application version.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Updates.UpdateService.GetCurrentVersionString">
+            <summary>
+            Gets the current application version as a string.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Updates.UpdateService.OpenReleasesPage">
+            <summary>
+            Opens the GitHub releases page in the default browser.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Updates.UpdateService.OpenReleaseUrl(System.String)">
+            <summary>
+            Opens a specific release URL in the default browser.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Updates.UpdateService.NormalizeVersion(System.String)">
+            <summary>
+            Normalizes a version string to ensure it has at least 3 parts.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Viewport.ZoomController">
             <summary>
             Manages zoom level and pan offset for viewport transformations, converting between
@@ -32444,6 +32593,92 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Dialogs.UpdateAvailableDialog">
+            <summary>
+            Dialog shown when a new update is available.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.SkipThisVersion">
+            <summary>
+            Gets whether the user chose to skip this version.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.AutoCheckEnabled">
+            <summary>
+            Gets whether auto-update checking is enabled.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.#ctor(PixlPunkt.Core.Updates.UpdateInfo)">
+            <summary>
+            Creates a new UpdateAvailableDialog.
+            </summary>
+            <param name="updateInfo">The update information to display.</param>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.UpdateInfo">
+            <summary>
+            Gets the update info associated with this dialog.
+            /// </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.RenderMarkdown(System.String)">
+            <summary>
+            Renders markdown content using Markdig.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.CreateTextBlock">
+            <summary>
+            Creates or returns the current RichTextBlock for text content.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.FlushTextBlock">
+            <summary>
+            Flushes the current text block to the container if it has content.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.RenderBlock(Markdig.Syntax.Block,System.Int32)">
+            <summary>
+            Renders a Markdig block element.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.RenderTableAsGrid(Markdig.Extensions.Tables.Table)">
+            <summary>
+            Renders a Markdig table as a proper WinUI Grid control.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.GetCellText(Markdig.Extensions.Tables.TableCell)">
+            <summary>
+            Extracts plain text from a table cell.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.GetInlineText(Markdig.Syntax.Inlines.ContainerInline)">
+            <summary>
+            Extracts plain text from inline content.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.TryParseLink(System.String,System.String@,System.String@)">
+            <summary>
+            Tries to parse a markdown link from text.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.RenderInlines(Microsoft.UI.Xaml.Documents.InlineCollection,Markdig.Syntax.Inlines.ContainerInline)">
+            <summary>
+            Renders Markdig inline elements to a WinUI InlineCollection.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.UpdateAvailableDialog.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Dialogs.ImportTileItem">
             <summary>
             Represents a tile available for import with selection state.
@@ -33893,9 +34128,6 @@
             Partial class for session state management (crash recovery).
             </summary>
             <summary>
-            Partial class for symmetry menu handlers.
-            </summary>
-            <summary>
             Partial class for tab and document management:
             - Tab creation and headers
             - Document window detachment
@@ -34446,6 +34678,36 @@
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.EndExternalDropperMode">
             <summary>
             Disables external dropper mode on the active canvas.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.CheckForUpdatesAsync(System.Boolean,System.Boolean)">
+            <summary>
+            Checks for updates on startup if enabled in settings.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.ShowUpdateAvailableDialogAsync(PixlPunkt.Core.Updates.UpdateInfo)">
+            <summary>
+            Shows the update available dialog and handles the user's response.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Help_CheckForUpdates_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Manually check for updates (triggered from Help menu).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Help_ViewReleases_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Opens the GitHub releases page.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Help_GitHub_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Opens the GitHub repository page.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Help_About_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Shows an About dialog with version information.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.InitializeComponent">

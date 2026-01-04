@@ -259,6 +259,14 @@
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Glyph Set Editor…" Click="OpenGlyphSetEditor_Click"/>
                 </MenuBarItem>
+                <MenuBarItem Title="Help">
+                    <MenuFlyoutItem Text="Check for Updates…" Click="Help_CheckForUpdates_Click"/>
+                    <MenuFlyoutItem Text="View Releases on GitHub" Click="Help_ViewReleases_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="GitHub Repository" Click="Help_GitHub_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="About PixlPunkt" Click="Help_About_Click"/>
+                </MenuBarItem>
             </MenuBar>
         </Grid>
 
