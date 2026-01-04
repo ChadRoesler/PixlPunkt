@@ -110,6 +110,25 @@ namespace PixlPunkt.Core.Settings
         public string? LogLevel { get; set; } = "Information";
 
         // ====================================================================
+        // UPDATE SETTINGS
+        // ====================================================================
+
+        /// <summary>
+        /// Gets or sets whether to automatically check for updates on startup.
+        /// </summary>
+        public bool CheckForUpdatesOnStartup { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets whether to include pre-release versions in update checks.
+        /// </summary>
+        public bool IncludePreReleaseUpdates { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets the version that the user chose to skip (won't be prompted again).
+        /// </summary>
+        public string? SkippedUpdateVersion { get; set; }
+
+        // ====================================================================
         // LOAD / SAVE
         // ====================================================================
 
