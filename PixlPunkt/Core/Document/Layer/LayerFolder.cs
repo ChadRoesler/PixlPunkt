@@ -140,15 +140,22 @@ namespace PixlPunkt.Core.Document.Layer
         /// </summary>
         /// <param name="fromIndex">The source index.</param>
         /// <param name="toIndex">The destination index.</param>
+        /// <remarks>
+        /// After removal, the toIndex is clamped to the valid range [0, Count-1] since
+        /// the collection shrinks by one element before insertion.
+        /// </remarks>
         public void MoveChild(int fromIndex, int toIndex)
         {
             if (fromIndex < 0 || fromIndex >= _children.Count) return;
-            if (toIndex < 0 || toIndex >= _children.Count) return;
             if (fromIndex == toIndex) return;
 
             var layer = _children[fromIndex];
             _children.RemoveAt(fromIndex);
-            _children.Insert(toIndex, layer);
+
+            // After removal, clamp toIndex to valid range [0, _children.Count]
+            // Note: Insert allows index == Count (appends to end)
+            int clampedToIndex = System.Math.Clamp(toIndex, 0, _children.Count);
+            _children.Insert(clampedToIndex, layer);
             OnPropertyChanged(nameof(Children));
         }
 

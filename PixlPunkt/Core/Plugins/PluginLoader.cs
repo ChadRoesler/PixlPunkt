@@ -43,7 +43,22 @@ namespace PixlPunkt.Core.Plugins
                 throw new PluginLoadException($"Invalid plugin file extension. Expected {PluginExtension}");
 
             string pluginName = Path.GetFileNameWithoutExtension(punkFilePath);
+            
+            // Security: Sanitize plugin name to prevent path traversal attacks
+            pluginName = SanitizePluginName(pluginName);
+            if (string.IsNullOrEmpty(pluginName))
+                throw new PluginLoadException("Invalid plugin name after sanitization");
+
             string extractPath = Path.Combine(_extractedDirectory, pluginName);
+            
+            // Security: Verify the extract path is actually inside our expected directory
+            string normalizedExtract = Path.GetFullPath(extractPath);
+            string normalizedBase = Path.GetFullPath(_extractedDirectory);
+            if (!normalizedExtract.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+            {
+                LoggingService.Error("Path traversal attempt detected: {Path}", extractPath);
+                throw new PluginLoadException("Invalid plugin path - possible path traversal attack");
+            }
 
             try
             {
@@ -243,6 +258,34 @@ namespace PixlPunkt.Core.Plugins
             {
                 LoggingService.Error($"[Plugin:{PluginId}] {message}", exception);
             }
+        }
+
+        /// <summary>
+        /// Sanitizes a plugin name to prevent path traversal attacks.
+        /// </summary>
+        /// <param name="name">The raw plugin name.</param>
+        /// <returns>A sanitized plugin name safe for use in file paths.</returns>
+        private static string SanitizePluginName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            // Remove any path separators and parent directory references
+            name = name.Replace("..", "")
+                       .Replace("/", "")
+                       .Replace("\\", "")
+                       .Replace(":", "");
+
+            // Remove any invalid filename characters
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(c.ToString(), "");
+            }
+
+            // Trim and ensure non-empty
+            name = name.Trim();
+            
+            return name;
         }
     }
 

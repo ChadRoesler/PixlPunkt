@@ -24,16 +24,17 @@ namespace PixlPunkt.Core.Compositing.Helpers
     /// (0.0-1.0) with proper alpha compositing.
     /// </para>
     /// <para>
-    /// The compositor is stateless except for a reusable scratch buffer for performance optimization.
-    /// It's safe to call from multiple threads if operating on different destination surfaces.
+    /// The compositor uses thread-local scratch buffers to ensure thread safety when compositing
+    /// from multiple threads simultaneously.
     /// </para>
     /// </remarks>
     public static class Compositor
     {
         /// <summary>
-        /// Reusable scratch surface for applying effects without mutating layer data.
-        /// Automatically resized as needed to match canvas dimensions.
+        /// Thread-local scratch surface for applying effects without mutating layer data.
+        /// Each thread gets its own scratch buffer to ensure thread safety.
         /// </summary>
+        [ThreadStatic]
         private static PixelSurface? _fxScratch;
 
         /// <summary>

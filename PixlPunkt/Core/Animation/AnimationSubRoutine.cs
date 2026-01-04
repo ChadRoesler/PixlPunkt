@@ -515,13 +515,16 @@ namespace PixlPunkt.Core.Animation
         /// Gets the normalized progress (0.0 to 1.0) for a given frame within this sub-routine.
         /// </summary>
         /// <param name="frameIndex">The frame index in the canvas animation timeline.</param>
-        /// <returns>Normalized progress, or 0.0 if frame is outside range.</returns>
+        /// <returns>Normalized progress, or 0.0 if frame is outside range or duration is invalid.</returns>
         public float GetNormalizedProgress(int frameIndex)
         {
             if (!IsFrameInRange(frameIndex)) return 0f;
+            
+            // Guard against division by zero (DurationFrames should always be >= 1, but be defensive)
+            if (DurationFrames <= 0) return 0f;
 
             int relativeFrame = frameIndex - StartFrame;
-            return DurationFrames > 0 ? relativeFrame / (float)DurationFrames : 0f;
+            return relativeFrame / (float)DurationFrames;
         }
 
         /// <summary>

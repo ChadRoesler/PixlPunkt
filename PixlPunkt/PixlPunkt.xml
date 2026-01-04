@@ -885,7 +885,7 @@
             Gets the normalized progress (0.0 to 1.0) for a given frame within this sub-routine.
             </summary>
             <param name="frameIndex">The frame index in the canvas animation timeline.</param>
-            <returns>Normalized progress, or 0.0 if frame is outside range.</returns>
+            <returns>Normalized progress, or 0.0 if frame is outside range or duration is invalid.</returns>
         </member>
         <member name="M:PixlPunkt.Core.Animation.AnimationSubRoutine.InterpolatePosition(System.Single)">
             <summary>
@@ -5430,15 +5430,15 @@
             (0.0-1.0) with proper alpha compositing.
             </para>
             <para>
-            The compositor is stateless except for a reusable scratch buffer for performance optimization.
-            It's safe to call from multiple threads if operating on different destination surfaces.
+            The compositor uses thread-local scratch buffers to ensure thread safety when compositing
+            from multiple threads simultaneously.
             </para>
             </remarks>
         </member>
         <member name="F:PixlPunkt.Core.Compositing.Helpers.Compositor._fxScratch">
             <summary>
-            Reusable scratch surface for applying effects without mutating layer data.
-            Automatically resized as needed to match canvas dimensions.
+            Thread-local scratch surface for applying effects without mutating layer data.
+            Each thread gets its own scratch buffer to ensure thread safety.
             </summary>
         </member>
         <member name="F:PixlPunkt.Core.Compositing.Helpers.Compositor.ByteToFloat">
@@ -6801,6 +6801,10 @@
             </summary>
             <param name="fromIndex">The source index.</param>
             <param name="toIndex">The destination index.</param>
+            <remarks>
+            After removal, the toIndex is clamped to the valid range [0, Count-1] since
+            the collection shrinks by one element before insertion.
+            </remarks>
         </member>
         <member name="M:PixlPunkt.Core.Document.Layer.LayerFolder.FlattenDepthFirst">
             <summary>
@@ -12704,7 +12708,17 @@
             Both modes support tolerance-based color matching using Chebyshev distance.
             When a selection is active, only pixels inside the selection are affected.
             </para>
+            <para>
+            The flood fill uses a bounded stack with queue fallback to prevent stack overflow
+            on extremely large fill regions.
+            </para>
             </remarks>
+        </member>
+        <member name="F:PixlPunkt.Core.Painting.FloodFillPainter.MaxStackSize">
+            <summary>
+            Maximum stack size before switching to queue-based processing.
+            This prevents stack overflow while maintaining good performance for typical fills.
+            </summary>
         </member>
         <member name="P:PixlPunkt.Core.Painting.FloodFillPainter.Shared">
             <summary>
@@ -12719,6 +12733,12 @@
             Flood fill (contiguous) using stack-based DFS with tolerance.
             Respects selection mask when active.
             Uses ArrayPool for the seen array to reduce GC pressure.
+            Uses bounded stack with queue fallback to prevent stack overflow on large regions.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Painting.FloodFillPainter.AddNeighbor(System.Int32,System.Int32,System.Int32,System.Int32,System.Boolean[],System.Collections.Generic.Stack{System.ValueTuple{System.Int32,System.Int32}},System.Collections.Generic.Queue{System.ValueTuple{System.Int32,System.Int32}}@)">
+            <summary>
+            Adds a neighbor to the processing collection with overflow protection.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Painting.FloodFillPainter.FillGlobal(PixlPunkt.Core.Imaging.PixelSurface,System.UInt32,System.UInt32,System.Int32,System.Int32,System.Int32,PixlPunkt.Core.Painting.FillContext,PixlPunkt.Core.History.PixelChangeItem)">
@@ -15899,6 +15919,13 @@
             <summary>
             Disposes the loaded plugin.
             </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Plugins.PluginLoader.SanitizePluginName(System.String)">
+            <summary>
+            Sanitizes a plugin name to prevent path traversal attacks.
+            </summary>
+            <param name="name">The raw plugin name.</param>
+            <returns>A sanitized plugin name safe for use in file paths.</returns>
         </member>
         <member name="T:PixlPunkt.Core.Plugins.PluginManifest">
             <summary>
@@ -27012,6 +27039,26 @@
             <summary>
             Panel for animation playback preview.
             Shows live preview and transport controls.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.Animation.PlaybackPanel._subscribedReel">
+            <summary>
+            Tracks the currently subscribed reel for proper event cleanup.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.PlaybackPanel.UnsubscribeAll">
+            <summary>
+            Unsubscribes from all event handlers to prevent memory leaks.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.PlaybackPanel.UnsubscribeFromReel">
+            <summary>
+            Unsubscribes from the currently tracked reel's Changed event.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Animation.PlaybackPanel.SubscribeToReel(PixlPunkt.Core.Animation.TileAnimationReel)">
+            <summary>
+            Subscribes to a reel's Changed event, properly tracking for cleanup.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Animation.PlaybackPanel.Bind(PixlPunkt.Core.Animation.TileAnimationState,PixlPunkt.Core.Document.CanvasDocument)">

@@ -5,6 +5,7 @@ using FluentIcons.Common;
 using PixlPunkt.Core.Coloring.Helpers;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.History;
+using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Painting.Helpers;
 using PixlPunkt.Core.Structs;
 
@@ -25,9 +26,19 @@ namespace PixlPunkt.Core.Painting
     /// Both modes support tolerance-based color matching using Chebyshev distance.
     /// When a selection is active, only pixels inside the selection are affected.
     /// </para>
+    /// <para>
+    /// The flood fill uses a bounded stack with queue fallback to prevent stack overflow
+    /// on extremely large fill regions.
+    /// </para>
     /// </remarks>
     public sealed class FloodFillPainter : IFillPainter
     {
+        /// <summary>
+        /// Maximum stack size before switching to queue-based processing.
+        /// This prevents stack overflow while maintaining good performance for typical fills.
+        /// </summary>
+        private const int MaxStackSize = 100_000;
+
         /// <summary>
         /// Shared singleton instance for common usage.
         /// </summary>
@@ -76,6 +87,7 @@ namespace PixlPunkt.Core.Painting
         /// Flood fill (contiguous) using stack-based DFS with tolerance.
         /// Respects selection mask when active.
         /// Uses ArrayPool for the seen array to reduce GC pressure.
+        /// Uses bounded stack with queue fallback to prevent stack overflow on large regions.
         /// </summary>
         private static void FillContiguous(
             Imaging.PixelSurface surface,
@@ -96,13 +108,30 @@ namespace PixlPunkt.Core.Painting
                 // Clear the rented portion we'll use (pool may return larger array)
                 Array.Clear(seen, 0, arraySize);
 
-                var stack = new Stack<(int x, int y)>(Math.Min(1024, arraySize / 4));
+                // Start with stack for typical cases (faster due to cache locality)
+                var stack = new Stack<(int x, int y)>(Math.Min(4096, arraySize / 4));
+                
+                // Queue for overflow handling - only allocated if needed
+                Queue<(int x, int y)>? queue = null;
+                
                 stack.Push((sx, sy));
                 seen[sy * w + sx] = true;
 
-                while (stack.Count > 0)
+                while (stack.Count > 0 || (queue != null && queue.Count > 0))
                 {
-                    var (x, y) = stack.Pop();
+                    // Prefer stack, fall back to queue
+                    (int x, int y) current;
+                    if (stack.Count > 0)
+                    {
+                        current = stack.Pop();
+                    }
+                    else
+                    {
+                        current = queue!.Dequeue();
+                    }
+
+                    int x = current.x;
+                    int y = current.y;
 
                     // Check selection mask - skip pixels outside selection
                     if (!context.IsInSelection(x, y))
@@ -121,33 +150,54 @@ namespace PixlPunkt.Core.Painting
                         Bgra.WriteUIntToBytes(surface.Pixels, idx, newColor);
                     }
 
-                    // 4-neighbor expansion
-                    if (x > 0 && !seen[y * w + (x - 1)])
-                    {
-                        seen[y * w + (x - 1)] = true;
-                        stack.Push((x - 1, y));
-                    }
-                    if (x + 1 < w && !seen[y * w + (x + 1)])
-                    {
-                        seen[y * w + (x + 1)] = true;
-                        stack.Push((x + 1, y));
-                    }
-                    if (y > 0 && !seen[(y - 1) * w + x])
-                    {
-                        seen[(y - 1) * w + x] = true;
-                        stack.Push((x, y - 1));
-                    }
-                    if (y + 1 < h && !seen[(y + 1) * w + x])
-                    {
-                        seen[(y + 1) * w + x] = true;
-                        stack.Push((x, y + 1));
-                    }
+                    // 4-neighbor expansion with stack overflow protection
+                    AddNeighbor(x - 1, y, w, h, seen, stack, ref queue);
+                    AddNeighbor(x + 1, y, w, h, seen, stack, ref queue);
+                    AddNeighbor(x, y - 1, w, h, seen, stack, ref queue);
+                    AddNeighbor(x, y + 1, w, h, seen, stack, ref queue);
+                }
+                
+                // Log if we had to use the queue (indicates very large fill)
+                if (queue != null)
+                {
+                    LoggingService.Debug("Flood fill used queue fallback for large region");
                 }
             }
             finally
             {
                 // Always return array to pool
                 ArrayPool<bool>.Shared.Return(seen);
+            }
+        }
+
+        /// <summary>
+        /// Adds a neighbor to the processing collection with overflow protection.
+        /// </summary>
+        private static void AddNeighbor(
+            int x, int y, int w, int h,
+            bool[] seen,
+            Stack<(int x, int y)> stack,
+            ref Queue<(int x, int y)>? queue)
+        {
+            // Bounds check
+            if (x < 0 || x >= w || y < 0 || y >= h)
+                return;
+
+            int seenIdx = y * w + x;
+            if (seen[seenIdx])
+                return;
+
+            seen[seenIdx] = true;
+
+            // If stack is getting too large, overflow to queue
+            if (stack.Count >= MaxStackSize)
+            {
+                queue ??= new Queue<(int x, int y)>(4096);
+                queue.Enqueue((x, y));
+            }
+            else
+            {
+                stack.Push((x, y));
             }
         }
 
