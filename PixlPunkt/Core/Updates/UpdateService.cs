@@ -253,6 +253,29 @@ namespace PixlPunkt.Core.Updates
         public static Version GetCurrentVersion()
         {
             var assembly = Assembly.GetExecutingAssembly();
+            
+            // First try to get the InformationalVersion (set by MinVer with full semver)
+            var infoVersionAttr = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            if (infoVersionAttr != null && !string.IsNullOrEmpty(infoVersionAttr.InformationalVersion))
+            {
+                // MinVer format: "1.2.3" or "1.2.3-alpha.1+build" - extract just the version part
+                var versionStr = infoVersionAttr.InformationalVersion;
+                
+                // Strip any +metadata suffix
+                var plusIndex = versionStr.IndexOf('+');
+                if (plusIndex > 0)
+                    versionStr = versionStr[..plusIndex];
+                
+                // Strip any -prerelease suffix for version comparison
+                var dashIndex = versionStr.IndexOf('-');
+                if (dashIndex > 0)
+                    versionStr = versionStr[..dashIndex];
+                
+                if (Version.TryParse(NormalizeVersion(versionStr), out var infoVersion))
+                    return infoVersion;
+            }
+            
+            // Fallback to AssemblyVersion
             var version = assembly.GetName().Version;
             return version ?? new Version(0, 0, 0);
         }
@@ -262,6 +285,23 @@ namespace PixlPunkt.Core.Updates
         /// </summary>
         public static string GetCurrentVersionString()
         {
+            var assembly = Assembly.GetExecutingAssembly();
+            
+            // First try InformationalVersion for display (includes prerelease tag)
+            var infoVersionAttr = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            if (infoVersionAttr != null && !string.IsNullOrEmpty(infoVersionAttr.InformationalVersion))
+            {
+                var versionStr = infoVersionAttr.InformationalVersion;
+                
+                // Strip +metadata but keep -prerelease for display
+                var plusIndex = versionStr.IndexOf('+');
+                if (plusIndex > 0)
+                    versionStr = versionStr[..plusIndex];
+                
+                return versionStr;
+            }
+            
+            // Fallback
             return GetCurrentVersion().ToString(3);
         }
 

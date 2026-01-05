@@ -184,6 +184,7 @@
                     <MenuFlyoutItem Text="Toggle Rulers" Click="View_ToggleRulers_Click"/>
                     <MenuFlyoutItem Text="Toggle Guides" Click="View_ToggleGuides_Click"/>
                     <MenuFlyoutItem Text="Toggle Snap to Guides" Click="View_ToggleSnapToGuides_Click"/>
+                    <MenuFlyoutItem Text="Lock Guides" Click="View_ToggleLockGuides_Click"/>
                     <MenuFlyoutItem Text="Clear All Guides" Click="View_ClearGuides_Click"/>
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutSubItem Text="Reference Images">

@@ -1019,6 +1019,15 @@ namespace PixlPunkt.UI
             }
         }
 
+        private void View_ToggleLockGuides_Click(object sender, RoutedEventArgs e)
+        {
+            if (CurrentHost != null)
+            {
+                CurrentHost.GuidesLocked = !CurrentHost.GuidesLocked;
+                LoggingService.Debug($"Toggled lock guides: {CurrentHost.GuidesLocked}");
+            }
+        }
+
         private void View_ClearGuides_Click(object sender, RoutedEventArgs e)
         {
             CurrentHost?.ClearAllGuides();

@@ -505,7 +505,8 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void HorizontalRuler_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (_guideService == null || !_showRulers) return;
+            // Skip guide creation/manipulation when guides are locked
+            if (_guidesLocked || _guideService == null || !_showRulers) return;
 
             var pos = e.GetCurrentPoint(HorizontalRulerCanvas).Position;
             int docY = ScreenYToDocYFromHorizontalRuler(pos.Y);
@@ -560,7 +561,8 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void VerticalRuler_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (_guideService == null || !_showRulers) return;
+            // Skip guide creation/manipulation when guides are locked
+            if (_guidesLocked || _guideService == null || !_showRulers) return;
 
             var pos = e.GetCurrentPoint(VerticalRulerCanvas).Position;
             int docX = ScreenXToDocXFromVerticalRuler(pos.X);
