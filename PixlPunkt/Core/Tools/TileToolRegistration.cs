@@ -56,7 +56,7 @@ namespace PixlPunkt.Core.Tools
     /// <param name="DisplayName">Human-readable name for UI display.</param>
     /// <param name="Settings">Tool-specific settings object.</param>
     /// <param name="HandlerFactory">Factory function to create the tile handler.</param>
-    public sealed record TileToolRegistration(
+    public sealed partial record TileToolRegistration(
         string Id,
         string DisplayName,
         ToolSettingsBase? Settings,

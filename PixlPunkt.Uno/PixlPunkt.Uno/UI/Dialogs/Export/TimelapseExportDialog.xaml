@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="PixlPunkt.Uno.UI.Dialogs.Export.TimelapseExportDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Export Timelapse"
+    PrimaryButtonText="Export"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                  HorizontalScrollBarVisibility="Disabled"
+                  MaxHeight="550">
+        <StackPanel Spacing="16" Width="420" Padding="4,4,16,4">
+
+            <!-- History Info -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="History Source" FontWeight="SemiBold"/>
+                <TextBlock x:Name="HistoryInfoText" 
+                           Text="156 history steps available"
+                           FontSize="12"
+                           Opacity="0.7"/>
+            </StackPanel>
+
+            <!-- History Range -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Range" FontWeight="SemiBold"/>
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="80"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="From:" VerticalAlignment="Center"/>
+                    <NumberBox x:Name="RangeStartBox"
+                               Grid.Column="1"
+                               Minimum="0"
+                               Value="0"
+                               SpinButtonPlacementMode="Hidden"
+                               ValueChanged="Range_ValueChanged"/>
+                    <TextBlock Text="To:" Grid.Column="2" VerticalAlignment="Center"/>
+                    <NumberBox x:Name="RangeEndBox"
+                               Grid.Column="3"
+                               Minimum="1"
+                               Value="100"
+                               SpinButtonPlacementMode="Hidden"
+                               ValueChanged="Range_ValueChanged"/>
+                </Grid>
+                <TextBlock x:Name="RangeInfoText"
+                           Text="Will render 100 steps"
+                           FontSize="12"
+                           Opacity="0.7"/>
+            </StackPanel>
+
+            <!-- Timing Mode -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Timing" FontWeight="SemiBold"/>
+                <ComboBox x:Name="TimingModeCombo"
+                          HorizontalAlignment="Stretch"
+                          SelectionChanged="TimingMode_Changed">
+                    <ComboBoxItem Tag="target" Content="Target Duration" IsSelected="True"/>
+                    <ComboBoxItem Tag="fixed" Content="Fixed Time Per Step"/>
+                    <ComboBoxItem Tag="fps" Content="Fixed FPS"/>
+                </ComboBox>
+
+                <!-- Target Duration Panel -->
+                <StackPanel x:Name="TargetDurationPanel" Spacing="8">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Target:" VerticalAlignment="Center"/>
+                        <NumberBox x:Name="TargetDurationBox"
+                                   Grid.Column="1"
+                                   Minimum="5"
+                                   Maximum="300"
+                                   Value="30"
+                                   SpinButtonPlacementMode="Hidden"
+                                   ValueChanged="Settings_Changed"/>
+                        <TextBlock Text="seconds" Grid.Column="2" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Fixed Per Step Panel -->
+                <StackPanel x:Name="FixedPerStepPanel" Spacing="8" Visibility="Collapsed">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Duration:" VerticalAlignment="Center"/>
+                        <NumberBox x:Name="MillisecondsPerStepBox"
+                                   Grid.Column="1"
+                                   Minimum="16"
+                                   Maximum="2000"
+                                   Value="100"
+                                   SpinButtonPlacementMode="Hidden"
+                                   ValueChanged="Settings_Changed"/>
+                        <TextBlock Text="ms per step" Grid.Column="2" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Fixed FPS Panel -->
+                <StackPanel x:Name="FixedFpsPanel" Spacing="8" Visibility="Collapsed">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="FPS:" VerticalAlignment="Center"/>
+                        <NumberBox x:Name="FixedFpsBox"
+                                   Grid.Column="1"
+                                   Minimum="1"
+                                   Maximum="60"
+                                   Value="12"
+                                   SpinButtonPlacementMode="Hidden"
+                                   ValueChanged="Settings_Changed"/>
+                        <TextBlock Text="frames/sec" Grid.Column="2" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Transition -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Transition" FontWeight="SemiBold"/>
+                <ComboBox x:Name="TransitionCombo"
+                          HorizontalAlignment="Stretch"
+                          SelectionChanged="Transition_Changed">
+                    <ComboBoxItem Tag="cut" Content="Cut (instant)" IsSelected="True"/>
+                    <ComboBoxItem Tag="dissolve" Content="Cross-Dissolve"/>
+                    <ComboBoxItem Tag="flash" Content="Flash"/>
+                </ComboBox>
+                <StackPanel x:Name="TransitionFramesPanel" Spacing="4" Visibility="Collapsed">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Frames:" VerticalAlignment="Center"/>
+                        <NumberBox x:Name="TransitionFramesBox"
+                                   Grid.Column="1"
+                                   Minimum="1"
+                                   Maximum="10"
+                                   Value="3"
+                                   SpinButtonPlacementMode="Hidden"
+                                   ValueChanged="Settings_Changed"/>
+                        <TextBlock Text="transition frames" Grid.Column="2" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Export Format -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Export Format" FontWeight="SemiBold"/>
+                <ComboBox x:Name="FormatComboBox" 
+                          HorizontalAlignment="Stretch">
+                    <ComboBoxItem Tag="gif" Content="Animated GIF (.gif)" IsSelected="True"/>
+                    <ComboBoxItem Tag="mp4" Content="MP4 Video (.mp4)"/>
+                    <ComboBoxItem Tag="png" Content="PNG Image Sequence"/>
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Scale -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Scale:" VerticalAlignment="Center"/>
+                <NumberBox x:Name="ScaleNumberBox" 
+                           Grid.Column="1"
+                           Minimum="1" 
+                           Maximum="16" 
+                           Value="1"
+                           SpinButtonPlacementMode="Hidden"
+                           ValueChanged="Settings_Changed"/>
+                <TextBlock x:Name="OutputSizeText" 
+                           Grid.Column="2"
+                           Text="64x64 pixels" 
+                           VerticalAlignment="Center" 
+                           Opacity="0.7"/>
+            </Grid>
+
+            <!-- Final Frame Hold -->
+            <StackPanel Spacing="4">
+                <CheckBox x:Name="HoldFinalCheckBox"
+                          Content="Hold final frame"
+                          IsChecked="True"
+                          Checked="Settings_CheckedChanged"
+                          Unchecked="Settings_CheckedChanged"/>
+                <Grid ColumnSpacing="12" x:Name="FinalHoldPanel">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Duration:" Grid.Column="1" VerticalAlignment="Center"/>
+                    <NumberBox x:Name="FinalHoldBox"
+                               Grid.Column="2"
+                               Minimum="500"
+                               Maximum="10000"
+                               Value="2000"
+                               SpinButtonPlacementMode="Hidden"
+                               ValueChanged="Settings_Changed"/>
+                    <TextBlock Text="ms" Grid.Column="3" VerticalAlignment="Center"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Estimated Output -->
+            <Border Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+                    CornerRadius="4"
+                    Padding="12,8">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Estimated Output" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="EstimatedDurationText"
+                               Text="Duration: ~30 seconds"
+                               FontSize="12"/>
+                    <TextBlock x:Name="EstimatedFramesText"
+                               Text="Frames: 360 frames @ 12 fps"
+                               FontSize="12"
+                               Opacity="0.7"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

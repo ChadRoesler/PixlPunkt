@@ -12,6 +12,7 @@ using PixlPunkt.Core.Helpers;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Logging;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Document
 {
@@ -176,8 +177,8 @@ namespace PixlPunkt.Core.Document
             int tilesX = Math.Max(1, pixelWidth / tileW);
             int tilesY = Math.Max(1, pixelHeight / tileH);
 
-            var tileSize = new SizeInt32(tileW, tileH);
-            var tileCounts = new SizeInt32(tilesX, tilesY);
+            var tileSize = CreateSize(tileW, tileH);
+            var tileCounts = CreateSize(tilesX, tilesY);
 
             string docName = Path.GetFileNameWithoutExtension(filePath);
 
@@ -469,8 +470,8 @@ namespace PixlPunkt.Core.Document
                 docName,
                 width,
                 height,
-                new SizeInt32(tileW, tileH),
-                new SizeInt32(tilesX, tilesY));
+                CreateSize(tileW, tileH),
+                CreateSize(tilesX, tilesY));
 
             // ── 4) Create layers from cels ───────────────────────────────
             // Sort cels by layer index and build layers bottom-to-top
@@ -845,8 +846,8 @@ namespace PixlPunkt.Core.Document
                 docName,
                 pixelWidth,
                 pixelHeight,
-                new SizeInt32(tileWidth, tileHeight),
-                new SizeInt32(mapWidth, mapHeight));
+                CreateSize(tileWidth, tileHeight),
+                CreateSize(mapWidth, mapHeight));
 
             // Process each tile layer
             foreach (var layerElement in mapElement.Elements("layer"))
@@ -879,85 +880,6 @@ namespace PixlPunkt.Core.Document
 
             canvasDoc.CompositeTo(canvasDoc.Surface);
             LoggingService.Info("TMX import complete for {FilePath}: {LayerCount} layers", filePath, canvasDoc.Layers.Count);
-            return canvasDoc;
-        }
-
-        // ──────────────────────────────────────────────────────────────────
-        // T I L E D   T S X   (.tsx)
-        // ──────────────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Imports a Tiled TSX tileset file as a CanvasDocument.
-        /// </summary>
-        /// <param name="filePath">Path to the .tsx file.</param>
-        /// <returns>A <see cref="CanvasDocument"/> containing the tileset image.</returns>
-        /// <exception cref="InvalidDataException">Thrown if the file is not a valid TSX document.</exception>
-        /// <remarks>
-        /// <para>
-        /// TSX files define tilesets for Tiled tilemaps. This importer loads the tileset image
-        /// and creates a document with the tile grid configuration matching the tileset definition.
-        /// </para>
-        /// </remarks>
-        public static CanvasDocument ImportTsx(string filePath)
-        {
-            var doc = System.Xml.Linq.XDocument.Load(filePath);
-            var tilesetElement = doc.Root ?? throw new InvalidDataException("TSX file has no root element.");
-
-            if (tilesetElement.Name.LocalName != "tileset")
-                throw new InvalidDataException("TSX file root element is not 'tileset'.");
-
-            string name = tilesetElement.Attribute("name")?.Value ?? Path.GetFileNameWithoutExtension(filePath);
-            int tileWidth = int.Parse(tilesetElement.Attribute("tilewidth")?.Value ?? "16");
-            int tileHeight = int.Parse(tilesetElement.Attribute("tileheight")?.Value ?? "16");
-            int tileCount = int.Parse(tilesetElement.Attribute("tilecount")?.Value ?? "0");
-            int columns = int.Parse(tilesetElement.Attribute("columns")?.Value ?? "1");
-
-            string baseDir = Path.GetDirectoryName(filePath) ?? ".";
-
-            // Load image
-            var imageElement = tilesetElement.Element("image");
-            if (imageElement == null)
-                throw new InvalidDataException("TSX tileset has no image element.");
-
-            string imageSrc = imageElement.Attribute("source")?.Value ?? "";
-            string imagePath = Path.IsPathRooted(imageSrc) ? imageSrc : Path.Combine(baseDir, imageSrc);
-
-            if (!File.Exists(imagePath))
-                throw new FileNotFoundException($"Tileset image not found: {imagePath}");
-
-            LoggingService.Info("TSX import {FilePath}: tile={TW}x{TH}, count={Count}, columns={Cols}",
-                filePath, tileWidth, tileHeight, tileCount, columns);
-
-            // Load the image
-            using var bmp = new Bitmap(imagePath);
-            int width = bmp.Width;
-            int height = bmp.Height;
-
-            int tilesX = columns > 0 ? columns : Math.Max(1, width / tileWidth);
-            int tilesY = tileCount > 0 && columns > 0 ? (tileCount + columns - 1) / columns : Math.Max(1, height / tileHeight);
-
-            var canvasDoc = new CanvasDocument(
-                name,
-                width,
-                height,
-                new SizeInt32(tileWidth, tileHeight),
-                new SizeInt32(tilesX, tilesY));
-
-            // Remove default layer and add our tileset layer
-            if (canvasDoc.Layers.Count == 1 && canvasDoc.Layers[0] is RasterLayer)
-                canvasDoc.RemoveLayer(0);
-
-            int layerIdx = canvasDoc.AddLayer("Tileset");
-            if (canvasDoc.Layers[layerIdx] is not RasterLayer rl)
-                throw new InvalidDataException("Failed to create RasterLayer for TSX import.");
-
-            CopyBitmapToSurface(bmp, rl.Surface);
-            rl.Visible = true;
-            rl.Opacity = 255;
-            rl.UpdatePreview();
-
-            canvasDoc.CompositeTo(canvasDoc.Surface);
-            LoggingService.Info("TSX import complete for {FilePath}", filePath);
             return canvasDoc;
         }
 
@@ -1209,6 +1131,85 @@ namespace PixlPunkt.Core.Document
         }
 
         // ──────────────────────────────────────────────────────────────────
+        // T I L E D   T S X   (.tsx)
+        // ──────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Imports a Tiled TSX tileset file as a CanvasDocument.
+        /// </summary>
+        /// <param name="filePath">Path to the .tsx file.</param>
+        /// <returns>A <see cref="CanvasDocument"/> containing the tileset image.</returns>
+        /// <exception cref="InvalidDataException">Thrown if the file is not a valid TSX document.</exception>
+        /// <remarks>
+        /// <para>
+        /// TSX files define tilesets for Tiled tilemaps. This importer loads the tileset image
+        /// and creates a document with the tile grid configuration matching the tileset definition.
+        /// </para>
+        /// </remarks>
+        public static CanvasDocument ImportTsx(string filePath)
+        {
+            var doc = System.Xml.Linq.XDocument.Load(filePath);
+            var tilesetElement = doc.Root ?? throw new InvalidDataException("TSX file has no root element.");
+
+            if (tilesetElement.Name.LocalName != "tileset")
+                throw new InvalidDataException("TSX file root element is not 'tileset'.");
+
+            string name = tilesetElement.Attribute("name")?.Value ?? Path.GetFileNameWithoutExtension(filePath);
+            int tileWidth = int.Parse(tilesetElement.Attribute("tilewidth")?.Value ?? "16");
+            int tileHeight = int.Parse(tilesetElement.Attribute("tileheight")?.Value ?? "16");
+            int tileCount = int.Parse(tilesetElement.Attribute("tilecount")?.Value ?? "0");
+            int columns = int.Parse(tilesetElement.Attribute("columns")?.Value ?? "1");
+
+            string baseDir = Path.GetDirectoryName(filePath) ?? ".";
+
+            // Load image
+            var imageElement = tilesetElement.Element("image");
+            if (imageElement == null)
+                throw new InvalidDataException("TSX tileset has no image element.");
+
+            string imageSrc = imageElement.Attribute("source")?.Value ?? "";
+            string imagePath = Path.IsPathRooted(imageSrc) ? imageSrc : Path.Combine(baseDir, imageSrc);
+
+            if (!File.Exists(imagePath))
+                throw new FileNotFoundException($"Tileset image not found: {imagePath}");
+
+            LoggingService.Info("TSX import {FilePath}: tile={TW}x{TH}, count={Count}, columns={Cols}",
+                filePath, tileWidth, tileHeight, tileCount, columns);
+
+            // Load the image
+            using var bmp = new Bitmap(imagePath);
+            int width = bmp.Width;
+            int height = bmp.Height;
+
+            int tilesX = columns > 0 ? columns : Math.Max(1, width / tileWidth);
+            int tilesY = tileCount > 0 && columns > 0 ? (tileCount + columns - 1) / columns : Math.Max(1, height / tileHeight);
+
+            var canvasDoc = new CanvasDocument(
+                name,
+                width,
+                height,
+                CreateSize(tileWidth, tileHeight),
+                CreateSize(tilesX, tilesY));
+
+            // Remove default layer and add our tileset layer
+            if (canvasDoc.Layers.Count == 1 && canvasDoc.Layers[0] is RasterLayer)
+                canvasDoc.RemoveLayer(0);
+
+            int layerIdx = canvasDoc.AddLayer("Tileset");
+            if (canvasDoc.Layers[layerIdx] is not RasterLayer rl)
+                throw new InvalidDataException("Failed to create RasterLayer for TSX import.");
+
+            CopyBitmapToSurface(bmp, rl.Surface);
+            rl.Visible = true;
+            rl.Opacity = 255;
+            rl.UpdatePreview();
+
+            canvasDoc.CompositeTo(canvasDoc.Surface);
+            LoggingService.Info("TSX import complete for {FilePath}", filePath);
+            return canvasDoc;
+        }
+
+        // ──────────────────────────────────────────────────────────────────
         // W I N D O W S   I C O N   (.ico)
         // ──────────────────────────────────────────────────────────────────
 
@@ -1244,8 +1245,8 @@ namespace PixlPunkt.Core.Document
                 name,
                 width,
                 height,
-                new SizeInt32(tileW, tileH),
-                new SizeInt32(tilesX, tilesY));
+                CreateSize(tileW, tileH),
+                CreateSize(tilesX, tilesY));
 
             if (doc.Layers.Count == 1 && doc.Layers[0] is RasterLayer)
                 doc.RemoveLayer(0);
@@ -1332,8 +1333,8 @@ namespace PixlPunkt.Core.Document
                 name,
                 width,
                 height,
-                new SizeInt32(tileW, tileH),
-                new SizeInt32(tilesX, tilesY));
+                CreateSize(tileW, tileH),
+                CreateSize(tilesX, tilesY));
 
             if (doc.Layers.Count == 1 && doc.Layers[0] is RasterLayer)
                 doc.RemoveLayer(0);

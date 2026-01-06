@@ -1,10 +1,12 @@
 using System;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Guides;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.UI.CanvasHost.Rulers;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.Foundation;
 using Windows.UI;
 
@@ -12,10 +14,6 @@ namespace PixlPunkt.UI.CanvasHost
 {
     /// <summary>
     /// Ruler and guide management for CanvasViewHost.
-    /// - Draws horizontal and vertical rulers with tile-based tick marks
-    /// - Supports guide creation by dragging from rulers
-    /// - Supports guide manipulation on canvas (move with LMB, delete with RMB)
-    /// - Manages guide visibility and snap settings
     /// </summary>
     public sealed partial class CanvasViewHost
     {
@@ -27,17 +25,13 @@ namespace PixlPunkt.UI.CanvasHost
         private bool _showRulers = true;
         private Guide? _dragGuide;
 
-        // Guide hover state for canvas interaction
         private Guide? _hoveredGuide;
         private bool _isDraggingGuideOnCanvas;
 
-        // Guide lock state - prevents interaction when locked
         private bool _guidesLocked = false;
 
-        // Background color for non-ruler area (matches canvas outside fill)
         private static readonly Color RulerHiddenBackground = Color.FromArgb(255, 24, 24, 24);
 
-        // Guide hit threshold in screen pixels
         private const float GuideHitThreshold = 6f;
 
         /// <summary>Gets or sets whether rulers are visible.</summary>
@@ -89,7 +83,6 @@ namespace PixlPunkt.UI.CanvasHost
                 if (_guidesLocked == value) return;
                 _guidesLocked = value;
 
-                // Clear any hover state when locking
                 if (_guidesLocked && _hoveredGuide != null)
                 {
                     _hoveredGuide.IsSelected = false;
@@ -113,10 +106,6 @@ namespace PixlPunkt.UI.CanvasHost
             _guideService = new GuideService();
             _guideService.GuidesChanged += OnGuidesChanged;
 
-            // Wire up ruler draw events
-            HorizontalRulerCanvas.Draw += HorizontalRulerCanvas_Draw;
-            VerticalRulerCanvas.Draw += VerticalRulerCanvas_Draw;
-
             UpdateRulerVisibility();
             UpdateSnapIndicator();
             UpdateLockGuidesIndicator();
@@ -124,12 +113,10 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void UpdateRulerVisibility()
         {
-            // Update corner background based on ruler visibility
             if (RulerCorner != null)
             {
                 if (_showRulers)
                 {
-                    // Use theme-aware resources for ruler corner
                     if (Application.Current.Resources.TryGetValue("ApplicationPageBackgroundThemeBrush", out var bgBrush))
                         RulerCorner.Background = bgBrush as Microsoft.UI.Xaml.Media.Brush;
                     if (Application.Current.Resources.TryGetValue("ApplicationPageBackgroundThemeBrush", out var borderBrush))
@@ -138,24 +125,18 @@ namespace PixlPunkt.UI.CanvasHost
                 }
                 else
                 {
-                    // Use theme-aware background when hidden
                     if (Application.Current.Resources.TryGetValue("ApplicationPageBackgroundThemeBrush", out var bgBrush))
                         RulerCorner.Background = bgBrush as Microsoft.UI.Xaml.Media.Brush;
                     RulerCorner.BorderThickness = new Microsoft.UI.Xaml.Thickness(0);
                 }
             }
 
-            // The rulers are always in the layout but we can skip drawing
             HorizontalRulerCanvas.Invalidate();
             VerticalRulerCanvas.Invalidate();
         }
 
-        /// <summary>
-        /// Updates the snap indicator visual state.
-        /// </summary>
         private void UpdateSnapIndicator()
         {
-            // Find controls by name since they're defined in XAML
             var snapIndicator = FindName("SnapIndicator") as Microsoft.UI.Xaml.Controls.Border;
             var snapIcon = FindName("SnapIcon") as FluentIcons.WinUI.FluentIcon;
             var snapText = FindName("SnapText") as Microsoft.UI.Xaml.Controls.TextBlock;
@@ -167,7 +148,6 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (isEnabled)
             {
-                // Active state - use accent color
                 snapIndicator.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
                     Windows.UI.Color.FromArgb(255, 0, 100, 140));
                 var accentFg = new Microsoft.UI.Xaml.Media.SolidColorBrush(
@@ -177,7 +157,6 @@ namespace PixlPunkt.UI.CanvasHost
             }
             else
             {
-                // Inactive state - use theme resource (will adapt to light/dark)
                 if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out var bgBrush))
                     snapIndicator.Background = bgBrush as Microsoft.UI.Xaml.Media.Brush;
                 if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var fgBrush))
@@ -188,9 +167,6 @@ namespace PixlPunkt.UI.CanvasHost
             }
         }
 
-        /// <summary>
-        /// Updates the lock guides indicator visual state.
-        /// </summary>
         private void UpdateLockGuidesIndicator()
         {
             var lockIndicator = FindName("LockGuidesIndicator") as Microsoft.UI.Xaml.Controls.Border;
@@ -202,7 +178,6 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (_guidesLocked)
             {
-                // Locked state - orange/yellow accent
                 lockIndicator.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
                     Windows.UI.Color.FromArgb(255, 140, 100, 0));
                 var accentFg = new Microsoft.UI.Xaml.Media.SolidColorBrush(
@@ -213,7 +188,6 @@ namespace PixlPunkt.UI.CanvasHost
             }
             else
             {
-                // Unlocked state - use theme resource (will adapt to light/dark)
                 if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out var bgBrush))
                     lockIndicator.Background = bgBrush as Microsoft.UI.Xaml.Media.Brush;
                 lockIcon.Icon = FluentIcons.Common.Icon.LockOpen;
@@ -225,18 +199,12 @@ namespace PixlPunkt.UI.CanvasHost
             }
         }
 
-        /// <summary>
-        /// Handles clicking the snap indicator to toggle snap-to-guides.
-        /// </summary>
         private void SnapIndicator_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
             SnapToGuides = !SnapToGuides;
             e.Handled = true;
         }
 
-        /// <summary>
-        /// Handles clicking the lock guides indicator to toggle guide locking.
-        /// </summary>
         private void LockGuidesIndicator_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
             GuidesLocked = !GuidesLocked;
@@ -251,12 +219,9 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ====================================================================
-        // CANVAS GUIDE INTERACTION (move/delete guides on canvas)
+        // CANVAS GUIDE INTERACTION
         // ====================================================================
 
-        /// <summary>
-        /// Finds a guide at the given screen position on the canvas.
-        /// </summary>
         private Guide? FindGuideAtScreenPosition(Point screenPos)
         {
             if (_guideService == null || !_guideService.GuidesVisible || _guidesLocked)
@@ -265,7 +230,6 @@ namespace PixlPunkt.UI.CanvasHost
             var dest = _zoom.GetDestRect();
             float scale = (float)_zoom.Scale;
 
-            // Check horizontal guides
             foreach (var guide in _guideService.HorizontalGuides)
             {
                 float screenY = (float)(dest.Y + guide.Position * scale);
@@ -273,7 +237,6 @@ namespace PixlPunkt.UI.CanvasHost
                     return guide;
             }
 
-            // Check vertical guides
             foreach (var guide in _guideService.VerticalGuides)
             {
                 float screenX = (float)(dest.X + guide.Position * scale);
@@ -284,21 +247,14 @@ namespace PixlPunkt.UI.CanvasHost
             return null;
         }
 
-        /// <summary>
-        /// Handles guide hover detection during pointer move on canvas.
-        /// Call this from the main pointer move handler.
-        /// Returns true if guide interaction consumed the event.
-        /// </summary>
         private bool Guide_TryHandlePointerMoved(PointerRoutedEventArgs e)
         {
-            // Skip all guide interaction if locked
             if (_guidesLocked)
                 return false;
 
             if (_guideService == null || !_guideService.GuidesVisible)
                 return false;
 
-            // If we're actively dragging a guide, update its position
             if (_isDraggingGuideOnCanvas && _dragGuide != null)
             {
                 var pos = e.GetCurrentPoint(CanvasView).Position;
@@ -316,13 +272,11 @@ namespace PixlPunkt.UI.CanvasHost
                 return true;
             }
 
-            // Check for hover (only when not dragging something else)
             var currentPos = e.GetCurrentPoint(CanvasView).Position;
             var newHovered = FindGuideAtScreenPosition(currentPos);
 
             if (newHovered != _hoveredGuide)
             {
-                // Update selection state for visual feedback
                 if (_hoveredGuide != null)
                     _hoveredGuide.IsSelected = false;
 
@@ -337,13 +291,8 @@ namespace PixlPunkt.UI.CanvasHost
             return false;
         }
 
-        /// <summary>
-        /// Handles guide interaction on pointer pressed.
-        /// Returns true if a guide was clicked and the event was handled.
-        /// </summary>
         private bool Guide_TryHandlePointerPressed(PointerRoutedEventArgs e)
         {
-            // Skip all guide interaction if locked
             if (_guidesLocked)
                 return false;
 
@@ -357,7 +306,6 @@ namespace PixlPunkt.UI.CanvasHost
             if (guide == null)
                 return false;
 
-            // Right-click to delete
             if (props.IsRightButtonPressed)
             {
                 _guideService.RemoveGuide(guide);
@@ -366,7 +314,6 @@ namespace PixlPunkt.UI.CanvasHost
                 return true;
             }
 
-            // Left-click to start dragging
             if (props.IsLeftButtonPressed)
             {
                 _dragGuide = guide;
@@ -378,10 +325,6 @@ namespace PixlPunkt.UI.CanvasHost
             return false;
         }
 
-        /// <summary>
-        /// Handles guide interaction on pointer released.
-        /// Returns true if a guide drag was completed.
-        /// </summary>
         private bool Guide_TryHandlePointerReleased(PointerRoutedEventArgs e)
         {
             if (!_isDraggingGuideOnCanvas || _dragGuide == null)
@@ -389,7 +332,6 @@ namespace PixlPunkt.UI.CanvasHost
 
             var pos = e.GetCurrentPoint(CanvasView).Position;
 
-            // Check if guide was dragged off canvas - delete it
             if (_dragGuide.IsHorizontal)
             {
                 int docY = ViewYToDocY(pos.Y);
@@ -414,13 +356,8 @@ namespace PixlPunkt.UI.CanvasHost
             return true;
         }
 
-        /// <summary>
-        /// Gets the appropriate cursor for guide interaction.
-        /// Returns null if no guide-specific cursor should be shown.
-        /// </summary>
         private InputSystemCursorShape? GetGuideCursor()
         {
-            // No guide cursor when guides are locked
             if (_guidesLocked)
                 return null;
 
@@ -442,82 +379,81 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ====================================================================
-        // RULER DRAWING
+        // RULER DRAWING HELPERS
         // ====================================================================
 
-        private void HorizontalRulerCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void HorizontalRuler_Draw(ICanvasRenderer renderer)
         {
-            var ds = args.DrawingSession;
+            var clearColor = GetThemeClearColor();
 
-            // When rulers are hidden, show the dark background color
             if (!_showRulers)
             {
-                var clearColor = GetThemeClearColor();
-                ds.Clear(clearColor);
+                renderer.Clear(clearColor);
                 return;
             }
 
-            ds.Clear(Microsoft.UI.Colors.Transparent);
+            renderer.Clear(Color.FromArgb(0, 0, 0, 0));
 
             var dest = _zoom.GetDestRect();
             int docWidth = Document.PixelWidth;
             int tileWidth = Document.TileSize.Width;
-            if (tileWidth <= 0) tileWidth = 16; // Default fallback
+            if (tileWidth <= 0) tileWidth = 16;
 
-            // Get cursor position for highlight
             int? cursorDocX = _hoverValid ? _hoverX : null;
 
-            // Draw ruler marks - pass the actual canvas dest position for proper alignment
-            float rulerWidth = (float)sender.ActualWidth;
-            RulerRenderer.DrawHorizontalRuler(ds, dest, _zoom.Scale, docWidth, tileWidth, 0, rulerWidth, cursorDocX, ActualTheme);
+            float rulerWidth = renderer.Width;
+
+            // Draw using the RulerRenderer directly with SKCanvas
+            if (renderer.Device is SkiaSharp.SKCanvas canvas)
+            {
+                RulerRenderer.DrawHorizontalRuler(canvas, dest, _zoom.Scale, docWidth, tileWidth, 0, rulerWidth, cursorDocX, ActualTheme);
+            }
         }
 
-        private void VerticalRulerCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void VerticalRuler_Draw(ICanvasRenderer renderer)
         {
-            var ds = args.DrawingSession;
+            var clearColor = GetThemeClearColor();
 
-            // When rulers are hidden, show the dark background color
             if (!_showRulers)
             {
-                var clearColor = GetThemeClearColor();
-                ds.Clear(clearColor);
+                renderer.Clear(clearColor);
                 return;
             }
 
-            ds.Clear(Microsoft.UI.Colors.Transparent);
+            renderer.Clear(Color.FromArgb(0, 0, 0, 0));
 
             var dest = _zoom.GetDestRect();
             int docHeight = Document.PixelHeight;
             int tileHeight = Document.TileSize.Height;
-            if (tileHeight <= 0) tileHeight = 16; // Default fallback
+            if (tileHeight <= 0) tileHeight = 16;
 
-            // Get cursor position for highlight
             int? cursorDocY = _hoverValid ? _hoverY : null;
 
-            // Draw ruler marks - pass the actual canvas dest position for proper alignment
-            float rulerHeight = (float)sender.ActualHeight;
-            RulerRenderer.DrawVerticalRuler(ds, dest, _zoom.Scale, docHeight, tileHeight, 0, rulerHeight, cursorDocY, ActualTheme);
+            float rulerHeight = renderer.Height;
+
+            // Draw using the RulerRenderer directly with SKCanvas
+            if (renderer.Device is SkiaSharp.SKCanvas canvas)
+            {
+                RulerRenderer.DrawVerticalRuler(canvas, dest, _zoom.Scale, docHeight, tileHeight, 0, rulerHeight, cursorDocY, ActualTheme);
+            }
         }
 
         // ====================================================================
-        // HORIZONTAL RULER INTERACTION (creates horizontal guides)
+        // HORIZONTAL RULER INTERACTION
         // ====================================================================
 
         private void HorizontalRuler_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            // Skip guide creation/manipulation when guides are locked
             if (_guidesLocked || _guideService == null || !_showRulers) return;
 
             var pos = e.GetCurrentPoint(HorizontalRulerCanvas).Position;
             int docY = ScreenYToDocYFromHorizontalRuler(pos.Y);
 
-            // Check if clicking on existing guide
             _dragGuide = _guideService.FindGuideAt(docY, isHorizontal: true, threshold: (int)(4 / _zoom.Scale) + 1);
 
             if (_dragGuide == null)
             {
-                // Create new horizontal guide (dragged from top ruler)
-                _dragGuide = _guideService.AddHorizontalGuide(0); // Start at top, will update on move
+                _dragGuide = _guideService.AddHorizontalGuide(0);
             }
 
             HorizontalRulerCanvas.CapturePointer(e.Pointer);
@@ -544,7 +480,6 @@ namespace PixlPunkt.UI.CanvasHost
             var pos = e.GetCurrentPoint(CanvasView).Position;
             int docY = ViewYToDocY(pos.Y);
 
-            // If dragged off canvas (back into ruler area or past bottom), delete the guide
             if (docY < 0 || docY > Document.PixelHeight)
             {
                 _guideService?.RemoveGuide(_dragGuide);
@@ -556,24 +491,21 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ====================================================================
-        // VERTICAL RULER INTERACTION (creates vertical guides)
+        // VERTICAL RULER INTERACTION
         // ====================================================================
 
         private void VerticalRuler_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            // Skip guide creation/manipulation when guides are locked
             if (_guidesLocked || _guideService == null || !_showRulers) return;
 
             var pos = e.GetCurrentPoint(VerticalRulerCanvas).Position;
             int docX = ScreenXToDocXFromVerticalRuler(pos.X);
 
-            // Check if clicking on existing guide
             _dragGuide = _guideService.FindGuideAt(docX, isHorizontal: false, threshold: (int)(4 / _zoom.Scale) + 1);
 
             if (_dragGuide == null)
             {
-                // Create new vertical guide (dragged from left ruler)
-                _dragGuide = _guideService.AddVerticalGuide(0); // Start at left, will update on move
+                _dragGuide = _guideService.AddVerticalGuide(0);
             }
 
             VerticalRulerCanvas.CapturePointer(e.Pointer);
@@ -600,7 +532,6 @@ namespace PixlPunkt.UI.CanvasHost
             var pos = e.GetCurrentPoint(CanvasView).Position;
             int docX = ViewXToDocX(pos.X);
 
-            // If dragged off canvas (back into ruler area or past right), delete the guide
             if (docX < 0 || docX > Document.PixelWidth)
             {
                 _guideService?.RemoveGuide(_dragGuide);
@@ -615,9 +546,6 @@ namespace PixlPunkt.UI.CanvasHost
         // COORDINATE CONVERSION FOR RULERS
         // ====================================================================
 
-        /// <summary>
-        /// Converts screen X from vertical ruler to document X coordinate.
-        /// </summary>
         private int ScreenXToDocXFromVerticalRuler(double screenX)
         {
             var dest = _zoom.GetDestRect();
@@ -625,9 +553,6 @@ namespace PixlPunkt.UI.CanvasHost
             return (int)Math.Round(docX);
         }
 
-        /// <summary>
-        /// Converts screen Y from horizontal ruler to document Y coordinate.
-        /// </summary>
         private int ScreenYToDocYFromHorizontalRuler(double screenY)
         {
             var dest = _zoom.GetDestRect();
@@ -635,9 +560,6 @@ namespace PixlPunkt.UI.CanvasHost
             return (int)Math.Round(docY);
         }
 
-        /// <summary>
-        /// Converts view X to document X coordinate (for main canvas).
-        /// </summary>
         private int ViewXToDocX(double viewX)
         {
             var dest = _zoom.GetDestRect();
@@ -645,9 +567,6 @@ namespace PixlPunkt.UI.CanvasHost
             return (int)Math.Round(docX);
         }
 
-        /// <summary>
-        /// Converts view Y to document Y coordinate (for main canvas).
-        /// </summary>
         private int ViewYToDocY(double viewY)
         {
             var dest = _zoom.GetDestRect();
@@ -655,9 +574,6 @@ namespace PixlPunkt.UI.CanvasHost
             return (int)Math.Round(docY);
         }
 
-        /// <summary>
-        /// Converts ruler screen X to document X coordinate.
-        /// </summary>
         private int ScreenXToDocX(double screenX)
         {
             var dest = _zoom.GetDestRect();
@@ -665,9 +581,6 @@ namespace PixlPunkt.UI.CanvasHost
             return (int)Math.Round(docX);
         }
 
-        /// <summary>
-        /// Converts ruler screen Y to document Y coordinate.
-        /// </summary>
         private int ScreenYToDocY(double screenY)
         {
             var dest = _zoom.GetDestRect();
@@ -679,19 +592,10 @@ namespace PixlPunkt.UI.CanvasHost
         // GUIDE MANAGEMENT PUBLIC API
         // ====================================================================
 
-        /// <summary>
-        /// Clears all guides.
-        /// </summary>
         public void ClearAllGuides() => _guideService?.ClearAllGuides();
 
-        /// <summary>
-        /// Adds a vertical guide at the specified document X position.
-        /// </summary>
         public void AddVerticalGuide(int x) => _guideService?.AddVerticalGuide(x);
 
-        /// <summary>
-        /// Adds a horizontal guide at the specified document Y position.
-        /// </summary>
         public void AddHorizontalGuide(int y) => _guideService?.AddHorizontalGuide(y);
     }
 }

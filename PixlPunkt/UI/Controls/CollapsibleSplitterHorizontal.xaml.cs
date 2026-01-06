@@ -279,8 +279,9 @@ namespace PixlPunkt.UI.Controls
         {
             UpdateIconDirection();
 
+            var grid = FindParent<Grid>(this);
             var targetRow = GetTargetRow();
-            if (targetRow == null) return;
+            if (targetRow == null || grid == null) return;
 
             if (IsCollapsed)
             {
@@ -291,9 +292,9 @@ namespace PixlPunkt.UI.Controls
                     _previousHeight = currentHeight;
                 }
 
-                // Collapse to zero
-                targetRow.Height = new GridLength(0);
+                // Collapse to zero - set MinHeight first to allow zero
                 targetRow.MinHeight = 0;
+                targetRow.Height = new GridLength(0, GridUnitType.Pixel);
             }
             else
             {
@@ -303,8 +304,13 @@ namespace PixlPunkt.UI.Controls
                     : DefaultExpandedHeight;
 
                 targetRow.MinHeight = MinExpandedHeight;
-                targetRow.Height = new GridLength(restoreHeight);
+                targetRow.Height = new GridLength(restoreHeight, GridUnitType.Pixel);
             }
+
+            // Force the parent Grid to re-measure and re-arrange
+            grid.InvalidateMeasure();
+            grid.InvalidateArrange();
+            grid.UpdateLayout();
         }
 
         // ====================================================================
@@ -437,7 +443,7 @@ namespace PixlPunkt.UI.Controls
         // HELPERS
         // ====================================================================
 
-        private static T? FindParent<T>(DependencyObject start) where T : DependencyObject
+        private static T? FindParent<T>(DependencyObject start) where T : class
         {
             var parent = VisualTreeHelper.GetParent(start);
             while (parent != null && parent is not T)

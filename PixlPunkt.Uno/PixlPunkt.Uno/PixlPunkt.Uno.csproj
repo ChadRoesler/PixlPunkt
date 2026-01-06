@@ -1,0 +1,93 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-browserwasm;net10.0-desktop;net10.0</TargetFrameworks>
+
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <RootNamespace>PixlPunkt.Uno</RootNamespace>
+
+    <!-- Display name -->
+    <ApplicationTitle>PixlPunkt</ApplicationTitle>
+    <!-- App Identifier -->
+    <ApplicationId>com.pixlpunkt.app</ApplicationId>
+    <!-- Versions -->
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <!-- Package Publisher -->
+    <ApplicationPublisher>Caesar</ApplicationPublisher>
+    <!-- Package Description -->
+    <Description>PixlPunkt - Cross-platform pixel art editor powered by Uno Platform.</Description>
+
+    <!--
+      UnoFeatures are used to quickly add and manage features enabled for your app.
+      https://aka.platform.uno/singleproject-features
+    -->
+    <UnoFeatures>
+      Lottie;
+      Hosting;
+      Toolkit;
+      Logging;
+      LoggingSerilog;
+      MVUX;
+      Configuration;
+      HttpKiota;
+      Serialization;
+      Localization;
+      Navigation;
+      ThemeService;
+      SkiaRenderer;
+    </UnoFeatures>
+  </PropertyGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       BUILD CONFIGURATION
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>$(OutputPath)PixlPunkt.Uno.xml</DocumentationFile>
+    
+    <!-- Suppress warnings -->
+    <NoWarn>$(NoWarn);CS1591;CS0169;CS0414;CS0649;CS0067;CS0618;CS0253;CS8601;CS8604;CS8629;WMC1506</NoWarn>
+    
+    <!-- Publishing -->
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishTrimmed>False</PublishTrimmed>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug' or '$(IsUiAutomationMappingEnabled)'=='True'">
+    <IsUiAutomationMappingEnabled>True</IsUiAutomationMappingEnabled>
+    <DefineConstants>$(DefineConstants);USE_UITESTS</DefineConstants>
+  </PropertyGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       DESKTOP (SKIA) CONFIGURATION
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('desktop'))">
+    <UnoSingleProjectAllowIncrementalBuilds>true</UnoSingleProjectAllowIncrementalBuilds>
+  </PropertyGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SHARED DEPENDENCIES (CPM - no versions here)
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <ItemGroup>
+    <PackageReference Include="Markdig" />
+    <PackageReference Include="MinVer">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="FluentIcons.Common" />
+    <PackageReference Include="FluentIcons.WinUI" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="System.Drawing.Common" />
+    <PackageReference Include="FFMpegCore" />
+    <PackageReference Include="Xabe.FFmpeg.Downloader" />
+    <PackageReference Include="NetCoreAudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,147 @@
+<ContentDialog
+    x:Class="PixlPunkt.Uno.UI.Dialogs.Export.AnimationExportDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:PixlPunkt.Uno.UI.Dialogs.Export"
+    Title="Export Animation"
+    PrimaryButtonText="Export"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary"
+    Closing="ContentDialog_Closing">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                  HorizontalScrollBarVisibility="Disabled"
+                  MaxHeight="500">
+        <StackPanel Spacing="16" Width="420" Padding="4,4,16,4">
+        
+            <!-- Animation Source -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Animation Source" FontWeight="SemiBold"/>
+                <RadioButtons x:Name="SourceRadioButtons" SelectionChanged="SourceRadioButtons_SelectionChanged">
+                    <RadioButton x:Name="TileAnimationRadio" Content="Tile Animation (Selected Reel)"/>
+                    <RadioButton x:Name="CanvasAnimationRadio" Content="Canvas Animation (All Frames)" IsChecked="True"/>
+                </RadioButtons>
+                <TextBlock x:Name="SourceInfoText" 
+                           Text="24 frames @ 12 fps" 
+                           FontSize="12" 
+                           Opacity="0.7"
+                           Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <!-- Export Format -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Export Format" FontWeight="SemiBold"/>
+                <ComboBox x:Name="FormatComboBox" 
+                          HorizontalAlignment="Stretch"
+                          SelectionChanged="FormatComboBox_SelectionChanged">
+                    <ComboBoxItem Tag="gif" Content="Animated GIF (.gif)"/>
+                    <ComboBoxItem Tag="mp4" Content="MP4 Video (.mp4)"/>
+                    <ComboBoxItem Tag="wmv" Content="Windows Media Video (.wmv)"/>
+                    <ComboBoxItem Tag="avi" Content="AVI Video (.avi)"/>
+                    <ComboBoxItem Tag="png" Content="PNG Image Sequence"/>
+                    <ComboBoxItem Tag="jpg" Content="JPEG Image Sequence"/>
+                    <ComboBoxItem Tag="pxpr" Content="Animation SubRoutine (.pxpr)"/>
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Scale -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Scale:" VerticalAlignment="Center"/>
+                <NumberBox x:Name="ScaleNumberBox" 
+                           Grid.Column="1"
+                           Minimum="1" 
+                           Maximum="16" 
+                           Value="1"
+                           SpinButtonPlacementMode="Hidden"/>
+                <TextBlock x:Name="OutputSizeText" 
+                           Grid.Column="2"
+                           Text="64×64 pixels" 
+                           VerticalAlignment="Center" 
+                           Opacity="0.7"/>
+            </Grid>
+
+            <!-- Stage Options (Canvas Animation only) -->
+            <StackPanel x:Name="StageOptionsPanel" Spacing="8">
+                <CheckBox x:Name="UseStageCheckBox" 
+                          Content="Use Stage bounds (if enabled)" 
+                          IsChecked="True"
+                          Checked="UseStageCheckBox_Changed"
+                          Unchecked="UseStageCheckBox_Changed"/>
+                <TextBlock x:Name="StageInfoText" 
+                           Text="Stage: 32×32 → 64×64 output" 
+                           FontSize="12" 
+                           Opacity="0.7"
+                           Visibility="Collapsed"/>
+            </StackPanel>
+
+            <!-- Loop Option (GIF only) -->
+            <CheckBox x:Name="LoopCheckBox" 
+                      Content="Loop animation" 
+                      IsChecked="True"/>
+
+            <!-- Video Quality (Video formats only) -->
+            <StackPanel x:Name="VideoQualityPanel" Spacing="8" Visibility="Collapsed">
+                <TextBlock Text="Video Quality" FontWeight="SemiBold"/>
+                <Slider x:Name="QualitySlider" 
+                        Minimum="20" 
+                        Maximum="100" 
+                        Value="80" 
+                        HorizontalAlignment="Stretch"/>
+                <TextBlock x:Name="QualityText" Text="80%"/>
+            </StackPanel>
+
+            <!-- Separate Layers (Image Sequence only) -->
+            <StackPanel x:Name="SeparateLayersPanel" Spacing="8" Visibility="Collapsed">
+                <CheckBox x:Name="SeparateLayersCheckBox" 
+                          Content="Export each layer to separate folder"/>
+                <TextBlock Text="Creates a subfolder for each layer with all frames" 
+                           FontSize="12" 
+                           Opacity="0.7"
+                           TextWrapping="Wrap"
+                           Margin="24,0,0,0"/>
+            </StackPanel>
+
+            <!-- FPS Override -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="70"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox x:Name="OverrideFpsCheckBox" 
+                          Content="Override FPS:" 
+                          VerticalAlignment="Center"
+                          Checked="OverrideFpsCheckBox_Changed"
+                          Unchecked="OverrideFpsCheckBox_Changed"/>
+                <NumberBox x:Name="FpsNumberBox" 
+                           Grid.Column="1"
+                           Minimum="1" 
+                           Maximum="60" 
+                           Value="12"
+                           IsEnabled="False"
+                           SpinButtonPlacementMode="Hidden"/>
+            </Grid>
+
+            <!-- Preview -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Preview" FontWeight="SemiBold"/>
+                <Border BorderBrush="{ThemeResource SystemBaseMediumLowColor}" 
+                        BorderThickness="1"
+                        Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+                        Width="200" Height="200"
+                        HorizontalAlignment="Left">
+                    <Image x:Name="PreviewImage" Stretch="Uniform"/>
+                </Border>
+                <TextBlock x:Name="PreviewInfoText" 
+                           Text="Frame 1/24 - 83ms" 
+                           FontSize="12" 
+                           Opacity="0.7"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

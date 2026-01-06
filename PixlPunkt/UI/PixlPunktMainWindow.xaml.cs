@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI;
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -29,6 +28,7 @@ using PixlPunkt.UI.Settings;
 using Windows.Graphics;
 using Windows.System;
 using PixlPunkt.UI.Ascii;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI
 {
@@ -57,7 +57,6 @@ namespace PixlPunkt.UI
         // FIELDS: Window / Workspace
         // ─────────────────────────────────────────────────────────────
 
-        private readonly AppWindow _appWindow;
         private readonly DocumentWorkspace _workspace = new();
         private CanvasViewHost? CurrentHost;
         private bool _suspendToolAccelerators;
@@ -121,15 +120,14 @@ namespace PixlPunkt.UI
             SyncStripeTheme();
 
             // Apply custom window chrome (resizable, proper title bar merging)
-            _appWindow = WindowHost.ApplyChrome(
+            WindowHost.ApplyChrome(
                 this,
                 resizable: true,
                 alwaysOnTop: false,
                 minimizable: true,
                 title: "Pixl Punkt");
 
-            // Wire up window closing event for unsaved changes check
-            _appWindow.Closing += OnWindowClosing;
+            // Note: Window closing handled via Closed event in Uno
 
             // Collect tool accelerators defined in XAML (B,E,F,R,G,J,U etc.)
             foreach (var accel in Root.KeyboardAccelerators)
@@ -330,57 +328,12 @@ namespace PixlPunkt.UI
 
         private bool _closingHandled = false;
 
-        private async void OnWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+        private void OnWindowClosed(object sender, WindowEventArgs args)
         {
             // Prevent re-entrancy
             if (_closingHandled) return;
-
-            // Check for any documents with unsaved changes
-            var dirtyDocs = GetDocumentsWithUnsavedChanges();
-            if (dirtyDocs.Count == 0)
-            {
-                // No unsaved changes - mark clean exit and allow close
-                MarkSessionCleanExit();
-                return;
-            }
-
-            // Cancel the close to show dialog
-            args.Cancel = true;
-
-            // Show confirmation dialog
-            var result = await PromptSaveAllChangesAsync(dirtyDocs);
-
-            if (result == SaveChangesResult.Cancel)
-            {
-                // User cancelled - don't close
-                return;
-            }
-
-            if (result == SaveChangesResult.Save)
-            {
-                // Try to save all dirty documents
-                foreach (var doc in dirtyDocs)
-                {
-                    var saved = await TrySaveDocumentAsync(doc);
-                    if (!saved)
-                    {
-                        // Save failed or cancelled - don't close
-                        return;
-                    }
-                }
-            }
-            // SaveChangesResult.DontSave - proceed with closing without saving
-
-            // Mark clean exit before closing
-            MarkSessionCleanExit();
-
-            // Mark as handled and close
             _closingHandled = true;
-            Close();
-        }
 
-        private void OnWindowClosed(object sender, WindowEventArgs args)
-        {
             // Stop and dispose auto-save service
             _autoSave.Dispose();
 
@@ -487,22 +440,17 @@ namespace PixlPunkt.UI
         // ─────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Configures extended title bar and adjusts padding to avoid overlap with caption buttons.
+        /// Configures extended title bar (simplified for cross-platform).
         /// </summary>
         private void SetupMergedTitleBar()
         {
-            ExtendsContentIntoTitleBar = true;
-            SetTitleBar(TitleBarRoot);
-
-            if (AppWindowTitleBar.IsCustomizationSupported())
-            {
-                var tb = _appWindow.TitleBar;
-                tb.ExtendsContentIntoTitleBar = true;
-                tb.ButtonBackgroundColor = Colors.Transparent;
-                tb.ButtonInactiveBackgroundColor = Colors.Transparent;
-                tb.ButtonForegroundColor = Colors.White;
-                TitleBarRoot.Padding = new Thickness(0, 0, tb.RightInset, 0);
-            }
+            // On Uno Platform, don't extend content into title bar
+            // This causes layout issues with maximized windows
+            // The standard window chrome provides the title bar
+            ExtendsContentIntoTitleBar = false;
+            
+            // Don't set a custom title bar - use the standard window chrome
+            // SetTitleBar(TitleBarRoot);
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -518,7 +466,6 @@ namespace PixlPunkt.UI
             return focused switch
             {
                 TextBox => true,
-                PasswordBox => true,
                 RichEditBox => true,
                 AutoSuggestBox => true,
                 NumberBox => true,
@@ -529,7 +476,6 @@ namespace PixlPunkt.UI
 
         /// <summary>
         /// Checks if a control that might intercept keyboard shortcuts has focus.
-        /// This includes text inputs plus list controls that handle keyboard navigation.
         /// </summary>
         private static bool IsKeyboardCapturingControlFocused()
         {
@@ -537,13 +483,10 @@ namespace PixlPunkt.UI
             return focused switch
             {
                 TextBox => true,
-                PasswordBox => true,
                 RichEditBox => true,
                 AutoSuggestBox => true,
                 NumberBox => true,
                 ComboBox cb when cb.IsEditable => true,
-                // ListView and ListViewItem can capture arrow keys and other navigation
-                // but should NOT block Ctrl+Z/Y/C/V/X/A shortcuts
                 _ => false
             };
         }
@@ -694,7 +637,7 @@ namespace PixlPunkt.UI
                     var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
                     var w = (int)decoder.PixelWidth;
                     var h = (int)decoder.PixelHeight;
-                    doc = new CanvasDocument(file.Name, w, h, new SizeInt32(8, 8), new SizeInt32(Math.Max(1, w / 8), Math.Max(1, h / 8)));
+                    doc = new CanvasDocument(file.Name, w, h, CreateSize(8, 8), CreateSize(Math.Max(1, w / 8), Math.Max(1, h / 8)));
                 }
                 else
                 {

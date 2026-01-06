@@ -1,0 +1,102 @@
+<ContentDialog
+    x:Class="PixlPunkt.Uno.UI.Dialogs.Import.ImageImportDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Import Image"
+    PrimaryButtonText="Import"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary"
+    MinWidth="480">
+
+    <StackPanel Spacing="16">
+        <!-- Image Info -->
+        <StackPanel Spacing="4">
+            <TextBlock Text="Source Image" Style="{StaticResource SubtitleTextBlockStyle}"/>
+            <TextBlock x:Name="ImageInfoText" Opacity="0.7"/>
+        </StackPanel>
+
+        <!-- Tile Mode Selection -->
+        <StackPanel Spacing="8">
+            <TextBlock Text="Import Mode" Style="{StaticResource SubtitleTextBlockStyle}"/>
+            
+            <RadioButton x:Name="SingleTileMode" Content="Single Tile (image size = tile size)" 
+                         GroupName="TileMode" Checked="TileMode_Changed"/>
+            <TextBlock Text="Creates a 1x1 tile canvas where the tile matches the image dimensions."
+                       Opacity="0.6" FontSize="12" Margin="28,0,0,0"/>
+            
+            <RadioButton x:Name="CustomTileMode" Content="Custom Tile Size" 
+                         GroupName="TileMode" IsChecked="True" Checked="TileMode_Changed"/>
+            <TextBlock Text="Specify tile dimensions. Canvas expands to fit the entire image."
+                       Opacity="0.6" FontSize="12" Margin="28,0,0,0"/>
+        </StackPanel>
+
+        <!-- Custom Tile Settings (visible when CustomTileMode is checked) -->
+        <StackPanel x:Name="CustomTilePanel" Spacing="12" Margin="28,0,0,0">
+            <Grid ColumnSpacing="16" RowSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Tile Width:" VerticalAlignment="Center" Grid.Column="0"/>
+                <NumberBox x:Name="TileWidthBox" Value="8" Minimum="1" Maximum="512"
+                           SpinButtonPlacementMode="Compact" SmallChange="1" LargeChange="8"
+                           Grid.Column="1" ValueChanged="TileSize_ValueChanged"/>
+
+                <TextBlock Text="Tile Height:" VerticalAlignment="Center" Grid.Column="2"/>
+                <NumberBox x:Name="TileHeightBox" Value="8" Minimum="1" Maximum="512"
+                           SpinButtonPlacementMode="Compact" SmallChange="1" LargeChange="8"
+                           Grid.Column="3" ValueChanged="TileSize_ValueChanged"/>
+            </Grid>
+
+            <!-- Preset Tile Sizes -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Presets:" VerticalAlignment="Center" Opacity="0.7"/>
+                <Button Content="8x8" Click="Preset8x8_Click" Padding="8,4"/>
+                <Button Content="16x16" Click="Preset16x16_Click" Padding="8,4"/>
+                <Button Content="32x32" Click="Preset32x32_Click" Padding="8,4"/>
+                <Button Content="64x64" Click="Preset64x64_Click" Padding="8,4"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Calculated Canvas Info -->
+        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                CornerRadius="4" Padding="12">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Resulting Canvas" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                <Grid ColumnSpacing="16" RowSpacing="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Tile Size:" Opacity="0.7" Grid.Row="0" Grid.Column="0"/>
+                    <TextBlock x:Name="ResultTileSizeText" Grid.Row="0" Grid.Column="1"/>
+
+                    <TextBlock Text="Tile Grid:" Opacity="0.7" Grid.Row="1" Grid.Column="0"/>
+                    <TextBlock x:Name="ResultTileGridText" Grid.Row="1" Grid.Column="1"/>
+
+                    <TextBlock Text="Canvas Size:" Opacity="0.7" Grid.Row="2" Grid.Column="0"/>
+                    <TextBlock x:Name="ResultCanvasSizeText" Grid.Row="2" Grid.Column="1"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Image Placement Note -->
+        <TextBlock Text="The image will be placed in the top-left corner of the canvas."
+                   Opacity="0.6" FontSize="12" FontStyle="Italic"/>
+    </StackPanel>
+</ContentDialog>

@@ -1,18 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Core.Coloring;
 using PixlPunkt.Core.Coloring.Helpers;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.Foundation;
 using Windows.UI;
 
 namespace PixlPunkt.UI.ColorPick.Controls
 {
     /// <summary>
-    /// Custom control that renders a horizontal row of color swatches using Win2D.
+    /// Custom control that renders a horizontal row of color swatches using SkiaSharp.
     /// Provides visual indicators for center and match states, with click interaction support.
     /// </summary>
     public sealed partial class LadderRow : UserControl
@@ -99,11 +100,13 @@ namespace PixlPunkt.UI.ColorPick.Controls
         // ════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Handles canvas draw operations to render all swatches.
+        /// Handles canvas paint operations to render all swatches.
         /// </summary>
-        private void Canvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void Canvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
+            var canvas = e.Surface.Canvas;
+            canvas.Clear(SKColors.Transparent);
+
             var items = ItemsSource;
             if (items is null || items.Count == 0) return;
 
@@ -118,19 +121,37 @@ namespace PixlPunkt.UI.ColorPick.Controls
                 var s = items[i];
                 var fill = ColorUtil.ToColor(s.Color);
 
-                var rect = new Rect(x + BORDER, BORDER, TILE_W - 2 * BORDER, TILE_H - 2 * BORDER);
+                var rect = new SKRoundRect(new SKRect(x + BORDER, BORDER, x + TILE_W - BORDER, TILE_H - BORDER), RADIUS, RADIUS);
 
-                // Fill + base border
-                ds.FillRoundedRectangle(rect, RADIUS, RADIUS, fill);
-                ds.DrawRoundedRectangle(rect, RADIUS, RADIUS, stroke, 1f);
+                // Fill
+                using (var fillPaint = new SKPaint { Color = ToSKColor(fill), Style = SKPaintStyle.Fill, IsAntialias = true })
+                {
+                    canvas.DrawRoundRect(rect, fillPaint);
+                }
+
+                // Base border
+                using (var strokePaint = new SKPaint { Color = ToSKColor(stroke), Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true })
+                {
+                    canvas.DrawRoundRect(rect, strokePaint);
+                }
 
                 // Center hint
                 if (s.IsCenter)
-                    ds.DrawRoundedRectangle(rect, RADIUS, RADIUS, centerHint, 1f);
+                {
+                    using (var centerPaint = new SKPaint { Color = ToSKColor(centerHint), Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true })
+                    {
+                        canvas.DrawRoundRect(rect, centerPaint);
+                    }
+                }
 
                 // Match highlight
                 if (s.IsMatch)
-                    ds.DrawRoundedRectangle(rect, RADIUS, RADIUS, accent, 2f);
+                {
+                    using (var accentPaint = new SKPaint { Color = ToSKColor(accent), Style = SKPaintStyle.Stroke, StrokeWidth = 2f, IsAntialias = true })
+                    {
+                        canvas.DrawRoundRect(rect, accentPaint);
+                    }
+                }
 
                 x += TILE_W + GAP;
             }
@@ -158,6 +179,11 @@ namespace PixlPunkt.UI.ColorPick.Controls
         // ════════════════════════════════════════════════════════════════════
         // HELPER METHODS
         // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Converts a Windows.UI.Color to SKColor.
+        /// </summary>
+        private static SKColor ToSKColor(Color c) => new SKColor(c.R, c.G, c.B, c.A);
 
         /// <summary>
         /// Retrieves a theme color from application resources with fallback.

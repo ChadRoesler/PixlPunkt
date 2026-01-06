@@ -1,0 +1,223 @@
+<Window
+    x:Class="PixlPunkt.Uno.UI.Dialogs.EditCanvasWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Edit Canvas">
+    
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="24">
+        <Grid.Resources>
+            <!-- Custom style for anchor radio buttons -->
+            <Style x:Key="AnchorRadioStyle" TargetType="RadioButton">
+                <Setter Property="MinWidth" Value="36"/>
+                <Setter Property="MinHeight" Value="36"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="VerticalAlignment" Value="Stretch"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="RootBorder"
+                                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Margin="2">
+                                <Ellipse x:Name="Indicator"
+                                         Width="12" Height="12"
+                                         Fill="Transparent"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CheckStates">
+                                        <VisualState x:Name="Checked">
+                                            <VisualState.Setters>
+                                                <Setter Target="Indicator.Fill" Value="{ThemeResource AccentFillColorDefaultBrush}"/>
+                                                <Setter Target="RootBorder.BorderBrush" Value="{ThemeResource AccentFillColorDefaultBrush}"/>
+                                                <Setter Target="RootBorder.Background" Value="{ThemeResource ControlFillColorSecondaryBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Unchecked"/>
+                                    </VisualStateGroup>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal"/>
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="RootBorder.Background" Value="{ThemeResource ControlFillColorSecondaryBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="RootBorder.Background" Value="{ThemeResource ControlFillColorTertiaryBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Grid.Resources>
+        
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Document Name -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Document Name" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,8"/>
+            <TextBox x:Name="DocumentNameTextBox" 
+                     PlaceholderText="Enter document name"
+                     MaxLength="100"/>
+        </StackPanel>
+
+        <!-- Document Size (Read-only) -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,16">
+            <TextBlock Text="Document Size (px)" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,8"/>
+            <TextBlock x:Name="DocumentSizeText" 
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+
+        <!-- Tile Size (Read-only) -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,16">
+            <TextBlock Text="Tile Size (px)" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,8"/>
+            <TextBlock x:Name="TileSizeText" 
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+
+        <!-- Document Tiles -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,16">
+            <TextBlock Text="Document Tiles" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,8"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" 
+                           Text="Width" 
+                           VerticalAlignment="Center" 
+                           Margin="0,0,8,0"/>
+                <NumberBox x:Name="TileWidthBox"
+                           Grid.Column="1"
+                           Minimum="1"
+                           Maximum="256"
+						   Margin="0,0,15,0"
+                           ValueChanged="TileCount_ValueChanged"/>
+
+                <TextBlock Grid.Column="2" 
+                           Text="Height" 
+                           VerticalAlignment="Center" 
+                           Margin="0,0,8,0"/>
+                <NumberBox x:Name="TileHeightBox"
+                           Grid.Column="3"
+                           Minimum="1"
+                           Maximum="256"
+                           Margin="0,0,15,0"
+                           ValueChanged="TileCount_ValueChanged"/>
+            </Grid>
+            
+            <!-- New Size Preview -->
+            <TextBlock x:Name="NewSizePreviewText" 
+                       Margin="0,8,0,0"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       FontStyle="Italic"/>
+        </StackPanel>
+
+        <!-- Anchor Point -->
+        <StackPanel Grid.Row="4" Margin="0,0,0,16">
+            <TextBlock Text="Anchor" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,8"/>
+            <TextBlock Text="Determines where content is positioned when resizing"
+                       FontSize="12"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       Margin="0,0,0,12"/>
+            
+            <!-- 3x3 Anchor Grid -->
+            <Grid HorizontalAlignment="Center" Width="120" Height="120">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Top Row -->
+                <RadioButton x:Name="AnchorTL" Grid.Row="0" Grid.Column="0" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="TopLeft"/>
+                <RadioButton x:Name="AnchorTC" Grid.Row="0" Grid.Column="1" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="TopCenter"/>
+                <RadioButton x:Name="AnchorTR" Grid.Row="0" Grid.Column="2" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="TopRight"/>
+
+                <!-- Middle Row -->
+                <RadioButton x:Name="AnchorML" Grid.Row="1" Grid.Column="0" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="MiddleLeft"/>
+                <RadioButton x:Name="AnchorMC" Grid.Row="1" Grid.Column="1" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             IsChecked="True"
+                             Checked="Anchor_Checked" Tag="MiddleCenter"/>
+                <RadioButton x:Name="AnchorMR" Grid.Row="1" Grid.Column="2" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="MiddleRight"/>
+
+                <!-- Bottom Row -->
+                <RadioButton x:Name="AnchorBL" Grid.Row="2" Grid.Column="0" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="BottomLeft"/>
+                <RadioButton x:Name="AnchorBC" Grid.Row="2" Grid.Column="1" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="BottomCenter"/>
+                <RadioButton x:Name="AnchorBR" Grid.Row="2" Grid.Column="2" 
+                             GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
+                             Checked="Anchor_Checked" Tag="BottomRight"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="6" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Spacing="12">
+            <Button x:Name="CancelButton" 
+                    Content="Cancel" 
+                    Width="100"
+                    Click="CancelButton_Click"/>
+            <Button x:Name="SaveButton" 
+                    Content="Save" 
+                    Width="100"
+                    Style="{ThemeResource AccentButtonStyle}"
+                    Click="SaveButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

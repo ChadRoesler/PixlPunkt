@@ -45,12 +45,8 @@ namespace PixlPunkt.UI.CanvasHost
                 CanvasView.Invalidate();
             };
 
-            CanvasView.Draw += CanvasView_Draw;
-
-            CanvasView.PointerPressed += CanvasView_PointerPressed;
-            CanvasView.PointerMoved += CanvasView_PointerMoved;
-            CanvasView.PointerReleased += CanvasView_PointerReleased;
-            CanvasView.PointerWheelChanged += CanvasView_PointerWheelChanged;
+            // SkiaSharp PaintSurface is wired in XAML via PaintSurface="CanvasView_PaintSurface"
+            // No need to wire it here since we use the event handler directly
 
             CanvasView.PointerExited += CanvasView_PointerExited;
             CanvasView.PointerEntered += CanvasView_PointerEntered;

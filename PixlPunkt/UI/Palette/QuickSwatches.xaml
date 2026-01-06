@@ -17,7 +17,6 @@
     x:Class="PixlPunkt.UI.Palette.QuickSwatches"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ctk="using:CommunityToolkit.WinUI.Controls"
     xmlns:ic="using:FluentIcons.WinUI">
 
     <StackPanel Spacing="10">
@@ -101,13 +100,15 @@
         <!-- ACTION BUTTONS -->
         <!-- Swap colors & reset to defaults -->
         <!-- ═══════════════════════════════════════════════════════════════ -->
-        <ctk:UniformGrid 
-    Columns="2" 
-    ColumnSpacing="8" 
-    RowSpacing="8">
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
             <!-- Swap FG ↔ BG Button (Keyboard: X) -->
             <Button 
+                Grid.Column="0"
                 Padding="0"
                 Height="32"
                 Click="Swap_Click" 
@@ -118,6 +119,7 @@
 
             <!-- Reset to Defaults Button (Black FG / White BG) -->
             <Button 
+                Grid.Column="1"
                 Height="32"
                 Padding="0"
                 HorizontalAlignment="Stretch"
@@ -125,7 +127,7 @@
                 ToolTipService.ToolTip="Default: FG black / BG white">
                 <ic:FluentIcon Icon="SquareShadow"/>
             </Button>
-        </ctk:UniformGrid>
+        </Grid>
 
     </StackPanel>
 

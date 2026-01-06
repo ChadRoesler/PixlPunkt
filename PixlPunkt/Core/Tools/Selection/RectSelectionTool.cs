@@ -1,12 +1,13 @@
 using System;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.UI;
 using Microsoft.UI.Xaml.Input;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
 using Windows.Graphics;
+using Windows.UI;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Tools.Selection
 {
@@ -75,7 +76,7 @@ namespace PixlPunkt.Core.Tools.Selection
         }
 
         /// <inheritdoc/>
-        public override void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase)
+        public override void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase)
         {
             if (!_hasPreview || _previewRect.Width <= 0 || _previewRect.Height <= 0)
                 return;
@@ -85,45 +86,94 @@ namespace PixlPunkt.Core.Tools.Selection
             float w = (float)(_previewRect.Width * scale);
             float h = (float)(_previewRect.Height * scale);
 
-            var dashStyleWhite = new CanvasStrokeStyle
-            {
-                DashStyle = CanvasDashStyle.Dash,
-                DashOffset = antsPhase,
-                CustomDashStyle = new float[] { ANTS_ON, ANTS_OFF }
-            };
-            var dashStyleBlack = new CanvasStrokeStyle
-            {
-                DashStyle = CanvasDashStyle.Dash,
-                DashOffset = antsPhase + ANTS_ON,
-                CustomDashStyle = new float[] { ANTS_ON, ANTS_OFF }
-            };
-
-            ds.DrawRectangle(x, y, w, h, Colors.White, ANTS_THICKNESS, dashStyleWhite);
-            ds.DrawRectangle(x, y, w, h, Colors.Black, ANTS_THICKNESS, dashStyleBlack);
+            // Draw marching ants rectangle (simplified dashed lines)
+            DrawDashedRectangle(renderer, x, y, w, h, Colors.White, Colors.Black, ANTS_THICKNESS, ANTS_ON, ANTS_OFF, antsPhase);
 
             // Draw dimension label near the cursor (bottom-right of selection)
-            DrawDimensionLabel(ds, x, y, w, h);
+            DrawDimensionLabel(renderer, x, y, w, h);
+        }
+
+        /// <summary>
+        /// Draws a dashed rectangle with alternating colors (simulating marching ants).
+        /// </summary>
+        private static void DrawDashedRectangle(ICanvasRenderer renderer, float x, float y, float w, float h,
+            Color color1, Color color2, float thickness, float dashOn, float dashOff, float phase)
+        {
+            // Top edge
+            DrawDashedLine(renderer, x, y, x + w, y, color1, color2, thickness, dashOn, dashOff, phase);
+            // Right edge
+            DrawDashedLine(renderer, x + w, y, x + w, y + h, color1, color2, thickness, dashOn, dashOff, phase);
+            // Bottom edge
+            DrawDashedLine(renderer, x + w, y + h, x, y + h, color1, color2, thickness, dashOn, dashOff, phase);
+            // Left edge
+            DrawDashedLine(renderer, x, y + h, x, y, color1, color2, thickness, dashOn, dashOff, phase);
+        }
+
+        /// <summary>
+        /// Draws a dashed line with alternating colors.
+        /// </summary>
+        private static void DrawDashedLine(ICanvasRenderer renderer, float x1, float y1, float x2, float y2,
+            Color color1, Color color2, float thickness, float dashOn, float dashOff, float phase)
+        {
+            float dx = x2 - x1;
+            float dy = y2 - y1;
+            float length = MathF.Sqrt(dx * dx + dy * dy);
+            if (length < 0.001f) return;
+
+            // Normalize direction
+            float nx = dx / length;
+            float ny = dy / length;
+
+            float dashLength = dashOn + dashOff;
+            float pos = -phase % dashLength;
+            if (pos < 0) pos += dashLength;
+
+            while (pos < length)
+            {
+                float startPos = Math.Max(0, pos);
+                float endPos = Math.Min(length, pos + dashOn);
+
+                if (endPos > startPos)
+                {
+                    float sx = x1 + nx * startPos;
+                    float sy = y1 + ny * startPos;
+                    float ex = x1 + nx * endPos;
+                    float ey = y1 + ny * endPos;
+
+                    renderer.DrawLine(sx, sy, ex, ey, color1, thickness);
+                }
+
+                // Draw the "off" portion with color2
+                float offStart = pos + dashOn;
+                float offEnd = Math.Min(length, pos + dashLength);
+                if (offEnd > offStart && offStart < length)
+                {
+                    float sx = x1 + nx * Math.Max(0, offStart);
+                    float sy = y1 + ny * Math.Max(0, offStart);
+                    float ex = x1 + nx * offEnd;
+                    float ey = y1 + ny * offEnd;
+
+                    renderer.DrawLine(sx, sy, ex, ey, color2, thickness);
+                }
+
+                pos += dashLength;
+            }
         }
 
         /// <summary>
         /// Draws a dimension label showing width × height near the selection rectangle.
         /// </summary>
-        private void DrawDimensionLabel(CanvasDrawingSession ds, float x, float y, float w, float h)
+        private void DrawDimensionLabel(ICanvasRenderer renderer, float x, float y, float w, float h)
         {
             string label = $"{_previewRect.Width} × {_previewRect.Height}";
 
-            // Use a simple text format
-            using var textFormat = new Microsoft.Graphics.Canvas.Text.CanvasTextFormat
-            {
-                FontFamily = "Segoe UI",
-                FontSize = 12,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-            };
+            // Create text format
+            using var textFormat = renderer.CreateTextFormat("Segoe UI", 12, FontWeight.SemiBold);
 
             // Measure the text
-            using var textLayout = new Microsoft.Graphics.Canvas.Text.CanvasTextLayout(ds, label, textFormat, 200, 20);
-            float textWidth = (float)textLayout.LayoutBounds.Width;
-            float textHeight = (float)textLayout.LayoutBounds.Height;
+            using var textLayout = renderer.CreateTextLayout(label, textFormat, 200, 20);
+            float textWidth = textLayout.LayoutWidth;
+            float textHeight = textLayout.LayoutHeight;
 
             // Position label at bottom-right of selection with offset
             float labelX = x + w + 12;
@@ -137,11 +187,11 @@ namespace PixlPunkt.Core.Tools.Selection
             float bgH = textHeight + padding;
 
             // Semi-transparent dark background with rounded corners
-            ds.FillRoundedRectangle(bgX, bgY, bgW, bgH, 4, 4, Windows.UI.Color.FromArgb(200, 30, 30, 30));
-            ds.DrawRoundedRectangle(bgX, bgY, bgW, bgH, 4, 4, Windows.UI.Color.FromArgb(180, 100, 100, 100), 1);
+            renderer.FillRoundedRectangle(new Rect(bgX, bgY, bgW, bgH), 4, 4, Color.FromArgb(200, 30, 30, 30));
+            renderer.DrawRoundedRectangle(new Rect(bgX, bgY, bgW, bgH), 4, 4, Color.FromArgb(180, 100, 100, 100), 1);
 
             // Draw text
-            ds.DrawText(label, labelX, labelY, Colors.White, textFormat);
+            renderer.DrawText(label, labelX, labelY, Colors.White, textFormat);
         }
 
         //////////////////////////////////////////////////////////////////
@@ -245,7 +295,7 @@ namespace PixlPunkt.Core.Tools.Selection
             maxX = Math.Clamp(maxX, 0, docW);
             maxY = Math.Clamp(maxY, 0, docH);
 
-            _previewRect = new RectInt32(minX, minY, Math.Max(0, maxX - minX), Math.Max(0, maxY - minY));
+            _previewRect = CreateRect(minX, minY, Math.Max(0, maxX - minX), Math.Max(0, maxY - minY));
         }
     }
 }

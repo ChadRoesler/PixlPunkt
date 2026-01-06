@@ -3,20 +3,20 @@
     x:Class="PixlPunkt.UI.Animation.TileFrameEditorCanvas"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:skia="using:SkiaSharp.Views.Windows"
     IsTabStop="True"
     KeyDown="EditorCanvas_KeyDown"
     KeyUp="EditorCanvas_KeyUp">
 
     <Grid Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
-        <!-- Win2D canvas for editing -->
-        <canvas:CanvasControl x:Name="EditorCanvas"
-                              Draw="EditorCanvas_Draw"
-                              PointerPressed="EditorCanvas_PointerPressed"
-                              PointerMoved="EditorCanvas_PointerMoved"
-                              PointerReleased="EditorCanvas_PointerReleased"
-                              PointerExited="EditorCanvas_PointerExited"
-                              PointerWheelChanged="EditorCanvas_PointerWheelChanged"/>
+        <!-- SkiaSharp canvas for editing -->
+        <skia:SKXamlCanvas x:Name="EditorCanvas"
+                           PaintSurface="EditorCanvas_PaintSurface"
+                           PointerPressed="EditorCanvas_PointerPressed"
+                           PointerMoved="EditorCanvas_PointerMoved"
+                           PointerReleased="EditorCanvas_PointerReleased"
+                           PointerExited="EditorCanvas_PointerExited"
+                           PointerWheelChanged="EditorCanvas_PointerWheelChanged"/>
         
         <!-- Empty state text when no tile is selected -->
 

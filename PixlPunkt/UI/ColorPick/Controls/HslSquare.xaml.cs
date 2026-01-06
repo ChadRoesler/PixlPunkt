@@ -1,13 +1,12 @@
 using System;
-using System.Numerics;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
-using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Coloring.Helpers;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.Foundation;
+using Windows.UI;
 
 namespace PixlPunkt.UI.ColorPick.Controls
 {
@@ -58,8 +57,10 @@ namespace PixlPunkt.UI.ColorPick.Controls
 
         private bool _drag;
         private uint _pid;
-        private CanvasRenderTarget? _gradient;
+        private SKBitmap? _gradientBitmap;
         private bool _needsGradient = true;
+        private int _lastGradientWidth;
+        private int _lastGradientHeight;
 
         private const float HANDLE_OUT = 9f;
         private const float HANDLE_IN = 7f;
@@ -75,8 +76,8 @@ namespace PixlPunkt.UI.ColorPick.Controls
             };
             Unloaded += (_, __) =>
             {
-                _gradient?.Dispose();
-                _gradient = null;
+                _gradientBitmap?.Dispose();
+                _gradientBitmap = null;
             };
         }
 
@@ -88,45 +89,57 @@ namespace PixlPunkt.UI.ColorPick.Controls
         }
         private static double Clamp01(double v) => v < 0 ? 0 : v > 1 ? 1 : v;
 
-        private void Canvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void Canvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
-            float W = (float)sender.ActualWidth;
-            float H = (float)sender.ActualHeight;
-            var paint = new Rect(INSET, INSET,
-                Math.Max(1, W - 2 * INSET),
-                Math.Max(1, H - 2 * INSET));
+            var canvas = e.Surface.Canvas;
+            float W = (float)PART_Canvas.ActualWidth;
+            float H = (float)PART_Canvas.ActualHeight;
 
-            if (_needsGradient || _gradient == null ||
-                _gradient.Size.Width != paint.Width || _gradient.Size.Height != paint.Height)
+            canvas.Clear(SKColors.Transparent);
+
+            var paintRect = new SKRect(INSET, INSET,
+                Math.Max(INSET + 1, W - INSET),
+                Math.Max(INSET + 1, H - INSET));
+
+            int paintW = Math.Max(1, (int)paintRect.Width);
+            int paintH = Math.Max(1, (int)paintRect.Height);
+
+            // Rebuild gradient bitmap if needed
+            if (_needsGradient || _gradientBitmap == null ||
+                _lastGradientWidth != paintW || _lastGradientHeight != paintH)
             {
-                _gradient?.Dispose();
-                _gradient = new CanvasRenderTarget(sender, (float)paint.Width, (float)paint.Height);
-                using (var gs = _gradient.CreateDrawingSession())
+                _gradientBitmap?.Dispose();
+                _gradientBitmap = new SKBitmap(paintW, paintH, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+                int cols = 64, rows = 64;
+                for (int iy = 0; iy < paintH; iy++)
                 {
-                    int cols = 64, rows = 64;
-                    for (int iy = 0; iy < rows; iy++)
+                    double l = 1.0 - (iy / (double)(paintH - 1));
+                    for (int ix = 0; ix < paintW; ix++)
                     {
-                        double l = 1.0 - (iy / (rows - 1.0));
-                        for (int ix = 0; ix < cols; ix++)
-                        {
-                            double s = ix / (cols - 1.0);
-                            var c = ColorUtil.FromHSL(Hue, s, l, 255);
-                            float x = ix * (float)paint.Width / cols;
-                            float y = iy * (float)paint.Height / rows;
-                            gs.FillRectangle(new Rect(x, y, paint.Width / cols + 1, paint.Height / rows + 1), c);
-                        }
+                        double s = ix / (double)(paintW - 1);
+                        var c = ColorUtil.FromHSL(Hue, s, l, 255);
+                        _gradientBitmap.SetPixel(ix, iy, new SKColor(c.R, c.G, c.B, c.A));
                     }
                 }
+
+                _lastGradientWidth = paintW;
+                _lastGradientHeight = paintH;
                 _needsGradient = false;
             }
 
-            ds.DrawImage(_gradient, new Vector2((float)paint.X, (float)paint.Y));
+            // Draw gradient
+            canvas.DrawBitmap(_gradientBitmap, paintRect.Left, paintRect.Top);
 
-            float cx = (float)(paint.X + Saturation * paint.Width);
-            float cy = (float)(paint.Y + (1.0 - Lightness) * paint.Height);
-            ds.DrawCircle(cx, cy, HANDLE_OUT, Colors.Black, 2f);
-            ds.DrawCircle(cx, cy, HANDLE_IN, Colors.White, 1.6f);
+            // Draw selection handle
+            float cx = paintRect.Left + (float)(Saturation * paintRect.Width);
+            float cy = paintRect.Top + (float)((1.0 - Lightness) * paintRect.Height);
+
+            using var blackPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 2f, IsAntialias = true };
+            using var whitePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.White, StrokeWidth = 1.6f, IsAntialias = true };
+
+            canvas.DrawCircle(cx, cy, HANDLE_OUT, blackPaint);
+            canvas.DrawCircle(cx, cy, HANDLE_IN, whitePaint);
         }
 
         private void Canvas_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -157,12 +170,12 @@ namespace PixlPunkt.UI.ColorPick.Controls
         {
             float W = (float)PART_Canvas.ActualWidth;
             float H = (float)PART_Canvas.ActualHeight;
-            var paint = new Rect(INSET, INSET,
-                Math.Max(1, W - 2 * INSET),
-                Math.Max(1, H - 2 * INSET));
+            var paintRect = new SKRect(INSET, INSET,
+                Math.Max(INSET + 1, W - INSET),
+                Math.Max(INSET + 1, H - INSET));
 
-            double s = Clamp01((p.X - paint.X) / paint.Width);
-            double l = Clamp01(1.0 - ((p.Y - paint.Y) / paint.Height));
+            double s = Clamp01((p.X - paintRect.Left) / paintRect.Width);
+            double l = Clamp01(1.0 - ((p.Y - paintRect.Top) / paintRect.Height));
 
             Saturation = s;
             Lightness = l;

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PixlPunkt.Uno.UI.Animation.StagePreviewPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ic="using:FluentIcons.WinUI">
+
+    <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+        <Grid.RowDefinitions>
+            <!-- Header -->
+            <RowDefinition Height="Auto"/>
+            <!-- Preview area -->
+            <RowDefinition Height="*"/>
+            <!-- Info bar -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" 
+                Padding="8,6"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:FluentIcon Icon="VideoClip" FontSize="14" Opacity="0.8"/>
+                    <TextBlock Text="Stage Preview" 
+                               FontWeight="SemiBold"
+                               FontSize="12"/>
+                </StackPanel>
+                
+                <!-- Expand/collapse toggle for larger view -->
+                <ToggleButton x:Name="ExpandToggle"
+                              Grid.Column="1"
+                              Padding="4"
+                              Background="Transparent"
+                              ToolTipService.ToolTip="Expand preview"
+                              Click="ExpandToggle_Click">
+                    <ic:FluentIcon x:Name="ExpandIcon" Icon="ArrowMaximize" FontSize="12"/>
+                </ToggleButton>
+            </Grid>
+        </Border>
+
+        <!-- Preview -->
+        <Border x:Name="PreviewBorder"
+                Grid.Row="1"
+                Margin="8"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="4">
+            <!-- Win2D CanvasControl will be inserted here programmatically -->
+        </Border>
+
+        <!-- Info bar -->
+        <Border Grid.Row="2"
+                Padding="8,4"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Stage/Canvas info -->
+                <TextBlock x:Name="StageInfoText"
+                           Text="Full Canvas"
+                           FontSize="10"
+                           Opacity="0.7"
+                           VerticalAlignment="Center"/>
+                
+                <!-- Output size -->
+                <TextBlock x:Name="OutputSizeText"
+                           Grid.Column="1"
+                           Text="64x64"
+                           FontSize="10"
+                           Opacity="0.7"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

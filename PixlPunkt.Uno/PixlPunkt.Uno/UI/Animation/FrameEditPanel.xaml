@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PixlPunkt.Uno.UI.Animation.FrameEditPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ic="using:FluentIcons.WinUI"
+    xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:local="using:PixlPunkt.Uno.UI.Animation">
+
+    <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="80"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" 
+                Padding="8,6"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="Frame Edit" 
+                           FontWeight="SemiBold"
+                           FontSize="12"/>
+
+                <TextBlock x:Name="FrameCountText"
+                           Grid.Column="1"
+                           Text="0 frames"
+                           Opacity="0.6"
+                           FontSize="11"/>
+            </Grid>
+        </Border>
+
+        <!-- Frame Strip -->
+        <Border Grid.Row="1"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="4">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" 
+                          VerticalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="FrameStrip" 
+                            Orientation="Horizontal" 
+                            Spacing="4"/>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Transport Controls -->
+        <Border Grid.Row="2"
+                Padding="8,4"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Frame navigation -->
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button x:Name="PrevFrameButton"
+                            Click="PrevFrameButton_Click"
+                            Padding="4"
+                            ToolTipService.ToolTip="Previous frame">
+                        <ic:FluentIcon Icon="ChevronLeft" FontSize="14"/>
+                    </Button>
+                    <Button x:Name="NextFrameButton"
+                            Click="NextFrameButton_Click"
+                            Padding="4"
+                            ToolTipService.ToolTip="Next frame">
+                        <ic:FluentIcon Icon="ChevronRight" FontSize="14"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Frame indicator -->
+                <StackPanel Grid.Column="1" 
+                            Orientation="Horizontal" 
+                            HorizontalAlignment="Center"
+                            Spacing="8">
+                    <TextBlock Text="Frame time:"
+                               VerticalAlignment="Center"
+                               Opacity="0.7"
+                               FontSize="11"/>
+                    <NumberBox x:Name="FrameTimeBox"
+                               Value="100"
+                               Minimum="10"
+                               Maximum="10000"
+                               SpinButtonPlacementMode="Compact"
+                               Width="100"
+                               ValueChanged="FrameTimeBox_ValueChanged"/>
+                    <TextBlock x:Name="CurrentFrameText"
+                               Text="1/4"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"/>
+                </StackPanel>
+
+                <!-- Frame actions -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                    <Button x:Name="AddFrameButton"
+                            Click="AddFrameButton_Click"
+                            Padding="4"
+                            ToolTipService.ToolTip="Add tile as frame">
+                        <ic:FluentIcon Icon="Add" FontSize="14"/>
+                    </Button>
+                    <Button x:Name="RemoveFrameButton"
+                            Click="RemoveFrameButton_Click"
+                            Padding="4"
+                            ToolTipService.ToolTip="Remove selected frame">
+                        <ic:FluentIcon Icon="Delete" FontSize="14"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Onion Skinning Controls -->
+        <Border Grid.Row="3"
+                Padding="8,4"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="Onion Skin:"
+                           VerticalAlignment="Center"
+                           Opacity="0.7"
+                           FontSize="11"
+                           Margin="0,0,8,0"/>
+
+                <StackPanel Grid.Column="1" 
+                            Orientation="Horizontal" 
+                            Spacing="4"
+                            HorizontalAlignment="Left">
+                    <!-- Previous frames (red tint) -->
+                    <ToggleButton x:Name="OnionPrev2Toggle"
+                                  Click="OnionPrev2Toggle_Click"
+                                  Padding="6,3"
+                                  ToolTipService.ToolTip="Show frame -2 (25% opacity)">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Border Width="8" Height="8" CornerRadius="4" 
+                                    Background="#FFFF6464" Opacity="0.5"/>
+                            <TextBlock Text="-2" FontSize="11"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="OnionPrev1Toggle"
+                                  Click="OnionPrev1Toggle_Click"
+                                  Padding="6,3"
+                                  ToolTipService.ToolTip="Show frame -1 (50% opacity)">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Border Width="8" Height="8" CornerRadius="4" 
+                                    Background="#FFFF6464"/>
+                            <TextBlock Text="-1" FontSize="11"/>
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <!-- Separator -->
+                    <Border Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="4,2"/>
+
+                    <!-- Next frames (blue tint) -->
+                    <ToggleButton x:Name="OnionNext1Toggle"
+                                  Click="OnionNext1Toggle_Click"
+                                  Padding="6,3"
+                                  ToolTipService.ToolTip="Show frame +1 (50% opacity)">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Border Width="8" Height="8" CornerRadius="4" 
+                                    Background="#FF6464FF"/>
+                            <TextBlock Text="+1" FontSize="11"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="OnionNext2Toggle"
+                                  Click="OnionNext2Toggle_Click"
+                                  Padding="6,3"
+                                  ToolTipService.ToolTip="Show frame +2 (25% opacity)">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Border Width="8" Height="8" CornerRadius="4" 
+                                    Background="#FF6464FF" Opacity="0.5"/>
+                            <TextBlock Text="+2" FontSize="11"/>
+                        </StackPanel>
+                    </ToggleButton>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Editable Frame Canvas -->
+        <Border Grid.Row="4"
+                Margin="8"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="4">
+            <Grid>
+                <!-- Editable tile canvas -->
+                <local:TileFrameEditorCanvas x:Name="FrameEditorCanvas"/>
+
+                <!-- Empty state (shown when no frame selected) -->
+                <TextBlock x:Name="EmptyStateText"
+                           Text="Select a reel and add frames to edit"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Opacity="0.5"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Margin="16"
+                           IsHitTestVisible="False"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

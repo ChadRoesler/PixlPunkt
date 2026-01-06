@@ -2,7 +2,6 @@
     x:Class="PixlPunkt.UI.PixlPunktMainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ctk="using:CommunityToolkit.WinUI.Controls"
     xmlns:ctrl="using:PixlPunkt.UI.Controls" 
     xmlns:palette="using:PixlPunkt.UI.Palette"
     xmlns:layers="using:PixlPunkt.UI.Layers"
@@ -277,7 +276,7 @@
         </StackPanel>
 
         <!-- ROW 3: Workspace -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="2" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftSidebarColumn" Width="Auto" MinWidth="102"/>
                 <ColumnDefinition Width="6"/>
@@ -287,7 +286,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- LEFT: ToolRail - Use Grid instead of StackPanel to constrain height -->
-            <Grid Grid.Column="0" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+            <Grid Grid.Column="0" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" VerticalAlignment="Stretch">
                 <tools:ToolRail x:Name="ToolRail" MinWidth="102" RequestedTheme="{Binding ElementName=Root, Path=RequestedTheme}" />
             </Grid>
 
@@ -298,10 +297,11 @@
                 Width="6"
                 CollapseLeft="True"
                 DefaultExpandedWidth="102"
-                MinExpandedWidth="102"/>
+                MinExpandedWidth="102"
+                VerticalAlignment="Stretch"/>
 
             <!-- CENTER: Document tabs + Canvas area -->
-            <Grid Grid.Column="2" Background="{ThemeResource SolidBackgroundFillColorBaseAltBrush}">
+            <Grid Grid.Column="2" Background="{ThemeResource SolidBackgroundFillColorBaseAltBrush}" VerticalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition x:Name="AnimationSplitterRow" Height="6"/>
@@ -352,72 +352,80 @@
                 Width="6"
                 CollapseLeft="False"
                 DefaultExpandedWidth="360"
-                MinExpandedWidth="200"/>
+                MinExpandedWidth="200"
+                VerticalAlignment="Stretch"/>
 
             <!-- RIGHT: Preview / Palette / Tiles / Layers / History -->
-            <Grid x:Name="RightSidebar" Grid.Column="4" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="8">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="6"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="6"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="6"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="6"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+            <Border Grid.Column="4" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+                <Grid x:Name="RightSidebar" Padding="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="*" MinHeight="80"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="*" MinHeight="80"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <!-- Preview -->
-                <ctrl:SectionCard x:Name="PreviewCard" Grid.Row="0" Title="Preview" DisplayIcon="PreviewLink" 
-                                  PanelId="Preview" CanUndock="True" Margin="0,0,0,8">
-                    <ctrl:SectionCard.CustomControl>
-                        <Border x:Name="PreviewBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="6">
-                            <preview:CanvasPreview x:Name="PreviewControl"/>
-                        </Border>
-                    </ctrl:SectionCard.CustomControl>
-                </ctrl:SectionCard>
-                <ctk:GridSplitter x:Name="PreviewSplitter" Grid.Row="1" Style="{StaticResource RailSplitterStyleHorizontal}"/>
+                    <!-- Preview -->
+                    <ctrl:SectionCard x:Name="PreviewCard" Grid.Row="0" Title="Preview" DisplayIcon="PreviewLink" 
+                                      PanelId="Preview" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="PreviewBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <preview:CanvasPreview x:Name="PreviewControl"/>
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                    <Border Grid.Row="1" Height="4"/>
 
-                <ctrl:SectionCard x:Name="PaletteCard" Grid.Row="2" Title="Palette" DisplayIcon="Color" 
-                                  PanelId="Palette" CanUndock="True" Margin="0,8,0,8">
-                    <ctrl:SectionCard.CustomControl>
-                        <Border x:Name="PaletteBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="6">
-                            <palette:PalettePanel x:Name="PalettePanel" />
-                        </Border>
-                    </ctrl:SectionCard.CustomControl>
-                </ctrl:SectionCard>
-                <ctk:GridSplitter x:Name="PaletteSplitter" Grid.Row="3" Style="{StaticResource RailSplitterStyleHorizontal}"/>
-                
-                <ctrl:SectionCard x:Name="TilesCard" Grid.Row="4" Title="Tiles" DisplayIcon="Grid" 
-                                  PanelId="Tiles" CanUndock="True" Margin="0,8,0,8">
-                    <ctrl:SectionCard.CustomControl>
-                        <Border x:Name="TilesBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="6">
-                            <tiles:TilePanel x:Name="TilePanel" />
-                        </Border>
-                    </ctrl:SectionCard.CustomControl>
-                </ctrl:SectionCard>
-                <ctk:GridSplitter x:Name="TilesSplitter" Grid.Row="5" Style="{StaticResource RailSplitterStyleHorizontal}"/>
-                
-                <ctrl:SectionCard x:Name="LayersCard" Grid.Row="6" Title="Layers" DisplayIcon="LayerDiagonal" 
-                                  PanelId="Layers" CanUndock="True" Margin="0,8,0,0">
-                    <ctrl:SectionCard.CustomControl>
-                        <Border x:Name="LayersBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="6">
-                            <layers:LayersPanel x:Name="LayersPanel" />
-                        </Border>
-                    </ctrl:SectionCard.CustomControl>
-                </ctrl:SectionCard>
+                    <ctrl:SectionCard x:Name="PaletteCard" Grid.Row="2" Title="Palette" DisplayIcon="Color" 
+                                      PanelId="Palette" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="PaletteBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <palette:PalettePanel x:Name="PalettePanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                    <Border Grid.Row="3" Height="4"/>
+                    
+                    <ctrl:SectionCard x:Name="TilesCard" Grid.Row="4" Title="Tiles" DisplayIcon="Grid" 
+                                      PanelId="Tiles" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="TilesBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <tiles:TilePanel x:Name="TilePanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                    <Border Grid.Row="5" Height="4"/>
+                    
+                    <ctrl:SectionCard x:Name="LayersCard" Grid.Row="6" Title="Layers" DisplayIcon="LayerDiagonal" 
+                                      PanelId="Layers" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="LayersBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <layers:LayersPanel x:Name="LayersPanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
 
-                <ctk:GridSplitter x:Name="HistorySplitter" Grid.Row="7" Style="{StaticResource RailSplitterStyleHorizontal}"/>
-                <ctrl:SectionCard x:Name="HistoryCard" Grid.Row="8" Title="History" DisplayIcon="Clock" 
-                                  PanelId="History" CanUndock="True" Margin="0,8,0,0" IsMinimized="True">
-                    <ctrl:SectionCard.CustomControl>
-                        <Border x:Name="HistoryBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="6">
-                            <history:HistoryPanel x:Name="HistoryPanel" />
-                        </Border>
-                    </ctrl:SectionCard.CustomControl>
-                </ctrl:SectionCard>
-            </Grid>
+                    <Border Grid.Row="7" Height="4"/>
+                    <ctrl:SectionCard x:Name="HistoryCard" Grid.Row="8" Title="History" DisplayIcon="Clock" 
+                                      PanelId="History" CanUndock="True" IsMinimized="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="HistoryBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <history:HistoryPanel x:Name="HistoryPanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                </Grid>
+            </Border>
         </Grid>
     </Grid>
 </Window>

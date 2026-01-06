@@ -5,6 +5,7 @@ using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.History;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 using SelectionState = PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelectionState;
 
 namespace PixlPunkt.UI.CanvasHost
@@ -271,7 +272,7 @@ namespace PixlPunkt.UI.CanvasHost
             _selFX = newFX; _selFY = newFY;
 
             var surf = rl.Surface;
-            var dstRect = new RectInt32(_selFX, _selFY, workW, workH);
+            var dstRect = CreateRect(_selFX, _selFY, workW, workH);
             var dstClamp = ClampToSurface(dstRect, surf.Width, surf.Height);
 
             // If nothing lands on canvas, push lift history to undo the clearing and clear state
@@ -297,7 +298,7 @@ namespace PixlPunkt.UI.CanvasHost
 
                 _selRegion.EnsureSize(Document.PixelWidth, Document.PixelHeight);
                 _selRegion.Clear();
-                _selRect = new RectInt32(0, 0, 0, 0);
+                _selRect = CreateRect(0, 0, 0, 0);
                 _selActive = false;
                 _selFloating = false;
                 _selBuf = null;
@@ -454,7 +455,7 @@ namespace PixlPunkt.UI.CanvasHost
             _selRegion.Clear();
             _selState.Active = false;
             _selState.State = SelectionState.None;
-            _selState.Rect = new RectInt32(0, 0, 0, 0);
+            _selState.Rect = CreateRect(0, 0, 0, 0);
 
             // Notify tool state
             _toolState?.SetSelectionPresence(false, false);
@@ -580,7 +581,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (baseW <= 0 || baseH <= 0 || dstClamp.Width <= 0 || dstClamp.Height <= 0)
             {
-                _selRect = new RectInt32(0, 0, 0, 0);
+                _selRect = CreateRect(0, 0, 0, 0);
                 _selActive = false;
                 return;
             }
@@ -617,13 +618,13 @@ namespace PixlPunkt.UI.CanvasHost
                     }
                     else if (runStart >= 0)
                     {
-                        _selRegion.AddRect(new RectInt32(runStart, y, x - runStart, 1));
+                        _selRegion.AddRect(CreateRect(runStart, y, x - runStart, 1));
                         runStart = -1;
                     }
                 }
 
                 if (runStart >= 0)
-                    _selRegion.AddRect(new RectInt32(runStart, y, x1 - runStart, 1));
+                    _selRegion.AddRect(CreateRect(runStart, y, x1 - runStart, 1));
             }
 
             _selRect = _selRegion.Bounds;
@@ -646,7 +647,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (r.Width <= 0 || r.Height <= 0)
             {
                 _selRegion.Clear();
-                _selRect = new RectInt32(0, 0, 0, 0);
+                _selRect = CreateRect(0, 0, 0, 0);
                 _selActive = false;
                 return;
             }
@@ -670,7 +671,7 @@ namespace PixlPunkt.UI.CanvasHost
                     {
                         if (runStart >= 0)
                         {
-                            _selRegion.AddRect(new RectInt32(runStart, y, x - runStart, 1));
+                            _selRegion.AddRect(CreateRect(runStart, y, x - runStart, 1));
                             runStart = -1;
                         }
                         continue;
@@ -685,13 +686,13 @@ namespace PixlPunkt.UI.CanvasHost
                     }
                     else if (runStart >= 0)
                     {
-                        _selRegion.AddRect(new RectInt32(runStart, y, x - runStart, 1));
+                        _selRegion.AddRect(CreateRect(runStart, y, x - runStart, 1));
                         runStart = -1;
                     }
                 }
 
                 if (runStart >= 0)
-                    _selRegion.AddRect(new RectInt32(runStart, y, x1 - runStart, 1));
+                    _selRegion.AddRect(CreateRect(runStart, y, x1 - runStart, 1));
             }
 
             _selRect = _selRegion.Bounds;

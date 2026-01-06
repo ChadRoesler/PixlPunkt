@@ -1,0 +1,578 @@
+<UserControl
+    x:Class="PixlPunkt.Uno.UI.Layers.LayersPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:doc="using:PixlPunkt.Uno.Core.Document"
+    xmlns:layer="using:PixlPunkt.Uno.Core.Document.Layer"
+    xmlns:ic="using:FluentIcons.WinUI"
+    xmlns:conv="using:PixlPunkt.Uno.UI.Converters"
+    xmlns:lctl="using:PixlPunkt.Uno.UI.Layers.Controls"
+    xmlns:local="using:PixlPunkt.Uno.UI.Layers">
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:InverseBoolToVisibilityConverter x:Key="NotBoolToVis"/>
+        <conv:LevelToIndentDoubleConverter x:Key="LevelToIndent" Indent="16"/>
+        <conv:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+        <Style x:Key="RasterItemStyle" TargetType="ListViewItem">
+            <Setter Property="MinHeight" Value="56"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+
+        <Style x:Key="FolderItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource RasterItemStyle}">
+            <Setter Property="MinHeight" Value="44"/>
+            <Setter Property="Padding" Value="6,2"/>
+        </Style>
+
+        <Style x:Key="ReferenceItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource RasterItemStyle}">
+            <Setter Property="MinHeight" Value="56"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+
+        <Style x:Key="RootDropZoneFooterItemStyle" TargetType="ListViewItem">
+            <Setter Property="MinHeight" Value="44"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="IsEnabled" Value="False"/>
+        </Style>
+
+        <local:LayerItemContainerStyleSelector x:Key="LayerRowStyleSelector"
+                                          RasterStyle="{StaticResource RasterItemStyle}"
+                                          FolderStyle="{StaticResource FolderItemStyle}"
+                                          ReferenceStyle="{StaticResource ReferenceItemStyle}"
+                                          RootDropZoneFooterStyle="{StaticResource RootDropZoneFooterItemStyle}" />
+
+        <!-- Template for RasterLayer -->
+        <DataTemplate x:Key="RasterLayerTemplate" x:DataType="layer:RasterLayer">
+            <Grid ColumnSpacing="8"
+                  RightTapped="Item_RightTapped">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Active indicator -->
+                    <ColumnDefinition Width="Auto"/> <!-- indent -->
+                    <ColumnDefinition Width="Auto"/> <!-- Preview thumbnails (layer + mask) -->
+                    <ColumnDefinition Width="Auto"/> <!-- Layer icon -->
+                    <ColumnDefinition Width="Auto"/> <!-- visibility -->
+                    <ColumnDefinition Width="Auto"/> <!-- lock -->
+                    <ColumnDefinition Width="*"/>    <!-- name -->
+                    <ColumnDefinition Width="Auto"/> <!-- settings -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Active layer indicator bar -->
+                <Border x:Name="ActiveIndicator"
+                        Grid.Column="0"
+                        Width="4"
+                        CornerRadius="2"
+                        Background="{ThemeResource SystemAccentColor}"
+                        Margin="0,4,-4,4"
+                        Visibility="Collapsed"/>
+
+                <!-- Indentation spacer based on depth -->
+                <Border Grid.Column="1" Width="{x:Bind Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
+
+                <!-- Preview thumbnails container (layer + mask) -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                    <!-- Layer preview thumbnail with selection border -->
+                    <Grid>
+                        <!-- Selection border (outside, behind the preview) - EDITING LAYER -->
+                        <Border x:Name="LayerEditIndicator"
+                                Width="54"
+                                Height="54"
+                                BorderBrush="#FF00D4FF"
+                                BorderThickness="3"
+                                CornerRadius="6"
+                                Visibility="{x:Bind IsEditingMask, Mode=OneWay, Converter={StaticResource NotBoolToVis}}">
+                            <Border.Background>
+                                <SolidColorBrush Color="#3000D4FF"/>
+                            </Border.Background>
+                        </Border>
+                        <!-- Layer preview thumbnail -->
+                        <Border x:Name="LayerPreviewBorder"
+                                Width="48"
+                                Height="48"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                PointerPressed="LayerPreview_PointerPressed"
+                                ToolTipService.ToolTip="Click to edit layer pixels">
+                            <lctl:LayerPreviewHost Source="{x:Bind Preview}" />
+                        </Border>
+                    </Grid>
+
+                    <!-- Mask preview thumbnail with selection border (only visible when mask exists) -->
+                    <Grid Visibility="{x:Bind HasMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                        <!-- Selection border (outside, behind the preview) - EDITING MASK -->
+                        <Border x:Name="MaskEditIndicator"
+                                Width="38"
+                                Height="54"
+                                BorderBrush="#FFFF6B00"
+                                BorderThickness="3"
+                                CornerRadius="6"
+                                Visibility="{x:Bind IsEditingMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                            <Border.Background>
+                                <SolidColorBrush Color="#30FF6B00"/>
+                            </Border.Background>
+                        </Border>
+                        <!-- Mask preview thumbnail -->
+                        <Border x:Name="MaskPreviewBorder"
+                                Width="32"
+                                Height="48"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                PointerPressed="MaskPreview_PointerPressed"
+                                ToolTipService.ToolTip="Click to edit layer mask">
+                            <Grid>
+                                <Image Source="{x:Bind MaskPreview, Mode=OneWay}" Stretch="Uniform"/>
+                                <!-- Disabled indicator overlay (when mask is disabled) -->
+                                <Border Background="#AA000000"
+                                        CornerRadius="4"
+                                        Visibility="{x:Bind Mask.IsEnabled, Mode=OneWay, Converter={StaticResource NotBoolToVis}}">
+                                    <ic:FluentIcon Icon="Dismiss" 
+                                                   FontSize="16" 
+                                                   Foreground="#FFFF4444"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Mask control buttons (only visible when mask exists) -->
+                    <StackPanel Orientation="Vertical" 
+                                Spacing="2"
+                                VerticalAlignment="Center"
+                                Visibility="{x:Bind HasMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                        <!-- Toggle mask enabled -->
+                        <ToggleButton x:Name="MaskEnabledBtn"
+                                      IsChecked="{x:Bind Mask.IsEnabled, Mode=TwoWay}"
+                                      Click="MaskEnabled_Click"
+                                      Padding="2"
+                                      MinWidth="24"
+                                      MinHeight="20"
+                                      ToolTipService.ToolTip="Toggle mask on/off">
+                            <Grid>
+                                <ic:FluentIcon Icon="Eye" FontSize="12"
+                                               Visibility="{Binding IsChecked, ElementName=MaskEnabledBtn, Converter={StaticResource BoolToVis}}"/>
+                                <ic:FluentIcon Icon="EyeOff" FontSize="12"
+                                               Visibility="{Binding IsChecked, ElementName=MaskEnabledBtn, Converter={StaticResource NotBoolToVis}}"/>
+                            </Grid>
+                        </ToggleButton>
+                        <!-- Toggle mask inverted -->
+                        <ToggleButton x:Name="MaskInvertBtn"
+                                      IsChecked="{x:Bind Mask.IsInverted, Mode=TwoWay}"
+                                      Click="MaskInvert_Click"
+                                      Padding="2"
+                                      MinWidth="24"
+                                      MinHeight="20"
+                                      ToolTipService.ToolTip="Invert mask effect">
+                            <ic:FluentIcon Icon="ArrowSwap" FontSize="12"/>
+                        </ToggleButton>
+                    </StackPanel>
+                </StackPanel>
+
+                <ic:FluentIcon Grid.Column="3" Icon="Layer" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+
+                <!-- visibility -->
+                <ToggleButton x:Name="VisBtn"
+                              Grid.Column="4"
+                              IsChecked="{x:Bind Visible, Mode=TwoWay}"
+                              Click="Vis_Click"
+                              Padding="1"
+                              ToolTipService.ToolTip="Toggle visibility">
+                    <Grid>
+                        <ic:FluentIcon Icon="Eye"
+                                       Visibility="{Binding IsChecked, ElementName=VisBtn, Converter={StaticResource BoolToVis}}"/>
+                        <ic:FluentIcon Icon="EyeOff"
+                                       Visibility="{Binding IsChecked, ElementName=VisBtn, Converter={StaticResource NotBoolToVis}}"/>
+                    </Grid>
+                </ToggleButton>
+
+                <!-- lock -->
+                <ToggleButton x:Name="LockBtn"
+                              Grid.Column="5"
+                              IsChecked="{x:Bind Locked, Mode=TwoWay}"
+                              Click="Lock_Click"
+                              Padding="1"
+                              ToolTipService.ToolTip="Toggle lock">
+                    <Grid>
+                        <ic:FluentIcon Icon="LockClosed"
+                                       Visibility="{Binding IsChecked, ElementName=LockBtn, Converter={StaticResource BoolToVis}}"/>
+                        <ic:FluentIcon Icon="LockOpen"
+                                       Visibility="{Binding IsChecked, ElementName=LockBtn, Converter={StaticResource NotBoolToVis}}"/>
+                    </Grid>
+                </ToggleButton>
+
+                <!-- name -->
+                <Grid Grid.Column="6">
+                    <TextBlock x:Name="NameView"
+                               Text="{x:Bind Name}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               DoubleTapped="LayerName_DoubleTapped"/>
+                    <TextBox x:Name="NameEdit"
+                             Text="{x:Bind Name, Mode=TwoWay}"
+                             Visibility="Collapsed"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             LostFocus="LayerNameEdit_LostFocus"
+                             KeyDown="LayerNameEdit_KeyDown" MaxHeight="20"/>
+                </Grid>
+
+                <!-- settings -->
+                <StackPanel Grid.Column="7" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="4">
+                    <ToggleButton x:Name="EffectsBtn" 
+                                  Padding="4" 
+                                  Click="FxMuteButton_Click"
+                                  ToolTipService.ToolTip="Toggle effects">
+                        <Grid>
+                            <ic:FluentIcon Icon="GlassesOff"
+                                           Visibility="{Binding IsChecked, ElementName=EffectsBtn, Converter={StaticResource BoolToVis}}"/>
+                            <ic:FluentIcon Icon="Glasses"
+                                           Visibility="{Binding IsChecked, ElementName=EffectsBtn, Converter={StaticResource NotBoolToVis}}"/>
+                        </Grid>
+                    </ToggleButton>
+                    <Button Click="Settings_Click" Padding="4">
+                        <ic:FluentIcon Icon="Settings"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Template for LayerFolder -->
+        <DataTemplate x:Key="FolderTemplate" x:DataType="layer:LayerFolder">
+            <Grid ColumnSpacing="8" RightTapped="Item_RightTapped" x:Name="FolderRoot">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Active indicator spacer -->
+                    <ColumnDefinition Width="Auto"/> <!-- indent -->
+                    <ColumnDefinition Width="Auto"/> <!-- folder icon (clickable) -->
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Drop target background -->
+                <Border x:Name="DropTargetBorder"
+                        Grid.ColumnSpan="6"
+                        CornerRadius="4"
+                        BorderThickness="0"
+                        Opacity="0"/>
+
+                <!-- Spacer to align with raster layer active indicator -->
+                <Border Grid.Column="0" Width="4"/>
+
+                <!-- Indentation spacer -->
+                <Border Grid.Column="1" Width="{x:Bind Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
+
+                <!-- Folder icon (clickable to expand/collapse) with badge for child count -->
+                <Grid Grid.Column="2">
+                    <ToggleButton x:Name="FolderIconButton"
+                                  IsChecked="{x:Bind IsExpanded, Mode=TwoWay}"
+                                  Click="FolderChevron_Click"
+                                  Padding="4"
+                                  MinWidth="0"
+                                  Background="Transparent"
+                                  BorderThickness="0">
+                        <Grid>
+                            <!-- Closed folder icon -->
+                            <ic:FluentIcon Icon="Folder" 
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding IsChecked, ElementName=FolderIconButton, Converter={StaticResource NotBoolToVis}}"/>
+                            <!-- Open folder icon -->
+                            <ic:FluentIcon Icon="FolderOpen" 
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding IsChecked, ElementName=FolderIconButton, Converter={StaticResource BoolToVis}}"/>
+                        </Grid>
+                    </ToggleButton>
+                    
+                    <!-- Badge showing child count -->
+                    <Border Background="{ThemeResource SystemAccentColor}"
+                            CornerRadius="8"
+                            Padding="4,2"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Margin="0,0,-4,-4"
+                            Visibility="{x:Bind Children.Count, Mode=OneWay, Converter={StaticResource CountToVisibilityConverter}}">
+                        <TextBlock Text="{x:Bind Children.Count, Mode=OneWay}"
+                                   FontSize="10"
+                                   Foreground="White"
+                                   FontWeight="SemiBold"/>
+                    </Border>
+                </Grid>
+
+                <!-- visibility -->
+                <ToggleButton x:Name="FolderVisBtn"
+                              Grid.Column="3"
+                              IsChecked="{x:Bind Visible, Mode=TwoWay}"
+                              Click="Vis_Click"
+                              Padding="1"
+                              ToolTipService.ToolTip="Toggle visibility">
+                    <Grid>
+                        <ic:FluentIcon Icon="Eye"
+                                       Visibility="{Binding IsChecked, ElementName=FolderVisBtn, Converter={StaticResource BoolToVis}}"/>
+                        <ic:FluentIcon Icon="EyeOff"
+                                       Visibility="{Binding IsChecked, ElementName=FolderVisBtn, Converter={StaticResource NotBoolToVis}}"/>
+                    </Grid>
+                </ToggleButton>
+
+                <!-- lock -->
+                <ToggleButton x:Name="FolderLockBtn"
+                              Grid.Column="4"
+                              IsChecked="{x:Bind Locked, Mode=TwoWay}"
+                              Click="Lock_Click"
+                              Padding="1"
+                              ToolTipService.ToolTip="Toggle lock">
+                    <Grid>
+                        <ic:FluentIcon Icon="LockClosed"
+                                       Visibility="{Binding IsChecked, ElementName=FolderLockBtn, Converter={StaticResource BoolToVis}}"/>
+                        <ic:FluentIcon Icon="LockOpen"
+                                       Visibility="{Binding IsChecked, ElementName=FolderLockBtn, Converter={StaticResource NotBoolToVis}}"/>
+                    </Grid>
+                </ToggleButton>
+
+                <!-- name -->
+                <Grid Grid.Column="5">
+                    <TextBlock x:Name="NameView"
+                               Text="{x:Bind Name}"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               DoubleTapped="LayerName_DoubleTapped"/>
+                    <TextBox x:Name="NameEdit"
+                             Text="{x:Bind Name, Mode=TwoWay}"
+                             Visibility="Collapsed"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             FontWeight="SemiBold"
+                             LostFocus="LayerNameEdit_LostFocus"
+                             KeyDown="LayerNameEdit_KeyDown"/>
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Template for ReferenceLayer -->
+        <DataTemplate x:Key="ReferenceLayerTemplate" x:DataType="layer:ReferenceLayer">
+            <Grid ColumnSpacing="8"
+                  RightTapped="Item_RightTapped">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Active indicator spacer -->
+                    <ColumnDefinition Width="Auto"/> <!-- indent -->
+                    <ColumnDefinition Width="Auto"/> <!-- Preview thumbnail -->
+                    <ColumnDefinition Width="Auto"/> <!-- Reference icon -->
+                    <ColumnDefinition Width="Auto"/> <!-- visibility -->
+                    <ColumnDefinition Width="Auto"/> <!-- lock -->
+                    <ColumnDefinition Width="*"/>    <!-- name -->
+                    <ColumnDefinition Width="Auto"/> <!-- opacity slider -->
+                    <ColumnDefinition Width="Auto"/> <!-- settings -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Spacer to align with raster layer active indicator -->
+                <Border Grid.Column="0" Width="4"/>
+
+                <!-- Indentation spacer based on depth -->
+                <Border Grid.Column="1" Width="{x:Bind Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
+
+                <!-- Preview thumbnail -->
+                <Border x:Name="RefPreviewBorder"
+                        Grid.Column="2"
+                        Width="48"
+                        Height="48"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                        ToolTipService.ToolTip="Reference image preview">
+                    <lctl:LayerPreviewHost Source="{x:Bind Preview, Mode=OneWay}" />
+                </Border>
+
+                <!-- Reference icon (ImageSparkle) - no special foreground, matches other layer icons -->
+                <ic:FluentIcon Grid.Column="3" 
+                               Icon="ImageSparkle" 
+                               HorizontalAlignment="Left" 
+                               VerticalAlignment="Center"/>
+
+                <!-- visibility -->
+                <ToggleButton x:Name="RefVisBtn"
+                              Grid.Column="4"
+                              IsChecked="{x:Bind Visible, Mode=TwoWay}"
+                              Click="Vis_Click"
+                              Padding="1"
+                              ToolTipService.ToolTip="Toggle visibility">
+                    <Grid>
+                        <ic:FluentIcon Icon="Eye"
+                                       Visibility="{Binding IsChecked, ElementName=RefVisBtn, Converter={StaticResource BoolToVis}}"/>
+                        <ic:FluentIcon Icon="EyeOff"
+                                       Visibility="{Binding IsChecked, ElementName=RefVisBtn, Converter={StaticResource NotBoolToVis}}"/>
+                    </Grid>
+                </ToggleButton>
+
+                <!-- lock -->
+                <ToggleButton x:Name="RefLockBtn"
+                              Grid.Column="5"
+                              IsChecked="{x:Bind Locked, Mode=TwoWay}"
+                              Click="Lock_Click"
+                              Padding="1"
+                              ToolTipService.ToolTip="Toggle lock">
+                    <Grid>
+                        <ic:FluentIcon Icon="LockClosed"
+                                       Visibility="{Binding IsChecked, ElementName=RefLockBtn, Converter={StaticResource BoolToVis}}"/>
+                        <ic:FluentIcon Icon="LockOpen"
+                                       Visibility="{Binding IsChecked, ElementName=RefLockBtn, Converter={StaticResource NotBoolToVis}}"/>
+                    </Grid>
+                </ToggleButton>
+
+                <!-- name -->
+                <Grid Grid.Column="6">
+                    <TextBlock x:Name="NameView"
+                               Text="{x:Bind Name, Mode=OneWay}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               DoubleTapped="LayerName_DoubleTapped"/>
+                    <TextBox x:Name="NameEdit"
+                             Text="{x:Bind Name, Mode=TwoWay}"
+                             Visibility="Collapsed"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             LostFocus="LayerNameEdit_LostFocus"
+                             KeyDown="LayerNameEdit_KeyDown" MaxHeight="20"/>
+                </Grid>
+
+                <!-- Opacity slider (inline) -->
+                <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+                    <Slider x:Name="RefOpacitySlider"
+                            Width="50"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="{x:Bind OpacityPercent, Mode=TwoWay}"
+                            VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Opacity"/>
+                </StackPanel>
+
+                <!-- settings button -->
+                <Button Grid.Column="8" 
+                        Click="RefLayerSettings_Click" 
+                        Padding="4"
+                        ToolTipService.ToolTip="Reference layer settings">
+                    <ic:FluentIcon Icon="Settings"/>
+                </Button>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Template for RootDropZoneFooterItem -->
+        <DataTemplate x:Key="RootDropZoneFooterTemplate" x:DataType="local:RootDropZoneFooterItem">
+            <Border x:Name="RootDropZoneBorder"
+                    Height="44"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    HorizontalAlignment="Stretch"
+                    Margin="0,4,0,0"
+                    AllowDrop="True"
+                    DragOver="RootDropZone_DragOver"
+                    Drop="RootDropZone_Drop"
+                    DragLeave="RootDropZone_DragLeave" >
+                <Border x:Name="RootDropZoneHighlight"
+                        Background="Transparent"
+                        CornerRadius="4"
+                        Opacity="0">
+                    <StackPanel Orientation="Horizontal" 
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center"
+                                Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" />
+                        <TextBlock Text="Drop here to move to root level"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorPrimary}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+            </Border>
+        </DataTemplate>
+
+        <!-- Template Selector -->
+        <local:LayerItemTemplateSelector x:Key="LayerTemplateSelector"
+                                         RasterLayerTemplate="{StaticResource RasterLayerTemplate}"
+                                         FolderTemplate="{StaticResource FolderTemplate}"
+                                         ReferenceLayerTemplate="{StaticResource ReferenceLayerTemplate}"
+                                         RootDropZoneFooterTemplate="{StaticResource RootDropZoneFooterTemplate}"/>
+    </UserControl.Resources>
+
+    <Grid RowSpacing="4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Flyout control instances (zero-size, just host the MenuFlyout resources) -->
+        <lctl:LayersPanelMenuFlyout x:Name="PanelMenuFlyout"/>
+        <lctl:RasterLayerMenuFlyout x:Name="LayerMenuFlyout"/>
+        <lctl:LayerFolderMenuFlyout x:Name="FolderMenuFlyout"/>
+        <lctl:ReferenceLayerMenuFlyout x:Name="RefLayerMenuFlyout"/>
+
+        <!-- header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="AddBtn" Click="Add_Click" Padding="3" ToolTipService.ToolTip="Add Layer">
+                    <ic:FluentIcon Icon="Add" FontSize="16"/>
+                </Button>
+                <Button x:Name="AddFolderBtnTop" Click="AddFolder_Click" Padding="3" ToolTipService.ToolTip="Add Folder">
+                    <ic:FluentIcon Icon="FolderAdd" FontSize="16"/>
+                </Button>
+                <Button x:Name="AddRefLayerBtn" Click="AddReferenceLayer_Click" Padding="3" ToolTipService.ToolTip="Add Reference Image">
+                    <ic:FluentIcon Icon="ImageSparkle" FontSize="16"/>
+                </Button>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Click="Remove_Click" x:Name="RemoveBtn" Padding="3" ToolTipService.ToolTip="Remove">
+                    <ic:FluentIcon Icon="Delete" FontSize="16"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1"
+                x:Name="LayerBox"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="8"
+                Margin="-3,0,-3,-3">
+            <Grid>
+                <ListView x:Name="LayersList"
+                          SelectionMode="Single"
+                          IsItemClickEnabled="False"
+                          AllowDrop="True"
+                          CanReorderItems="False"
+                          ItemTemplateSelector="{StaticResource LayerTemplateSelector}"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          SelectionChanged="LayersList_SelectionChanged"
+                          RightTapped="LayersList_RightTapped"
+                          ItemContainerStyleSelector="{StaticResource LayerRowStyleSelector}">
+                </ListView>
+
+                <!-- Insertion indicator bar (Photoshop-style) -->
+                <Border x:Name="InsertionIndicator"
+                        Height="3"
+                        Background="{ThemeResource SystemAccentColor}"
+                        CornerRadius="2"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top"
+                        Margin="0"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False">
+                    <Border.Shadow>
+                        <ThemeShadow/>
+                    </Border.Shadow>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

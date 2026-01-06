@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PixlPunkt.Uno.UI.Layers.Controls.LayerFolderMenuFlyout"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:PixlPunkt.Uno.UI.Layers.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <MenuFlyout x:Name="FolderMenuFlyout" Placement="RightEdgeAlignedTop">
+            <ToggleMenuFlyoutItem x:Name="VisibleToggle" Text="Visible" Click="Visible_Toggled"/>
+            <ToggleMenuFlyoutItem x:Name="LockedToggle" Text="Locked" Click="Locked_Toggled"/>
+            <MenuFlyoutSeparator/>
+            <MenuFlyoutItem Text="Duplicate Folder" Click="Duplicate_Click"/>
+            <MenuFlyoutItem Text="Flatten Folder" Click="FlattenFolder_Click"/>
+            <MenuFlyoutSeparator/>
+            <MenuFlyoutItem Text="Remove Folder" Click="Remove_Click"/>
+        </MenuFlyout>
+    </UserControl.Resources>
+
+    <!-- Empty visual - this control just hosts the MenuFlyout resource -->
+    <Grid Height="0" Width="0"/>
+</UserControl>

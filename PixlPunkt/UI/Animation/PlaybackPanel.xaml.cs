@@ -1,19 +1,16 @@
 using System;
 using FluentIcons.Common;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Document;
-using Windows.Foundation;
-using Windows.Graphics.DirectX;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 
 namespace PixlPunkt.UI.Animation
 {
     /// <summary>
     /// Panel for animation playback preview.
-    /// Shows live preview and transport controls.
     /// </summary>
     public sealed partial class PlaybackPanel : UserControl
     {
@@ -23,14 +20,11 @@ namespace PixlPunkt.UI.Animation
 
         private TileAnimationState? _state;
         private CanvasDocument? _document;
-        private CanvasControl? _previewCanvas;
+        private SKXamlCanvas? _previewCanvas;
         private byte[]? _currentTilePixels;
         private int _currentTileWidth;
         private int _currentTileHeight;
 
-        /// <summary>
-        /// Tracks the currently subscribed reel for proper event cleanup.
-        /// </summary>
         private TileAnimationReel? _subscribedReel;
 
         // ====================================================================
@@ -46,13 +40,9 @@ namespace PixlPunkt.UI.Animation
 
         private void PlaybackPanel_Unloaded(object sender, RoutedEventArgs e)
         {
-            // Clean up all subscriptions when the panel is unloaded
             UnsubscribeAll();
         }
 
-        /// <summary>
-        /// Unsubscribes from all event handlers to prevent memory leaks.
-        /// </summary>
         private void UnsubscribeAll()
         {
             if (_state != null)
@@ -65,9 +55,6 @@ namespace PixlPunkt.UI.Animation
             UnsubscribeFromReel();
         }
 
-        /// <summary>
-        /// Unsubscribes from the currently tracked reel's Changed event.
-        /// </summary>
         private void UnsubscribeFromReel()
         {
             if (_subscribedReel != null)
@@ -77,15 +64,10 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
-        /// <summary>
-        /// Subscribes to a reel's Changed event, properly tracking for cleanup.
-        /// </summary>
         private void SubscribeToReel(TileAnimationReel? reel)
         {
-            // First unsubscribe from any existing reel
             UnsubscribeFromReel();
 
-            // Subscribe to new reel if provided
             if (reel != null)
             {
                 reel.Changed += OnReelChanged;
@@ -95,62 +77,61 @@ namespace PixlPunkt.UI.Animation
 
         private void SetupPreviewCanvas()
         {
-            _previewCanvas = new CanvasControl();
-            _previewCanvas.Draw += PreviewCanvas_Draw;
-
-            // Replace the Image with the CanvasControl
+            _previewCanvas = new SKXamlCanvas();
+            _previewCanvas.PaintSurface += PreviewCanvas_PaintSurface;
             PreviewBorder.Child = _previewCanvas;
         }
 
-        private void PreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void PreviewCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
-            ds.Antialiasing = CanvasAntialiasing.Aliased;
-
-            // Clear background
-            ds.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            var canvas = e.Surface.Canvas;
+            canvas.Clear(SKColors.Transparent);
 
             if (_currentTilePixels == null || _currentTilePixels.Length < _currentTileWidth * _currentTileHeight * 4)
                 return;
 
-            float w = (float)sender.ActualWidth;
-            float h = (float)sender.ActualHeight;
+            float w = e.Info.Width;
+            float h = e.Info.Height;
 
             if (w <= 0 || h <= 0) return;
 
-            using var bitmap = CanvasBitmap.CreateFromBytes(
-                sender.Device,
-                _currentTilePixels,
-                _currentTileWidth,
-                _currentTileHeight,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f);
+            var info = new SKImageInfo(_currentTileWidth, _currentTileHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using var bitmap = new SKBitmap(info);
 
-            // Calculate destination rect (centered, uniform scale)
-            float scale = Math.Min(w / _currentTileWidth, h / _currentTileHeight);
-            float destW = _currentTileWidth * scale;
-            float destH = _currentTileHeight * scale;
-            float destX = (w - destW) / 2;
-            float destY = (h - destH) / 2;
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(_currentTilePixels, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                bitmap.InstallPixels(info, handle.AddrOfPinnedObject(), info.RowBytes);
 
-            ds.DrawImage(
-                bitmap,
-                new Rect(destX, destY, destW, destH),
-                new Rect(0, 0, _currentTileWidth, _currentTileHeight),
-                1.0f,
-                CanvasImageInterpolation.NearestNeighbor);
+                float scale = Math.Min(w / _currentTileWidth, h / _currentTileHeight);
+                float destW = _currentTileWidth * scale;
+                float destH = _currentTileHeight * scale;
+                float destX = (w - destW) / 2;
+                float destY = (h - destH) / 2;
+
+                var destRect = new SKRect(destX, destY, destX + destW, destY + destH);
+                var srcRect = new SKRect(0, 0, _currentTileWidth, _currentTileHeight);
+
+                using var paint = new SKPaint
+                {
+                    FilterQuality = SKFilterQuality.None,
+                    IsAntialias = false
+                };
+
+                canvas.DrawBitmap(bitmap, srcRect, destRect, paint);
+            }
+            finally
+            {
+                handle.Free();
+            }
         }
 
         // ====================================================================
         // PUBLIC API
         // ====================================================================
 
-        /// <summary>
-        /// Binds the panel to animation state and document.
-        /// </summary>
         public void Bind(TileAnimationState? state, CanvasDocument? document)
         {
-            // Unbind previous state
             if (_state != null)
             {
                 _state.PlaybackStateChanged -= OnPlaybackStateChanged;
@@ -158,29 +139,23 @@ namespace PixlPunkt.UI.Animation
                 _state.SelectedReelChanged -= OnSelectedReelChanged;
             }
 
-            // Unsubscribe from previous reel
             UnsubscribeFromReel();
 
             _state = state;
             _document = document;
 
-            // Bind new
             if (_state != null)
             {
                 _state.PlaybackStateChanged += OnPlaybackStateChanged;
                 _state.CurrentFrameChanged += OnCurrentFrameChanged;
                 _state.SelectedReelChanged += OnSelectedReelChanged;
 
-                // Subscribe to selected reel
                 SubscribeToReel(_state.SelectedReel);
             }
 
             RefreshDisplay();
         }
 
-        /// <summary>
-        /// Refreshes the display.
-        /// </summary>
         public void RefreshDisplay()
         {
             UpdateTransportUI();
@@ -210,9 +185,7 @@ namespace PixlPunkt.UI.Animation
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                // Properly track and subscribe to the new reel
                 SubscribeToReel(reel);
-
                 UpdateTransportUI();
                 UpdateFrameInfo();
                 RefreshPreview();
@@ -266,11 +239,9 @@ namespace PixlPunkt.UI.Animation
             StepForwardButton.IsEnabled = hasFrames;
             LoopToggle.IsEnabled = hasReel;
 
-            // Update play/pause icon
             bool isPlaying = _state?.IsPlaying == true;
             PlayPauseIcon.Icon = isPlaying ? Icon.Pause : Icon.Play;
 
-            // Update loop toggle
             if (_state?.SelectedReel != null)
             {
                 LoopToggle.IsChecked = _state.SelectedReel.Loop;
@@ -299,16 +270,12 @@ namespace PixlPunkt.UI.Animation
 
             FrameInfoText.Text = $"Frame {current + 1}/{total}";
 
-            // Calculate time info
             int currentTimeMs = reel.GetTimeAtFrame(current);
             int totalTimeMs = reel.TotalDurationMs;
 
             TimeInfoText.Text = $"{currentTimeMs / 1000.0:F1}s / {totalTimeMs / 1000.0:F1}s";
         }
 
-        /// <summary>
-        /// Reads pixels from the canvas at a tile grid position.
-        /// </summary>
         private byte[]? ReadTilePixelsFromCanvas(int tileX, int tileY)
         {
             if (_document == null) return null;
@@ -316,11 +283,9 @@ namespace PixlPunkt.UI.Animation
             int tileW = _document.TileSize.Width;
             int tileH = _document.TileSize.Height;
 
-            // Calculate pixel coordinates
             int docX = tileX * tileW;
             int docY = tileY * tileH;
 
-            // Ensure we're within bounds
             if (docX < 0 || docY < 0 ||
                 docX + tileW > _document.PixelWidth ||
                 docY + tileH > _document.PixelHeight)
@@ -328,7 +293,6 @@ namespace PixlPunkt.UI.Animation
                 return null;
             }
 
-            // Read from composite surface
             var surface = _document.Surface;
             if (surface == null) return null;
 
@@ -371,7 +335,6 @@ namespace PixlPunkt.UI.Animation
                 return;
             }
 
-            // Read pixels from canvas at tile position
             _currentTilePixels = ReadTilePixelsFromCanvas(tileX, tileY);
             if (_currentTilePixels == null)
             {

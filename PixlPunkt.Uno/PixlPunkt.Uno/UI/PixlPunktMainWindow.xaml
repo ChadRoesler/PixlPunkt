@@ -1,0 +1,427 @@
+﻿<Window
+    x:Class="PixlPunkt.Uno.UI.PixlPunktMainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctrl="using:PixlPunkt.Uno.UI.Controls" 
+    xmlns:palette="using:PixlPunkt.Uno.UI.Palette"
+    xmlns:layers="using:PixlPunkt.Uno.UI.Layers"
+    xmlns:tiles="using:PixlPunkt.Uno.UI.Tiles"
+    xmlns:tools="using:PixlPunkt.Uno.UI.Tools"
+    xmlns:preview="using:PixlPunkt.Uno.UI.Preview"
+    xmlns:history="using:PixlPunkt.Uno.UI.History"
+    xmlns:animation="using:PixlPunkt.Uno.UI.Animation">
+    <Grid 
+        x:Name="Root" 
+        IsTabStop="True"  
+        KeyDown="Root_KeyDown" 
+        KeyUp="Root_KeyUp"
+        KeyboardAcceleratorPlacementMode="Hidden">
+        <Grid.RowDefinitions>
+            <!-- Menu Bar (always visible) -->
+            <RowDefinition Height="Auto"/>
+            <!-- Tool Options Strip-->
+            <RowDefinition Height="Auto" />
+            <!-- Document Tabs And Canvas ToolBar -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.KeyboardAccelerators>
+            <!-- History -->
+            <KeyboardAccelerator Key="Z" Modifiers="Control" Invoked="UndoAccel_Invoked"/>
+            <KeyboardAccelerator Key="Y" Modifiers="Control" Invoked="RedoAccel_Invoked"/>
+            <KeyboardAccelerator Key="Z" Modifiers="Control,Shift" Invoked="RedoAccel_Invoked"/>
+            <!-- Clipboard -->
+            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyAccel_Invoked"/>
+            <KeyboardAccelerator Key="X" Modifiers="Control" Invoked="CutAccel_Invoked"/>
+            <KeyboardAccelerator Key="V" Modifiers="Control" Invoked="PasteAccel_Invoked"/>
+            <!-- Selection -->
+            <KeyboardAccelerator Key="Delete" Invoked="DeleteAccel_Invoked"/>
+            <KeyboardAccelerator Key="Back"   Invoked="DeleteAccel_Invoked"/>
+            <KeyboardAccelerator Key="Enter" Invoked="CommitSelection_Invoked"/>
+            <KeyboardAccelerator Key="Escape" Invoked="CancelSelection_Invoked"/>
+            <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAll_Invoked"/>
+            <!-- IO Operations -->
+            <KeyboardAccelerator Key="N" Modifiers="Control" Invoked="NewDocument_Invoked"/>
+            <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="SaveDocument_Invoked"/>
+            <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OpenDocument_Invoked"/>
+            <KeyboardAccelerator Key="S" Modifiers="Control,Shift" Invoked="SaveAsDocument_Invoked"/>
+            <!-- Zoom -->
+            <KeyboardAccelerator Key="Add" Modifiers="Control" Invoked="ZoomIn_Invoked"/>
+            <KeyboardAccelerator Key="Subtract" Modifiers="Control" Invoked="ZoomOut_Invoked"/>
+            <KeyboardAccelerator Key="Home" Modifiers="Control" Invoked="ZoomFit_Invoked"/>
+            <KeyboardAccelerator Key="End" Modifiers="Control" Invoked="ZoomActualSize_Invoked"/>
+            <!-- Selection -->
+            <KeyboardAccelerator Key="I" Modifiers="Control,Shift" Invoked="InvertSelection_Invoked"/>
+        </Grid.KeyboardAccelerators>
+        
+        <!-- ROW 0: Windows Title Bar (merged with menu - only visible on Windows) -->
+        <Grid Grid.Row="0"
+              x:Name="TitleBarRoot"
+              Height="32"
+              VerticalAlignment="Top"
+              Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- App icon on the left -->
+            <Image Grid.Column="0"
+                   Width="20"
+                   Height="20"
+                   Margin="8,0,4,0"
+                   VerticalAlignment="Center"
+                   Source="ms-appx:///Assets/Icons/Icon.png" />
+
+            <!-- Menu Bar (inside title bar on Windows) -->
+            <MenuBar x:Name="MainMenuBar"
+                     Grid.Column="1"
+                     MinHeight="32">
+                <MenuBar.Resources>
+                    <Style TargetType="MenuBarItem">
+                        <Setter Property="Margin" Value="5,2,5,0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                    </Style>
+                </MenuBar.Resources>
+
+                <MenuBarItem Title="File">
+                    <MenuFlyoutItem Text="New Canvas…" Click="File_NewCanvas_Click"/>
+                    <MenuFlyoutSubItem x:Name="File_NewFromTemplate_Submenu" Text="New from Template…">
+                        <MenuFlyoutItem Text="(No templates)" IsEnabled="False"/>
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutItem Text="Open…"  Click="File_OpenDocument_Click" />
+                    <MenuFlyoutSubItem x:Name="File_OpenRecent_Submenu" Text="Open Recent…">
+                        <MenuFlyoutSubItem x:Name="File_OpenFromAutosave_Submenu" Text="From Autosave…" >
+                        </MenuFlyoutSubItem>
+                        <MenuFlyoutSeparator x:Name="File_OpenRecent_Separator" />
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem Text="Save"   Click="File_SaveDocument_Click" />
+                    <MenuFlyoutItem Text="Save As…" Click="File_SaveDocumentAs_Click" />
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutSubItem Text="Import From…">
+                        <MenuFlyoutItem Text="Image" Click="File_Import_Image"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Icon" Click="File_Import_Icon" />
+                        <MenuFlyoutItem Text="Cursor" Click="File_Import_Cursor"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Aseprite" Click="File_Import_Aseprite"/>
+                        <MenuFlyoutItem Text="Pyxel Edit" Click="File_Import_PyxelEdit"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Tiled Map (.tmx)" Click="File_Import_Tmx"/>
+                        <MenuFlyoutItem Text="Tiled Tileset (.tsx)" Click="File_Import_Tsx"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Animation Sub-Routine (.pxpr)" Click="File_Import_SubRoutine"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Sprite Sheet" />
+                        <MenuFlyoutItem Text="Tile Sheet" />
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Project File (PixlPunkt JSON)"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutSubItem x:Name="File_ImportFrom_Custom_Submenu" Text="Custom (Plugins)"/>
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutSubItem Text="Export To…">
+                        <MenuFlyoutItem Text="Image" Click="File_Export_Image_Click"/>
+                        <MenuFlyoutItem Text="Animation" Click="File_Export_Animation_Click"/>
+                        <MenuFlyoutItem Text="Batch Tile Animations" Click="File_Export_BatchTileAnimation_Click"/>
+                        <MenuFlyoutItem Text="Timelapse (from History)" Click="File_Export_Timelapse_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Icon" Click="File_Export_Icon_Click"/>
+                        <MenuFlyoutItem Text="Cursor" Click="File_Export_Cursor_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Brush" Click="File_Export_Brush_Click" />
+                        <MenuFlyoutItem Text="Sprite Sheet" />
+                        <MenuFlyoutItem Text="Tile Sheet" />
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Advanced Template (.pxpt)…" Click="File_Export_AdvancedTemplate_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Project File (PixlPunkt JSON)"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutSubItem x:Name="File_ExportTo_Custom_Submenu" Text="Custom (Plugins)"/>
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Exit" Click="File_Exit_Click"/>
+                </MenuBarItem>
+
+                <MenuBarItem Title="Edit">
+                    <MenuFlyoutItem Text="Cut" Click="Edit_Cut_Click">
+                        <MenuFlyoutItem.KeyboardAcceleratorTextOverride>Ctrl+X</MenuFlyoutItem.KeyboardAcceleratorTextOverride>
+                    </MenuFlyoutItem>
+                    <MenuFlyoutItem Text="Copy" Click="Edit_Copy_Click">
+                        <MenuFlyoutItem.KeyboardAcceleratorTextOverride>Ctrl+C</MenuFlyoutItem.KeyboardAcceleratorTextOverride>
+                    </MenuFlyoutItem>
+                    <MenuFlyoutItem Text="Paste" Click="Edit_Paste_Click">
+                        <MenuFlyoutItem.KeyboardAcceleratorTextOverride>Ctrl+V</MenuFlyoutItem.KeyboardAcceleratorTextOverride>
+                    </MenuFlyoutItem>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Undo" Click="Edit_Undo_Click">
+                        <MenuFlyoutItem.KeyboardAcceleratorTextOverride>Ctrl+Z</MenuFlyoutItem.KeyboardAcceleratorTextOverride>
+                    </MenuFlyoutItem>
+                    <MenuFlyoutItem Text="Redo" Click="Edit_Redo_Click">
+                        <MenuFlyoutItem.KeyboardAcceleratorTextOverride>Ctrl+Y</MenuFlyoutItem.KeyboardAcceleratorTextOverride>
+                    </MenuFlyoutItem>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Edit Canvas…" Click="Edit_EditCanvas_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Refresh Custom Brushes" Click="View_RefreshBrushes_Click"/>
+                </MenuBarItem>
+
+                <MenuBarItem Title="View">
+                    <MenuFlyoutItem Text="Fit to Screen (Ctrl+0)" Click="View_Fit_Click"/>
+                    <MenuFlyoutItem Text="Actual Size (Ctrl+1)" Click="View_Actual_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Toggle Pixel Grid" Click="View_TogglePixelGrid_Click"/>
+                    <MenuFlyoutItem Text="Toggle Tile Grid" Click="View_ToggleTileGrid_Click"/>
+                    <MenuFlyoutItem Text="Toggle Tile Mappings" Click="View_ToggleTileMappings_Click"/>
+                    <MenuFlyoutItem Text="Toggle Tile Animation Frames" Click="View_ToggleTileAnimationMappings_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Toggle Rulers" Click="View_ToggleRulers_Click"/>
+                    <MenuFlyoutItem Text="Toggle Guides" Click="View_ToggleGuides_Click"/>
+                    <MenuFlyoutItem Text="Toggle Snap to Guides" Click="View_ToggleSnapToGuides_Click"/>
+                    <MenuFlyoutItem Text="Lock Guides" Click="View_ToggleLockGuides_Click"/>
+                    <MenuFlyoutItem Text="Clear All Guides" Click="View_ClearGuides_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutSubItem Text="Reference Images">
+                        <MenuFlyoutItem Text="Add Reference Image…" Click="View_AddReferenceImage_Click"/>
+                        <MenuFlyoutItem Text="Toggle Reference Images" Click="View_ToggleReferenceImages_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Remove Selected Reference" Click="View_RemoveSelectedReference_Click"/>
+                        <MenuFlyoutItem Text="Clear All References" Click="View_ClearAllReferences_Click"/>
+                    </MenuFlyoutSubItem>
+                </MenuBarItem>
+
+                <MenuBarItem Title="Palette">
+                    <MenuFlyoutItem Text="Edit FG…" Click="Palette_EditFg_Click"/>
+                    <MenuFlyoutItem Text="Edit BG…" Click="Palette_EditBg_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutSubItem x:Name="Palette_SortBy_Submenu" Text="Sort Palette by">
+                        <MenuFlyoutItem Text="Hue" Click="Palette_SortBy_Hue_Click"/>
+                        <MenuFlyoutItem Text="Saturation" Click="Palette_SortBy_Saturation_Click"/>
+                        <MenuFlyoutItem Text="Lightness" Click="Palette_SortBy_Lightness_Click"/>
+                        <MenuFlyoutItem Text="Luminance" Click="Palette_SortBy_Luminance_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Red Channel" Click="Palette_SortBy_Red_Click"/>
+                        <MenuFlyoutItem Text="Green Channel" Click="Palette_SortBy_Green_Click"/>
+                        <MenuFlyoutItem Text="Blue Channel" Click="Palette_SortBy_Blue_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Reverse" Click="Palette_SortBy_Reverse_Click"/>
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Export (Save As Custom)…" Click="Palette_Export_Click"/>
+                    <MenuFlyoutSubItem x:Name="Palette_ImportFrom_Submenu" Text="Import Palette from…">
+                        <MenuFlyoutItem Text="JSON" Click="Palette_ImportFrom_Json_Click"/>
+                        <MenuFlyoutItem Text="Image" Click="Palette_ImportFrom_Image_Click"/>
+                        <MenuFlyoutItem x:Name="ImportFromLayer" Text="Layer" Click="Palette_ImportFrom_Layer_Click"/>
+                        <MenuFlyoutItem x:Name="ImportFromDocument" Text="Document" Click="Palette_ImportFrom_Document_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Palette File…" Click="Palette_ImportFrom_File_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutSubItem x:Name="Palette_ImportFrom_Custom_Submenu" Text="Custom (Plugins)"/>
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutSubItem x:Name="Palette_ExportTo_Submenu" Text="Export Palette to…">
+                        <MenuFlyoutItem Text="Palette File…" Click="Palette_ExportTo_File_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutSubItem x:Name="Palette_ExportTo_Custom_Submenu" Text="Custom (Plugins)"/>
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutSubItem x:Name="Palette_Custom_Submenu" Text="Custom"/>
+                    <MenuFlyoutSubItem x:Name="Palette_Presets_Submenu" Text="Presets"/>
+                    <MenuFlyoutItem Text="Reset to Default" Click="Palette_Reset_Click"/>
+                </MenuBarItem>
+                <MenuBarItem Title="Tiles">
+                    <MenuFlyoutItem Text="Merge Duplicate Tiles" Click="Tiles_MergeDuplicates_Click"/>
+                    <MenuFlyoutItem Text="Remove Unused Tiles" Click="Tiles_RemoveUnused_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Export Tiles…" Click="Tiles_Export_Click"/>
+                    <MenuFlyoutSubItem Text="Import Tiles…">
+                        <MenuFlyoutItem Text="From Open Document…" Click="Tiles_ImportFromDocument_Click"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="From Tile File (.pxpt)" Click="Tiles_ImportFromPxpt_Click"/>
+                        <MenuFlyoutItem Text="From Project File (.pxp)" Click="Tiles_ImportFromPxp_Click"/>
+                    </MenuFlyoutSubItem>
+                </MenuBarItem>
+                <MenuBarItem Title="Settings">
+                    <MenuFlyoutItem Text="Configure…" Click="OpenSettings_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutSubItem Text="Quick Actions…" >
+                        <MenuFlyoutItem Text="Open Plugins Folder" Click="OpenPluginFolder_Click"/>
+                        <MenuFlyoutItem Text="Open Logging Folder" Click="OpenLogFolder_Click"/>
+                        <MenuFlyoutItem Text="Open Custom Brushes Folder" Click="OpenBrushFolder_Click"/>
+                        <MenuFlyoutItem Text="Open Custom Palette Folder" Click="OpenPaletteFolder_Click"/>
+                        <MenuFlyoutItem Text="Open Custom Templates Folder" Click="OpenTemplateFolder_Click"/>
+                        <MenuFlyoutItem Text="Open Custom Glyph Sets Folder" Click="OpenGlyphSetsFolder_Click"/>
+                    </MenuFlyoutSubItem>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Glyph Set Editor…" Click="OpenGlyphSetEditor_Click"/>
+                </MenuBarItem>
+                <MenuBarItem Title="Help">
+                    <MenuFlyoutItem Text="Check for Updates…" Click="Help_CheckForUpdates_Click"/>
+                    <MenuFlyoutItem Text="View Releases on GitHub" Click="Help_ViewReleases_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="GitHub Repository" Click="Help_GitHub_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="About PixlPunkt" Click="Help_About_Click"/>
+                </MenuBarItem>
+            </MenuBar>
+        </Grid>
+
+        <!-- Simple tool strip -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Padding="8" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+            <tools:ToolOptionsBar x:Name="OptionsBar"/>
+        </StackPanel>
+
+        <!-- ROW 3: Workspace -->
+        <Grid Grid.Row="2" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LeftSidebarColumn" Width="Auto" MinWidth="102"/>
+                <ColumnDefinition Width="6"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition x:Name="RightSplitterColumn" Width="6"/>
+                <ColumnDefinition x:Name="RightSidebarColumn" Width="360" MinWidth="100"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: ToolRail - Use Grid instead of StackPanel to constrain height -->
+            <Grid Grid.Column="0" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" VerticalAlignment="Stretch">
+                <tools:ToolRail x:Name="ToolRail" MinWidth="102" RequestedTheme="{Binding ElementName=Root, Path=RequestedTheme}" />
+            </Grid>
+
+            <!-- Collapsible Splitter between Left and Center -->
+            <ctrl:CollapsibleSplitter 
+                x:Name="LeftSplitter"
+                Grid.Column="1"
+                Width="6"
+                CollapseLeft="True"
+                DefaultExpandedWidth="102"
+                MinExpandedWidth="102"
+                VerticalAlignment="Stretch"/>
+
+            <!-- CENTER: Document tabs + Canvas area -->
+            <Grid Grid.Column="2" Background="{ThemeResource SolidBackgroundFillColorBaseAltBrush}" VerticalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition x:Name="AnimationSplitterRow" Height="6"/>
+                    <RowDefinition x:Name="AnimationPanelRow" Height="180" MinHeight="120"/>
+                </Grid.RowDefinitions>
+                <Image x:Name="CenterLogo"
+                       Grid.Row="0"
+                       Source="/Assets/Images/PixlPunktSplash.png"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Stretch="None"
+                       Opacity="0.5" />
+                <TabView x:Name="DocsTab"
+                 Grid.Row="0"
+                 HorizontalAlignment="Stretch"
+                 VerticalAlignment="Stretch"
+                 TabWidthMode="Equal"
+                 AddTabButtonClick="DocsTab_AddTabButtonClick"
+                
+                 SelectionChanged="DocsTab_SelectionChanged"
+                 TabCloseRequested="DocsTab_TabCloseRequested">
+                    <TabView.Resources>
+                        <Style TargetType="TabViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                        <SolidColorBrush x:Key="TabViewButtonBackground" Color="{ThemeResource ControlFillColorDefault}"/>
+                    </TabView.Resources>
+                </TabView>
+
+                <!-- Animation Splitter (Collapsible) -->
+                <ctrl:CollapsibleSplitterHorizontal 
+                    x:Name="AnimationSplitter" 
+                    Grid.Row="1" 
+                    Height="6"
+                    CollapseAbove="False"
+                    DefaultExpandedHeight="180"
+                    MinExpandedHeight="120"/>
+
+                <!-- Animation Panel -->
+                <animation:AnimationPanel x:Name="AnimationPanel" 
+                                          Grid.Row="2"/>
+            </Grid>
+
+            <!-- Collapsible Splitter between Center and Right -->
+            <ctrl:CollapsibleSplitter 
+                x:Name="RightSplitter"
+                Grid.Column="3"
+                Width="6"
+                CollapseLeft="False"
+                DefaultExpandedWidth="360"
+                MinExpandedWidth="200"
+                VerticalAlignment="Stretch"/>
+
+            <!-- RIGHT: Preview / Palette / Tiles / Layers / History -->
+            <Border Grid.Column="4" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+                <Grid x:Name="RightSidebar" Padding="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="*" MinHeight="80"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="*" MinHeight="80"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Preview -->
+                    <ctrl:SectionCard x:Name="PreviewCard" Grid.Row="0" Title="Preview" DisplayIcon="PreviewLink" 
+                                      PanelId="Preview" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="PreviewBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <preview:CanvasPreview x:Name="PreviewControl"/>
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                    <Border Grid.Row="1" Height="4"/>
+
+                    <ctrl:SectionCard x:Name="PaletteCard" Grid.Row="2" Title="Palette" DisplayIcon="Color" 
+                                      PanelId="Palette" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="PaletteBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <palette:PalettePanel x:Name="PalettePanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                    <Border Grid.Row="3" Height="4"/>
+                    
+                    <ctrl:SectionCard x:Name="TilesCard" Grid.Row="4" Title="Tiles" DisplayIcon="Grid" 
+                                      PanelId="Tiles" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="TilesBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <tiles:TilePanel x:Name="TilePanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                    <Border Grid.Row="5" Height="4"/>
+                    
+                    <ctrl:SectionCard x:Name="LayersCard" Grid.Row="6" Title="Layers" DisplayIcon="LayerDiagonal" 
+                                      PanelId="Layers" CanUndock="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="LayersBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <layers:LayersPanel x:Name="LayersPanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+
+                    <Border Grid.Row="7" Height="4"/>
+                    <ctrl:SectionCard x:Name="HistoryCard" Grid.Row="8" Title="History" DisplayIcon="Clock" 
+                                      PanelId="History" CanUndock="True" IsMinimized="True">
+                        <ctrl:SectionCard.CustomControl>
+                            <Border x:Name="HistoryBorder" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                    CornerRadius="8" Padding="6">
+                                <history:HistoryPanel x:Name="HistoryPanel" />
+                            </Border>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

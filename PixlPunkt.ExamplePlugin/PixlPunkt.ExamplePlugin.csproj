@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -25,9 +25,6 @@
     <PluginMinApiVersion>1</PluginMinApiVersion>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Tools\Tile\" />
@@ -36,8 +33,4 @@
   <ItemGroup>
     <PackageReference Include="FluentIcons.Common" Version="2.0.316" />
   </ItemGroup>
-
-  <!-- Import SDK targets for .punk packaging -->
-  <Import Project="..\PixlPunkt.PluginSdk\build\PixlPunkt.PluginSdk.targets" />
-
 </Project>

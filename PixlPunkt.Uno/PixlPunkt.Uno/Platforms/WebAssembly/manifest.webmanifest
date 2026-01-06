@@ -1,0 +1,10 @@
+{
+  "background_color": "#ffffff",
+  "description": "PixlPunkt.Uno",
+  "display": "standalone",
+  "name": "PixlPunkt.Uno",
+  "short_name": "PixlPunkt.Uno",
+  "start_url": "/index.html",
+  "theme_color": "#ffffff",
+  "scope": "/"
+}

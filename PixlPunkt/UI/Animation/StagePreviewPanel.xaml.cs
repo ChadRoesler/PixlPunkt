@@ -1,14 +1,12 @@
 using System;
-using System.Collections.Generic;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Imaging;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.Foundation;
-using Windows.Graphics.DirectX;
 
 namespace PixlPunkt.UI.Animation
 {
@@ -24,7 +22,7 @@ namespace PixlPunkt.UI.Animation
 
         private CanvasDocument? _document;
         private CanvasAnimationState? _animationState;
-        private CanvasControl? _previewCanvas;
+        private SKXamlCanvas? _previewCanvas;
         private byte[]? _previewPixels;
         private int _previewWidth;
         private int _previewHeight;
@@ -34,10 +32,6 @@ namespace PixlPunkt.UI.Animation
         // EVENTS
         //////////////////////////////////////////////////////////////////
 
-        /// <summary>
-        /// Raised when the expand toggle is clicked.
-        /// Parameter is true when expanding, false when collapsing.
-        /// </summary>
         public event Action<bool>? ExpandRequested;
 
         //////////////////////////////////////////////////////////////////
@@ -52,8 +46,8 @@ namespace PixlPunkt.UI.Animation
 
         private void SetupPreviewCanvas()
         {
-            _previewCanvas = new CanvasControl();
-            _previewCanvas.Draw += PreviewCanvas_Draw;
+            _previewCanvas = new SKXamlCanvas();
+            _previewCanvas.PaintSurface += PreviewCanvas_PaintSurface;
             PreviewBorder.Child = _previewCanvas;
         }
 
@@ -61,12 +55,8 @@ namespace PixlPunkt.UI.Animation
         // PUBLIC API
         //////////////////////////////////////////////////////////////////
 
-        /// <summary>
-        /// Binds the panel to a document and its canvas animation state.
-        /// </summary>
         public void Bind(CanvasDocument? document, CanvasAnimationState? animationState)
         {
-            // Unbind previous
             if (_animationState != null)
             {
                 _animationState.CurrentFrameChanged -= OnFrameChanged;
@@ -77,23 +67,18 @@ namespace PixlPunkt.UI.Animation
             _document = document;
             _animationState = animationState;
 
-            // Bind new
             if (_animationState != null)
             {
                 _animationState.CurrentFrameChanged += OnFrameChanged;
                 _animationState.StageSettingsChanged += OnStageSettingsChanged;
                 _animationState.SubRoutinesChanged += OnSubRoutinesChanged;
 
-                // Load all sub-routine reels
                 LoadSubRoutineReels();
             }
 
             RefreshPreview();
         }
 
-        /// <summary>
-        /// Loads all sub-routine reels from their file paths.
-        /// </summary>
         private void LoadSubRoutineReels()
         {
             if (_animationState == null || _document == null)
@@ -108,10 +93,6 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
-        /// <summary>
-        /// Refreshes the preview to reflect current document state.
-        /// Call this when the canvas content changes.
-        /// </summary>
         public void RefreshPreview()
         {
             if (_document == null)
@@ -127,9 +108,6 @@ namespace PixlPunkt.UI.Animation
             _previewCanvas?.Invalidate();
         }
 
-        /// <summary>
-        /// Gets or sets whether the panel is in expanded mode.
-        /// </summary>
         public bool IsExpanded
         {
             get => _isExpanded;
@@ -160,7 +138,6 @@ namespace PixlPunkt.UI.Animation
 
         private void OnSubRoutinesChanged()
         {
-            // Reload sub-routine reels when they change
             DispatcherQueue.TryEnqueue(() =>
             {
                 LoadSubRoutineReels();
@@ -174,43 +151,51 @@ namespace PixlPunkt.UI.Animation
             ExpandRequested?.Invoke(IsExpanded);
         }
 
-        private void PreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void PreviewCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
-            ds.Antialiasing = CanvasAntialiasing.Aliased;
-
-            // Clear with transparency grid pattern
-            ds.Clear(Windows.UI.Color.FromArgb(255, 40, 40, 40));
+            var canvas = e.Surface.Canvas;
+            canvas.Clear(new SKColor(40, 40, 40, 255));
 
             if (_previewPixels == null || _previewPixels.Length < _previewWidth * _previewHeight * 4)
                 return;
 
-            float canvasW = (float)sender.ActualWidth;
-            float canvasH = (float)sender.ActualHeight;
+            float canvasW = e.Info.Width;
+            float canvasH = e.Info.Height;
 
             if (canvasW <= 0 || canvasH <= 0) return;
 
-            using var bitmap = CanvasBitmap.CreateFromBytes(
-                sender.Device,
-                _previewPixels,
-                _previewWidth,
-                _previewHeight,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f);
+            // Create bitmap from pixels
+            var info = new SKImageInfo(_previewWidth, _previewHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using var bitmap = new SKBitmap(info);
 
-            // Calculate destination rect (centered, uniform scale, nearest neighbor for pixel art)
-            float scale = Math.Min(canvasW / _previewWidth, canvasH / _previewHeight);
-            float destW = _previewWidth * scale;
-            float destH = _previewHeight * scale;
-            float destX = (canvasW - destW) / 2;
-            float destY = (canvasH - destH) / 2;
+            // Copy pixels to bitmap
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(_previewPixels, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                bitmap.InstallPixels(info, handle.AddrOfPinnedObject(), info.RowBytes);
 
-            ds.DrawImage(
-                bitmap,
-                new Rect(destX, destY, destW, destH),
-                new Rect(0, 0, _previewWidth, _previewHeight),
-                1.0f,
-                CanvasImageInterpolation.NearestNeighbor);
+                // Calculate destination rect (centered, uniform scale, nearest neighbor for pixel art)
+                float scale = Math.Min(canvasW / _previewWidth, canvasH / _previewHeight);
+                float destW = _previewWidth * scale;
+                float destH = _previewHeight * scale;
+                float destX = (canvasW - destW) / 2;
+                float destY = (canvasH - destH) / 2;
+
+                var destRect = new SKRect(destX, destY, destX + destW, destY + destH);
+                var srcRect = new SKRect(0, 0, _previewWidth, _previewHeight);
+
+                using var paint = new SKPaint
+                {
+                    FilterQuality = SKFilterQuality.None, // Nearest neighbor
+                    IsAntialias = false
+                };
+
+                canvas.DrawBitmap(bitmap, srcRect, destRect, paint);
+            }
+            finally
+            {
+                handle.Free();
+            }
         }
 
         //////////////////////////////////////////////////////////////////
@@ -225,36 +210,25 @@ namespace PixlPunkt.UI.Animation
                 return;
             }
 
-            // Composite the document
             var composite = new PixelSurface(_document.PixelWidth, _document.PixelHeight);
             _document.CompositeTo(composite);
 
-            // Check if stage is enabled
             bool useStage = _animationState?.Stage.Enabled == true;
             int currentFrame = _animationState?.CurrentFrameIndex ?? 0;
 
             if (useStage)
             {
                 var stage = _animationState!.Stage;
-
-                // Apply any stage animation interpolation for current frame
                 var interpolated = _animationState.StageTrack.GetInterpolatedStateAt(currentFrame);
 
-                // Calculate effective stage position and size
                 int stageX, stageY;
                 int stageW, stageH;
 
                 if (interpolated != null)
                 {
-                    // The keyframe stores the CENTER position of the stage (not an offset)
-                    // Calculate top-left corner from the center
                     float centerX = interpolated.PositionX;
                     float centerY = interpolated.PositionY;
                     
-                    // Apply scale to determine the capture area
-                    // Scale > 1 = zooming in (smaller capture area)
-                    // Scale < 1 = zooming out (larger capture area)
-                    // The capture area is OutputSize / Scale
                     float scaleX = interpolated.ScaleX;
                     float scaleY = interpolated.ScaleY;
                     float captureW = stage.OutputWidth / scaleX;
@@ -267,21 +241,18 @@ namespace PixlPunkt.UI.Animation
                 }
                 else
                 {
-                    // No keyframes - use default stage settings (top-left position)
                     stageX = stage.StageX;
                     stageY = stage.StageY;
                     stageW = stage.StageWidth;
                     stageH = stage.StageHeight;
                 }
 
-                // Ensure we have valid dimensions
                 if (stageW <= 0 || stageH <= 0)
                 {
                     _previewPixels = null;
                     return;
                 }
 
-                // Extract stage region
                 _previewWidth = stageW;
                 _previewHeight = stageH;
                 _previewPixels = new byte[stageW * stageH * 4];
@@ -306,7 +277,6 @@ namespace PixlPunkt.UI.Animation
                         }
                         else
                         {
-                            // Outside canvas bounds - transparent
                             _previewPixels[dstIdx + 0] = 0;
                             _previewPixels[dstIdx + 1] = 0;
                             _previewPixels[dstIdx + 2] = 0;
@@ -315,57 +285,36 @@ namespace PixlPunkt.UI.Animation
                     }
                 }
 
-                // Composite sub-routines on top (in stage space)
                 CompositeSubRoutines(_previewPixels, stageW, stageH, stageX, stageY, currentFrame);
             }
             else
             {
-                // Use full canvas
                 _previewWidth = composite.Width;
                 _previewHeight = composite.Height;
                 _previewPixels = (byte[])composite.Pixels.Clone();
 
-                // Composite sub-routines on top (in canvas space)
                 CompositeSubRoutines(_previewPixels, _previewWidth, _previewHeight, 0, 0, currentFrame);
             }
         }
 
-        /// <summary>
-        /// Composites all active sub-routines onto the preview buffer.
-        /// </summary>
-        /// <param name="pixels">The destination pixel buffer (BGRA).</param>
-        /// <param name="destWidth">The width of the destination buffer.</param>
-        /// <param name="destHeight">The height of the destination buffer.</param>
-        /// <param name="offsetX">The X offset (stage position) to subtract from sub-routine positions.</param>
-        /// <param name="offsetY">The Y offset (stage position) to subtract from sub-routine positions.</param>
-        /// <param name="frameIndex">The current animation frame index.</param>
         private void CompositeSubRoutines(byte[] pixels, int destWidth, int destHeight, int offsetX, int offsetY, int frameIndex)
         {
             if (_animationState == null)
                 return;
 
-            // Update sub-routine state for current frame
             _animationState.SubRoutineState.UpdateForFrame(frameIndex);
 
-            // Get render info for all active sub-routines
             foreach (var renderInfo in _animationState.SubRoutineState.GetRenderInfo(frameIndex))
             {
-                // Calculate position in destination buffer
-                // The sub-routine position is in canvas coordinates, we need to convert to dest buffer coordinates
                 double posX = renderInfo.PositionX - offsetX;
                 double posY = renderInfo.PositionY - offsetY;
 
-                // Apply scale
                 int scaledWidth = (int)(renderInfo.FrameWidth * renderInfo.Scale);
                 int scaledHeight = (int)(renderInfo.FrameHeight * renderInfo.Scale);
 
                 if (scaledWidth <= 0 || scaledHeight <= 0)
                     continue;
 
-                // For now, ignore rotation and just do position + scale
-                // TODO: Add rotation support with matrix transformation
-
-                // Composite the sub-routine frame onto the destination
                 CompositeFrame(
                     pixels, destWidth, destHeight,
                     renderInfo.FramePixels, renderInfo.FrameWidth, renderInfo.FrameHeight,
@@ -374,9 +323,6 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
-        /// <summary>
-        /// Composites a single frame onto the destination buffer with alpha blending.
-        /// </summary>
         private static void CompositeFrame(
             byte[] dest, int destWidth, int destHeight,
             byte[] src, int srcWidth, int srcHeight,
@@ -392,7 +338,6 @@ namespace PixlPunkt.UI.Animation
                 if (targetY < 0 || targetY >= destHeight)
                     continue;
 
-                // Source Y with nearest-neighbor scaling
                 int srcY = (int)(dy / scale);
                 if (srcY >= srcHeight) srcY = srcHeight - 1;
 
@@ -402,7 +347,6 @@ namespace PixlPunkt.UI.Animation
                     if (targetX < 0 || targetX >= destWidth)
                         continue;
 
-                    // Source X with nearest-neighbor scaling
                     int srcX = (int)(dx / scale);
                     if (srcX >= srcWidth) srcX = srcWidth - 1;
 
@@ -415,11 +359,10 @@ namespace PixlPunkt.UI.Animation
                     byte srcA = src[srcIdx + 3];
 
                     if (srcA == 0)
-                        continue; // Fully transparent, skip
+                        continue;
 
                     if (srcA == 255)
                     {
-                        // Fully opaque, just copy
                         dest[dstIdx + 0] = srcB;
                         dest[dstIdx + 1] = srcG;
                         dest[dstIdx + 2] = srcR;
@@ -427,7 +370,6 @@ namespace PixlPunkt.UI.Animation
                     }
                     else
                     {
-                        // Alpha blend
                         byte dstB = dest[dstIdx + 0];
                         byte dstG = dest[dstIdx + 1];
                         byte dstR = dest[dstIdx + 2];

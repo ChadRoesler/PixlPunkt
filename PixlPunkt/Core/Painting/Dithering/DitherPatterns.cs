@@ -1,5 +1,6 @@
 using System;
 using PixlPunkt.Core.Tools.Settings;
+using GradientStop = PixlPunkt.Core.Tools.Settings.GradientStop;
 
 namespace PixlPunkt.Core.Painting.Dithering
 {

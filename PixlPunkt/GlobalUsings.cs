@@ -66,3 +66,6 @@ global using ToolLimits = PixlPunkt.PluginSdk.Constants.ToolLimits;
 global using EffectLimits = PixlPunkt.PluginSdk.Constants.EffectLimits;
 global using ColorConstants = PixlPunkt.PluginSdk.Constants.ColorConstants;
 global using MathConstants = PixlPunkt.PluginSdk.Constants.MathConstants;
+
+// Graphics struct helpers for Uno Platform (uses object initializers instead of constructors)
+global using static PixlPunkt.Core.Helpers.GraphicsStructHelper;

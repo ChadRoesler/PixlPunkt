@@ -6,6 +6,7 @@ using PixlPunkt.Core.History;
 using PixlPunkt.Core.Logging;
 using Windows.Foundation;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Selection
 {
@@ -601,7 +602,7 @@ namespace PixlPunkt.Core.Selection
                     // A non-transparent run?
                     if (end > start)
                     {
-                        region.AddRect(new RectInt32(start, y, end - start, 1));
+                        region.AddRect(CreateRect(start, y, end - start, 1));
                     }
 
                     // Move forward to next candidate

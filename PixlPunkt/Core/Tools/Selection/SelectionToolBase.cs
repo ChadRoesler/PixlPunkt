@@ -1,5 +1,5 @@
-using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml.Input;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
 
@@ -138,7 +138,7 @@ namespace PixlPunkt.Core.Tools.Selection
         }
 
         /// <inheritdoc/>
-        public virtual void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase)
+        public virtual void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase)
         {
         }
 

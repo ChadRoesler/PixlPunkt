@@ -144,7 +144,7 @@ namespace PixlPunkt.UI.Layers
                 if (result != null)
                     return result;
             }
-            return null;
+            return default;
         }
 
         // ────────────────────────────────────────────────────────────────────

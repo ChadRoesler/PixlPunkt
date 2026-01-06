@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -21,9 +19,11 @@ using PixlPunkt.Core.Tools.Settings;
 using PixlPunkt.PluginSdk.Settings;
 using PixlPunkt.UI.CanvasHost;
 using PixlPunkt.UI.Rendering;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.Foundation;
-using Windows.Graphics.DirectX;
 using Windows.UI;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI.Animation
 {
@@ -46,6 +46,10 @@ namespace PixlPunkt.UI.Animation
 
         // Pattern background service for diagonal stripes
         private readonly PatternBackgroundService _patternService = new() { StripeBandDip = 4f, RepeatCycles = 8 };
+
+        // Cached checkerboard pattern for SkiaSharp
+        private SKShader? _checkerboardShader;
+        private SKBitmap? _checkerboardBitmap;
 
         // ====================================================================
         // FIELDS - TILE STATE
@@ -113,103 +117,50 @@ namespace PixlPunkt.UI.Animation
         // FIELDS - ONION SKINNING
         // ====================================================================
 
-        private bool _onionSkinPrev1 = false;  // Show -1 frame at 50% opacity
-        private bool _onionSkinPrev2 = false;  // Show -2 frame at 25% opacity
-        private bool _onionSkinNext1 = false;  // Show +1 frame at 50% opacity
-        private bool _onionSkinNext2 = false;  // Show +2 frame at 25% opacity
+        private bool _onionSkinPrev1 = false;
+        private bool _onionSkinPrev2 = false;
+        private bool _onionSkinNext1 = false;
+        private bool _onionSkinNext2 = false;
 
-        // Onion skin opacity levels
-        private const byte OnionOpacity1 = 128;  // 50% for ±1 frame
-        private const byte OnionOpacity2 = 64;   // 25% for ±2 frame
+        private const byte OnionOpacity1 = 128;
+        private const byte OnionOpacity2 = 64;
 
-        // Onion skin tint colors (to differentiate past/future)
-        private static readonly Color OnionPrevTint = Color.FromArgb(255, 255, 100, 100);  // Reddish for past
-        private static readonly Color OnionNextTint = Color.FromArgb(255, 100, 100, 255);  // Bluish for future
+        private static readonly Color OnionPrevTint = Color.FromArgb(255, 255, 100, 100);
+        private static readonly Color OnionNextTint = Color.FromArgb(255, 100, 100, 255);
 
         // ====================================================================
         // EVENTS
         // ====================================================================
 
-        /// <summary>
-        /// Raised when the tile content has been modified (for thumbnail refresh).
-        /// </summary>
         public event Action? TileModified;
-
-        /// <summary>
-        /// Raised when onion skinning settings change.
-        /// </summary>
         public event Action? OnionSkinChanged;
 
         // ====================================================================
         // PROPERTIES - ONION SKINNING
         // ====================================================================
 
-        /// <summary>
-        /// Gets or sets whether to show the previous frame (-1) at 50% opacity.
-        /// </summary>
         public bool OnionSkinPrev1
         {
             get => _onionSkinPrev1;
-            set
-            {
-                if (_onionSkinPrev1 != value)
-                {
-                    _onionSkinPrev1 = value;
-                    OnionSkinChanged?.Invoke();
-                    EditorCanvas?.Invalidate();
-                }
-            }
+            set { if (_onionSkinPrev1 != value) { _onionSkinPrev1 = value; OnionSkinChanged?.Invoke(); EditorCanvas?.Invalidate(); } }
         }
 
-        /// <summary>
-        /// Gets or sets whether to show the frame 2 back (-2) at 25% opacity.
-        /// </summary>
         public bool OnionSkinPrev2
         {
             get => _onionSkinPrev2;
-            set
-            {
-                if (_onionSkinPrev2 != value)
-                {
-                    _onionSkinPrev2 = value;
-                    OnionSkinChanged?.Invoke();
-                    EditorCanvas?.Invalidate();
-                }
-            }
+            set { if (_onionSkinPrev2 != value) { _onionSkinPrev2 = value; OnionSkinChanged?.Invoke(); EditorCanvas?.Invalidate(); } }
         }
 
-        /// <summary>
-        /// Gets or sets whether to show the next frame (+1) at 50% opacity.
-        /// </summary>
         public bool OnionSkinNext1
         {
             get => _onionSkinNext1;
-            set
-            {
-                if (_onionSkinNext1 != value)
-                {
-                    _onionSkinNext1 = value;
-                    OnionSkinChanged?.Invoke();
-                    EditorCanvas?.Invalidate();
-                }
-            }
+            set { if (_onionSkinNext1 != value) { _onionSkinNext1 = value; OnionSkinChanged?.Invoke(); EditorCanvas?.Invalidate(); } }
         }
 
-        /// <summary>
-        /// Gets or sets whether to show the frame 2 ahead (+2) at 25% opacity.
-        /// </summary>
         public bool OnionSkinNext2
         {
             get => _onionSkinNext2;
-            set
-            {
-                if (_onionSkinNext2 != value)
-                {
-                    _onionSkinNext2 = value;
-                    OnionSkinChanged?.Invoke();
-                    EditorCanvas?.Invalidate();
-                }
-            }
+            set { if (_onionSkinNext2 != value) { _onionSkinNext2 = value; OnionSkinChanged?.Invoke(); EditorCanvas?.Invalidate(); } }
         }
 
         // ====================================================================
@@ -233,12 +184,15 @@ namespace PixlPunkt.UI.Animation
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
+            _checkerboardShader?.Dispose();
+            _checkerboardBitmap?.Dispose();
         }
 
         private void OnStripeColorsChanged()
         {
             ApplyStripeColors();
             _patternService.Invalidate();
+            InvalidateCheckerboardCache();
             EditorCanvas?.Invalidate();
         }
 
@@ -261,16 +215,20 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
+        private void InvalidateCheckerboardCache()
+        {
+            _checkerboardShader?.Dispose();
+            _checkerboardShader = null;
+            _checkerboardBitmap?.Dispose();
+            _checkerboardBitmap = null;
+        }
+
         // ====================================================================
         // PUBLIC API
         // ====================================================================
 
-        /// <summary>
-        /// Binds the editor to animation state and document.
-        /// </summary>
         public void Bind(TileAnimationState? state, CanvasDocument? document)
         {
-            // Unbind previous
             if (_state != null)
             {
                 _state.CurrentFrameChanged -= OnCurrentFrameChanged;
@@ -284,14 +242,12 @@ namespace PixlPunkt.UI.Animation
             _state = state;
             _document = document;
 
-            // Setup stroke engine for the document
             if (_document != null)
             {
                 _stroke = new StrokeEngine(_document.TargetSurface);
                 SyncBrushToStrokeEngine();
             }
 
-            // Bind new
             if (_state != null)
             {
                 _state.CurrentFrameChanged += OnCurrentFrameChanged;
@@ -305,20 +261,10 @@ namespace PixlPunkt.UI.Animation
             RefreshDisplay();
         }
 
-        /// <summary>
-        /// Binds the canvas host for brush overlay sync.
-        /// </summary>
-        public void BindCanvasHost(CanvasViewHost? canvasHost)
-        {
-            _canvasHost = canvasHost;
-        }
+        public void BindCanvasHost(CanvasViewHost? canvasHost) => _canvasHost = canvasHost;
 
-        /// <summary>
-        /// Binds the tool state and palette service.
-        /// </summary>
         public void BindToolState(ToolState? toolState, PaletteService? palette)
         {
-            // Unbind previous
             if (_toolState != null)
             {
                 _toolState.ActiveToolIdChanged -= OnToolChanged;
@@ -334,7 +280,6 @@ namespace PixlPunkt.UI.Animation
             _toolState = toolState;
             _palette = palette;
 
-            // Bind new
             if (_toolState != null)
             {
                 _toolState.ActiveToolIdChanged += OnToolChanged;
@@ -351,25 +296,9 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
-        /// <summary>
-        /// Sets the foreground color (kept for API compatibility).
-        /// </summary>
-        public void SetForegroundColor(uint bgra)
-        {
-            _foregroundColor = bgra;
-        }
+        public void SetForegroundColor(uint bgra) => _foregroundColor = bgra;
+        public void SetBackgroundColor(uint bgra) => _backgroundColor = bgra;
 
-        /// <summary>
-        /// Sets the background color (kept for API compatibility).
-        /// </summary>
-        public void SetBackgroundColor(uint bgra)
-        {
-            _backgroundColor = bgra;
-        }
-
-        /// <summary>
-        /// Refreshes the display to reflect current state.
-        /// </summary>
         public void RefreshDisplay()
         {
             UpdateTilePosition();
@@ -377,37 +306,14 @@ namespace PixlPunkt.UI.Animation
         }
 
         // ====================================================================
-        // TOOL/BRUSH STATE SYNC
+        // TOOL/BRUSH STATE SYNC (unchanged)
         // ====================================================================
 
-        private void OnToolChanged(string toolId)
-        {
-            SyncBrushFromToolState();
-            EditorCanvas?.Invalidate();
-        }
-
-        private void OnToolOptionsChanged()
-        {
-            SyncBrushFromToolState();
-            EditorCanvas?.Invalidate();
-        }
-
-        private void OnBrushChanged(BrushSettings s)
-        {
-            SyncBrushFromToolState();
-            EditorCanvas?.Invalidate();
-        }
-
-        private void OnForegroundChanged(uint bgra)
-        {
-            _foregroundColor = bgra;
-            SyncBrushToStrokeEngine();
-        }
-
-        private void OnBackgroundChanged(uint bgra)
-        {
-            _backgroundColor = bgra;
-        }
+        private void OnToolChanged(string toolId) { SyncBrushFromToolState(); EditorCanvas?.Invalidate(); }
+        private void OnToolOptionsChanged() { SyncBrushFromToolState(); EditorCanvas?.Invalidate(); }
+        private void OnBrushChanged(BrushSettings s) { SyncBrushFromToolState(); EditorCanvas?.Invalidate(); }
+        private void OnForegroundChanged(uint bgra) { _foregroundColor = bgra; SyncBrushToStrokeEngine(); }
+        private void OnBackgroundChanged(uint bgra) { _backgroundColor = bgra; }
 
         private void SyncBrushFromToolState()
         {
@@ -445,17 +351,14 @@ namespace PixlPunkt.UI.Animation
         }
 
         // ====================================================================
-        // TOOL HELPERS
+        // TOOL HELPERS (unchanged)
         // ====================================================================
 
         private IStrokeSettings? GetStrokeSettingsForCurrentTool()
         {
             var toolId = _toolState?.ActiveToolId ?? ToolIds.Brush;
-
             var brushReg = ToolRegistry.Shared.GetById<BrushToolRegistration>(toolId);
-            if (brushReg != null)
-                return brushReg.StrokeSettings;
-
+            if (brushReg != null) return brushReg.StrokeSettings;
             var registration = ToolRegistry.Shared.GetById(toolId);
             return registration?.Settings as IStrokeSettings;
         }
@@ -463,12 +366,8 @@ namespace PixlPunkt.UI.Animation
         private IStrokePainter? GetPainterForCurrentTool()
         {
             var toolId = _toolState?.ActiveToolId ?? ToolIds.Brush;
-
             var brushReg = ToolRegistry.Shared.GetById<BrushToolRegistration>(toolId);
-            if (brushReg != null)
-                return brushReg.CreatePainter();
-
-            return null;
+            return brushReg?.CreatePainter();
         }
 
         private IReadOnlyList<(int dx, int dy)> GetCurrentBrushOffsets()
@@ -487,87 +386,30 @@ namespace PixlPunkt.UI.Animation
             return BrushMaskCache.Shared.GetOffsets(_brushShape, _brushSize);
         }
 
-        private bool IsPaintingToolActive()
-        {
-            if (_toolState == null) return true;
-            return _toolState.ActiveCategory == ToolCategory.Brush;
-        }
+        private bool IsPaintingToolActive() => _toolState == null || _toolState.ActiveCategory == ToolCategory.Brush;
+        private bool IsFillToolActive() => _toolState?.ActiveToolId == ToolIds.Fill;
+        private bool IsDropperToolActive() => _toolState?.ActiveToolId == ToolIds.Dropper;
+        private bool ShouldShowFilledBrushGhost() => (_toolState?.ActiveToolId ?? ToolIds.Brush) == ToolIds.Brush;
 
-        private bool IsFillToolActive()
-        {
-            return _toolState?.ActiveToolId == ToolIds.Fill;
-        }
-
-        private bool IsDropperToolActive()
-        {
-            return _toolState?.ActiveToolId == ToolIds.Dropper;
-        }
-
-        /// <summary>
-        /// Determines if the current tool should show a filled brush ghost preview.
-        /// Matches CanvasViewHost logic exactly.
-        /// </summary>
-        private bool ShouldShowFilledBrushGhost()
-        {
-            var toolId = _toolState?.ActiveToolId ?? ToolIds.Brush;
-            // Only brush tool shows filled ghost, not eraser/blur/etc.
-            return toolId == ToolIds.Brush;
-        }
-
-        /// <summary>
-        /// Checks if the current tool has a custom brush selected.
-        /// </summary>
-        private bool IsCustomBrushSelected()
-        {
-            var strokeSettings = GetStrokeSettingsForCurrentTool();
-            return strokeSettings is ICustomBrushSettings custom && custom.IsCustomBrushSelected;
-        }
-
-        /// <summary>
-        /// Computes brush alpha at offset using the stroke engine (matches CanvasViewHost exactly).
-        /// </summary>
         private byte ComputeBrushAlphaAtOffset(int dx, int dy)
         {
             if (_stroke == null) return 0;
-
             var strokeSettings = GetStrokeSettingsForCurrentTool();
-
-            // Check for custom brush
-            if (strokeSettings is ICustomBrushSettings customBrushSettings && customBrushSettings.IsCustomBrushSelected)
-            {
-                // Custom brushes use radial density-based falloff
+            if (strokeSettings is ICustomBrushSettings custom && custom.IsCustomBrushSelected)
                 return ComputeCustomBrushAlpha(dx, dy, _brushSize, _brushOpacity, _brushDensity);
-            }
-
-            // Built-in shapes use the stroke engine's alpha computation
             return _stroke.ComputeBrushAlphaAtOffset(dx, dy);
         }
 
-        /// <summary>
-        /// Computes per-pixel alpha for custom brushes using radial density-based falloff.
-        /// Matches CanvasViewHost.ComputeCustomBrushAlpha exactly.
-        /// </summary>
         private static byte ComputeCustomBrushAlpha(int dx, int dy, int size, byte opacity, byte density)
         {
             if (opacity == 0) return 0;
-
             int sz = Math.Max(1, size);
             double Aop = opacity / 255.0;
-
             double r = sz / 2.0;
-
-            // Use circular distance - offsets are already relative to brush center
             double d = Math.Sqrt((double)dx * dx + (double)dy * dy);
-
-            // Apply density falloff based on distance
             double D = density / 255.0;
             double Rhard = r * D;
-
-            // Full opacity within the hard radius
-            if (d <= Rhard)
-                return (byte)Math.Round(255.0 * Aop);
-
-            // Falloff region beyond hard radius
+            if (d <= Rhard) return (byte)Math.Round(255.0 * Aop);
             double span = Math.Max(1e-6, r - Rhard);
             double t = Math.Min(1.0, (d - Rhard) / span);
             double mask = 1.0 - (t * t) * (3 - 2 * t);
@@ -578,49 +420,33 @@ namespace PixlPunkt.UI.Animation
         // EVENT HANDLERS
         // ====================================================================
 
-        private void OnCurrentFrameChanged(int frameIndex)
-        {
-            DispatcherQueue.TryEnqueue(RefreshDisplay);
-        }
-
-        private void OnSelectedReelChanged(TileAnimationReel? reel)
-        {
-            DispatcherQueue.TryEnqueue(RefreshDisplay);
-        }
+        private void OnCurrentFrameChanged(int frameIndex) => DispatcherQueue.TryEnqueue(RefreshDisplay);
+        private void OnSelectedReelChanged(TileAnimationReel? reel) => DispatcherQueue.TryEnqueue(RefreshDisplay);
 
         private void OnDocumentModified()
         {
-            // Skip refresh if we're actively painting (we're the source)
             if (_isPainting) return;
-
             DispatcherQueue.TryEnqueue(() => EditorCanvas?.Invalidate());
         }
 
         // ====================================================================
-        // RENDERING
+        // RENDERING (SKIASHARP)
         // ====================================================================
 
-        private void EditorCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void EditorCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
-            ds.Antialiasing = CanvasAntialiasing.Aliased;
+            var canvas = e.Surface.Canvas;
 
-            float canvasW = (float)sender.ActualWidth;
-            float canvasH = (float)sender.ActualHeight;
+            float canvasW = (float)EditorCanvas.ActualWidth;
+            float canvasH = (float)EditorCanvas.ActualHeight;
 
             if (canvasW <= 0 || canvasH <= 0) return;
 
-            ds.Clear(Color.FromArgb(255, 30, 30, 30));
+            canvas.Clear(new SKColor(30, 30, 30));
 
-            //if (_document == null || _tileX < 0 || _tileY < 0 || _tileWidth <= 0 || _tileHeight <= 0)
-            //{
-            //    EmptyStateText.Visibility = Visibility.Visible;
-            //    return;
-            //}
+            if (_document == null || _tileX < 0 || _tileY < 0 || _tileWidth <= 0 || _tileHeight <= 0)
+                return;
 
-            //EmptyStateText.Visibility = Visibility.Collapsed;
-
-            // Calculate layout
             float padding = 8f;
             float availableW = canvasW - padding * 2;
             float availableH = canvasH - padding * 2;
@@ -635,176 +461,138 @@ namespace PixlPunkt.UI.Animation
 
             if (destW <= 0 || destH <= 0) return;
 
-            // Apply pan offset to destination position
             float destX = (canvasW - destW) / 2 + (float)_panOffsetX;
             float destY = (canvasH - destH) / 2 + (float)_panOffsetY;
 
-            var destRect = new Rect(destX, destY, destW, destH);
+            var destRect = new SKRect(destX, destY, destX + destW, destY + destH);
 
             // Draw pattern background
-            DrawPatternBackground(sender, ds, destX, destY, destW, destH);
+            DrawPatternBackground(canvas, destRect);
 
-            // Draw onion skin layers (behind current frame)
-            DrawOnionSkinLayers(sender, ds, destRect);
+            // Draw onion skin layers
+            DrawOnionSkinLayers(canvas, destRect);
 
-            // Read tile pixels directly from document composite surface
+            // Read tile pixels
             byte[]? tilePixels = ReadTilePixelsFromDocument();
             if (tilePixels == null) return;
 
-            // If hover is valid and brush tool (not painting), composite brush ghost into tile pixels
+            // Composite brush ghost if hovering with brush tool
             bool showFilledGhost = _hoverValid && !_isPainting && IsPaintingToolActive() && ShouldShowFilledBrushGhost();
             if (showFilledGhost)
-            {
                 CompositeBrushGhostIntoBuffer(tilePixels);
-            }
 
             // Draw tile pixels
-            using var bitmap = CanvasBitmap.CreateFromBytes(
-                sender.Device,
-                tilePixels,
-                _tileWidth,
-                _tileHeight,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f);
+            using var bitmap = new SKBitmap(_tileWidth, _tileHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+            System.Runtime.InteropServices.Marshal.Copy(tilePixels, 0, bitmap.GetPixels(), tilePixels.Length);
 
-            ds.DrawImage(
-                bitmap,
-                destRect,
-                new Rect(0, 0, _tileWidth, _tileHeight),
-                1.0f,
-                CanvasImageInterpolation.NearestNeighbor);
+            using var paint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
+            canvas.DrawBitmap(bitmap, new SKRect(0, 0, _tileWidth, _tileHeight), destRect, paint);
 
-            // Draw pixel grid if zoomed in enough
+            // Draw pixel grid if zoomed in
             if (scale >= 4)
-            {
-                DrawPixelGrid(ds, destX, destY, destW, destH, scale);
-            }
+                DrawPixelGrid(canvas, destX, destY, destW, destH, scale);
 
-            // Draw brush cursor overlay (outline for non-brush tools, always show while hovering)
+            // Draw brush outline for non-brush tools
             bool showOutline = _hoverValid && IsPaintingToolActive() && !ShouldShowFilledBrushGhost();
             if (showOutline)
+                DrawBrushOutline(canvas, destX, destY, scale, tilePixels);
+        }
+
+        private void DrawPatternBackground(SKCanvas canvas, SKRect destRect)
+        {
+            var (lightColor, darkColor) = _patternService.CurrentScheme;
+
+            int squareSize = 4;
+            EnsureCheckerboardShader(squareSize, lightColor, darkColor);
+
+            if (_checkerboardShader != null)
             {
-                DrawBrushOutline(ds, destX, destY, scale, tilePixels);
+                using var paint = new SKPaint { Shader = _checkerboardShader, IsAntialias = false };
+                canvas.DrawRect(destRect, paint);
+            }
+            else
+            {
+                canvas.DrawRect(destRect, new SKPaint { Color = new SKColor(lightColor.R, lightColor.G, lightColor.B) });
             }
         }
 
-        /// <summary>
-        /// Draws onion skin layers for previous and next frames.
-        /// </summary>
-        private void DrawOnionSkinLayers(CanvasControl sender, CanvasDrawingSession ds, Rect destRect)
+        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
+        {
+            if (_checkerboardBitmap != null && _checkerboardShader != null) return;
+
+            _checkerboardShader?.Dispose();
+            _checkerboardBitmap?.Dispose();
+
+            int tileSize = squareSize * 2;
+            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
+            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
+
+            for (int y = 0; y < tileSize; y++)
+            {
+                for (int x = 0; x < tileSize; x++)
+                {
+                    int cx = x / squareSize;
+                    int cy = y / squareSize;
+                    bool isLight = ((cx + cy) & 1) == 0;
+                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
+                }
+            }
+
+            using var image = SKImage.FromBitmap(_checkerboardBitmap);
+            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
+        }
+
+        private void DrawOnionSkinLayers(SKCanvas canvas, SKRect destRect)
         {
             var reel = _state?.SelectedReel;
             if (reel == null || reel.Frames.Count <= 1) return;
 
             int currentIndex = _state!.CurrentFrameIndex;
 
-            // Draw -2 frame (furthest back, drawn first so it's behind -1)
-            if (_onionSkinPrev2)
-            {
-                DrawOnionFrame(sender, ds, destRect, currentIndex - 2, OnionOpacity2, OnionPrevTint);
-            }
-
-            // Draw -1 frame
-            if (_onionSkinPrev1)
-            {
-                DrawOnionFrame(sender, ds, destRect, currentIndex - 1, OnionOpacity1, OnionPrevTint);
-            }
-
-            // Draw +2 frame (furthest forward, drawn first so it's behind +1)
-            if (_onionSkinNext2)
-            {
-                DrawOnionFrame(sender, ds, destRect, currentIndex + 2, OnionOpacity2, OnionNextTint);
-            }
-
-            // Draw +1 frame
-            if (_onionSkinNext1)
-            {
-                DrawOnionFrame(sender, ds, destRect, currentIndex + 1, OnionOpacity1, OnionNextTint);
-            }
+            if (_onionSkinPrev2) DrawOnionFrame(canvas, destRect, currentIndex - 2, OnionOpacity2, OnionPrevTint);
+            if (_onionSkinPrev1) DrawOnionFrame(canvas, destRect, currentIndex - 1, OnionOpacity1, OnionPrevTint);
+            if (_onionSkinNext2) DrawOnionFrame(canvas, destRect, currentIndex + 2, OnionOpacity2, OnionNextTint);
+            if (_onionSkinNext1) DrawOnionFrame(canvas, destRect, currentIndex + 1, OnionOpacity1, OnionNextTint);
         }
 
-        /// <summary>
-        /// Draws a single onion skin frame at the specified offset with given opacity and tint.
-        /// </summary>
-        private void DrawOnionFrame(CanvasControl sender, CanvasDrawingSession ds, Rect destRect,
-            int frameIndex, byte opacity, Color tint)
+        private void DrawOnionFrame(SKCanvas canvas, SKRect destRect, int frameIndex, byte opacity, Color tint)
         {
             var reel = _state?.SelectedReel;
             if (reel == null) return;
 
-            // Handle wrapping/bounds
             int frameCount = reel.Frames.Count;
-            if (frameCount == 0) return;
-
-            // Don't wrap - just skip out-of-bounds frames
-            if (frameIndex < 0 || frameIndex >= frameCount) return;
-
-            // Don't show current frame as onion
+            if (frameCount == 0 || frameIndex < 0 || frameIndex >= frameCount) return;
             if (frameIndex == _state!.CurrentFrameIndex) return;
 
-            // Get the frame's tile position
             var frame = reel.Frames[frameIndex];
-            int frameTileX = frame.TileX;
-            int frameTileY = frame.TileY;
-
-            // Read pixels for this frame's tile
-            byte[]? framePixels = ReadTilePixelsAt(frameTileX, frameTileY);
+            byte[]? framePixels = ReadTilePixelsAt(frame.TileX, frame.TileY);
             if (framePixels == null) return;
 
-            // Apply opacity and tint to pixels
             byte[] tintedPixels = ApplyOnionTint(framePixels, opacity, tint);
 
-            // Draw the onion frame
-            using var bitmap = CanvasBitmap.CreateFromBytes(
-                sender.Device,
-                tintedPixels,
-                _tileWidth,
-                _tileHeight,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f);
+            using var bitmap = new SKBitmap(_tileWidth, _tileHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+            System.Runtime.InteropServices.Marshal.Copy(tintedPixels, 0, bitmap.GetPixels(), tintedPixels.Length);
 
-            ds.DrawImage(
-                bitmap,
-                destRect,
-                new Rect(0, 0, _tileWidth, _tileHeight),
-                1.0f,
-                CanvasImageInterpolation.NearestNeighbor);
+            using var paint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
+            canvas.DrawBitmap(bitmap, new SKRect(0, 0, _tileWidth, _tileHeight), destRect, paint);
         }
 
-        /// <summary>
-        /// Applies opacity reduction and color tint to onion skin pixels.
-        /// </summary>
         private byte[] ApplyOnionTint(byte[] sourcePixels, byte opacity, Color tint)
         {
             byte[] result = new byte[sourcePixels.Length];
             float opacityFactor = opacity / 255f;
-
-            // Tint blend factor (subtle tinting)
             const float tintStrength = 0.3f;
 
             for (int i = 0; i < sourcePixels.Length; i += 4)
             {
-                byte b = sourcePixels[i];
-                byte g = sourcePixels[i + 1];
-                byte r = sourcePixels[i + 2];
-                byte a = sourcePixels[i + 3];
+                byte b = sourcePixels[i], g = sourcePixels[i + 1], r = sourcePixels[i + 2], a = sourcePixels[i + 3];
+                if (a == 0) { result[i] = result[i + 1] = result[i + 2] = result[i + 3] = 0; continue; }
 
-                // Skip fully transparent pixels
-                if (a == 0)
-                {
-                    result[i] = 0;
-                    result[i + 1] = 0;
-                    result[i + 2] = 0;
-                    result[i + 3] = 0;
-                    continue;
-                }
-
-                // Apply tint (blend toward tint color)
                 float tr = r + (tint.R - r) * tintStrength;
                 float tg = g + (tint.G - g) * tintStrength;
                 float tb = b + (tint.B - b) * tintStrength;
-
-                // Apply opacity reduction
                 float newA = a * opacityFactor;
 
                 result[i] = (byte)Math.Clamp(tb, 0, 255);
@@ -812,13 +600,9 @@ namespace PixlPunkt.UI.Animation
                 result[i + 2] = (byte)Math.Clamp(tr, 0, 255);
                 result[i + 3] = (byte)Math.Clamp(newA, 0, 255);
             }
-
             return result;
         }
 
-        /// <summary>
-        /// Reads tile pixels at a specific tile position (for onion skinning).
-        /// </summary>
         private byte[]? ReadTilePixelsAt(int tileX, int tileY)
         {
             if (_document == null || _tileWidth <= 0 || _tileHeight <= 0) return null;
@@ -826,78 +610,58 @@ namespace PixlPunkt.UI.Animation
             int docX = tileX * _tileWidth;
             int docY = tileY * _tileHeight;
 
-            if (docX < 0 || docY < 0 ||
-                docX + _tileWidth > _document.PixelWidth ||
-                docY + _tileHeight > _document.PixelHeight)
-            {
+            if (docX < 0 || docY < 0 || docX + _tileWidth > _document.PixelWidth || docY + _tileHeight > _document.PixelHeight)
                 return null;
-            }
 
             var surface = _document.Surface;
             if (surface == null) return null;
 
             byte[] pixels = new byte[_tileWidth * _tileHeight * 4];
-
             for (int y = 0; y < _tileHeight; y++)
             {
                 for (int x = 0; x < _tileWidth; x++)
                 {
                     int srcIdx = ((docY + y) * surface.Width + (docX + x)) * 4;
                     int dstIdx = (y * _tileWidth + x) * 4;
-
                     if (srcIdx + 3 < surface.Pixels.Length)
                     {
-                        pixels[dstIdx + 0] = surface.Pixels[srcIdx + 0];
+                        pixels[dstIdx] = surface.Pixels[srcIdx];
                         pixels[dstIdx + 1] = surface.Pixels[srcIdx + 1];
                         pixels[dstIdx + 2] = surface.Pixels[srcIdx + 2];
                         pixels[dstIdx + 3] = surface.Pixels[srcIdx + 3];
                     }
                 }
             }
-
             return pixels;
         }
 
-        private void DrawPatternBackground(CanvasControl sender, CanvasDrawingSession ds, float x, float y, float w, float h)
+        private void DrawPixelGrid(SKCanvas canvas, float x, float y, float w, float h, float scale)
         {
-            if (w <= 0 || h <= 0) return;
-
-            double dpi = sender.XamlRoot?.RasterizationScale ?? 1.0;
-            var img = _patternService.GetSizedImage(sender.Device, dpi, w, h);
-
-            var target = new Rect(x, y, w, h);
-            var src = new Rect(0, 0, img.SizeInPixels.Width, img.SizeInPixels.Height);
-
-            ds.DrawImage(img, target, src);
-        }
-
-        private void DrawPixelGrid(CanvasDrawingSession ds, float x, float y, float w, float h, float scale)
-        {
-            var gridColor = Color.FromArgb(50, 255, 255, 255);
+            using var gridPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = new SKColor(255, 255, 255, 50),
+                StrokeWidth = 1,
+                IsAntialias = false
+            };
 
             for (int px = 0; px <= _tileWidth; px++)
             {
                 float lx = x + px * scale;
-                ds.DrawLine(lx, y, lx, y + h, gridColor, 1);
+                canvas.DrawLine(lx, y, lx, y + h, gridPaint);
             }
 
             for (int py = 0; py <= _tileHeight; py++)
             {
                 float ly = y + py * scale;
-                ds.DrawLine(x, ly, x + w, ly, gridColor, 1);
+                canvas.DrawLine(x, ly, x + w, ly, gridPaint);
             }
         }
 
-        /// <summary>
-        /// Composites the brush ghost (filled cursor preview for brush tool) into the tile buffer.
-        /// Uses ComputeBrushAlphaAtOffset to exactly match CanvasViewHost behavior.
-        /// </summary>
         private void CompositeBrushGhostIntoBuffer(byte[] tilePixels)
         {
             int docX = _tileX * _tileWidth;
             int docY = _tileY * _tileHeight;
-
-            // Convert hover doc coords to tile-local
             int localX = _hoverDocX - docX;
             int localY = _hoverDocY - docY;
 
@@ -908,52 +672,38 @@ namespace PixlPunkt.UI.Animation
                 int px = localX + dx;
                 int py = localY + dy;
 
-                if (px < 0 || px >= _tileWidth || py < 0 || py >= _tileHeight)
-                    continue;
+                if (px < 0 || px >= _tileWidth || py < 0 || py >= _tileHeight) continue;
 
-                // Use ComputeBrushAlphaAtOffset to exactly match CanvasViewHost
                 byte effA = ComputeBrushAlphaAtOffset(dx, dy);
                 if (effA == 0) continue;
 
                 int idx = (py * _tileWidth + px) * 4;
-
-                // Blend foreground color with computed alpha over existing pixel
                 uint before = (uint)(tilePixels[idx] | (tilePixels[idx + 1] << 8) |
                                     (tilePixels[idx + 2] << 16) | (tilePixels[idx + 3] << 24));
                 uint srcWithAlpha = (_foregroundColor & 0x00FFFFFFu) | ((uint)effA << 24);
                 uint after = ColorUtil.BlendOver(before, srcWithAlpha);
 
-                tilePixels[idx + 0] = (byte)(after & 0xFF);
+                tilePixels[idx] = (byte)(after & 0xFF);
                 tilePixels[idx + 1] = (byte)((after >> 8) & 0xFF);
                 tilePixels[idx + 2] = (byte)((after >> 16) & 0xFF);
                 tilePixels[idx + 3] = (byte)((after >> 24) & 0xFF);
             }
         }
 
-        /// <summary>
-        /// Draws the brush outline overlay for non-brush tools.
-        /// Uses contrasting color based on pixels under the cursor, matching CanvasViewHost exactly.
-        /// </summary>
-        private void DrawBrushOutline(CanvasDrawingSession ds, float destX, float destY, float scale, byte[] tilePixels)
+        private void DrawBrushOutline(SKCanvas canvas, float destX, float destY, float scale, byte[] tilePixels)
         {
             int docX = _tileX * _tileWidth;
             int docY = _tileY * _tileHeight;
-
-            // Convert hover doc coords to tile-local
             int localX = _hoverDocX - docX;
             int localY = _hoverDocY - docY;
 
             var offsets = GetCurrentBrushOffsets();
             if (offsets.Count == 0) return;
 
-            // Build grid for edge detection (matches CanvasViewHost.DrawBrushOutline)
             StrokeUtil.BuildMaskGrid(offsets, out var grid, out int minDx, out int minDy, out int w, out int h);
 
             int localX0 = localX + minDx;
             int localY0 = localY + minDy;
-
-            float sf = scale;
-            float thick = 1f;
 
             // Horizontal edges
             for (int y = 0; y <= h; y++)
@@ -967,27 +717,26 @@ namespace PixlPunkt.UI.Animation
                     bool insideBelow = StrokeUtil.Occup(grid, w, h, x, y);
                     int outLocalY = localY0 + (insideBelow ? y - 1 : y);
                     int sampleLocalX = localX0 + Math.Clamp(x, 0, w - 1);
-                    Color ink = SampleInkAtLocal(sampleLocalX, outLocalY, tilePixels);
+                    var ink = SampleInkAtLocal(sampleLocalX, outLocalY, tilePixels);
 
                     int x0 = x++;
                     while (x < w)
                     {
                         bool e2 = StrokeUtil.Occup(grid, w, h, x, y) ^ StrokeUtil.Occup(grid, w, h, x, y - 1);
                         if (!e2) break;
-
                         bool insideBelow2 = StrokeUtil.Occup(grid, w, h, x, y);
                         int outLocalY2 = localY0 + (insideBelow2 ? y - 1 : y);
                         int sampleLocalX2 = localX0 + Math.Clamp(x, 0, w - 1);
-                        Color ink2 = SampleInkAtLocal(sampleLocalX2, outLocalY2, tilePixels);
+                        var ink2 = SampleInkAtLocal(sampleLocalX2, outLocalY2, tilePixels);
                         if (!ink2.Equals(ink)) break;
-
                         x++;
                     }
 
-                    float sx0 = destX + (localX0 + x0) * sf;
-                    float sx1 = destX + (localX0 + x) * sf;
-                    float sy = destY + (localY0 + y) * sf;
-                    ds.DrawLine(sx0, sy, sx1, sy, ink, thick);
+                    float sx0 = destX + (localX0 + x0) * scale;
+                    float sx1 = destX + (localX0 + x) * scale;
+                    float sy = destY + (localY0 + y) * scale;
+                    using var paint = new SKPaint { Color = new SKColor(ink.R, ink.G, ink.B, ink.A), StrokeWidth = 1, IsAntialias = false };
+                    canvas.DrawLine(sx0, sy, sx1, sy, paint);
                 }
             }
 
@@ -1003,55 +752,41 @@ namespace PixlPunkt.UI.Animation
                     bool insideRight = StrokeUtil.Occup(grid, w, h, x, y);
                     int outLocalX = localX0 + (insideRight ? x - 1 : x);
                     int sampleLocalY = localY0 + Math.Clamp(y, 0, h - 1);
-                    Color ink = SampleInkAtLocal(outLocalX, sampleLocalY, tilePixels);
+                    var ink = SampleInkAtLocal(outLocalX, sampleLocalY, tilePixels);
 
                     int y0 = y++;
                     while (y < h)
                     {
                         bool e2 = StrokeUtil.Occup(grid, w, h, x, y) ^ StrokeUtil.Occup(grid, w, h, x - 1, y);
                         if (!e2) break;
-
                         bool insideRight2 = StrokeUtil.Occup(grid, w, h, x, y);
                         int outLocalX2 = localX0 + (insideRight2 ? x - 1 : x);
                         int sampleLocalY2 = localY0 + Math.Clamp(y, 0, h - 1);
-                        Color ink2 = SampleInkAtLocal(outLocalX2, sampleLocalY2, tilePixels);
+                        var ink2 = SampleInkAtLocal(outLocalX2, sampleLocalY2, tilePixels);
                         if (!ink2.Equals(ink)) break;
-
                         y++;
                     }
 
-                    float sy0 = destY + (localY0 + y0) * sf;
-                    float sy1 = destY + (localY0 + y) * sf;
-                    float sx = destX + (localX0 + x) * sf;
-                    ds.DrawLine(sx, sy0, sx, sy1, ink, thick);
+                    float sy0 = destY + (localY0 + y0) * scale;
+                    float sy1 = destY + (localY0 + y) * scale;
+                    float sx = destX + (localX0 + x) * scale;
+                    using var paint = new SKPaint { Color = new SKColor(ink.R, ink.G, ink.B, ink.A), StrokeWidth = 1, IsAntialias = false };
+                    canvas.DrawLine(sx, sy0, sx, sy1, paint);
                 }
             }
         }
 
-        /// <summary>
-        /// Samples a contrasting ink color for outline drawing at a tile-local position.
-        /// Matches CanvasViewHost.SampleInkAtDoc behavior.
-        /// </summary>
         private Color SampleInkAtLocal(int localX, int localY, byte[] tilePixels)
         {
-            // Clamp to tile bounds
             localX = Math.Clamp(localX, 0, _tileWidth - 1);
             localY = Math.Clamp(localY, 0, _tileHeight - 1);
 
             int idx = (localY * _tileWidth + localX) * 4;
-            if (idx < 0 || idx + 3 >= tilePixels.Length)
-                return Colors.White;
+            if (idx < 0 || idx + 3 >= tilePixels.Length) return Colors.White;
 
-            byte b = tilePixels[idx];
-            byte g = tilePixels[idx + 1];
-            byte r = tilePixels[idx + 2];
-            byte a = tilePixels[idx + 3];
-
-            // Composite over white to get effective color (matches ColorUtil.CompositeOverWhite)
+            byte b = tilePixels[idx], g = tilePixels[idx + 1], r = tilePixels[idx + 2], a = tilePixels[idx + 3];
             uint bgra = (uint)(b | (g << 8) | (r << 16) | (a << 24));
             uint onWhite = ColorUtil.CompositeOverWhite(bgra);
-
-            // Get high contrast ink (matches ColorUtil.HighContrastInk)
             return ColorUtil.HighContrastInk(onWhite);
         }
 
@@ -1062,55 +797,43 @@ namespace PixlPunkt.UI.Animation
             int docX = _tileX * _tileWidth;
             int docY = _tileY * _tileHeight;
 
-            if (docX < 0 || docY < 0 ||
-                docX + _tileWidth > _document.PixelWidth ||
-                docY + _tileHeight > _document.PixelHeight)
-            {
+            if (docX < 0 || docY < 0 || docX + _tileWidth > _document.PixelWidth || docY + _tileHeight > _document.PixelHeight)
                 return null;
-            }
 
             var surface = _document.Surface;
             if (surface == null) return null;
 
             byte[] pixels = new byte[_tileWidth * _tileHeight * 4];
-
             for (int y = 0; y < _tileHeight; y++)
             {
                 for (int x = 0; x < _tileWidth; x++)
                 {
                     int srcIdx = ((docY + y) * surface.Width + (docX + x)) * 4;
                     int dstIdx = (y * _tileWidth + x) * 4;
-
                     if (srcIdx + 3 < surface.Pixels.Length)
                     {
-                        pixels[dstIdx + 0] = surface.Pixels[srcIdx + 0];
+                        pixels[dstIdx] = surface.Pixels[srcIdx];
                         pixels[dstIdx + 1] = surface.Pixels[srcIdx + 1];
                         pixels[dstIdx + 2] = surface.Pixels[srcIdx + 2];
                         pixels[dstIdx + 3] = surface.Pixels[srcIdx + 3];
                     }
                 }
             }
-
             return pixels;
         }
 
         // ====================================================================
-        // INPUT HANDLING
+        // INPUT HANDLING (unchanged except EditorCanvas references)
         // ====================================================================
 
         private void EditorCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (_document == null || _stroke == null || _tileX < 0 || _tileY < 0)
-            {
-                e.Handled = true;
-                return;
-            }
+            if (_document == null || _stroke == null || _tileX < 0 || _tileY < 0) { e.Handled = true; return; }
 
             var point = e.GetCurrentPoint(EditorCanvas);
             var props = point.Properties;
             var (docX, docY) = ScreenToDocument(point.Position);
 
-            // MMB or space+LMB = pan
             if (props.IsMiddleButtonPressed || (_spacePan && props.IsLeftButtonPressed))
             {
                 _isPanning = true;
@@ -1123,75 +846,27 @@ namespace PixlPunkt.UI.Animation
                 return;
             }
 
-            // RMB = dropper (quick sample)
-            if (props.IsRightButtonPressed)
-            {
-                SampleColorAt(docX, docY);
-                e.Handled = true;
-                return;
-            }
+            if (props.IsRightButtonPressed) { SampleColorAt(docX, docY); e.Handled = true; return; }
+            if (!props.IsLeftButtonPressed) { e.Handled = true; return; }
+            if (IsDropperToolActive()) { SampleColorAt(docX, docY); e.Handled = true; return; }
+            if (IsFillToolActive()) { HandleFillAt(docX, docY); e.Handled = true; return; }
+            if (!IsPaintingToolActive()) { e.Handled = true; return; }
+            if (_document.ActiveLayer is not RasterLayer rl) { e.Handled = true; return; }
 
-            if (!props.IsLeftButtonPressed)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            // Dropper tool
-            if (IsDropperToolActive())
-            {
-                SampleColorAt(docX, docY);
-                e.Handled = true;
-                return;
-            }
-
-            // Fill tool
-            if (IsFillToolActive())
-            {
-                HandleFillAt(docX, docY);
-                e.Handled = true;
-                return;
-            }
-
-            // Painting tools
-            if (!IsPaintingToolActive())
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (_document.ActiveLayer is not RasterLayer rl)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            // Check if within tile bounds
             int tileDocX = _tileX * _tileWidth;
             int tileDocY = _tileY * _tileHeight;
-            if (docX < tileDocX || docX >= tileDocX + _tileWidth ||
-                docY < tileDocY || docY >= tileDocY + _tileHeight)
-            {
-                e.Handled = true;
-                return;
-            }
+            if (docX < tileDocX || docX >= tileDocX + _tileWidth || docY < tileDocY || docY >= tileDocY + _tileHeight)
+            { e.Handled = true; return; }
 
-            // Capture before state
             CaptureBeforeState();
-
-            // Begin stroke
             _isPainting = true;
             _hasLastPos = true;
             _lastDocX = docX;
             _lastDocY = docY;
 
             _activePainter = GetPainterForCurrentTool();
-            if (_activePainter != null)
-            {
-                _stroke.BeginWithPainter(_activePainter, rl);
-            }
+            if (_activePainter != null) _stroke.BeginWithPainter(_activePainter, rl);
 
-            // Initial stamp
             var strokeSettings = GetStrokeSettingsForCurrentTool();
             if (strokeSettings != null && _activePainter != null)
             {
@@ -1200,47 +875,34 @@ namespace PixlPunkt.UI.Animation
             }
 
             EditorCanvas.CapturePointer(e.Pointer);
-
-            // Live update
             _document.CompositeTo(_document.Surface);
             _document.RaiseDocumentModified();
             EditorCanvas.Invalidate();
-
             e.Handled = true;
         }
 
         private void EditorCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            if (_document == null || _tileX < 0 || _tileY < 0)
-            {
-                e.Handled = true;
-                return;
-            }
+            if (_document == null || _tileX < 0 || _tileY < 0) { e.Handled = true; return; }
 
             var point = e.GetCurrentPoint(EditorCanvas);
             var props = point.Properties;
 
-            // Handle panning
             if (_isPanning)
             {
-                double deltaX = point.Position.X - _panStartPoint.X;
-                double deltaY = point.Position.Y - _panStartPoint.Y;
-                _panOffsetX = _panStartOffsetX + deltaX;
-                _panOffsetY = _panStartOffsetY + deltaY;
+                _panOffsetX = _panStartOffsetX + point.Position.X - _panStartPoint.X;
+                _panOffsetY = _panStartOffsetY + point.Position.Y - _panStartPoint.Y;
                 EditorCanvas?.Invalidate();
                 e.Handled = true;
                 return;
             }
 
             var (docX, docY) = ScreenToDocument(point.Position);
-
-            // Update hover state
             int tileDocX = _tileX * _tileWidth;
             int tileDocY = _tileY * _tileHeight;
             _hoverDocX = docX;
             _hoverDocY = docY;
-            _hoverValid = docX >= tileDocX && docX < tileDocX + _tileWidth &&
-                          docY >= tileDocY && docY < tileDocY + _tileHeight;
+            _hoverValid = docX >= tileDocX && docX < tileDocX + _tileWidth && docY >= tileDocY && docY < tileDocY + _tileHeight;
 
             if (_isPainting && _stroke != null && props.IsLeftButtonPressed)
             {
@@ -1250,21 +912,12 @@ namespace PixlPunkt.UI.Animation
                     if (strokeSettings != null && _activePainter != null)
                     {
                         uint fg = (_foregroundColor & 0x00FFFFFFu) | ((uint)_brushOpacity << 24);
-
                         if (_hasLastPos && (_lastDocX != docX || _lastDocY != docY))
-                        {
                             _stroke.StampLineWithPainter(_lastDocX, _lastDocY, docX, docY, fg, _backgroundColor, strokeSettings);
-                        }
                         else
-                        {
                             _stroke.StampAtWithPainter(docX, docY, fg, _backgroundColor, strokeSettings);
-                        }
 
-                        _lastDocX = docX;
-                        _lastDocY = docY;
-                        _hasLastPos = true;
-
-                        // Live update
+                        _lastDocX = docX; _lastDocY = docY; _hasLastPos = true;
                         _document.CompositeTo(_document.Surface);
                         _document.RaiseDocumentModified();
                     }
@@ -1277,40 +930,14 @@ namespace PixlPunkt.UI.Animation
 
         private void EditorCanvas_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
-            // Handle pan release
-            if (_isPanning)
-            {
-                _isPanning = false;
-                EditorCanvas.ReleasePointerCapture(e.Pointer);
-                ProtectedCursor = null;
-                e.Handled = true;
-                return;
-            }
+            if (_isPanning) { _isPanning = false; EditorCanvas.ReleasePointerCapture(e.Pointer); ProtectedCursor = null; e.Handled = true; return; }
 
             if (_isPainting)
             {
-                _isPainting = false;
-                _hasLastPos = false;
-                _lastDocX = -1;
-                _lastDocY = -1;
-
-                // Commit stroke
-                if (_activePainter != null && _stroke?.HasActivePainterStroke == true)
-                {
-                    _stroke.CommitPainter("Brush Stroke");
-                    _activePainter = null;
-                }
-
-                // Push to history
+                _isPainting = false; _hasLastPos = false; _lastDocX = -1; _lastDocY = -1;
+                if (_activePainter != null && _stroke?.HasActivePainterStroke == true) { _stroke.CommitPainter("Brush Stroke"); _activePainter = null; }
                 PushStrokeToHistory();
-
-                // Final update
-                if (_document != null)
-                {
-                    _document.CompositeTo(_document.Surface);
-                    _document.RaiseDocumentModified();
-                }
-
+                if (_document != null) { _document.CompositeTo(_document.Surface); _document.RaiseDocumentModified(); }
                 TileModified?.Invoke();
             }
 
@@ -1320,9 +947,7 @@ namespace PixlPunkt.UI.Animation
 
         private void EditorCanvas_PointerExited(object sender, PointerRoutedEventArgs e)
         {
-            _hoverValid = false;
-            _hoverDocX = -1;
-            _hoverDocY = -1;
+            _hoverValid = false; _hoverDocX = -1; _hoverDocY = -1;
             EditorCanvas?.Invalidate();
         }
 
@@ -1331,7 +956,6 @@ namespace PixlPunkt.UI.Animation
             var point = e.GetCurrentPoint(EditorCanvas);
             var delta = point.Properties.MouseWheelDelta;
 
-            // Ctrl+Wheel = brush size
             if (IsKeyDown(Windows.System.VirtualKey.Control))
             {
                 int step = delta > 0 ? 1 : -1;
@@ -1340,39 +964,17 @@ namespace PixlPunkt.UI.Animation
                 return;
             }
 
-            // Get zoom pivot point (mouse position)
-            double mouseX = point.Position.X;
-            double mouseY = point.Position.Y;
-
-            // Calculate current canvas center
             float canvasW = (float)EditorCanvas.ActualWidth;
             float canvasH = (float)EditorCanvas.ActualHeight;
-            float padding = 8f;
-            float availableW = canvasW - padding * 2;
-            float availableH = canvasH - padding * 2;
-            float baseScale = Math.Min(availableW / _tileWidth, availableH / _tileHeight);
-
             double oldZoom = _zoomLevel;
 
-            // Normal wheel = zoom
-            if (delta > 0)
-            {
-                _zoomLevel = Math.Min(MaxZoom, _zoomLevel * ZoomStep);
-            }
-            else if (delta < 0)
-            {
-                _zoomLevel = Math.Max(MinZoom, _zoomLevel / ZoomStep);
-            }
+            _zoomLevel = delta > 0 ? Math.Min(MaxZoom, _zoomLevel * ZoomStep) : Math.Max(MinZoom, _zoomLevel / ZoomStep);
 
-            // Adjust pan offset to zoom toward mouse position
             double zoomRatio = _zoomLevel / oldZoom;
             double centerX = canvasW / 2 + _panOffsetX;
             double centerY = canvasH / 2 + _panOffsetY;
-
-            // New center after zoom
-            double newCenterX = mouseX + (centerX - mouseX) * zoomRatio;
-            double newCenterY = mouseY + (centerY - mouseY) * zoomRatio;
-
+            double newCenterX = point.Position.X + (centerX - point.Position.X) * zoomRatio;
+            double newCenterY = point.Position.Y + (centerY - point.Position.Y) * zoomRatio;
             _panOffsetX = newCenterX - canvasW / 2;
             _panOffsetY = newCenterY - canvasH / 2;
 
@@ -1380,45 +982,26 @@ namespace PixlPunkt.UI.Animation
             e.Handled = true;
         }
 
-        private static bool IsKeyDown(Windows.System.VirtualKey k)
-        {
-            var st = InputKeyboardSource.GetKeyStateForCurrentThread(k);
-            return st.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-        }
+        private static bool IsKeyDown(Windows.System.VirtualKey k) =>
+            InputKeyboardSource.GetKeyStateForCurrentThread(k).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 
         private void EditorCanvas_KeyDown(object sender, KeyRoutedEventArgs e)
         {
             if (e.Key == Windows.System.VirtualKey.Space && !_spacePan)
-            {
-                _spacePan = true;
-                ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeAll);
-                e.Handled = true;
-            }
+            { _spacePan = true; ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeAll); e.Handled = true; }
         }
 
         private void EditorCanvas_KeyUp(object sender, KeyRoutedEventArgs e)
         {
-            if (e.Key == Windows.System.VirtualKey.Space)
-            {
-                _spacePan = false;
-                if (!_isPanning)
-                {
-                    ProtectedCursor = null;
-                }
-                e.Handled = true;
-            }
+            if (e.Key == Windows.System.VirtualKey.Space) { _spacePan = false; if (!_isPanning) ProtectedCursor = null; e.Handled = true; }
         }
 
-        /// <summary>
-        /// Converts screen position to document coordinates.
-        /// </summary>
         private (int docX, int docY) ScreenToDocument(Point screenPos)
         {
             if (_tileWidth <= 0 || _tileHeight <= 0) return (-1, -1);
 
             float canvasW = (float)EditorCanvas.ActualWidth;
             float canvasH = (float)EditorCanvas.ActualHeight;
-
             if (canvasW <= 0 || canvasH <= 0) return (-1, -1);
 
             float padding = 8f;
@@ -1429,53 +1012,29 @@ namespace PixlPunkt.UI.Animation
 
             float destW = _tileWidth * scale;
             float destH = _tileHeight * scale;
-            
-            // Account for pan offset
             float destX = (canvasW - destW) / 2 + (float)_panOffsetX;
             float destY = (canvasH - destH) / 2 + (float)_panOffsetY;
 
-            // Convert to tile-local coordinates
             int localX = (int)Math.Floor((screenPos.X - destX) / scale);
             int localY = (int)Math.Floor((screenPos.Y - destY) / scale);
 
-            // Convert to document coordinates
-            int docX = _tileX * _tileWidth + localX;
-            int docY = _tileY * _tileHeight + localY;
-
-            return (docX, docY);
+            return (_tileX * _tileWidth + localX, _tileY * _tileHeight + localY);
         }
 
         private void UpdateTilePosition()
         {
             if (_state == null || _document == null)
-            {
-                _tileX = -1;
-                _tileY = -1;
-                _tileWidth = 0;
-                _tileHeight = 0;
-                return;
-            }
+            { _tileX = -1; _tileY = -1; _tileWidth = 0; _tileHeight = 0; return; }
 
             var (tx, ty) = _state.CurrentTilePosition;
-            
-            // Reset pan when tile position changes
-            if (_tileX != tx || _tileY != ty)
-            {
-                _panOffsetX = 0;
-                _panOffsetY = 0;
-            }
-            
-            _tileX = tx;
-            _tileY = ty;
+            if (_tileX != tx || _tileY != ty) { _panOffsetX = 0; _panOffsetY = 0; }
+
+            _tileX = tx; _tileY = ty;
             _tileWidth = _document.TileSize.Width;
             _tileHeight = _document.TileSize.Height;
 
-            // Reset stroke engine target when document changes
             if (_stroke != null && _document.TargetSurface != null)
-            {
-                _stroke = new StrokeEngine(_document.TargetSurface);
-                SyncBrushToStrokeEngine();
-            }
+            { _stroke = new StrokeEngine(_document.TargetSurface); SyncBrushToStrokeEngine(); }
         }
 
         // ====================================================================
@@ -1485,52 +1044,33 @@ namespace PixlPunkt.UI.Animation
         private void SampleColorAt(int docX, int docY)
         {
             if (_document == null || _palette == null) return;
-
-            if (docX < 0 || docX >= _document.PixelWidth || docY < 0 || docY >= _document.PixelHeight)
-                return;
+            if (docX < 0 || docX >= _document.PixelWidth || docY < 0 || docY >= _document.PixelHeight) return;
 
             var surface = _document.Surface;
             int idx = (docY * surface.Width + docX) * 4;
             if (idx < 0 || idx + 3 >= surface.Pixels.Length) return;
 
-            byte b = surface.Pixels[idx];
-            byte g = surface.Pixels[idx + 1];
-            byte r = surface.Pixels[idx + 2];
-            byte a = surface.Pixels[idx + 3];
-
-            uint color = (uint)(b | (g << 8) | (r << 16) | (a << 24));
+            uint color = (uint)(surface.Pixels[idx] | (surface.Pixels[idx + 1] << 8) | (surface.Pixels[idx + 2] << 16) | (surface.Pixels[idx + 3] << 24));
             _palette.SetForeground(color);
         }
 
         private void HandleFillAt(int docX, int docY)
         {
             if (_document?.ActiveLayer is not RasterLayer rl) return;
-
             CaptureBeforeState();
 
             var fillReg = ToolRegistry.Shared.GetById<FillToolRegistration>(ToolIds.Fill);
             if (fillReg == null) return;
 
-            var context = new FillContext
-            {
-                Surface = rl.Surface,
-                Color = _foregroundColor,
-                Tolerance = _toolState?.FillTolerance ?? 0,
-                Contiguous = _toolState?.FillContiguous ?? true,
-                Description = "Fill"
-            };
-
+            var context = new FillContext { Surface = rl.Surface, Color = _foregroundColor, Tolerance = _toolState?.FillTolerance ?? 0, Contiguous = _toolState?.FillContiguous ?? true, Description = "Fill" };
             var result = fillReg.EffectiveFillPainter.FillAt(rl, docX, docY, context);
 
             if (result is { CanPushToHistory: true } and IHistoryItem historyItem)
-            {
                 _document.History.Push(historyItem);
-            }
 
             _document.CompositeTo(_document.Surface);
             _document.RaiseDocumentModified();
             EditorCanvas?.Invalidate();
-
             TileModified?.Invoke();
         }
 
@@ -1544,7 +1084,6 @@ namespace PixlPunkt.UI.Animation
 
             int docX = _tileX * _tileWidth;
             int docY = _tileY * _tileHeight;
-
             _strokeBeforePixels = new byte[_tileWidth * _tileHeight * 4];
             var surface = rl.Surface;
 
@@ -1554,10 +1093,9 @@ namespace PixlPunkt.UI.Animation
                 {
                     int srcIdx = ((docY + y) * surface.Width + (docX + x)) * 4;
                     int dstIdx = (y * _tileWidth + x) * 4;
-
                     if (srcIdx + 3 < surface.Pixels.Length)
                     {
-                        _strokeBeforePixels[dstIdx + 0] = surface.Pixels[srcIdx + 0];
+                        _strokeBeforePixels[dstIdx] = surface.Pixels[srcIdx];
                         _strokeBeforePixels[dstIdx + 1] = surface.Pixels[srcIdx + 1];
                         _strokeBeforePixels[dstIdx + 2] = surface.Pixels[srcIdx + 2];
                         _strokeBeforePixels[dstIdx + 3] = surface.Pixels[srcIdx + 3];
@@ -1568,13 +1106,10 @@ namespace PixlPunkt.UI.Animation
 
         private void PushStrokeToHistory()
         {
-            if (_document?.ActiveLayer is not RasterLayer rl || _strokeBeforePixels == null)
-                return;
+            if (_document?.ActiveLayer is not RasterLayer rl || _strokeBeforePixels == null) return;
 
             int docX = _tileX * _tileWidth;
             int docY = _tileY * _tileHeight;
-
-            // Get after state
             byte[] afterPixels = new byte[_tileWidth * _tileHeight * 4];
             var surface = rl.Surface;
 
@@ -1584,10 +1119,9 @@ namespace PixlPunkt.UI.Animation
                 {
                     int srcIdx = ((docY + y) * surface.Width + (docX + x)) * 4;
                     int dstIdx = (y * _tileWidth + x) * 4;
-
                     if (srcIdx + 3 < surface.Pixels.Length)
                     {
-                        afterPixels[dstIdx + 0] = surface.Pixels[srcIdx + 0];
+                        afterPixels[dstIdx] = surface.Pixels[srcIdx];
                         afterPixels[dstIdx + 1] = surface.Pixels[srcIdx + 1];
                         afterPixels[dstIdx + 2] = surface.Pixels[srcIdx + 2];
                         afterPixels[dstIdx + 3] = surface.Pixels[srcIdx + 3];
@@ -1595,31 +1129,16 @@ namespace PixlPunkt.UI.Animation
                 }
             }
 
-            // Check for changes
             bool hasChanges = false;
             for (int i = 0; i < _strokeBeforePixels.Length; i++)
-            {
-                if (_strokeBeforePixels[i] != afterPixels[i])
-                {
-                    hasChanges = true;
-                    break;
-                }
-            }
+                if (_strokeBeforePixels[i] != afterPixels[i]) { hasChanges = true; break; }
 
-            if (!hasChanges)
-            {
-                _strokeBeforePixels = null;
-                return;
-            }
+            if (!hasChanges) { _strokeBeforePixels = null; return; }
 
-            var bounds = new Windows.Graphics.RectInt32(docX, docY, _tileWidth, _tileHeight);
+            var bounds = CreateRect(docX, docY, _tileWidth, _tileHeight);
             var historyItem = PixelChangeItem.FromRegion(rl, bounds, _strokeBeforePixels, afterPixels, "Brush Stroke");
 
-            if (!historyItem.IsEmpty)
-            {
-                _document.History.Push(historyItem);
-            }
-
+            if (!historyItem.IsEmpty) _document.History.Push(historyItem);
             _strokeBeforePixels = null;
         }
     }

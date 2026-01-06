@@ -7,7 +7,6 @@
     
     <!-- Package metadata -->
     <PackageId>PixlPunkt.PluginSdk</PackageId>
-    <!-- Version is set automatically by MinVer from git tags (configured in Directory.Build.props) -->
     <Product>PixlPunkt Plugin SDK</Product>
     <Description>SDK for developing PixlPunkt plugins. Create custom tools, brushes, effects, and file format handlers for the PixlPunkt pixel art editor.</Description>
     <PackageTags>pixlpunkt;plugin;sdk;pixel-art;image-editing;drawing;sprite;game-dev</PackageTags>
@@ -36,13 +35,13 @@
   <!-- Dependencies -->
   <ItemGroup>
     <PackageReference Include="FluentIcons.Common" Version="2.0.316" />
-    <PackageReference Include="MinVer" Version="6.0.0">
+    <PackageReference Include="MinVer" Version="6.1.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
-  <!-- Include SDK-specific README in package (not the main repo README) -->
+  <!-- Include SDK-specific README in package -->
   <ItemGroup>
     <None Include="README.nuget.md" Pack="true" PackagePath="README.nuget.md" />
   </ItemGroup>
@@ -52,7 +51,7 @@
     <None Include="Assets\Icons\punkFileIcon.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
 
-  <!-- Include MSBuild targets in NuGet package (with correct naming convention) -->
+  <!-- Include MSBuild targets in NuGet package -->
   <ItemGroup>
     <None Include="build\PixlPunkt.PluginSdk.targets" Pack="true" PackagePath="build\$(PackageId).targets" />
     <None Include="build\README.md" Pack="true" PackagePath="build\" Condition="Exists('build\README.md')" />

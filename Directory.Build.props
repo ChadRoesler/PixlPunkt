@@ -2,14 +2,6 @@
   <!--
     Shared build properties for all PixlPunkt projects.
     MinVer automatically derives version from git tags (e.g., v1.0.0 ? 1.0.0).
-    
-    How versioning works:
-    - Tagged commit (v1.0.0): Version = 1.0.0
-    - 3 commits after v1.0.0: Version = 1.0.1-alpha.0.3
-    - Override in CI: dotnet build -p:Version=1.2.3
-    
-    Tag format: v{major}.{minor}.{patch}
-    Examples: v1.0.0, v1.2.3, v2.0.0-beta.1
   -->
   
   <PropertyGroup>
@@ -28,6 +20,20 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   
+  <!-- ???????????????????????????????????????????????????????????????????????
+       UNO PLATFORM + SKIASHARP MIGRATION
+       Centralized version management for cross-platform dependencies
+  ??????????????????????????????????????????????????????????????????????? -->
+  <PropertyGroup>
+    <!-- SkiaSharp version for rendering (must be compatible with Uno SDK) -->
+    <SkiaSharpVersion>3.119.1</SkiaSharpVersion>
+    
+    <!-- Language settings -->
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  
   <!-- Common metadata -->
   <PropertyGroup>
     <Authors>PixlPunkt Team</Authors>
@@ -35,6 +41,7 @@
     <Copyright>Copyright © 2025 PixlPunkt Team</Copyright>
     <RepositoryUrl>https://github.com/ChadRoesler/PixlPunkt</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <Product>PixlPunkt</Product>
   </PropertyGroup>
 
 </Project>

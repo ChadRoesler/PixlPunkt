@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using CommunityToolkit.WinUI.Controls;
 using FluentIcons.Common;
 using FluentIcons.WinUI;
 using Microsoft.UI;
@@ -259,13 +258,22 @@ namespace PixlPunkt.UI.Tools
 
                 // Create 2-column grid for this category
                 // Don't set Background - let it be transparent so parent background shows through
-                var grid = new UniformGrid
+                var grid = new Grid
                 {
-                    Columns = 2,
                     ColumnSpacing = 8,
                     RowSpacing = 8
                 };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
+                // Calculate number of rows needed
+                int rowCount = (sortedTools.Count + 1) / 2;
+                for (int r = 0; r < rowCount; r++)
+                {
+                    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                }
+
+                int index = 0;
                 foreach (var registration in sortedTools)
                 {
                     var settings = registration.Settings;
@@ -273,14 +281,20 @@ namespace PixlPunkt.UI.Tools
                     string tooltip = settings?.TooltipText ?? registration.DisplayName;
 
                     var button = CreateToolButton(registration.Id, icon, tooltip);
+                    Grid.SetColumn(button, index % 2);
+                    Grid.SetRow(button, index / 2);
                     grid.Children.Add(button);
                     _toolButtons[registration.Id] = button;
+                    index++;
                 }
 
                 // Add empty spacer if odd number of tools (keeps grid even)
                 if (sortedTools.Count % 2 == 1)
                 {
-                    grid.Children.Add(new Border()); // Empty placeholder
+                    var spacer = new Border();
+                    Grid.SetColumn(spacer, 1);
+                    Grid.SetRow(spacer, (sortedTools.Count - 1) / 2);
+                    grid.Children.Add(spacer);
                 }
 
                 ToolContainer.Children.Add(grid);

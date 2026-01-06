@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Document.Layer;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Tools.Selection
 {
@@ -86,7 +87,7 @@ namespace PixlPunkt.Core.Tools.Selection
         }
 
         /// <inheritdoc/>
-        public override void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase)
+        public override void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase)
         {
             // Wand tool has no preview - selection happens instantly on click
         }
@@ -182,7 +183,7 @@ namespace PixlPunkt.Core.Tools.Selection
                     continue;
 
                 // Add to wand region
-                wandRegion.AddRect(new Windows.Graphics.RectInt32(x, y, 1, 1));
+                wandRegion.AddRect(CreateRect(x, y, 1, 1));
 
                 // Expand to neighbors (only if contiguous mode)
                 if (contiguous)
@@ -216,7 +217,7 @@ namespace PixlPunkt.Core.Tools.Selection
                             int idx = (y * w + x) * 4;
                             if (Imaging.PixelOps.PixelsSimilar(pix, idx, idxStart, tolerance, useAlpha))
                             {
-                                wandRegion.AddRect(new Windows.Graphics.RectInt32(x, y, 1, 1));
+                                wandRegion.AddRect(CreateRect(x, y, 1, 1));
                             }
                         }
                     }

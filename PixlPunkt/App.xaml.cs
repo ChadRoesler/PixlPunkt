@@ -9,71 +9,42 @@ using PixlPunkt.Core.Plugins;
 using PixlPunkt.Core.Settings;
 using PixlPunkt.UI;
 
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
-
 namespace PixlPunkt
 {
     /// <summary>
     /// Provides application-specific behavior to supplement the default Application class.
+    /// Cross-platform entry point for PixlPunkt.
     /// </summary>
     public partial class App : Application
     {
         public static Window PixlPunktMainWindow { get; private set; } = null!;
 
         /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
+        /// Initializes the singleton application object.
+        /// This is the first line of authored code
         /// executed, and as such is the logical equivalent of main() or WinMain().
         /// </summary>
         public App()
         {
+            // InitializeComponent is called by generated code from App.xaml
+            // It MUST be called after the base Application constructor completes
+            // and the Uno runtime is initialized
+            this.InitializeComponent();
 
-            InitializeComponent();
-            this.UnhandledException += (s, e) =>
-            {
-                LoggingService.Fatal("XAML unhandled exception", e.Exception);
-                // Also log details at debug level
-                LoggingService.Debug($"XAML unhandled: {e.Exception}");
-                if (e.Exception.InnerException != null)
-                {
-                    LoggingService.Debug($"Inner exception: {e.Exception.InnerException}");
-                }
-                // e.Handled = true; // only if you want to swallow during dev
-            };
-
-            // AppDomain-level (non-UI) exceptions
-            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
-            {
-                var ex = e.ExceptionObject as Exception;
-                if (ex != null)
-                {
-                    LoggingService.Fatal("AppDomain unhandled exception", ex);
-                }
-                else
-                {
-                    LoggingService.Fatal($"AppDomain unhandled non-exception object: {e.ExceptionObject}");
-                }
-            };
-
-
-            // Task exceptions that weren't observed
-            TaskScheduler.UnobservedTaskException += (s, e) =>
-            {
-                LoggingService.Error("Unobserved task exception", e.Exception);
-                LoggingService.Debug($"Unobserved task exception details: {e.Exception}");
-                // e.SetObserved(); // optional
-            };
+#if DEBUG
+            System.Diagnostics.Debug.WriteLine("[PixlPunkt] App constructor completed");
+#endif
         }
 
         /// <summary>
         /// Invoked when the application is launched.
         /// </summary>
         /// <param name="args">Details about the launch request and process.</param>
-
-
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
+            // Wire up exception handlers now that runtime is fully initialized
+            SetupExceptionHandlers();
+
             // CRITICAL: Ensure the application data directory structure exists FIRST
             // This creates %LocalAppData%\PixlPunkt\ and all subdirectories
             // Must happen before ANY other initialization that might access these directories
@@ -205,6 +176,65 @@ namespace PixlPunkt
             PixlPunktMainWindow.Activate();
 
             LoggingService.Info("PixlPunkt main window activated");
+        }
+
+        /// <summary>
+        /// Sets up global exception handlers.
+        /// Called from OnLaunched when the runtime is fully initialized.
+        /// </summary>
+        private void SetupExceptionHandlers()
+        {
+            this.UnhandledException += (s, e) =>
+            {
+                try
+                {
+                    LoggingService.Fatal("XAML unhandled exception", e.Exception);
+                    LoggingService.Debug($"XAML unhandled: {e.Exception}");
+                    if (e.Exception.InnerException != null)
+                    {
+                        LoggingService.Debug($"Inner exception: {e.Exception.InnerException}");
+                    }
+                }
+                catch
+                {
+                    System.Diagnostics.Debug.WriteLine($"[App] Unhandled exception: {e.Exception}");
+                }
+                // e.Handled = true; // only if you want to swallow during dev
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                if (ex != null)
+                {
+                    try
+                    {
+                        LoggingService.Fatal("AppDomain unhandled exception", ex);
+                    }
+                    catch
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[App] AppDomain unhandled exception: {ex}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[App] AppDomain unhandled non-exception object: {e.ExceptionObject}");
+                }
+            };
+
+            TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                try
+                {
+                    LoggingService.Error("Unobserved task exception", e.Exception);
+                    LoggingService.Debug($"Unobserved task exception details: {e.Exception}");
+                }
+                catch
+                {
+                    System.Diagnostics.Debug.WriteLine($"[App] Unobserved task exception: {e.Exception}");
+                }
+                // e.SetObserved(); // optional
+            };
         }
     }
 }

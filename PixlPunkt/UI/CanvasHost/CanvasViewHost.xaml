@@ -2,7 +2,7 @@
     x:Class="PixlPunkt.UI.CanvasHost.CanvasViewHost"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:skia="using:SkiaSharp.Views.Windows"
     xmlns:ic="using:FluentIcons.WinUI">
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
@@ -27,23 +27,31 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="0,0,1,1"/>
             
-            <!-- Horizontal ruler (top) - drawn in Win2D canvas -->
-            <win2d:CanvasControl x:Name="HorizontalRulerCanvas" 
-                                 Grid.Row="0" Grid.Column="1"
-                                 PointerPressed="HorizontalRuler_PointerPressed"
-                                 PointerMoved="HorizontalRuler_PointerMoved"
-                                 PointerReleased="HorizontalRuler_PointerReleased" />
+            <!-- Horizontal ruler (top) - SkiaSharp canvas -->
+            <skia:SKXamlCanvas x:Name="HorizontalRulerCanvas" 
+                               Grid.Row="0" Grid.Column="1"
+                               PaintSurface="HorizontalRulerCanvas_PaintSurface"
+                               PointerPressed="HorizontalRuler_PointerPressed"
+                               PointerMoved="HorizontalRuler_PointerMoved"
+                               PointerReleased="HorizontalRuler_PointerReleased" />
             
-            <!-- Vertical ruler (left) - drawn in Win2D canvas -->
-            <win2d:CanvasControl x:Name="VerticalRulerCanvas" 
-                                 Grid.Row="1" Grid.Column="0"
-                                 PointerPressed="VerticalRuler_PointerPressed"
-                                 PointerMoved="VerticalRuler_PointerMoved"
-                                 PointerReleased="VerticalRuler_PointerReleased" />
+            <!-- Vertical ruler (left) - SkiaSharp canvas -->
+            <skia:SKXamlCanvas x:Name="VerticalRulerCanvas" 
+                               Grid.Row="1" Grid.Column="0"
+                               PaintSurface="VerticalRulerCanvas_PaintSurface"
+                               PointerPressed="VerticalRuler_PointerPressed"
+                               PointerMoved="VerticalRuler_PointerMoved"
+                               PointerReleased="VerticalRuler_PointerReleased" />
             
-            <!-- Main canvas -->
-            <win2d:CanvasControl x:Name="CanvasView"
-                                 Grid.Row="1" Grid.Column="1" />
+            <!-- Main canvas - SkiaSharp canvas -->
+            <skia:SKXamlCanvas x:Name="CanvasView"
+                               Grid.Row="1" Grid.Column="1"
+                               PaintSurface="CanvasView_PaintSurface"
+                               PointerPressed="CanvasView_PointerPressed"
+                               PointerMoved="CanvasView_PointerMoved"
+                               PointerReleased="CanvasView_PointerReleased"
+                               PointerWheelChanged="CanvasView_PointerWheelChanged"
+                               PointerExited="CanvasView_PointerExited" />
             
             <!-- Locked layer warning InfoBar - overlays at top of canvas area -->
             <InfoBar x:Name="LockedLayerWarning"

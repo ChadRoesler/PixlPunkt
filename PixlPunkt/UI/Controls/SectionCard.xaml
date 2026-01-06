@@ -4,7 +4,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ic="using:FluentIcons.WinUI"
     xmlns:conv="using:PixlPunkt.UI.Converters"
-    x:Name="root">
+    x:Name="root"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch"
+    HorizontalContentAlignment="Stretch"
+    VerticalContentAlignment="Stretch">
 
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
@@ -14,8 +18,11 @@
     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" 
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="8" Padding="4">
-        <Grid>
+            CornerRadius="8" 
+            Padding="4"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch">
+        <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <!-- header -->
@@ -85,18 +92,19 @@
                 </Button>
             </Grid>
 
-            <!-- spacer (hide when minimized) -->
-     
-
             <!-- Body (hidden when minimized) -->
             <ContentPresenter
                 Grid.Row="2"
                 Content="{x:Bind Body, Mode=OneWay}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
                 Visibility="{x:Bind IsMinimized, Mode=OneWay, Converter={StaticResource NotBoolToVis}}"/>
 
             <ContentPresenter
                 Grid.Row="2"
                 Content="{x:Bind CustomControl, Mode=OneWay}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
                 Visibility="{x:Bind IsMinimized, Mode=OneWay, Converter={StaticResource NotBoolToVis}}"/>
         </Grid>
     </Border>

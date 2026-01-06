@@ -1,5 +1,5 @@
-using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml.Input;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
 
@@ -74,10 +74,10 @@ namespace PixlPunkt.Core.Tools.Selection
         /// <summary>
         /// Draws tool-specific preview geometry (marquee, lasso path, etc.).
         /// </summary>
-        /// <param name="ds">Canvas drawing session for rendering.</param>
+        /// <param name="renderer">Canvas renderer for rendering.</param>
         /// <param name="destRect">Destination rectangle in view coordinates.</param>
         /// <param name="scale">Current zoom scale factor.</param>
         /// <param name="antsPhase">Current marching ants animation phase (0 to period).</param>
-        void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase);
+        void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase);
     }
 }

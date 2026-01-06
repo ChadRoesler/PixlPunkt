@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Microsoft.Graphics.Canvas;
+using System.Runtime.InteropServices;
 using PixlPunkt.Core.Brush;
 using PixlPunkt.Core.Coloring.Helpers;
 using PixlPunkt.Core.Painting;
 using PixlPunkt.Core.Painting.Helpers;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Structs;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.PluginSdk.Settings;
+using SkiaSharp;
 using Windows.Foundation;
-using Windows.Graphics.DirectX;
 using Windows.UI;
 
 namespace PixlPunkt.UI.CanvasHost
@@ -28,14 +29,14 @@ namespace PixlPunkt.UI.CanvasHost
         // BRUSH CURSOR OVERLAY
         // ════════════════════════════════════════════════════════════════════
 
-        private void DrawBrushCursorOverlay(CanvasDrawingSession ds, Rect dest)
+        private void DrawBrushCursorOverlay(ICanvasRenderer renderer, Rect dest)
         {
             // External dropper mode - always show 1x1 pixel cursor
             if (_externalDropperActive)
             {
                 if (_hoverValid)
                 {
-                    DrawPixelCursor(ds, dest);
+                    DrawPixelCursor(renderer, dest);
                 }
                 return;
             }
@@ -43,7 +44,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Tile tools - show tile overlay
             if (_toolState?.IsActiveTileTool == true)
             {
-                DrawTileOverlay(ds, dest);
+                DrawTileOverlay(renderer, dest);
                 return;
             }
 
@@ -56,12 +57,12 @@ namespace PixlPunkt.UI.CanvasHost
                 if (fillGhost)
                 {
                     // Brush tool: show filled ghost preview of the line
-                    DrawShiftLinePreview(ds, dest);
+                    DrawShiftLinePreview(renderer, dest);
                 }
                 else
                 {
                     // Other tools (Eraser, etc.): show outline preview of the line
-                    DrawShiftLineOutlinePreview(ds, dest);
+                    DrawShiftLineOutlinePreview(renderer, dest);
                 }
                 return;
             }
@@ -74,14 +75,14 @@ namespace PixlPunkt.UI.CanvasHost
             // Handle ALL shape tools (built-in and plugin) via category check
             if (_toolState?.ActiveCategory == ToolCategory.Shape)
             {
-                DrawShapeStartPointHover(ds, dest);
+                DrawShapeStartPointHover(renderer, dest);
                 return;
             }
 
             // Draw 1x1 pixel cursor for utility tools (Dropper, Pan, Zoom) and precision tools (Fill, Selection)
             if (ShouldShowPixelCursor(activeToolId2))
             {
-                DrawPixelCursor(ds, dest);
+                DrawPixelCursor(renderer, dest);
                 return;
             }
 
@@ -118,12 +119,12 @@ namespace PixlPunkt.UI.CanvasHost
 
                     float sx = (float)(dest.X + x * s);
                     float sy = (float)(dest.Y + y * s);
-                    ds.FillRectangle(sx, sy, (float)s, (float)s, ColorUtil.ToColor(after));
+                    renderer.FillRectangle(sx, sy, (float)s, (float)s, ColorUtil.ToColor(after));
                 }
                 return;
             }
 
-            DrawBrushOutline(ds, dest, mask, s, baseX, baseY);
+            DrawBrushOutline(renderer, dest, mask, s, baseX, baseY);
         }
 
         /// <summary>
@@ -144,7 +145,7 @@ namespace PixlPunkt.UI.CanvasHost
         /// Draws a 1x1 pixel cursor outline at the hover position.
         /// This shows the exact pixel the user is pointing at for precision tools.
         /// </summary>
-        private void DrawPixelCursor(CanvasDrawingSession ds, Rect dest)
+        private void DrawPixelCursor(ICanvasRenderer renderer, Rect dest)
         {
             double s = _zoom.Scale;
             float x = (float)(dest.X + _hoverX * s);
@@ -155,7 +156,7 @@ namespace PixlPunkt.UI.CanvasHost
             Color ink = SampleInkAtDoc(_hoverX, _hoverY);
 
             // Draw pixel outline
-            ds.DrawRectangle(x, y, size, size, ink, 1f);
+            renderer.DrawRectangle(x, y, size, size, ink, 1f);
         }
 
         /// <summary>
@@ -238,7 +239,7 @@ namespace PixlPunkt.UI.CanvasHost
             return (byte)Math.Round(255.0 * Math.Clamp(Aop * mask, 0.0, 1.0));
         }
 
-        private void DrawBrushOutline(CanvasDrawingSession ds, Rect dest, IReadOnlyList<(int dx, int dy)> mask,
+        private void DrawBrushOutline(ICanvasRenderer renderer, Rect dest, IReadOnlyList<(int dx, int dy)> mask,
             double s, float baseX, float baseY)
         {
             StrokeUtil.BuildMaskGrid(mask, out var grid, out int minDx, out int minDy, out int w, out int h);
@@ -281,7 +282,7 @@ namespace PixlPunkt.UI.CanvasHost
                     float sx0 = baseX + (docX0 + x0) * sf;
                     float sx1 = baseX + (docX0 + x) * sf;
                     float sy = baseY + (docY0 + y) * sf;
-                    ds.DrawLine(sx0, sy, sx1, sy, ink, thick);
+                    renderer.DrawLine(sx0, sy, sx1, sy, ink, thick);
                 }
             }
 
@@ -317,7 +318,7 @@ namespace PixlPunkt.UI.CanvasHost
                     float sy0 = baseY + (docY0 + y0) * sf;
                     float sy1 = baseY + (docY0 + y) * sf;
                     float sx = baseX + (docX0 + x) * sf;
-                    ds.DrawLine(sx, sy0, sx, sy1, ink, thick);
+                    renderer.DrawLine(sx, sy0, sx, sy1, ink, thick);
                 }
             }
         }
@@ -513,7 +514,7 @@ namespace PixlPunkt.UI.CanvasHost
         /// Draws a preview line from shift-line origin to current endpoint.
         /// Uses smooth stamping (stride of 1) matching PainterBase.StampLine for accurate preview.
         /// </summary>
-        private void DrawShiftLinePreview(CanvasDrawingSession ds, Rect dest)
+        private void DrawShiftLinePreview(ICanvasRenderer renderer, Rect dest)
         {
             double s = _zoom.Scale;
             var mask = GetCurrentBrushMask();
@@ -560,7 +561,7 @@ namespace PixlPunkt.UI.CanvasHost
 
                 float screenX = (float)(dest.X + px * s);
                 float screenY = (float)(dest.Y + py * s);
-                ds.FillRectangle(screenX, screenY, (float)s, (float)s, ColorUtil.ToColor(after));
+                renderer.FillRectangle(screenX, screenY, (float)s, (float)s, ColorUtil.ToColor(after));
             }
         }
 
@@ -569,7 +570,7 @@ namespace PixlPunkt.UI.CanvasHost
         /// Shows the outline of the combined brush path rather than filled pixels.
         /// Uses smooth stamping (stride of 1) matching PainterBase.StampLine.
         /// </summary>
-        private void DrawShiftLineOutlinePreview(CanvasDrawingSession ds, Rect dest)
+        private void DrawShiftLineOutlinePreview(ICanvasRenderer renderer, Rect dest)
         {
             double s = _zoom.Scale;
             var mask = GetCurrentBrushMask();
@@ -686,7 +687,7 @@ namespace PixlPunkt.UI.CanvasHost
                     float sx0 = baseX + (minX + gx0) * sf;
                     float sx1 = baseX + (minX + gx) * sf;
                     float sy = baseY + (minY + gy) * sf;
-                    ds.DrawLine(sx0, sy, sx1, sy, ink, thick);
+                    renderer.DrawLine(sx0, sy, sx1, sy, ink, thick);
                 }
             }
 
@@ -720,7 +721,7 @@ namespace PixlPunkt.UI.CanvasHost
                     float sy0 = baseY + (minY + gy0) * sf;
                     float sy1 = baseY + (minY + gy) * sf;
                     float sx = baseX + (minX + gx) * sf;
-                    ds.DrawLine(sx, sy0, sx, sy1, ink, thick);
+                    renderer.DrawLine(sx, sy0, sx, sy1, ink, thick);
                 }
             }
         }
@@ -753,7 +754,7 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Draws the tile overlay preview for tile tools.
         /// </summary>
-        private void DrawTileOverlay(CanvasDrawingSession ds, Rect dest)
+        private void DrawTileOverlay(ICanvasRenderer renderer, Rect dest)
         {
             var overlay = _currentTileOverlay;
             if (overlay == null)
@@ -771,7 +772,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Handle animation selection overlay (Tile Animation tool)
             if (preview.AnimationSelection.HasValue)
             {
-                DrawAnimationSelectionOverlay(ds, dest, scale, tileW, tileH, preview.AnimationSelection.Value);
+                DrawAnimationSelectionOverlay(renderer, dest, scale, tileW, tileH, preview.AnimationSelection.Value);
                 return;
             }
 
@@ -796,7 +797,7 @@ namespace PixlPunkt.UI.CanvasHost
                 var pixels = tileSet.GetTilePixels(preview.TileId);
                 if (pixels != null)
                 {
-                    DrawTileGhost(ds, dest, scale, docX, docY, tileW, tileH, pixels);
+                    DrawTileGhost(renderer, dest, scale, docX, docY, tileW, tileH, pixels);
                 }
             }
 
@@ -804,7 +805,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (preview.ShowOutline)
             {
                 var outlineColor = Color.FromArgb(180, 0, 160, 255);
-                ds.DrawRectangle(screenX, screenY, screenW, screenH, outlineColor, 2f);
+                renderer.DrawRectangle(screenX, screenY, screenW, screenH, outlineColor, 2f);
             }
         }
 
@@ -813,7 +814,7 @@ namespace PixlPunkt.UI.CanvasHost
         /// Shows: Blue border on start tile, Orange border on end tile, 
         /// Semi-transparent highlight on all selected tiles in the range.
         /// </summary>
-        private void DrawAnimationSelectionOverlay(CanvasDrawingSession ds, Rect dest, double scale,
+        private void DrawAnimationSelectionOverlay(ICanvasRenderer renderer, Rect dest, double scale,
             int tileW, int tileH, PixlPunkt.PluginSdk.Tile.AnimationSelectionOverlay selection)
         {
             // Normalize the selection bounds
@@ -850,8 +851,8 @@ namespace PixlPunkt.UI.CanvasHost
                     if (!isStart && !isEnd)
                     {
                         // Fill interior tiles with highlight
-                        ds.FillRectangle(screenX, screenY, screenW, screenH, highlightFill);
-                        ds.DrawRectangle(screenX, screenY, screenW, screenH, highlightStroke, innerStroke);
+                        renderer.FillRectangle(screenX, screenY, screenW, screenH, highlightFill);
+                        renderer.DrawRectangle(screenX, screenY, screenW, screenH, highlightStroke, innerStroke);
                     }
                 }
             }
@@ -866,13 +867,13 @@ namespace PixlPunkt.UI.CanvasHost
                 float screenH = (float)(tileH * scale);
 
                 // Fill start tile with blue tint
-                ds.FillRectangle(screenX, screenY, screenW, screenH, Color.FromArgb(60, 0, 140, 255));
+                renderer.FillRectangle(screenX, screenY, screenW, screenH, Color.FromArgb(60, 0, 140, 255));
 
                 // Draw thick border
-                ds.DrawRectangle(screenX, screenY, screenW, screenH, startColor, strokeWidth);
+                renderer.DrawRectangle(screenX, screenY, screenW, screenH, startColor, strokeWidth);
 
                 // Inner white highlight for visibility
-                ds.DrawRectangle(screenX + 2, screenY + 2, screenW - 4, screenH - 4,
+                renderer.DrawRectangle(screenX + 2, screenY + 2, screenW - 4, screenH - 4,
                     Color.FromArgb(180, 255, 255, 255), 1f);
             }
 
@@ -887,22 +888,22 @@ namespace PixlPunkt.UI.CanvasHost
                 float screenH = (float)(tileH * scale);
 
                 // Fill end tile with orange tint
-                ds.FillRectangle(screenX, screenY, screenW, screenH, Color.FromArgb(60, 255, 140, 0));
+                renderer.FillRectangle(screenX, screenY, screenW, screenH, Color.FromArgb(60, 255, 140, 0));
 
                 // Draw thick border
-                ds.DrawRectangle(screenX, screenY, screenW, screenH, endColor, strokeWidth);
+                renderer.DrawRectangle(screenX, screenY, screenW, screenH, endColor, strokeWidth);
 
                 // Inner white highlight for visibility
-                ds.DrawRectangle(screenX + 2, screenY + 2, screenW - 4, screenH - 4,
+                renderer.DrawRectangle(screenX + 2, screenY + 2, screenW - 4, screenH - 4,
                     Color.FromArgb(180, 255, 255, 255), 1f);
             }
         }
 
         /// <summary>
-        /// Draws a semi-transparent ghost preview of a tile's pixels using Win2D bitmap.
+        /// Draws a semi-transparent ghost preview of a tile's pixels using SkiaSharp.
         /// Uses NearestNeighbor interpolation for crisp pixel-perfect rendering.
         /// </summary>
-        private void DrawTileGhost(CanvasDrawingSession ds, Rect dest, double scale,
+        private void DrawTileGhost(ICanvasRenderer renderer, Rect dest, double scale,
             int docX, int docY, int tileW, int tileH, byte[] pixels)
         {
             // Create a copy of pixels with ghost transparency (50% alpha)
@@ -915,31 +916,17 @@ namespace PixlPunkt.UI.CanvasHost
                 ghostPixels[i + 3] = (byte)(pixels[i + 3] / 2); // A at 50%
             }
 
-            // Create bitmap from ghost pixels
-            using var bitmap = CanvasBitmap.CreateFromBytes(
-                ds.Device,
-                ghostPixels,
-                tileW,
-                tileH,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f);
-
             // Calculate screen position and size
             float screenX = (float)(dest.X + docX * scale);
             float screenY = (float)(dest.Y + docY * scale);
             float screenW = (float)(tileW * scale);
             float screenH = (float)(tileH * scale);
 
-            // Draw with NearestNeighbor for crisp pixels
+            // Draw using the renderer abstraction
             var destRect = new Rect(screenX, screenY, screenW, screenH);
             var srcRect = new Rect(0, 0, tileW, tileH);
 
-            ds.DrawImage(
-                bitmap,
-                destRect,
-                srcRect,
-                1.0f,
-                CanvasImageInterpolation.NearestNeighbor);
+            renderer.DrawPixels(ghostPixels, tileW, tileH, destRect, srcRect, 1.0f, ImageInterpolation.NearestNeighbor);
         }
     }
 }

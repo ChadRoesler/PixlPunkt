@@ -4,6 +4,7 @@ using PixlPunkt.Core.History;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Tools;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI.CanvasHost.Selection
 {
@@ -480,7 +481,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             PreviewBuf = null;
             BufferFlipped = false;
             Region.Clear();
-            Rect = new RectInt32(0, 0, 0, 0);
+            Rect = CreateRect(0, 0, 0, 0);
             ResetTransform();
         }
 
@@ -513,7 +514,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// Normalizes a rectangle to have positive width and height.
         /// </summary>
         public static RectInt32 Normalize(RectInt32 r) =>
-            new(r.Width >= 0 ? r.X : r.X + r.Width,
+            CreateRect(r.Width >= 0 ? r.X : r.X + r.Width,
                 r.Height >= 0 ? r.Y : r.Y + r.Height,
                 Math.Abs(r.Width),
                 Math.Abs(r.Height));
@@ -527,7 +528,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             int y0 = Math.Clamp(r.Y, 0, h);
             int x1 = Math.Clamp(r.X + r.Width, 0, w);
             int y1 = Math.Clamp(r.Y + r.Height, 0, h);
-            return new(x0, y0, Math.Max(0, x1 - x0), Math.Max(0, y1 - y0));
+            return CreateRect(x0, y0, Math.Max(0, x1 - x0), Math.Max(0, y1 - y0));
         }
 
         /// <summary>
@@ -539,7 +540,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             int y0 = Math.Max(a.Y, b.Y);
             int x1 = Math.Min(a.X + a.Width, b.X + b.Width);
             int y1 = Math.Min(a.Y + a.Height, b.Y + b.Height);
-            return (x1 > x0 && y1 > y0) ? new(x0, y0, x1 - x0, y1 - y0) : new(0, 0, 0, 0);
+            return (x1 > x0 && y1 > y0) ? CreateRect(x0, y0, x1 - x0, y1 - y0) : CreateRect(0, 0, 0, 0);
         }
 
         /// <summary>
@@ -551,7 +552,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             int y0 = Math.Min(a.Y, b.Y);
             int x1 = Math.Max(a.X + a.Width, b.X + b.Width);
             int y1 = Math.Max(a.Y + a.Height, b.Y + b.Height);
-            return new RectInt32(x0, y0, Math.Max(0, x1 - x0), Math.Max(0, y1 - y0));
+            return CreateRect(x0, y0, Math.Max(0, x1 - x0), Math.Max(0, y1 - y0));
         }
 
         /// <summary>

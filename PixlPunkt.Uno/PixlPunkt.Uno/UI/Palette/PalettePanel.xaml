@@ -1,0 +1,163 @@
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+  PALETTE PANEL - Color Swatch Management
+═══════════════════════════════════════════════════════════════════════════════
+  Interactive color palette with swatch grid display and management tools.
+  
+  Features:
+    • Add colors via color picker flyout
+    • Remove selected or last color
+    • Generate gradient ramps
+    • Left-click: Set foreground color
+    • Right-click: Set background color
+    • Visual indicators for active FG/BG colors
+═══════════════════════════════════════════════════════════════════════════════
+-->
+<UserControl
+    x:Class="PixlPunkt.Uno.UI.Palette.PalettePanel"
+    x:Name="Self"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="using:PixlPunkt.Uno.UI.Converters"
+    xmlns:ic="using:FluentIcons.WinUI">
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- RESOURCES -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <UserControl.Resources>
+        <!-- Converts BGRA color values to WinUI Brush for swatch display -->
+        <conv:BgraToBrushConverter x:Key="BgraToBrush"/>
+    </UserControl.Resources>
+
+    <Grid x:Name="Root" RowSpacing="4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- header -->
+            <RowDefinition Height="*"/>
+            <!-- fill remainder -->
+        </Grid.RowDefinitions>
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- HEADER ROW -->
+        <!-- Left: Add & remove buttons | Right: Gradient tools -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Action Buttons -->
+            <StackPanel 
+                Grid.Column="0"
+                Orientation="Horizontal" 
+                Spacing="8">
+                
+                <!-- Add Color Button with Picker Flyout -->
+                <Button 
+                    x:Name="AddBtn" 
+                    ToolTipService.ToolTip="Add color (from picker)"
+                    Click="AddBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="AddSquare" FontSize="16"/>
+                    
+                    
+                </Button>
+
+                <!-- Remove Color Button (Removes current FG or last swatch) -->
+                <Button 
+    Click="Gradient_Click"
+    ToolTipService.ToolTip="Add gradient ramp" Padding="3">
+                    <ic:FluentIcon Icon="StackAdd" FontSize="16"/>
+                </Button>
+                
+            </StackPanel>
+
+            <!-- Right Action Buttons -->
+            <StackPanel 
+                Grid.Column="1" 
+                Orientation="Horizontal">
+                
+                <!-- Add Gradient Ramp Button -->
+                <Button 
+    x:Name="RemoveBtn" 
+    ToolTipService.ToolTip="Remove current FG (or last)"
+    Click="RemoveBtn_Click" Padding="3">
+                    <ic:FluentIcon Icon="Delete" FontSize="16"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- SWATCH GRID -->
+        <!-- Scrollable, tight grid layout of color swatches -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="1"
+          x:Name="PaletteBox"
+          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+          BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+          BorderThickness="1"
+          CornerRadius="8"
+          Padding="8"
+          Margin="-3,0,-3,-3">
+            <!-- grow L/R by 3, and bottom by 3 -->
+            <ScrollViewer x:Name="PaletteScroll"
+            VerticalScrollBarVisibility="Auto"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+
+                <ItemsControl x:Name="SwatchList" MinHeight="18">
+
+                    <!-- Grid Panel Configuration: Tight 20x20 cells -->
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapGrid 
+                            Orientation="Horizontal"
+                            ItemWidth="{Binding SwatchSize, ElementName=Self}" 
+                            ItemHeight="{Binding SwatchSize, ElementName=Self}"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <!-- Swatch Cell Template -->
+                    <ItemsControl.ItemTemplate >
+                        <DataTemplate>
+                            <Grid 
+                            Margin="1"
+                            Loaded="Cell_Loaded" 
+                            Unloaded="Cell_Unloaded" >
+
+                                <!-- Color Swatch Border -->
+                                <Border 
+                                x:Name="Swatch"
+                                CornerRadius="3"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                Background="{Binding Converter={StaticResource BgraToBrush}}"
+                                Tag="{Binding}"
+                                Tapped="Swatch_Tapped"
+                                RightTapped="Swatch_RightTapped"/>
+
+                                <!-- Foreground Selection Ring (White - high contrast for selection) -->
+                                <Border 
+                                x:Name="FgRing"
+                                IsHitTestVisible="False"
+                                CornerRadius="4"
+                                BorderThickness="1.5"
+                                BorderBrush="{ThemeResource TextFillColorPrimaryBrush}"
+                                Visibility="Collapsed"/>
+
+                                <!-- Background Selection Ring (Gold/Orange - accent color for BG) -->
+                                <Border 
+                                x:Name="BgRing"
+                                IsHitTestVisible="False"
+                                CornerRadius="4"
+                                BorderThickness="1.5"
+                                BorderBrush="#FFE0A000"
+                                Visibility="Collapsed"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>
