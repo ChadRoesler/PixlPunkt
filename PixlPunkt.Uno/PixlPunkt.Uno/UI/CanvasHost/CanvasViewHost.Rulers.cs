@@ -394,6 +394,11 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             renderer.Clear(Color.FromArgb(0, 0, 0, 0));
 
+            // Don't draw if layout hasn't happened yet
+            if (CanvasView.ActualWidth <= 0 || CanvasView.ActualHeight <= 0)
+                return;
+
+            // Get the dest rect from zoom controller (in logical pixels relative to CanvasView)
             var dest = _zoom.GetDestRect();
             int docWidth = Document.PixelWidth;
             int tileWidth = Document.TileSize.Width;
@@ -401,24 +406,31 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             int? cursorDocX = _hoverValid ? _hoverX : null;
 
-            float rulerWidth = renderer.Width;
-
-            // Calculate DPI scale: renderer works in physical pixels, dest rect is in logical pixels
-            // ActualWidth is logical, renderer.Width is physical
-            double dpiScale = HorizontalRulerCanvas.ActualWidth > 0 
-                ? renderer.Width / HorizontalRulerCanvas.ActualWidth 
-                : 1.0;
-
-            // Scale the dest rect to physical pixels for rendering
-            // The dest.X is the logical pixel offset where document starts in the CanvasView
-            // We need to scale this to physical pixels for the ruler
-            var rulerDest = new Rect(dest.X * dpiScale, 0, dest.Width * dpiScale, dest.Height * dpiScale);
-            double adjustedScale = _zoom.Scale * dpiScale;
-
             // Draw using the RulerRenderer directly with SKCanvas
             if (renderer.Device is SkiaSharp.SKCanvas canvas)
             {
-                RulerRenderer.DrawHorizontalRuler(canvas, rulerDest, adjustedScale, docWidth, tileWidth, 0, rulerWidth, cursorDocX, ActualTheme);
+                // Get the canvas total matrix to determine any DPI scaling
+                var matrix = canvas.TotalMatrix;
+                float dpiScaleX = matrix.ScaleX;
+                
+                // The ruler canvas dimensions in physical pixels
+                float rulerWidth = renderer.Width;
+                
+                // Scale the dest rect and zoom to account for DPI
+                // If dpiScaleX is not 1, it means the canvas is scaled
+                if (dpiScaleX > 0 && Math.Abs(dpiScaleX - 1.0f) > 0.01f)
+                {
+                    var scaledDest = new Rect(
+                        dest.X * dpiScaleX, 
+                        dest.Y * dpiScaleX, 
+                        dest.Width * dpiScaleX, 
+                        dest.Height * dpiScaleX);
+                    RulerRenderer.DrawHorizontalRuler(canvas, scaledDest, _zoom.Scale * dpiScaleX, docWidth, tileWidth, 0, rulerWidth, cursorDocX, ActualTheme);
+                }
+                else
+                {
+                    RulerRenderer.DrawHorizontalRuler(canvas, dest, _zoom.Scale, docWidth, tileWidth, 0, rulerWidth, cursorDocX, ActualTheme);
+                }
             }
         }
 
@@ -434,6 +446,11 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             renderer.Clear(Color.FromArgb(0, 0, 0, 0));
 
+            // Don't draw if layout hasn't happened yet
+            if (CanvasView.ActualWidth <= 0 || CanvasView.ActualHeight <= 0)
+                return;
+
+            // Get the dest rect from zoom controller (in logical pixels relative to CanvasView)
             var dest = _zoom.GetDestRect();
             int docHeight = Document.PixelHeight;
             int tileHeight = Document.TileSize.Height;
@@ -441,21 +458,31 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             int? cursorDocY = _hoverValid ? _hoverY : null;
 
-            float rulerHeight = renderer.Height;
-
-            // Calculate DPI scale: renderer works in physical pixels, dest rect is in logical pixels
-            double dpiScale = VerticalRulerCanvas.ActualHeight > 0 
-                ? renderer.Height / VerticalRulerCanvas.ActualHeight 
-                : 1.0;
-
-            // Scale the dest rect to physical pixels for rendering
-            var rulerDest = new Rect(0, dest.Y * dpiScale, dest.Width * dpiScale, dest.Height * dpiScale);
-            double adjustedScale = _zoom.Scale * dpiScale;
-
             // Draw using the RulerRenderer directly with SKCanvas
             if (renderer.Device is SkiaSharp.SKCanvas canvas)
             {
-                RulerRenderer.DrawVerticalRuler(canvas, rulerDest, adjustedScale, docHeight, tileHeight, 0, rulerHeight, cursorDocY, ActualTheme);
+                // Get the canvas total matrix to determine any DPI scaling
+                var matrix = canvas.TotalMatrix;
+                float dpiScaleY = matrix.ScaleY;
+                
+                // The ruler canvas dimensions in physical pixels
+                float rulerHeight = renderer.Height;
+                
+                // Scale the dest rect and zoom to account for DPI
+                // If dpiScaleY is not 1, it means the canvas is scaled
+                if (dpiScaleY > 0 && Math.Abs(dpiScaleY - 1.0f) > 0.01f)
+                {
+                    var scaledDest = new Rect(
+                        dest.X * dpiScaleY, 
+                        dest.Y * dpiScaleY, 
+                        dest.Width * dpiScaleY, 
+                        dest.Height * dpiScaleY);
+                    RulerRenderer.DrawVerticalRuler(canvas, scaledDest, _zoom.Scale * dpiScaleY, docHeight, tileHeight, 0, rulerHeight, cursorDocY, ActualTheme);
+                }
+                else
+                {
+                    RulerRenderer.DrawVerticalRuler(canvas, dest, _zoom.Scale, docHeight, tileHeight, 0, rulerHeight, cursorDocY, ActualTheme);
+                }
             }
         }
 

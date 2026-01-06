@@ -35,7 +35,13 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
         private void WireCanvasEvents()
         {
-            CanvasView.Loaded += (_, __) => DoFit();
+            CanvasView.Loaded += (_, __) => 
+            {
+                DoFit();
+                // Explicitly invalidate rulers after fit to ensure they draw correctly
+                HorizontalRulerCanvas?.Invalidate();
+                VerticalRulerCanvas?.Invalidate();
+            };
 
             CanvasView.SizeChanged += (_, __) =>
             {
@@ -43,6 +49,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 UpdateViewport();
                 ZoomLevel.Text = ZoomLevelText;
                 CanvasView.Invalidate();
+                // Ensure rulers redraw when canvas size changes
+                HorizontalRulerCanvas?.Invalidate();
+                VerticalRulerCanvas?.Invalidate();
             };
 
             // SkiaSharp PaintSurface is wired in XAML via PaintSurface="CanvasView_PaintSurface"
