@@ -1,4 +1,4 @@
-<Window
+﻿<Window
     x:Class="PixlPunkt.Uno.UI.Layers.ReferenceLayerSettingsWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -40,7 +40,7 @@
                    Margin="0,0,8,0" />
         <TextBox x:Name="NameBox"
                  Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
-                 Text="{x:Bind Layer.Name, Mode=TwoWay}" />
+                 Text="{Binding Layer.Name, Mode=TwoWay}" />
 
         <TextBlock Grid.Row="1" Grid.Column="0"
                    Text="Opacity:"
@@ -50,14 +50,14 @@
                 Grid.Row="1" Grid.Column="1"
                 Minimum="0"
                 Maximum="100"
-                Value="{x:Bind Layer.OpacityPercent, Mode=TwoWay}"
+                Value="{Binding Layer.OpacityPercent, Mode=TwoWay}"
                 ValueChanged="Opacity_ValueChanged" />
         <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Spacing="4">
             <NumberBox x:Name="OpacityBox"
                        Minimum="0"
                        Maximum="100"
                        Width="64"
-                       Value="{x:Bind Layer.OpacityPercent, Mode=TwoWay}"
+                       Value="{Binding Layer.OpacityPercent, Mode=TwoWay}"
                        ValueChanged="Opacity_ValueChanged" />
             <TextBlock Text="%" VerticalAlignment="Center" />
         </StackPanel>
@@ -70,14 +70,14 @@
                 Grid.Row="2" Grid.Column="1"
                 Minimum="1"
                 Maximum="500"
-                Value="{x:Bind Layer.ScalePercent, Mode=TwoWay}"
+                Value="{Binding Layer.ScalePercent, Mode=TwoWay}"
                 ValueChanged="Transform_ValueChanged" />
         <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" Spacing="4">
             <NumberBox x:Name="ScaleBox"
                        Minimum="1"
                        Maximum="10000"
                        Width="64"
-                       Value="{x:Bind Layer.ScalePercent, Mode=TwoWay}"
+                       Value="{Binding Layer.ScalePercent, Mode=TwoWay}"
                        ValueChanged="Transform_ValueChanged" />
             <TextBlock Text="%" VerticalAlignment="Center" />
         </StackPanel>
@@ -90,14 +90,14 @@
                 Grid.Row="3" Grid.Column="1"
                 Minimum="-180"
                 Maximum="180"
-                Value="{x:Bind Layer.Rotation, Mode=TwoWay}"
+                Value="{Binding Layer.Rotation, Mode=TwoWay}"
                 ValueChanged="Transform_ValueChanged" />
         <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Spacing="4">
             <NumberBox x:Name="RotationBox"
                        Minimum="-180"
                        Maximum="180"
                        Width="64"
-                       Value="{x:Bind Layer.Rotation, Mode=TwoWay}"
+                       Value="{Binding Layer.Rotation, Mode=TwoWay}"
                        ValueChanged="Transform_ValueChanged" />
             <TextBlock Text="deg" VerticalAlignment="Center" />
         </StackPanel>
@@ -111,12 +111,12 @@
             <TextBlock Text="X:" VerticalAlignment="Center" />
             <NumberBox x:Name="PosXBox"
                        Width="80"
-                       Value="{x:Bind Layer.PositionX, Mode=TwoWay}"
+                       Value="{Binding Layer.PositionX, Mode=TwoWay}"
                        ValueChanged="Transform_ValueChanged" />
             <TextBlock Text="Y:" VerticalAlignment="Center" Margin="12,0,0,0" />
             <NumberBox x:Name="PosYBox"
                        Width="80"
-                       Value="{x:Bind Layer.PositionY, Mode=TwoWay}"
+                       Value="{Binding Layer.PositionY, Mode=TwoWay}"
                        ValueChanged="Transform_ValueChanged" />
         </StackPanel>
 
@@ -125,7 +125,7 @@
                     Spacing="12">
             <ToggleButton x:Name="VisBtn"
                           ToolTipService.ToolTip="Visibility"
-                          IsChecked="{x:Bind Layer.Visible, Mode=TwoWay}"
+                          IsChecked="{Binding Layer.Visible, Mode=TwoWay}"
                           Click="VisBtn_Click">
                 <Grid>
                     <ic:FluentIcon Icon="Eye"
@@ -136,7 +136,7 @@
             </ToggleButton>
             <ToggleButton x:Name="LockBtn"
                           ToolTipService.ToolTip="Lock"
-                          IsChecked="{x:Bind Layer.Locked, Mode=TwoWay}"
+                          IsChecked="{Binding Layer.Locked, Mode=TwoWay}"
                           Click="LockBtn_Click">
                 <Grid>
                     <ic:FluentIcon Icon="LockClosed"

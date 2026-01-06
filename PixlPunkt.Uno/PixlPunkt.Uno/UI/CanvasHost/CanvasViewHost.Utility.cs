@@ -47,6 +47,10 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             {
                 _host._zoom.PanBy(deltaX, deltaY);
                 _host.UpdateViewport();
+                // Always invalidate rulers during pan, even if viewport rect didn't change
+                // (the document position changes even when fully visible)
+                _host.HorizontalRulerCanvas?.Invalidate();
+                _host.VerticalRulerCanvas?.Invalidate();
             }
 
             public void ZoomAt(Point screenPos, double factor)
@@ -54,6 +58,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _host._zoom.ZoomAt(screenPos, factor, MinZoomScale, MaxZoomScale);
                 _host.UpdateViewport();
                 _host.ZoomLevel.Text = _host.ZoomLevelText;
+                // Rulers are already invalidated by UpdateViewport when zoom changes
             }
 
             public uint SampleColorAt(int docX, int docY)

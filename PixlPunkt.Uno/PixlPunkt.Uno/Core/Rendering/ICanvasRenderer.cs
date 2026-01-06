@@ -7,7 +7,7 @@ namespace PixlPunkt.Uno.Core.Rendering;
 
 /// <summary>
 /// Platform-agnostic canvas rendering interface.
-/// Abstracts Win2D (Windows) and SkiaSharp (cross-platform) drawing operations.
+/// Abstracts SkiaSharp drawing operations for cross-platform rendering.
 /// </summary>
 public interface ICanvasRenderer : IDisposable
 {

@@ -491,7 +491,70 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
         private void DrawTileMappings(ICanvasRenderer renderer, Rect dest)
         {
-            // TODO: Implement tile mappings with SkiaSharp text rendering
+            if (Document == null) return;
+
+            // Get the SKCanvas from the renderer for text drawing
+            if (renderer.Device is not SKCanvas canvas) return;
+
+            float scale = (float)_zoom.Scale;
+            int tileW = Document.TileSize.Width;
+            int tileH = Document.TileSize.Height;
+            int tilesX = Document.TileCounts.Width;
+            int tilesY = Document.TileCounts.Height;
+
+            // Calculate font size based on tile size and zoom (smaller for corner placement)
+            float baseFontSize = Math.Min(tileW, tileH) * scale * 0.25f;
+            float fontSize = Math.Clamp(baseFontSize, 8f, 16f);
+            float padding = 2f;
+
+            using var textPaint = new SKPaint
+            {
+                Color = SKColors.White,
+                TextSize = fontSize,
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Right,
+                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+            };
+
+            using var bgPaint = new SKPaint
+            {
+                Color = new SKColor(0, 0, 0, 200), // Semi-transparent black
+                IsAntialias = false
+            };
+
+            // Get active layer's tile mapping
+            var activeLayer = Document.ActiveLayer;
+            var tileMapping = activeLayer?.TileMapping;
+            if (tileMapping == null) return;
+
+            for (int ty = 0; ty < tilesY; ty++)
+            {
+                for (int tx = 0; tx < tilesX; tx++)
+                {
+                    int tileId = tileMapping.GetTileId(tx, ty);
+                    if (tileId < 0) continue; // No tile mapped
+
+                    string text = tileId.ToString();
+                    float textWidth = textPaint.MeasureText(text);
+
+                    // Calculate position in top-right corner of tile
+                    float tileRight = (float)(dest.X + (tx + 1) * tileW * scale);
+                    float tileTop = (float)(dest.Y + ty * tileH * scale);
+
+                    // Background rectangle
+                    float bgWidth = textWidth + padding * 2;
+                    float bgHeight = fontSize + padding * 2;
+                    float bgX = tileRight - bgWidth - 1;
+                    float bgY = tileTop + 1;
+
+                    canvas.DrawRect(bgX, bgY, bgWidth, bgHeight, bgPaint);
+
+                    // Draw text
+                    float textX = tileRight - padding - 1;
+                    float textY = bgY + fontSize + padding / 2;
+                    canvas.DrawText(text, textX, textY, textPaint);
+                }
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -500,7 +563,89 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
         private void DrawTileAnimationFrames(ICanvasRenderer renderer, Rect dest)
         {
-            // TODO: Implement tile animation frame rendering
+            if (Document == null) return;
+
+            var tileAnimState = Document.TileAnimationState;
+            if (tileAnimState == null) return;
+
+            var selectedReel = tileAnimState.SelectedReel;
+            if (selectedReel == null || selectedReel.FrameCount == 0) return;
+
+            float scale = (float)_zoom.Scale;
+            int tileW = Document.TileSize.Width;
+            int tileH = Document.TileSize.Height;
+
+            int currentFrameIndex = tileAnimState.CurrentFrameIndex;
+
+            // Calculate font size (smaller for corner placement)
+            float baseFontSize = Math.Min(tileW, tileH) * scale * 0.25f;
+            float fontSize = Math.Clamp(baseFontSize, 8f, 16f);
+            float padding = 2f;
+
+            // Draw frame markers for all frames in the selected reel
+            for (int i = 0; i < selectedReel.FrameCount; i++)
+            {
+                var frame = selectedReel.Frames[i];
+                int tx = frame.TileX;
+                int ty = frame.TileY;
+
+                // Calculate screen rectangle
+                float screenX = (float)(dest.X + tx * tileW * scale);
+                float screenY = (float)(dest.Y + ty * tileH * scale);
+                float screenW = tileW * scale;
+                float screenH = tileH * scale;
+
+                bool isCurrent = (i == currentFrameIndex);
+
+                // Draw fill overlay
+                var fillColor = isCurrent ? TileAnimCurrentFrameColor : TileAnimFrameColor;
+                renderer.FillRectangle(screenX, screenY, screenW, screenH, fillColor);
+
+                // Draw outline
+                var outlineColor = isCurrent ? TileAnimCurrentOutline : TileAnimFrameOutline;
+                float outlineWidth = isCurrent ? 3f : 2f;
+                renderer.DrawRectangle(screenX, screenY, screenW, screenH, outlineColor, outlineWidth);
+
+                // Draw frame number in top-right corner
+                if (renderer.Device is SKCanvas canvas)
+                {
+                    string text = (i + 1).ToString();
+
+                    using var textPaint = new SKPaint
+                    {
+                        Color = SKColors.White,
+                        TextSize = fontSize,
+                        IsAntialias = true,
+                        TextAlign = SKTextAlign.Right,
+                        Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                    };
+
+                    using var bgPaint = new SKPaint
+                    {
+                        Color = isCurrent ? new SKColor(0, 0, 0, 240) : new SKColor(0, 0, 0, 200),
+                        IsAntialias = false
+                    };
+
+                    float textWidth = textPaint.MeasureText(text);
+
+                    // Position in top-right corner
+                    float tileRight = screenX + screenW;
+                    float tileTop = screenY;
+
+                    // Background rectangle
+                    float bgWidth = textWidth + padding * 2;
+                    float bgHeight = fontSize + padding * 2;
+                    float bgX = tileRight - bgWidth - 1;
+                    float bgY = tileTop + 1;
+
+                    canvas.DrawRect(bgX, bgY, bgWidth, bgHeight, bgPaint);
+
+                    // Draw text
+                    float textX = tileRight - padding - 1;
+                    float textY = bgY + fontSize + padding / 2;
+                    canvas.DrawText(text, textX, textY, textPaint);
+                }
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════

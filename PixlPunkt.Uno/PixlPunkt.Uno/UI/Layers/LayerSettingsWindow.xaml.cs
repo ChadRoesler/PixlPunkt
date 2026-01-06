@@ -93,7 +93,7 @@ namespace PixlPunkt.Uno.UI.Layers
             // Local editable copy for the name box.
             EditableName = _origName;
 
-            // Initialize VM BEFORE InitializeComponent so x:Bind can see it.
+            // Initialize VM BEFORE InitializeComponent so Binding can see it.
             ViewModel = new LayerSettingsViewModel(doc, layer);
 
             InitializeComponent();

@@ -125,6 +125,7 @@ namespace PixlPunkt.Uno.UI
                 resizable: true,
                 alwaysOnTop: false,
                 minimizable: true,
+                maximizable: true,
                 title: "Pixl Punkt");
 
             // Note: Window closing handled via Closed event in Uno

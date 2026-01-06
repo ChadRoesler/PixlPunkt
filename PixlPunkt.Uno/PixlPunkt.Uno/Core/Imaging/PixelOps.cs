@@ -313,7 +313,7 @@ namespace PixlPunkt.Uno.Core.Imaging
         /// <para>
         /// Samples four surrounding pixels with bilinear weighting to produce anti-aliased edges.
         /// Uses **premultiplied alpha blending** internally and outputs premultiplied alpha data
-        /// suitable for direct use with Win2D's B8G8R8A8UIntNormalized format.
+        /// suitable for direct use with standard graphics APIs' B8G8R8A8 premultiplied format.
         /// </para>
         /// <para>
         /// **Premultiplied Alpha Algorithm**:
@@ -324,7 +324,8 @@ namespace PixlPunkt.Uno.Core.Imaging
         /// <para>
         /// This ensures edge pixels fade to transparent while preserving the original color,
         /// preventing the "dark bleeding" artifact where edges appear to blend toward black.
-        /// The output format matches Win2D's expectations for CanvasBitmap.CreateFromBytes.
+        /// The output format is compatible with SkiaSharp and other graphics APIs that expect
+        /// premultiplied alpha data.
         /// </para>
         /// </remarks>
         public static (byte[] buf, int w, int h) RotateBilinear(byte[] src, int sw, int sh, double angleDeg)
@@ -446,7 +447,7 @@ namespace PixlPunkt.Uno.Core.Imaging
                     byte outA = (byte)Math.Clamp(Math.Round(sumAlpha * 255.0), 0, 255);
 
                     // **CRITICAL**: Keep RGB premultiplied (do NOT divide by alpha)
-                    // Win2D's B8G8R8A8UIntNormalized format expects premultiplied alpha data
+                    // Graphics APIs expect premultiplied alpha data for proper compositing
                     byte outR = (byte)Math.Clamp(Math.Round(sumPremulR * 255.0), 0, 255);
                     byte outG = (byte)Math.Clamp(Math.Round(sumPremulG * 255.0), 0, 255);
                     byte outB = (byte)Math.Clamp(Math.Round(sumPremulB * 255.0), 0, 255);

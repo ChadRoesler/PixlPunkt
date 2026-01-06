@@ -1,10 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <UserControl
     x:Class="PixlPunkt.Uno.UI.Animation.FrameEditPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ic="using:FluentIcons.WinUI"
-    xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:local="using:PixlPunkt.Uno.UI.Animation">
 
     <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">

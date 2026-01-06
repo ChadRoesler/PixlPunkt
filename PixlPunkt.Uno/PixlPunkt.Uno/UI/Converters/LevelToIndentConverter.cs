@@ -26,7 +26,7 @@ namespace PixlPunkt.Uno.UI.Converters
     /// <code>
     /// &lt;local:LevelToIndentConverter x:Key="LevelToIndent" Indent="16" /&gt;
     /// 
-    /// &lt;TextBlock Margin="{x:Bind Depth, Converter={StaticResource LevelToIndent}}" /&gt;
+    /// &lt;TextBlock Margin="{Binding Depth, Converter={StaticResource LevelToIndent}}" /&gt;
     /// </code>
     /// <para><strong>Use Cases:</strong></para>
     /// <para>

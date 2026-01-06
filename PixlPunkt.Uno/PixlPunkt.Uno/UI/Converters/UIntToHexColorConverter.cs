@@ -26,7 +26,7 @@ namespace PixlPunkt.Uno.UI.Converters
     /// </para>
     /// <para><strong>XAML Usage:</strong></para>
     /// <code>
-    /// &lt;TextBox Text="{x:Bind CurrentColor, Converter={StaticResource UIntToHexColor}, Mode=TwoWay}" /&gt;
+    /// &lt;TextBox Text="{Binding CurrentColor, Converter={StaticResource UIntToHexColor}, Mode=TwoWay}" /&gt;
     /// </code>
     /// </remarks>
     /// <seealso cref="UIntToBrushConverter"/>
@@ -75,7 +75,7 @@ namespace PixlPunkt.Uno.UI.Converters
                 if (uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u))
                     return u;
             }
-            // Fallback: unchanged (x:Bind two-way will keep old value)
+            // Fallback: unchanged (Binding two-way will keep old value)
             return 0xFF000000u;
         }
     }

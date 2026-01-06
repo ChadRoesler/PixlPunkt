@@ -44,13 +44,14 @@ namespace PixlPunkt.Uno.UI.Helpers
         // ════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Applies basic window configuration including window chrome.
+        /// Applies basic window configuration including window chrome, title bar theming, and icon.
         /// </summary>
         public static Window ApplyChrome(
             Window window,
             bool resizable = false,
             bool alwaysOnTop = false,
             bool minimizable = false,
+            bool maximizable = false,
             string? title = null,
             Window? owner = null)
         {
@@ -70,9 +71,15 @@ namespace PixlPunkt.Uno.UI.Helpers
                     var presenter = Microsoft.UI.Windowing.OverlappedPresenter.Create();
                     presenter.IsResizable = resizable;
                     presenter.IsMinimizable = minimizable;
-                    presenter.IsMaximizable = minimizable;
+                    presenter.IsMaximizable = maximizable;
                     presenter.IsAlwaysOnTop = alwaysOnTop;
                     appWindow.SetPresenter(presenter);
+
+                    // Apply title bar colors to match theme
+                    ApplyTitleBarTheme(appWindow, effectiveTheme);
+
+                    // Set window icon
+                    SetWindowIcon(appWindow);
                 }
             }
             catch (Exception ex)
@@ -81,6 +88,104 @@ namespace PixlPunkt.Uno.UI.Helpers
             }
 
             return window;
+        }
+
+        /// <summary>
+        /// Sets the window icon from the application's icon asset.
+        /// </summary>
+        private static void SetWindowIcon(Microsoft.UI.Windowing.AppWindow appWindow)
+        {
+            try
+            {
+                // Try to get the icon path from the application's assets
+                // On Windows, we use the .ico file
+                // On Linux/macOS, we'd use the .png file
+                
+                string iconPath;
+                
+                if (IsWindows)
+                {
+                    // Get the path to the .ico file in the output directory
+                    var baseDir = AppContext.BaseDirectory;
+                    iconPath = System.IO.Path.Combine(baseDir, "Assets", "Icons", "PixlPunkt.ico");
+                    
+                    if (!System.IO.File.Exists(iconPath))
+                    {
+                        // Try alternate location
+                        iconPath = System.IO.Path.Combine(baseDir, "PixlPunkt.ico");
+                    }
+                }
+                else
+                {
+                    // For Linux/macOS, use PNG
+                    var baseDir = AppContext.BaseDirectory;
+                    iconPath = System.IO.Path.Combine(baseDir, "Assets", "Icons", "Icon.png");
+                    
+                    if (!System.IO.File.Exists(iconPath))
+                    {
+                        iconPath = System.IO.Path.Combine(baseDir, "Icon.png");
+                    }
+                }
+
+                if (System.IO.File.Exists(iconPath))
+                {
+                    appWindow.SetIcon(iconPath);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIcon: Icon file not found at {iconPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIcon: Could not set window icon: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Applies theme colors to the window's title bar.
+        /// </summary>
+        private static void ApplyTitleBarTheme(Microsoft.UI.Windowing.AppWindow appWindow, ElementTheme theme)
+        {
+            try
+            {
+                var titleBar = appWindow.TitleBar;
+                if (titleBar == null) return;
+
+                var (bg, fg) = GetThemeColors(theme);
+
+                // Title bar background and text
+                titleBar.BackgroundColor = bg;
+                titleBar.ForegroundColor = fg;
+
+                // Inactive state colors (slightly muted)
+                titleBar.InactiveBackgroundColor = bg;
+                titleBar.InactiveForegroundColor = theme == ElementTheme.Light
+                    ? Color.FromArgb(255, 100, 100, 100)
+                    : Color.FromArgb(255, 150, 150, 150);
+
+                // Button colors
+                titleBar.ButtonBackgroundColor = bg;
+                titleBar.ButtonForegroundColor = fg;
+                titleBar.ButtonInactiveBackgroundColor = bg;
+                titleBar.ButtonInactiveForegroundColor = titleBar.InactiveForegroundColor;
+
+                // Button hover colors
+                titleBar.ButtonHoverBackgroundColor = theme == ElementTheme.Light
+                    ? Color.FromArgb(255, 220, 220, 220)
+                    : Color.FromArgb(255, 60, 60, 60);
+                titleBar.ButtonHoverForegroundColor = fg;
+
+                // Button pressed colors
+                titleBar.ButtonPressedBackgroundColor = theme == ElementTheme.Light
+                    ? Color.FromArgb(255, 200, 200, 200)
+                    : Color.FromArgb(255, 80, 80, 80);
+                titleBar.ButtonPressedForegroundColor = fg;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WindowHost.ApplyTitleBarTheme: Could not apply title bar theme: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -109,7 +214,7 @@ namespace PixlPunkt.Uno.UI.Helpers
         // ════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Sizes window content to fit.
+        /// Sizes window content to fit and resizes the window to match.
         /// </summary>
         public static Window FitToContent(
             Window window,
@@ -121,8 +226,34 @@ namespace PixlPunkt.Uno.UI.Helpers
             root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var desired = root.DesiredSize;
 
-            root.Width = Math.Max(minWidth, desired.Width);
-            root.Height = Math.Max(minHeight, desired.Height);
+            double contentWidth = Math.Max(minWidth, desired.Width);
+            double contentHeight = Math.Max(minHeight, desired.Height);
+
+            root.Width = contentWidth;
+            root.Height = contentHeight;
+
+            // Also resize the window itself to fit the content
+            try
+            {
+                var appWindow = window.AppWindow;
+                if (appWindow != null)
+                {
+                    // Add some padding for window chrome (title bar, borders)
+                    // This is approximate - different platforms may have different chrome sizes
+                    int chromeHeight = 32; // Title bar height
+                    int chromeBorder = 2;  // Window border
+
+                    int windowWidth = (int)contentWidth + (chromeBorder * 2);
+                    int windowHeight = (int)contentHeight + chromeHeight + chromeBorder;
+
+                    var size = new Windows.Graphics.SizeInt32 { Width = windowWidth, Height = windowHeight };
+                    appWindow.Resize(size);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WindowHost.FitToContent: Could not resize window: {ex.Message}");
+            }
 
             return window;
         }
@@ -176,7 +307,7 @@ namespace PixlPunkt.Uno.UI.Helpers
             double maxScreenFraction = 0.90,
             Window? owner = null)
         {
-            ApplyChrome(window, resizable, false, minimizable, title, owner);
+            ApplyChrome(window, resizable: resizable, alwaysOnTop: false, minimizable: minimizable, maximizable: false, title: title, owner: owner);
             ApplyThemeToWindow(window);
 
             if (window.Content is FrameworkElement root)
@@ -201,6 +332,20 @@ namespace PixlPunkt.Uno.UI.Helpers
         {
             if (window.Content is FrameworkElement root)
                 root.RequestedTheme = theme;
+
+            // Also update title bar colors
+            try
+            {
+                var appWindow = window.AppWindow;
+                if (appWindow != null)
+                {
+                    ApplyTitleBarTheme(appWindow, theme);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WindowHost.UpdateWindowTheme: Could not update title bar: {ex.Message}");
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════

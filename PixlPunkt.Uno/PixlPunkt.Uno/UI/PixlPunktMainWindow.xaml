@@ -355,15 +355,15 @@
             <Border Grid.Column="4" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
                 <Grid x:Name="RightSidebar" Padding="8">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*" MinHeight="100"/>
-                        <RowDefinition Height="4"/>
-                        <RowDefinition Height="*" MinHeight="80"/>
-                        <RowDefinition Height="4"/>
-                        <RowDefinition Height="*" MinHeight="80"/>
-                        <RowDefinition Height="4"/>
-                        <RowDefinition Height="*" MinHeight="100"/>
-                        <RowDefinition Height="4"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition x:Name="PreviewRow" Height="*" MinHeight="40"/>
+                        <RowDefinition x:Name="PreviewSpacerRow" Height="4"/>
+                        <RowDefinition x:Name="PaletteRow" Height="*" MinHeight="40"/>
+                        <RowDefinition x:Name="PaletteSpacerRow" Height="4"/>
+                        <RowDefinition x:Name="TilesRow" Height="*" MinHeight="40"/>
+                        <RowDefinition x:Name="TilesSpacerRow" Height="4"/>
+                        <RowDefinition x:Name="LayersRow" Height="*" MinHeight="40"/>
+                        <RowDefinition x:Name="LayersSpacerRow" Height="4"/>
+                        <RowDefinition x:Name="HistoryRow" Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- Preview -->

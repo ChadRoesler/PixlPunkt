@@ -17,6 +17,9 @@
     <ApplicationPublisher>Caesar</ApplicationPublisher>
     <!-- Package Description -->
     <Description>PixlPunkt - Cross-platform pixel art editor powered by Uno Platform.</Description>
+    
+    <!-- Application Icon for Desktop -->
+    <ApplicationIcon Condition="$(TargetFramework.Contains('desktop')) or $(TargetFramework.Contains('windows'))">Assets\Icons\PixlPunkt.ico</ApplicationIcon>
 
     <!--
       UnoFeatures are used to quickly add and manage features enabled for your app.
@@ -67,6 +70,19 @@
   <PropertyGroup Condition="$(TargetFramework.Contains('desktop'))">
     <UnoSingleProjectAllowIncrementalBuilds>true</UnoSingleProjectAllowIncrementalBuilds>
   </PropertyGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       ICON AND CONTENT FILES
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <ItemGroup>
+    <!-- Ensure icon files are copied to output -->
+    <Content Include="Assets\Icons\PixlPunkt.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Icons\Icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
        SHARED DEPENDENCIES (CPM - no versions here)

@@ -11783,7 +11783,7 @@
             <para>
             Samples four surrounding pixels with bilinear weighting to produce anti-aliased edges.
             Uses **premultiplied alpha blending** internally and outputs premultiplied alpha data
-            suitable for direct use with Win2D's B8G8R8A8UIntNormalized format.
+            suitable for direct use with standard graphics APIs' B8G8R8A8 premultiplied format.
             </para>
             <para>
             **Premultiplied Alpha Algorithm**:
@@ -11794,7 +11794,8 @@
             <para>
             This ensures edge pixels fade to transparent while preserving the original color,
             preventing the "dark bleeding" artifact where edges appear to blend toward black.
-            The output format matches Win2D's expectations for CanvasBitmap.CreateFromBytes.
+            The output format is compatible with SkiaSharp and other graphics APIs that expect
+            premultiplied alpha data.
             </para>
             </remarks>
         </member>
@@ -16874,7 +16875,7 @@
         <member name="T:PixlPunkt.Uno.Core.Rendering.ICanvasRenderer">
             <summary>
             Platform-agnostic canvas rendering interface.
-            Abstracts Win2D (Windows) and SkiaSharp (cross-platform) drawing operations.
+            Abstracts SkiaSharp drawing operations for cross-platform rendering.
             </summary>
         </member>
         <member name="P:PixlPunkt.Uno.Core.Rendering.ICanvasRenderer.Device">
@@ -17316,7 +17317,7 @@
             </para>
             <para>
             **Architecture**: This class is UI-framework-agnostic. It receives pointer events and coordinate
-            transformations from the canvas host but contains no WinUI or Win2D dependencies. All rendering
+            transformations from the canvas host but contains no UI framework dependencies. All rendering
             is delegated via callbacks.
             </para>
             <para>
@@ -31015,6 +31016,11 @@
             Supports a minimized state and undocking to a separate window.
             </summary>
         </member>
+        <member name="E:PixlPunkt.Uno.UI.Controls.SectionCard.MinimizedChanged">
+            <summary>
+            Raised when the minimized state changes, allowing parent containers to adjust layout.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Uno.UI.Controls.SectionCard.InitializeComponent">
             <summary>
             InitializeComponent()
@@ -31120,7 +31126,7 @@
             <para><strong>XAML Usage:</strong></para>
             <code>
             &lt;Button Content="Save"
-                    Visibility="{x:Bind HasUnsavedChanges, Converter={StaticResource BoolToVisibility}}" /&gt;
+                    Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibility}}" /&gt;
             </code>
             </remarks>
             <seealso cref="T:PixlPunkt.Uno.UI.Converters.InverseBoolToVisibilityConverter"/>
@@ -31168,7 +31174,7 @@
             <para><strong>XAML Usage:</strong></para>
             <code>
             &lt;Slider Minimum="0" Maximum="255"
-                    Value="{x:Bind LayerOpacity, Converter={StaticResource ByteToDouble}, Mode=TwoWay}" /&gt;
+                    Value="{Binding LayerOpacity, Converter={StaticResource ByteToDouble}, Mode=TwoWay}" /&gt;
             </code>
             </remarks>
             <seealso cref="T:PixlPunkt.Uno.UI.Converters.LevelToIndentConverter"/>
@@ -31221,7 +31227,7 @@
             <para><strong>XAML Usage:</strong></para>
             <code>
             &lt;TextBlock Text="No layers"
-                       Visibility="{x:Bind HasLayers, Converter={StaticResource InverseBoolToVisibility}}" /&gt;
+                       Visibility="{Binding HasLayers, Converter={StaticResource InverseBoolToVisibility}}" /&gt;
             </code>
             </remarks>
             <seealso cref="T:PixlPunkt.Uno.UI.Converters.BoolToVisibilityConverter"/>
@@ -31265,7 +31271,7 @@
             <para><strong>XAML Usage:</strong></para>
             <code>
             &lt;TextBlock Text="▼" 
-                       Visibility="{x:Bind Layer, Converter={StaticResource LayerTypeToChevron}}" /&gt;
+                       Visibility="{Binding Layer, Converter={StaticResource LayerTypeToChevron}}" /&gt;
             </code>
             <para><strong>Use Cases:</strong></para>
             <para>
@@ -31319,7 +31325,7 @@
             <code>
             &lt;local:LevelToIndentConverter x:Key="LevelToIndent" Indent="16" /&gt;
             
-            &lt;TextBlock Margin="{x:Bind Depth, Converter={StaticResource LevelToIndent}}" /&gt;
+            &lt;TextBlock Margin="{Binding Depth, Converter={StaticResource LevelToIndent}}" /&gt;
             </code>
             <para><strong>Use Cases:</strong></para>
             <para>
@@ -31380,7 +31386,7 @@
             <code>
             &lt;local:LevelToIndentDoubleConverter x:Key="LevelToIndentDouble" Indent="16" /&gt;
             
-            &lt;Border Width="{x:Bind Depth, Converter={StaticResource LevelToIndentDouble}}" /&gt;
+            &lt;Border Width="{Binding Depth, Converter={StaticResource LevelToIndentDouble}}" /&gt;
             </code>
             <para><strong>Use Cases:</strong></para>
             <para>
@@ -31503,7 +31509,7 @@
             </para>
             <para><strong>XAML Usage:</strong></para>
             <code>
-            &lt;Rectangle Fill="{x:Bind CurrentColor, Converter={StaticResource UIntToBrush}}" /&gt;
+            &lt;Rectangle Fill="{Binding CurrentColor, Converter={StaticResource UIntToBrush}}" /&gt;
             </code>
             <para><strong>Debug Logging:</strong></para>
             <para>
@@ -31561,7 +31567,7 @@
             </para>
             <para><strong>XAML Usage:</strong></para>
             <code>
-            &lt;TextBox Text="{x:Bind CurrentColor, Converter={StaticResource UIntToHexColor}, Mode=TwoWay}" /&gt;
+            &lt;TextBox Text="{Binding CurrentColor, Converter={StaticResource UIntToHexColor}, Mode=TwoWay}" /&gt;
             </code>
             </remarks>
             <seealso cref="T:PixlPunkt.Uno.UI.Converters.UIntToBrushConverter"/>
@@ -32573,9 +32579,19 @@
             Gets whether we're running on Linux.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Uno.UI.Helpers.WindowHost.ApplyChrome(Microsoft.UI.Xaml.Window,System.Boolean,System.Boolean,System.Boolean,System.String,Microsoft.UI.Xaml.Window)">
+        <member name="M:PixlPunkt.Uno.UI.Helpers.WindowHost.ApplyChrome(Microsoft.UI.Xaml.Window,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.String,Microsoft.UI.Xaml.Window)">
             <summary>
-            Applies basic window configuration including window chrome.
+            Applies basic window configuration including window chrome, title bar theming, and icon.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Helpers.WindowHost.SetWindowIcon(Microsoft.UI.Windowing.AppWindow)">
+            <summary>
+            Sets the window icon from the application's icon asset.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Helpers.WindowHost.ApplyTitleBarTheme(Microsoft.UI.Windowing.AppWindow,Microsoft.UI.Xaml.ElementTheme)">
+            <summary>
+            Applies theme colors to the window's title bar.
             </summary>
         </member>
         <member name="M:PixlPunkt.Uno.UI.Helpers.WindowHost.GetEffectiveTheme">
@@ -32585,7 +32601,7 @@
         </member>
         <member name="M:PixlPunkt.Uno.UI.Helpers.WindowHost.FitToContent(Microsoft.UI.Xaml.Window,Microsoft.UI.Xaml.FrameworkElement,System.Double,System.Double,System.Double)">
             <summary>
-            Sizes window content to fit.
+            Sizes window content to fit and resizes the window to match.
             </summary>
         </member>
         <member name="M:PixlPunkt.Uno.UI.Helpers.WindowHost.FitToContentAfterLayout(Microsoft.UI.Xaml.Window,Microsoft.UI.Xaml.FrameworkElement,System.Double,System.Double,System.Double)">
@@ -33764,10 +33780,28 @@
             Initializes the panel docking system.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Uno.UI.PixlPunktMainWindow.OnPanelMinimizedChanged(PixlPunkt.Uno.UI.Controls.SectionCard,System.Boolean)">
+            <summary>
+            Called when a panel's minimized state changes.
+            Updates the sidebar row heights to redistribute space.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.PixlPunktMainWindow.IsPanelDocked(System.String)">
+            <summary>
+            Helper to check if a panel is currently docked.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.PixlPunktMainWindow.UpdateSidebarRowHeights">
+            <summary>
+            Updates the sidebar row heights based on each panel's docked and minimized state.
+            Undocked panels get 0 height, minimized panels get Auto height, 
+            expanded panels share the remaining space with star sizing.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Uno.UI.PixlPunktMainWindow.OnPanelLayoutChanged">
             <summary>
             Called when the panel layout changes (dock/undock events).
-            Updates sidebar visibility based on docked panel count.
+            Updates sidebar row heights to redistribute space when panels are docked/undocked.
             </summary>
         </member>
         <member name="M:PixlPunkt.Uno.UI.PixlPunktMainWindow.DockAllPanels">

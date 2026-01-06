@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -10,7 +12,7 @@ using Windows.UI;
 
 namespace PixlPunkt.Uno.UI.ColorPick
 {
-    public sealed partial class GradientWindow : Window
+    public sealed partial class GradientWindow : Window, INotifyPropertyChanged
     {
         private bool _editingStart = true;
 
@@ -29,8 +31,21 @@ namespace PixlPunkt.Uno.UI.ColorPick
         private bool _suppress;
         private bool _toggling;
 
-        public SolidColorBrush StartBrush { get; set; }
-        public SolidColorBrush EndBrush { get; set; }
+        private SolidColorBrush _startBrush;
+        private SolidColorBrush _endBrush;
+
+        public SolidColorBrush StartBrush
+        {
+            get => _startBrush;
+            set { _startBrush = value; OnPropertyChanged(); }
+        }
+
+        public SolidColorBrush EndBrush
+        {
+            get => _endBrush;
+            set { _endBrush = value; OnPropertyChanged(); }
+        }
+
         public bool IsEditingStart => _editingStart;
         public bool IsEditingEnd => !_editingStart;
         public ObservableCollection<uint> PreviewItems { get; } = new();
@@ -38,6 +53,13 @@ namespace PixlPunkt.Uno.UI.ColorPick
         public Action<IReadOnlyList<uint>>? Commit { get; set; }
         public Func<uint>? GetStart { get; set; }
         public Func<uint>? GetEnd { get; set; }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         /// <summary>
         /// Event raised when the dropper button is toggled on, requesting canvas pick mode.
@@ -49,11 +71,17 @@ namespace PixlPunkt.Uno.UI.ColorPick
         {
             InitializeComponent();
 
+            // Set DataContext for bindings
+            if (Content is FrameworkElement root)
+            {
+                root.DataContext = this;
+            }
+
             // Don't seed colors here - the delegates aren't set yet
             // We'll initialize in the deferred queue once delegates are wired
 
-            StartBrush = new SolidColorBrush(Colors.Black);
-            EndBrush = new SolidColorBrush(Colors.White);
+            _startBrush = new SolidColorBrush(Colors.Black);
+            _endBrush = new SolidColorBrush(Colors.White);
 
             TriFalloff.Start_out = new(-0.60f, 0.00f);
             TriFalloff.Mid_left = new(-0.20f, 0.85f);
@@ -80,8 +108,8 @@ namespace PixlPunkt.Uno.UI.ColorPick
                 ColorUtil.ToHSL(cs, out _hS, out _sS, out _lS);
                 ColorUtil.ToHSL(ce, out _hE, out _sE, out _lE);
 
-                StartBrush.Color = cs;
-                EndBrush.Color = ce;
+                _startBrush.Color = cs;
+                _endBrush.Color = ce;
 
                 _editingStart = true;
                 NotifySelection(); // updates inputs + controls (HueSlider/HslSquare)
@@ -133,12 +161,12 @@ namespace PixlPunkt.Uno.UI.ColorPick
             if (_editingStart)
             {
                 _hS = h; _sS = s; _lS = l; _aS = a;
-                StartBrush.Color = ColorUtil.FromHSL(h, s, l, a);
+                _startBrush.Color = ColorUtil.FromHSL(h, s, l, a);
             }
             else
             {
                 _hE = h; _sE = s; _lE = l; _aE = a;
-                EndBrush.Color = ColorUtil.FromHSL(h, s, l, a);
+                _endBrush.Color = ColorUtil.FromHSL(h, s, l, a);
             }
         }
 
@@ -150,7 +178,9 @@ namespace PixlPunkt.Uno.UI.ColorPick
 
         private void NotifySelection()
         {
-            Bindings.Update();
+            // Notify property changes for bindings
+            OnPropertyChanged(nameof(IsEditingStart));
+            OnPropertyChanged(nameof(IsEditingEnd));
             SyncUIFromSelection();
         }
 
@@ -343,6 +373,7 @@ namespace PixlPunkt.Uno.UI.ColorPick
             HslSquare.Hue = h;
             HslSquare.Saturation = s;
             HslSquare.Lightness = l;
+            _suppress = false;
 
             BuildPreview();
         }
@@ -396,8 +427,8 @@ namespace PixlPunkt.Uno.UI.ColorPick
 
             var cS = ColorUtil.FromHSL(_hS, _sS, _lS, _aS);
             var cE = ColorUtil.FromHSL(_hE, _sE, _lE, _aE);
-            StartBrush.Color = cS;
-            EndBrush.Color = cE;
+            _startBrush.Color = cS;
+            _endBrush.Color = cE;
 
             NotifySelection();
             BuildPreview();

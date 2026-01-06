@@ -25,7 +25,7 @@ namespace PixlPunkt.Uno.Core.Selection
     /// </para>
     /// <para>
     /// **Architecture**: This class is UI-framework-agnostic. It receives pointer events and coordinate
-    /// transformations from the canvas host but contains no WinUI or Win2D dependencies. All rendering
+    /// transformations from the canvas host but contains no UI framework dependencies. All rendering
     /// is delegated via callbacks.
     /// </para>
     /// <para>

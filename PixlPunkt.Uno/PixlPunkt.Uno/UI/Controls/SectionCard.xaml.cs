@@ -57,7 +57,7 @@ namespace PixlPunkt.Uno.UI.Controls
         private static void OnIsMinimizedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var card = (SectionCard)d;
-            card.UpdateToggleIcon();
+            card.UpdateMinimizedState();
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -66,6 +66,11 @@ namespace PixlPunkt.Uno.UI.Controls
 
         public event Action<SectionCard>? UndockRequested;
         public event Action<SectionCard>? DockRequested;
+        
+        /// <summary>
+        /// Raised when the minimized state changes, allowing parent containers to adjust layout.
+        /// </summary>
+        public event Action<SectionCard, bool>? MinimizedChanged;
 
         // ────────────────────────────────────────────────────────────────────
         // PROPERTIES
@@ -139,6 +144,7 @@ namespace PixlPunkt.Uno.UI.Controls
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             UpdateToggleIcon();
+            UpdateMinimizedState();
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -180,6 +186,19 @@ namespace PixlPunkt.Uno.UI.Controls
                 ToolTipService.SetToolTip(UndockButton,
                     IsFloating ? "Dock back to main window" : "Undock to separate window");
             }
+        }
+
+        private void UpdateMinimizedState()
+        {
+            UpdateToggleIcon();
+            
+            // Set vertical alignment based on minimized state
+            // When minimized, align to top so it only takes header height
+            // When expanded, stretch to fill available space
+            VerticalAlignment = IsMinimized ? VerticalAlignment.Top : VerticalAlignment.Stretch;
+            
+            // Notify parent containers of the state change
+            MinimizedChanged?.Invoke(this, IsMinimized);
         }
 
         private void UpdateToggleIcon()
