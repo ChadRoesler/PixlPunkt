@@ -45,6 +45,31 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         private static readonly Color SymmetryAxisColorSecondary = Color.FromArgb(120, 200, 100, 255);
         private static readonly Color SymmetryCenterColor = Color.FromArgb(255, 255, 200, 100);
 
+        // ════════════════════════════════════════════════════════════════════
+        // CACHED RENDERING OBJECTS - Reused across frames to minimize GC
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>Cached paint for tile mapping text rendering.</summary>
+        private SKPaint? _tileMappingTextPaint;
+        
+        /// <summary>Cached paint for tile mapping background.</summary>
+        private SKPaint? _tileMappingBgPaint;
+        
+        /// <summary>Cached paint for tile animation text rendering.</summary>
+        private SKPaint? _tileAnimTextPaint;
+        
+        /// <summary>Cached paint for tile animation background.</summary>
+        private SKPaint? _tileAnimBgPaint;
+        
+        /// <summary>Cached paint for checkerboard rendering - reused to avoid per-frame allocation.</summary>
+        private SKPaint? _checkerboardPaint;
+        
+        /// <summary>Cached dictionary for tile animation frame positions.</summary>
+        private Dictionary<(int, int), List<int>>? _cachedFramePositions;
+        
+        /// <summary>Cached list for reuse in frame position building.</summary>
+        private List<int>? _cachedFrameIndexList;
+
         private bool _showStageOverlay = true;
 
         public bool ShowStageOverlay
@@ -314,6 +339,17 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             DrawMaskOverlay(renderer, dest);
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        // CACHED MASK OVERLAY BUFFER
+        // ════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Cached buffer for mask overlay rendering to avoid per-frame allocation.
+        /// </summary>
+        private byte[]? _cachedMaskOverlayBuffer;
+        private int _cachedMaskOverlayWidth;
+        private int _cachedMaskOverlayHeight;
+
         private void DrawMaskOverlay(ICanvasRenderer renderer, Rect dest)
         {
             var activeLayer = Document.ActiveLayer;
@@ -322,7 +358,20 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             var mask = activeLayer.Mask;
             var maskPixels = mask.Surface.Pixels;
-            var overlayPixels = new byte[maskPixels.Length];
+            int maskWidth = mask.Width;
+            int maskHeight = mask.Height;
+
+            // Reuse cached buffer if dimensions match, otherwise allocate new one
+            if (_cachedMaskOverlayBuffer == null ||
+                _cachedMaskOverlayWidth != maskWidth ||
+                _cachedMaskOverlayHeight != maskHeight)
+            {
+                _cachedMaskOverlayBuffer = new byte[maskPixels.Length];
+                _cachedMaskOverlayWidth = maskWidth;
+                _cachedMaskOverlayHeight = maskHeight;
+            }
+
+            var overlayPixels = _cachedMaskOverlayBuffer;
 
             for (int i = 0; i < maskPixels.Length; i += 4)
             {
@@ -345,8 +394,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 }
             }
 
-            var srcRect = new Rect(0, 0, mask.Width, mask.Height);
-            renderer.DrawPixels(overlayPixels, mask.Width, mask.Height,
+            var srcRect = new Rect(0, 0, maskWidth, maskHeight);
+            renderer.DrawPixels(overlayPixels, maskWidth, maskHeight,
                 dest, srcRect, 1.0f, ImageInterpolation.NearestNeighbor);
         }
 
@@ -386,14 +435,17 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 return;
             }
 
-            // Draw the checkerboard using the shader
-            using var paint = new SKPaint
+            // Ensure cached paint exists and has correct shader
+            if (_checkerboardPaint == null)
             {
-                Shader = _checkerboardShader,
-                IsAntialias = false
-            };
+                _checkerboardPaint = new SKPaint
+                {
+                    IsAntialias = false
+                };
+            }
+            _checkerboardPaint.Shader = _checkerboardShader;
 
-            canvas.DrawRect(dest.ToSKRect(), paint);
+            canvas.DrawRect(dest.ToSKRect(), _checkerboardPaint);
         }
 
         /// <summary>
@@ -445,6 +497,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _checkerboardShader = null;
             _checkerboardBitmap?.Dispose();
             _checkerboardBitmap = null;
+            _checkerboardPaint?.Dispose();
+            _checkerboardPaint = null;
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -491,68 +545,70 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
         private void DrawTileMappings(ICanvasRenderer renderer, Rect dest)
         {
-            if (Document == null) return;
+            if (Document?.ActiveLayer is not RasterLayer rl)
+                return;
+
+            var tileMapping = rl.TileMapping;
+            if (tileMapping == null)
+                return;
 
             // Get the SKCanvas from the renderer for text drawing
             if (renderer.Device is not SKCanvas canvas) return;
 
-            float scale = (float)_zoom.Scale;
             int tileW = Document.TileSize.Width;
             int tileH = Document.TileSize.Height;
-            int tilesX = Document.TileCounts.Width;
-            int tilesY = Document.TileCounts.Height;
+            float scale = (float)_zoom.Scale;
 
-            // Calculate font size based on tile size and zoom (smaller for corner placement)
-            float baseFontSize = Math.Min(tileW, tileH) * scale * 0.25f;
-            float fontSize = Math.Clamp(baseFontSize, 8f, 16f);
-            float padding = 2f;
+            // Only draw if tiles are large enough to see the text
+            float minTileScreenSize = 24f;
+            if (tileW * scale < minTileScreenSize || tileH * scale < minTileScreenSize)
+                return;
 
-            using var textPaint = new SKPaint
+            float fontSize = Math.Max(8f, Math.Min(14f, tileW * scale * 0.3f));
+
+            // Initialize or update cached text paint
+            if (_tileMappingTextPaint == null)
             {
-                Color = SKColors.White,
-                TextSize = fontSize,
-                IsAntialias = true,
-                TextAlign = SKTextAlign.Right,
-                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
-            };
+                _tileMappingTextPaint = new SKPaint
+                {
+                    Color = SKColors.White,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
+                };
+            }
+            _tileMappingTextPaint.TextSize = fontSize;
 
-            using var bgPaint = new SKPaint
+            // Initialize cached background paint
+            _tileMappingBgPaint ??= new SKPaint
             {
-                Color = new SKColor(0, 0, 0, 200), // Semi-transparent black
+                Color = new SKColor(0, 0, 0, 180),
                 IsAntialias = false
             };
 
-            // Get active layer's tile mapping
-            var activeLayer = Document.ActiveLayer;
-            var tileMapping = activeLayer?.TileMapping;
-            if (tileMapping == null) return;
+            int tilesX = (Document.PixelWidth + tileW - 1) / tileW;
+            int tilesY = (Document.PixelHeight + tileH - 1) / tileH;
 
             for (int ty = 0; ty < tilesY; ty++)
             {
                 for (int tx = 0; tx < tilesX; tx++)
                 {
                     int tileId = tileMapping.GetTileId(tx, ty);
-                    if (tileId < 0) continue; // No tile mapped
+                    if (tileId < 0) continue; // No tile mapped at this position
 
+                    // Calculate screen position
+                    float screenX = (float)(dest.X + tx * tileW * scale);
+                    float screenY = (float)(dest.Y + ty * tileH * scale);
+
+                    // Draw background for readability
                     string text = tileId.ToString();
-                    float textWidth = textPaint.MeasureText(text);
+                    float textW = _tileMappingTextPaint.MeasureText(text);
+                    float textH = fontSize;
 
-                    // Calculate position in top-right corner of tile
-                    float tileRight = (float)(dest.X + (tx + 1) * tileW * scale);
-                    float tileTop = (float)(dest.Y + ty * tileH * scale);
-
-                    // Background rectangle
-                    float bgWidth = textWidth + padding * 2;
-                    float bgHeight = fontSize + padding * 2;
-                    float bgX = tileRight - bgWidth - 1;
-                    float bgY = tileTop + 1;
-
-                    canvas.DrawRect(bgX, bgY, bgWidth, bgHeight, bgPaint);
+                    var bgRect = new SKRect(screenX + 2, screenY + 2, screenX + 2 + textW + 4, screenY + 2 + textH + 2);
+                    canvas.DrawRect(bgRect, _tileMappingBgPaint);
 
                     // Draw text
-                    float textX = tileRight - padding - 1;
-                    float textY = bgY + fontSize + padding / 2;
-                    canvas.DrawText(text, textX, textY, textPaint);
+                    canvas.DrawText(text, screenX + 4, screenY + 2 + textH, _tileMappingTextPaint);
                 }
             }
         }
@@ -565,87 +621,131 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (Document == null) return;
 
-            var tileAnimState = Document.TileAnimationState;
-            if (tileAnimState == null) return;
+            var animState = Document.TileAnimationState;
+            if (animState == null) return;
 
-            var selectedReel = tileAnimState.SelectedReel;
-            if (selectedReel == null || selectedReel.FrameCount == 0) return;
+            var reel = animState.SelectedReel;
+            if (reel == null || reel.FrameCount == 0) return;
 
-            float scale = (float)_zoom.Scale;
             int tileW = Document.TileSize.Width;
             int tileH = Document.TileSize.Height;
+            float scale = (float)_zoom.Scale;
 
-            int currentFrameIndex = tileAnimState.CurrentFrameIndex;
+            // Get the current tile position
+            var (currentTileX, currentTileY) = animState.CurrentTilePosition;
 
-            // Calculate font size (smaller for corner placement)
-            float baseFontSize = Math.Min(tileW, tileH) * scale * 0.25f;
-            float fontSize = Math.Clamp(baseFontSize, 8f, 16f);
-            float padding = 2f;
+            // Build a set of all frame positions and their frame indices
+            if (_cachedFramePositions == null)
+                _cachedFramePositions = new Dictionary<(int, int), List<int>>();
 
-            // Draw frame markers for all frames in the selected reel
-            for (int i = 0; i < selectedReel.FrameCount; i++)
+            _cachedFramePositions.Clear();
+
+            for (int i = 0; i < reel.FrameCount; i++)
             {
-                var frame = selectedReel.Frames[i];
-                int tx = frame.TileX;
-                int ty = frame.TileY;
+                var frame = reel.Frames[i];
+                var key = (frame.TileX, frame.TileY);
+                if (!_cachedFramePositions.ContainsKey(key))
+                    _cachedFramePositions[key] = new List<int>();
+                _cachedFramePositions[key].Add(i);
+            }
 
-                // Calculate screen rectangle
+            // Draw all frame positions
+            foreach (var kvp in _cachedFramePositions)
+            {
+                int tx = kvp.Key.Item1;
+                int ty = kvp.Key.Item2;
+                var frameIndices = kvp.Value;
+
+                bool isCurrent = tx == currentTileX && ty == currentTileY;
+
+                // Calculate screen position
                 float screenX = (float)(dest.X + tx * tileW * scale);
                 float screenY = (float)(dest.Y + ty * tileH * scale);
                 float screenW = tileW * scale;
                 float screenH = tileH * scale;
 
-                bool isCurrent = (i == currentFrameIndex);
-
-                // Draw fill overlay
+                // Draw fill
                 var fillColor = isCurrent ? TileAnimCurrentFrameColor : TileAnimFrameColor;
                 renderer.FillRectangle(screenX, screenY, screenW, screenH, fillColor);
 
                 // Draw outline
                 var outlineColor = isCurrent ? TileAnimCurrentOutline : TileAnimFrameOutline;
-                float outlineWidth = isCurrent ? 3f : 2f;
-                renderer.DrawRectangle(screenX, screenY, screenW, screenH, outlineColor, outlineWidth);
+                renderer.DrawRectangle(screenX, screenY, screenW, screenH, outlineColor, isCurrent ? 3f : 2f);
 
-                // Draw frame number in top-right corner
-                if (renderer.Device is SKCanvas canvas)
-                {
-                    string text = (i + 1).ToString();
-
-                    using var textPaint = new SKPaint
-                    {
-                        Color = SKColors.White,
-                        TextSize = fontSize,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Right,
-                        Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
-                    };
-
-                    using var bgPaint = new SKPaint
-                    {
-                        Color = isCurrent ? new SKColor(0, 0, 0, 240) : new SKColor(0, 0, 0, 200),
-                        IsAntialias = false
-                    };
-
-                    float textWidth = textPaint.MeasureText(text);
-
-                    // Position in top-right corner
-                    float tileRight = screenX + screenW;
-                    float tileTop = screenY;
-
-                    // Background rectangle
-                    float bgWidth = textWidth + padding * 2;
-                    float bgHeight = fontSize + padding * 2;
-                    float bgX = tileRight - bgWidth - 1;
-                    float bgY = tileTop + 1;
-
-                    canvas.DrawRect(bgX, bgY, bgWidth, bgHeight, bgPaint);
-
-                    // Draw text
-                    float textX = tileRight - padding - 1;
-                    float textY = bgY + fontSize + padding / 2;
-                    canvas.DrawText(text, textX, textY, textPaint);
-                }
+                // Draw frame number label(s) in the top-left
+                DrawTileAnimationLabel(renderer, screenX, screenY, screenW, frameIndices, isCurrent);
             }
+        }
+
+        /// <summary>
+        /// Draws frame number labels on a tile animation frame.
+        /// </summary>
+        private void DrawTileAnimationLabel(ICanvasRenderer renderer, float screenX, float screenY, float screenW,
+            System.Collections.Generic.List<int> frameIndices, bool isCurrent)
+        {
+            // Only draw if tiles are large enough to see the text
+            if (screenW < 24f)
+                return;
+
+            if (renderer.Device is not SKCanvas canvas) return;
+
+            // Lazy-create text paint if needed
+            if (_tileAnimTextPaint == null)
+            {
+                _tileAnimTextPaint = new SKPaint
+                {
+                    Color = isCurrent ? SKColors.White : new SKColor(200, 220, 255),
+                    TextSize = 12f,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
+                };
+            }
+
+            // Lazy-create background paint if needed
+            if (_tileAnimBgPaint == null)
+            {
+                _tileAnimBgPaint = new SKPaint
+                {
+                    Color = new SKColor(0, 50, 100, 200),
+                    IsAntialias = true
+                };
+            }
+
+            // Create label text (show all frame indices for this tile)
+            string label;
+            if (frameIndices.Count == 1)
+            {
+                label = $"F{frameIndices[0] + 1}";
+            }
+            else if (frameIndices.Count <= 3)
+            {
+                label = string.Join(",", frameIndices.ConvertAll(i => $"F{i + 1}"));
+            }
+            else
+            {
+                // Too many to show, just show count
+                label = $"×{frameIndices.Count}";
+            }
+
+            float textW = _tileAnimTextPaint.MeasureText(label);
+            float textH = _tileAnimTextPaint.TextSize;
+
+            float labelX = screenX + 2;
+            float labelY = screenY + 2;
+
+            // Draw background
+            var bgColor = isCurrent ? new SKColor(80, 60, 0, 220) : new SKColor(0, 50, 100, 200);
+            using var bgPaint = new SKPaint
+            {
+                Color = bgColor,
+                IsAntialias = true
+            };
+
+            var bgRect = new SKRect(labelX, labelY, labelX + textW + 4, labelY + textH + 2);
+            canvas.DrawRoundRect(bgRect, 2, 2, bgPaint);
+
+            // Draw text
+            canvas.DrawText(label, labelX + 2, labelY + textH, _tileAnimTextPaint);
         }
 
         // ════════════════════════════════════════════════════════════════════

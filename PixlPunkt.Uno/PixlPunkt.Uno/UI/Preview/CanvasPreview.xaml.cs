@@ -26,6 +26,10 @@ namespace PixlPunkt.Uno.UI.Preview
         private int _docHeight;
         private readonly PatternBackgroundService _patternService = new();
 
+        // Cached working buffer for compositing (reused to avoid per-frame allocations)
+        private byte[]? _workingBuffer;
+        private int _workingBufferSize;
+
         // Cached checkerboard pattern
         private SKShader? _checkerboardShader;
         private SKBitmap? _checkerboardBitmap;
@@ -177,6 +181,8 @@ namespace PixlPunkt.Uno.UI.Preview
             _zoom = 1.0f;
             _dragging = false;
             _isEmpty = true;
+            _workingBuffer = null;
+            _workingBufferSize = 0;
         }
 
         // Frame from host
@@ -314,9 +320,14 @@ namespace PixlPunkt.Uno.UI.Preview
             // Draw checkerboard background
             DrawCheckerboardBackground(canvas, destRect);
 
-            // Create working buffer for compositing overlays
-            byte[] workingBuf = new byte[_docWidth * _docHeight * 4];
-            System.Buffer.BlockCopy(_pixels, 0, workingBuf, 0, _pixels.Length);
+            // Reuse or reallocate working buffer for compositing overlays
+            int requiredSize = _docWidth * _docHeight * 4;
+            if (_workingBuffer == null || _workingBufferSize < requiredSize)
+            {
+                _workingBuffer = new byte[requiredSize];
+                _workingBufferSize = requiredSize;
+            }
+            System.Buffer.BlockCopy(_pixels, 0, _workingBuffer, 0, _pixels.Length);
 
             // ═══════════════════════════════════════════════════════════════
             // BRUSH OVERLAYS - Trust snapshot.Visible completely
@@ -325,29 +336,29 @@ namespace PixlPunkt.Uno.UI.Preview
             // 1. Shift-line preview (during shift+drag line drawing)
             if (_brushOverlay.IsShiftLineDrag && _host != null)
             {
-                CompositeShiftLinePreviewIntoBuffer(workingBuf);
+                CompositeShiftLinePreviewIntoBuffer(_workingBuffer);
             }
             // 2. Brush cursor ghost (filled preview for brush tool)
             else if (_brushOverlay.Visible && _brushOverlay.FillGhost && _brushOverlay.Mask != null && _brushOverlay.Mask.Count > 0 && _host != null)
             {
-                CompositeBrushGhostIntoBuffer(workingBuf);
+                CompositeBrushGhostIntoBuffer(_workingBuffer);
             }
 
             // 3. Shape start point hover (when hovering with shape tool before drag starts)
             if (_brushOverlay.ShowShapeStartPoint && _host != null)
             {
-                CompositeShapeStartPointIntoBuffer(workingBuf);
+                CompositeShapeStartPointIntoBuffer(_workingBuffer);
             }
 
             // 4. Shape preview overlay (during shape drag)
             if (_brushOverlay.IsShapeDrag && _host != null)
             {
-                CompositeShapePreviewIntoBuffer(workingBuf);
+                CompositeShapePreviewIntoBuffer(_workingBuffer);
             }
 
             // Render the composited image as a single bitmap
             using var compositeBmp = new SKBitmap(_docWidth, _docHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
-            System.Runtime.InteropServices.Marshal.Copy(workingBuf, 0, compositeBmp.GetPixels(), workingBuf.Length);
+            System.Runtime.InteropServices.Marshal.Copy(_workingBuffer, 0, compositeBmp.GetPixels(), requiredSize);
 
             using var paint = new SKPaint
             {

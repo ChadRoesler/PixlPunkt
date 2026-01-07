@@ -6,6 +6,7 @@
     xmlns:conv="using:PixlPunkt.Uno.UI.Converters"
     x:Name="root"
     HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch"
     HorizontalContentAlignment="Stretch"
     VerticalContentAlignment="Stretch">
 
@@ -19,8 +20,9 @@
             BorderThickness="1"
             CornerRadius="8" 
             Padding="4"
-            HorizontalAlignment="Stretch">
-        <Grid HorizontalAlignment="Stretch">
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch">
+        <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <!-- header -->
@@ -31,7 +33,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Grid Grid.Row="0" Padding="0">
+            <Grid Grid.Row="0" Padding="0" HorizontalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -101,6 +103,8 @@
                 Content="{Binding Body, ElementName=root, Mode=OneWay}"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
                 Visibility="{Binding IsMinimized, ElementName=root, Mode=OneWay, Converter={StaticResource NotBoolToVis}}"/>
 
             <ContentPresenter
@@ -108,6 +112,8 @@
                 Content="{Binding CustomControl, ElementName=root, Mode=OneWay}"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
                 Visibility="{Binding IsMinimized, ElementName=root, Mode=OneWay, Converter={StaticResource NotBoolToVis}}"/>
         </Grid>
     </Border>

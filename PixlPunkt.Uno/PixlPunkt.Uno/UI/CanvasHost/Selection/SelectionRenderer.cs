@@ -16,6 +16,10 @@ namespace PixlPunkt.Uno.UI.CanvasHost.Selection
     /// Handles rendering of selection visuals including marching ants, handles, and floating selections.
     /// Uses ICanvasRenderer abstraction for cross-platform compatibility (SkiaSharp).
     /// </summary>
+    /// <remarks>
+    /// This class caches frequently allocated objects (Lists, byte arrays) to minimize GC pressure
+    /// during rendering. Selection visuals are drawn every frame while a selection is active.
+    /// </remarks>
     public sealed class SelectionRenderer
     {
         private readonly SelectionSubsystem _state;
@@ -26,6 +30,20 @@ namespace PixlPunkt.Uno.UI.CanvasHost.Selection
         private Func<double>? _getScale;
         private Func<ISelectionTool?>? _getActiveTool;
         private Func<SelDrag, bool>? _needsContinuousRender;
+
+        // ════════════════════════════════════════════════════════════════════
+        // CACHED OBJECTS - Reused across frames to minimize GC pressure
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>Cached list for horizontal edges in DrawAntsFromBuffer.</summary>
+        private readonly List<(float x0, float y, float x1)> _cachedHEdges = new(256);
+        
+        /// <summary>Cached list for vertical edges in DrawAntsFromBuffer.</summary>
+        private readonly List<(float x, float y0, float y1)> _cachedVEdges = new(256);
+
+        /// <summary>Cached buffer for premultiplied floating selection when no transform needed.</summary>
+        private byte[]? _cachedPremulBuffer;
+        private int _cachedPremulBufferSize;
 
         /// <summary>Debug overlay for hit areas.</summary>
         public bool DebugShowHit { get; set; } = false;
@@ -144,10 +162,18 @@ namespace PixlPunkt.Uno.UI.CanvasHost.Selection
             {
                 _state.PreviewBuf = null;
 
-                renderBuf = new byte[_state.Buffer.Length];
-                Buffer.BlockCopy(_state.Buffer, 0, renderBuf, 0, _state.Buffer.Length);
-                PremultiplyAlpha(renderBuf, _state.BufferWidth, _state.BufferHeight);
+                // Use cached buffer to avoid per-frame allocation
+                int requiredSize = _state.Buffer.Length;
+                if (_cachedPremulBuffer == null || _cachedPremulBufferSize != requiredSize)
+                {
+                    _cachedPremulBuffer = new byte[requiredSize];
+                    _cachedPremulBufferSize = requiredSize;
+                }
 
+                Buffer.BlockCopy(_state.Buffer, 0, _cachedPremulBuffer, 0, _state.Buffer.Length);
+                PremultiplyAlpha(_cachedPremulBuffer, _state.BufferWidth, _state.BufferHeight);
+
+                renderBuf = _cachedPremulBuffer;
                 renderW = _state.BufferWidth;
                 renderH = _state.BufferHeight;
                 drawX = (float)(dest.X + _state.FloatX * scale);
@@ -324,31 +350,32 @@ namespace PixlPunkt.Uno.UI.CanvasHost.Selection
         {
             bool IsOpaque(int x, int y) => x >= 0 && y >= 0 && x < bufW && y < bufH && buffer[(y * bufW + x) * 4 + 3] > 0;
 
-            var hEdges = new List<(float x0, float y, float x1)>();
-            var vEdges = new List<(float x, float y0, float y1)>();
+            // Clear and reuse cached lists instead of allocating new ones
+            _cachedHEdges.Clear();
+            _cachedVEdges.Clear();
 
             for (int y = 0; y < bufH; y++)
             {
                 for (int x = 0; x < bufW; x++)
                 {
                     if (!IsOpaque(x, y)) continue;
-                    if (!IsOpaque(x, y - 1)) hEdges.Add((offsetX + x * scale, offsetY + y * scale, offsetX + (x + 1) * scale));
-                    if (!IsOpaque(x, y + 1)) hEdges.Add((offsetX + x * scale, offsetY + (y + 1) * scale, offsetX + (x + 1) * scale));
-                    if (!IsOpaque(x - 1, y)) vEdges.Add((offsetX + x * scale, offsetY + y * scale, offsetY + (y + 1) * scale));
-                    if (!IsOpaque(x + 1, y)) vEdges.Add((offsetX + (x + 1) * scale, offsetY + y * scale, offsetY + (y + 1) * scale));
+                    if (!IsOpaque(x, y - 1)) _cachedHEdges.Add((offsetX + x * scale, offsetY + y * scale, offsetX + (x + 1) * scale));
+                    if (!IsOpaque(x, y + 1)) _cachedHEdges.Add((offsetX + x * scale, offsetY + (y + 1) * scale, offsetX + (x + 1) * scale));
+                    if (!IsOpaque(x - 1, y)) _cachedVEdges.Add((offsetX + x * scale, offsetY + y * scale, offsetY + (y + 1) * scale));
+                    if (!IsOpaque(x + 1, y)) _cachedVEdges.Add((offsetX + (x + 1) * scale, offsetY + y * scale, offsetY + (y + 1) * scale));
                 }
             }
 
             float period = ANTS_ON + ANTS_OFF;
             if (animated)
             {
-                foreach (var (x0, y, x1) in hEdges) DrawAntsLineH(renderer, x0, y, x1 - x0, _state.AntsPhase, period);
-                foreach (var (x, y0, y1) in vEdges) DrawAntsLineV(renderer, x, y0, y1 - y0, _state.AntsPhase, period);
+                foreach (var (x0, y, x1) in _cachedHEdges) DrawAntsLineH(renderer, x0, y, x1 - x0, _state.AntsPhase, period);
+                foreach (var (x, y0, y1) in _cachedVEdges) DrawAntsLineV(renderer, x, y0, y1 - y0, _state.AntsPhase, period);
             }
             else
             {
-                foreach (var (x0, y, x1) in hEdges) renderer.DrawLine(x0, y, x1, y, Colors.White, ANTS_THICKNESS);
-                foreach (var (x, y0, y1) in vEdges) renderer.DrawLine(x, y0, x, y1, Colors.White, ANTS_THICKNESS);
+                foreach (var (x0, y, x1) in _cachedHEdges) renderer.DrawLine(x0, y, x1, y, Colors.White, ANTS_THICKNESS);
+                foreach (var (x, y0, y1) in _cachedVEdges) renderer.DrawLine(x, y0, x, y1, Colors.White, ANTS_THICKNESS);
             }
         }
 

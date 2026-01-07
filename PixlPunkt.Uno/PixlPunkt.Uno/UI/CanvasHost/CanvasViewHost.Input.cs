@@ -71,8 +71,13 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (_isPainting)
             {
                 _isPainting = false;
+                _isActivePainting = false;
                 _hasLastDocPos = false;
                 // Note: Don't reset _shiftLineActive - we want the origin to persist for shift-click
+                
+                // Stop the rapid invalidation timer
+                StopPaintInvalidationTimer();
+                
                 CommitStroke();
             }
             _pendingStrokeFromOutside = false;
@@ -1617,7 +1622,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             }
             else
             {
-                // Find the closest keyframe to edit, or add a new one at current progress
+                // Find the closest keyframe to edit, or add a new one at the current progress
                 float closestKey = -1f;
                 float minDist = float.MaxValue;
 

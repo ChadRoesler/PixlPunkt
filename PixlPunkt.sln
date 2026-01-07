@@ -15,6 +15,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.Uno.Tests", "PixlPunkt.Uno\PixlPunkt.Uno.Tests\PixlPunkt.Uno.Tests.csproj", "{FE0E7340-E061-4D04-957F-2985080CA0B9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.Uno.UITests", "PixlPunkt.Uno\PixlPunkt.Uno.UITests\PixlPunkt.Uno.UITests.csproj", "{E9F4B16E-5BF2-43A8-9BE5-212F07CFC155}"
+	ProjectSection(ProjectDependencies) = postProject
+		{94DA9B44-63D4-4B19-8778-2D2B0B10980C} = {94DA9B44-63D4-4B19-8778-2D2B0B10980C}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -22,8 +25,9 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|Any CPU.Build.0 = Debug|x64
+		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Debug|Any CPU.Deploy.0 = Debug|x64
 		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AD9223E7-46D4-4F5F-A4DC-55DD04659492}.Release|Any CPU.Build.0 = Release|Any CPU
 		{06345212-8688-4F8F-91FA-4EB0C9785853}.Debug|Any CPU.ActiveCfg = Debug|Any CPU

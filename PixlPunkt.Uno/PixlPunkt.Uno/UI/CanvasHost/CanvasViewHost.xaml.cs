@@ -4,6 +4,7 @@ using System.Numerics;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Uno.Core.Animation;
 using PixlPunkt.Uno.Core.Document;
 using PixlPunkt.Uno.Core.Document.Layer;
@@ -23,6 +24,8 @@ using SkiaSharp;
 using SkiaSharp.Views.Windows;
 using Windows.Graphics;
 using Windows.UI;
+using PixlPunkt.Uno.Core.Platform;
+using Microsoft.UI.Dispatching;
 
 namespace PixlPunkt.Uno.UI.CanvasHost
 {
@@ -270,6 +273,21 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         private DispatcherTimer? _lockedLayerWarningTimer;
 
         // ════════════════════════════════════════════════════════════════════
+        // FIELDS - SKIA RENDERING OPTIMIZATION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Whether we're actively painting (mouse down + moving).
+        /// Used to trigger more aggressive invalidation on Skia platforms.
+        /// </summary>
+        private bool _isActivePainting;
+
+        /// <summary>
+        /// Cached reference to DispatcherQueue for high-priority invalidation.
+        /// </summary>
+        private DispatcherQueue? _dispatcherQueue;
+
+        // ════════════════════════════════════════════════════════════════════
         // CONSTRUCTION
         // ════════════════════════════════════════════════════════════════════
         /// <summary>
@@ -279,6 +297,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         public CanvasViewHost(CanvasDocument doc)
         {
             InitializeComponent();
+
+            // Cache dispatcher queue for forced invalidation
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
             Document = doc;
 
@@ -321,6 +342,26 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             InitSelection();
             InitRulers();
             RaiseFrame();
+
+            // Cleanup when control is unloaded
+            Unloaded += OnControlUnloaded;
+        }
+
+        /// <summary>
+        /// Handles control unload to clean up resources like the render hook and timers.
+        /// </summary>
+        private void OnControlUnloaded(object sender, RoutedEventArgs e)
+        {
+            // Stop the continuous rendering hook and fallback timer to prevent memory leaks
+            StopContinuousRendering();
+            
+            // Dispose checkerboard resources
+            _checkerboardShader?.Dispose();
+            _checkerboardShader = null;
+            _checkerboardBitmap?.Dispose();
+            _checkerboardBitmap = null;
+            _checkerboardPaint?.Dispose();
+            _checkerboardPaint = null;
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -376,6 +417,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _checkerboardShader = null;
                 _checkerboardBitmap?.Dispose();
                 _checkerboardBitmap = null;
+                _checkerboardPaint?.Dispose();
+                _checkerboardPaint = null;
                 CanvasView?.Invalidate();
             }
             catch (Exception ex)
@@ -1079,6 +1122,115 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 return null;
 
             return ReadCompositeBGRA(docX, docY);
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // SKIA RENDER SYNCHRONIZATION
+        // ════════════════════════════════════════════════════════════════════
+        // 
+        // On Skia platforms, SKXamlCanvas.Invalidate() is asynchronous and posts
+        // to the dispatcher queue. During rapid painting, pointer events can flood
+        // the queue faster than repaints occur, causing visual lag.
+        //
+        // Unlike Win2D (which has GPU-backed composition running in parallel),
+        // Skia rendering competes with input events for dispatcher time.
+        //
+        // Our strategy: Track pending invalidations and ensure they get processed
+        // by using UpdateLayout() to force a synchronous layout pass when needed.
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Whether the paint invalidation system is active.
+        /// </summary>
+        private bool _isRenderingHooked;
+
+        /// <summary>
+        /// Counter to track idle frames for auto-stop.
+        /// </summary>
+        private int _idleFrameCount;
+
+        /// <summary>
+        /// Maximum idle ticks before auto-stopping.
+        /// </summary>
+        private const int MaxIdleFramesBeforeStop = 10;
+
+        /// <summary>
+        /// Counter to throttle forced layout passes (every N invalidations).
+        /// </summary>
+        private int _invalidationCounter;
+
+        /// <summary>
+        /// How often to force a synchronous layout pass (every N invalidations).
+        /// Lower = more responsive but higher CPU. Higher = smoother but more lag.
+        /// </summary>
+        private const int ForceLayoutEveryN = 2;
+
+        /// <summary>
+        /// Starts active painting mode - enables more aggressive invalidation.
+        /// </summary>
+        private void StartContinuousRendering()
+        {
+            if (_isRenderingHooked) return;
+            _isRenderingHooked = true;
+            _idleFrameCount = 0;
+            _invalidationCounter = 0;
+        }
+
+        /// <summary>
+        /// Stops active painting mode.
+        /// </summary>
+        private void StopContinuousRendering()
+        {
+            _isRenderingHooked = false;
+        }
+
+        /// <summary>
+        /// Starts the rapid invalidation for Skia platforms during painting.
+        /// </summary>
+        private void StartPaintInvalidationTimer()
+        {
+            StartContinuousRendering();
+        }
+
+        /// <summary>
+        /// Stops the rapid invalidation when painting ends.
+        /// </summary>
+        private void StopPaintInvalidationTimer()
+        {
+            // Let it auto-stop after stroke commit
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // SKIA INVALIDATION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Forces canvas invalidation during active painting.
+        /// On Skia platforms, we periodically force a synchronous layout pass
+        /// to ensure the repaint actually happens between pointer events.
+        /// </summary>
+        private void ForceInvalidate()
+        {
+            // Always queue the invalidation
+            CanvasView.Invalidate();
+
+            // During active painting, periodically force synchronous processing
+            if (_isActivePainting)
+            {
+                _idleFrameCount = 0;
+                _invalidationCounter++;
+
+                // Every N invalidations, force a synchronous layout pass
+                // This ensures the queued Invalidate() actually gets processed
+                if (_invalidationCounter >= ForceLayoutEveryN)
+                {
+                    _invalidationCounter = 0;
+                    
+                    // UpdateLayout() forces XAML to process pending layout/render requests
+                    // This is the key to getting synchronous-ish rendering on Skia
+                    CanvasView.UpdateLayout();
+                }
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════

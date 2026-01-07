@@ -23,8 +23,31 @@ namespace PixlPunkt.Uno.UI.CanvasHost
     /// - Brush outline drawing
     /// - Tile overlay rendering
     /// </summary>
+    /// <remarks>
+    /// This class caches frequently allocated objects (Dictionaries, HashSets, arrays) to minimize 
+    /// GC pressure during rendering. Shift-line preview and outline rendering are called every frame
+    /// during painting operations.
+    /// </remarks>
     public sealed partial class CanvasViewHost
     {
+        // ════════════════════════════════════════════════════════════════════
+        // CACHED BRUSH OVERLAY OBJECTS - Reused across frames to minimize GC
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>Cached dictionary for shift-line preview pixel accumulation.</summary>
+        private Dictionary<(int x, int y), byte>? _cachedDrawnPixels;
+        
+        /// <summary>Cached HashSet for shift-line outline preview affected pixels.</summary>
+        private HashSet<(int x, int y)>? _cachedAffectedPixels;
+        
+        /// <summary>Cached grid array for shift-line outline detection.</summary>
+        private bool[]? _cachedOutlineGrid;
+        private int _cachedOutlineGridSize;
+
+        /// <summary>Cached ghost pixels array for tile ghost preview.</summary>
+        private byte[]? _cachedTileGhostPixels;
+        private int _cachedTileGhostPixelsSize;
+
         // ════════════════════════════════════════════════════════════════════
         // BRUSH CURSOR OVERLAY
         // ════════════════════════════════════════════════════════════════════
@@ -527,13 +550,14 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             int dx = x1 - x0, dy = y1 - y0;
             int steps = Math.Max(Math.Abs(dx), Math.Abs(dy));
 
-            // Track which pixels have been drawn to prevent over-blending (max alpha wins)
-            var drawnPixels = new Dictionary<(int x, int y), byte>();
+            // Use cached dictionary instead of allocating new one each frame
+            _cachedDrawnPixels ??= new Dictionary<(int x, int y), byte>(256);
+            _cachedDrawnPixels.Clear();
 
             if (steps == 0)
             {
                 // Single stamp at origin
-                AccumulateStampAtPoint(x0, y0, mask, drawnPixels);
+                AccumulateStampAtPoint(x0, y0, mask, _cachedDrawnPixels);
             }
             else
             {
@@ -544,14 +568,14 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 double x = x0, y = y0;
                 for (int i = 0; i <= steps; i++)
                 {
-                    AccumulateStampAtPoint((int)Math.Round(x), (int)Math.Round(y), mask, drawnPixels);
+                    AccumulateStampAtPoint((int)Math.Round(x), (int)Math.Round(y), mask, _cachedDrawnPixels);
                     x += sx;
                     y += sy;
                 }
             }
 
             // Draw all accumulated pixels
-            foreach (var ((px, py), effA) in drawnPixels)
+            foreach (var ((px, py), effA) in _cachedDrawnPixels)
             {
                 if ((uint)px >= (uint)Document.Surface.Width || (uint)py >= (uint)Document.Surface.Height) continue;
 
@@ -584,15 +608,16 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             int dx = x1 - x0, dy = y1 - y0;
             int steps = Math.Max(Math.Abs(dx), Math.Abs(dy));
 
-            // Collect all pixels that would be affected by the line
-            var affectedPixels = new HashSet<(int x, int y)>();
+            // Use cached HashSet instead of allocating new one each frame
+            _cachedAffectedPixels ??= new HashSet<(int x, int y)>(256);
+            _cachedAffectedPixels.Clear();
 
             if (steps == 0)
             {
                 // Single stamp at origin
                 foreach (var (mdx, mdy) in mask)
                 {
-                    affectedPixels.Add((x0 + mdx, y0 + mdy));
+                    _cachedAffectedPixels.Add((x0 + mdx, y0 + mdy));
                 }
             }
             else
@@ -609,7 +634,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
                     foreach (var (mdx, mdy) in mask)
                     {
-                        affectedPixels.Add((cx + mdx, cy + mdy));
+                        _cachedAffectedPixels.Add((cx + mdx, cy + mdy));
                     }
 
                     x += sx;
@@ -618,12 +643,12 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             }
 
             // Build grid for outline detection
-            if (affectedPixels.Count == 0) return;
+            if (_cachedAffectedPixels.Count == 0) return;
 
             int minX = int.MaxValue, minY = int.MaxValue;
             int maxX = int.MinValue, maxY = int.MinValue;
 
-            foreach (var (px, py) in affectedPixels)
+            foreach (var (px, py) in _cachedAffectedPixels)
             {
                 if (px < minX) minX = px;
                 if (py < minY) minY = py;
@@ -633,15 +658,27 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             int gridW = maxX - minX + 1;
             int gridH = maxY - minY + 1;
-            var grid = new bool[gridW * gridH];
+            int gridSize = gridW * gridH;
+            
+            // Use cached grid array instead of allocating new one each frame
+            if (_cachedOutlineGrid == null || _cachedOutlineGridSize < gridSize)
+            {
+                _cachedOutlineGrid = new bool[gridSize];
+                _cachedOutlineGridSize = gridSize;
+            }
+            else
+            {
+                // Clear the portion we'll use
+                Array.Clear(_cachedOutlineGrid, 0, gridSize);
+            }
 
-            foreach (var (px, py) in affectedPixels)
+            foreach (var (px, py) in _cachedAffectedPixels)
             {
                 int gx = px - minX;
                 int gy = py - minY;
                 if (gx >= 0 && gx < gridW && gy >= 0 && gy < gridH)
                 {
-                    grid[gy * gridW + gx] = true;
+                    _cachedOutlineGrid[gy * gridW + gx] = true;
                 }
             }
 
@@ -654,7 +691,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             bool Occup(int gx, int gy)
             {
                 if (gx < 0 || gx >= gridW || gy < 0 || gy >= gridH) return false;
-                return grid[gy * gridW + gx];
+                return _cachedOutlineGrid[gy * gridW + gx];
             }
 
             // Horizontal edges
@@ -906,14 +943,22 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         private void DrawTileGhost(ICanvasRenderer renderer, Rect dest, double scale,
             int docX, int docY, int tileW, int tileH, byte[] pixels)
         {
-            // Create a copy of pixels with ghost transparency (50% alpha)
-            var ghostPixels = new byte[pixels.Length];
+            int requiredSize = pixels.Length;
+            
+            // Use cached buffer instead of allocating new one each frame
+            if (_cachedTileGhostPixels == null || _cachedTileGhostPixelsSize < requiredSize)
+            {
+                _cachedTileGhostPixels = new byte[requiredSize];
+                _cachedTileGhostPixelsSize = requiredSize;
+            }
+
+            // Create ghost transparency (50% alpha)
             for (int i = 0; i < pixels.Length; i += 4)
             {
-                ghostPixels[i] = pixels[i];         // B
-                ghostPixels[i + 1] = pixels[i + 1]; // G
-                ghostPixels[i + 2] = pixels[i + 2]; // R
-                ghostPixels[i + 3] = (byte)(pixels[i + 3] / 2); // A at 50%
+                _cachedTileGhostPixels[i] = pixels[i];         // B
+                _cachedTileGhostPixels[i + 1] = pixels[i + 1]; // G
+                _cachedTileGhostPixels[i + 2] = pixels[i + 2]; // R
+                _cachedTileGhostPixels[i + 3] = (byte)(pixels[i + 3] / 2); // A at 50%
             }
 
             // Calculate screen position and size
@@ -926,7 +971,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             var destRect = new Rect(screenX, screenY, screenW, screenH);
             var srcRect = new Rect(0, 0, tileW, tileH);
 
-            renderer.DrawPixels(ghostPixels, tileW, tileH, destRect, srcRect, 1.0f, ImageInterpolation.NearestNeighbor);
+            renderer.DrawPixels(_cachedTileGhostPixels, tileW, tileH, destRect, srcRect, 1.0f, ImageInterpolation.NearestNeighbor);
         }
     }
 }

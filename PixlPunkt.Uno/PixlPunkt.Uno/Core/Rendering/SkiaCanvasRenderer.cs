@@ -11,6 +11,11 @@ namespace PixlPunkt.Uno.Core.Rendering;
 /// SkiaSharp implementation of <see cref="ICanvasRenderer"/>.
 /// Used for cross-platform rendering on Desktop (Windows/macOS/Linux) and WebAssembly.
 /// </summary>
+/// <remarks>
+/// This renderer caches SKBitmap and SKPaint objects to minimize GC pressure during
+/// frequent rendering operations. Without caching, each frame would allocate new
+/// bitmaps and paints, causing significant GC pauses especially in maximized windows.
+/// </remarks>
 public sealed class SkiaCanvasRenderer : ICanvasRenderer
 {
     private readonly SKCanvas _canvas;
@@ -19,6 +24,46 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
     private readonly float _height;
     private bool _antialiasing = true;
     private readonly Stack<int> _saveStack = new();
+
+    // ════════════════════════════════════════════════════════════════════
+    // CACHED OBJECTS - Reused across frames to minimize GC pressure
+    // ════════════════════════════════════════════════════════════════════
+    
+    /// <summary>Primary cached bitmap for DrawPixels - reused when dimensions match (document surface).</summary>
+    private SKBitmap? _cachedBitmap;
+    private int _cachedBitmapWidth;
+    private int _cachedBitmapHeight;
+
+    /// <summary>Secondary cached bitmap for DrawPixels - for mask overlay (typically same dimensions as primary).</summary>
+    private SKBitmap? _cachedBitmap2;
+    private int _cachedBitmap2Width;
+    private int _cachedBitmap2Height;
+
+    /// <summary>Tertiary cached bitmap for DrawPixels - for reference layers (may have different dimensions).</summary>
+    private SKBitmap? _cachedBitmap3;
+    private int _cachedBitmap3Width;
+    private int _cachedBitmap3Height;
+
+    /// <summary>Cached paint for image drawing operations.</summary>
+    private readonly SKPaint _imagePaint = new()
+    {
+        FilterQuality = SKFilterQuality.None,
+        IsAntialias = false
+    };
+
+    /// <summary>Cached paint for stroke operations.</summary>
+    private readonly SKPaint _strokePaint = new()
+    {
+        Style = SKPaintStyle.Stroke,
+        IsAntialias = true
+    };
+
+    /// <summary>Cached paint for fill operations.</summary>
+    private readonly SKPaint _fillPaint = new()
+    {
+        Style = SKPaintStyle.Fill,
+        IsAntialias = true
+    };
 
     /// <summary>
     /// Creates a renderer wrapping an existing SKCanvas (from PaintSurface event).
@@ -71,6 +116,12 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
     public void Dispose()
     {
         _surface?.Dispose();
+        _cachedBitmap?.Dispose();
+        _cachedBitmap2?.Dispose();
+        _cachedBitmap3?.Dispose();
+        _imagePaint.Dispose();
+        _strokePaint.Dispose();
+        _fillPaint.Dispose();
     }
 
     // ????????????????????????????????????????????????????????????????????
@@ -88,8 +139,10 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
 
     public void DrawLine(float x1, float y1, float x2, float y2, Color color, float strokeWidth)
     {
-        using var paint = CreateStrokePaint(color, strokeWidth);
-        _canvas.DrawLine(x1, y1, x2, y2, paint);
+        _strokePaint.Color = color.ToSKColor();
+        _strokePaint.StrokeWidth = strokeWidth;
+        _strokePaint.IsAntialias = _antialiasing;
+        _canvas.DrawLine(x1, y1, x2, y2, _strokePaint);
     }
 
     public void DrawLine(Vector2 p1, Vector2 p2, Color color, float strokeWidth)
@@ -103,8 +156,10 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
 
     public void DrawRectangle(float x, float y, float width, float height, Color color, float strokeWidth)
     {
-        using var paint = CreateStrokePaint(color, strokeWidth);
-        _canvas.DrawRect(x, y, width, height, paint);
+        _strokePaint.Color = color.ToSKColor();
+        _strokePaint.StrokeWidth = strokeWidth;
+        _strokePaint.IsAntialias = _antialiasing;
+        _canvas.DrawRect(x, y, width, height, _strokePaint);
     }
 
     public void DrawRectangle(Rect rect, Color color, float strokeWidth)
@@ -114,8 +169,9 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
 
     public void FillRectangle(float x, float y, float width, float height, Color color)
     {
-        using var paint = CreateFillPaint(color);
-        _canvas.DrawRect(x, y, width, height, paint);
+        _fillPaint.Color = color.ToSKColor();
+        _fillPaint.IsAntialias = _antialiasing;
+        _canvas.DrawRect(x, y, width, height, _fillPaint);
     }
 
     public void FillRectangle(Rect rect, Color color)
@@ -125,14 +181,17 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
 
     public void DrawRoundedRectangle(Rect rect, float radiusX, float radiusY, Color color, float strokeWidth)
     {
-        using var paint = CreateStrokePaint(color, strokeWidth);
-        _canvas.DrawRoundRect(rect.ToSKRect(), radiusX, radiusY, paint);
+        _strokePaint.Color = color.ToSKColor();
+        _strokePaint.StrokeWidth = strokeWidth;
+        _strokePaint.IsAntialias = _antialiasing;
+        _canvas.DrawRoundRect(rect.ToSKRect(), radiusX, radiusY, _strokePaint);
     }
 
     public void FillRoundedRectangle(Rect rect, float radiusX, float radiusY, Color color)
     {
-        using var paint = CreateFillPaint(color);
-        _canvas.DrawRoundRect(rect.ToSKRect(), radiusX, radiusY, paint);
+        _fillPaint.Color = color.ToSKColor();
+        _fillPaint.IsAntialias = _antialiasing;
+        _canvas.DrawRoundRect(rect.ToSKRect(), radiusX, radiusY, _fillPaint);
     }
 
     // ????????????????????????????????????????????????????????????????????
@@ -141,14 +200,17 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
 
     public void DrawEllipse(float centerX, float centerY, float radiusX, float radiusY, Color color, float strokeWidth)
     {
-        using var paint = CreateStrokePaint(color, strokeWidth);
-        _canvas.DrawOval(centerX, centerY, radiusX, radiusY, paint);
+        _strokePaint.Color = color.ToSKColor();
+        _strokePaint.StrokeWidth = strokeWidth;
+        _strokePaint.IsAntialias = _antialiasing;
+        _canvas.DrawOval(centerX, centerY, radiusX, radiusY, _strokePaint);
     }
 
     public void FillEllipse(float centerX, float centerY, float radiusX, float radiusY, Color color)
     {
-        using var paint = CreateFillPaint(color);
-        _canvas.DrawOval(centerX, centerY, radiusX, radiusY, paint);
+        _fillPaint.Color = color.ToSKColor();
+        _fillPaint.IsAntialias = _antialiasing;
+        _canvas.DrawOval(centerX, centerY, radiusX, radiusY, _fillPaint);
     }
 
     // ????????????????????????????????????????????????????????????????????
@@ -160,14 +222,11 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
         if (bitmap.NativeBitmap is not SKBitmap skBitmap)
             throw new ArgumentException("Expected SKBitmap", nameof(bitmap));
 
-        using var paint = new SKPaint
-        {
-            Color = new SKColor(255, 255, 255, (byte)(opacity * 255)),
-            FilterQuality = MapInterpolation(interpolation),
-            IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor
-        };
+        _imagePaint.Color = new SKColor(255, 255, 255, (byte)(opacity * 255));
+        _imagePaint.FilterQuality = MapInterpolation(interpolation);
+        _imagePaint.IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor;
 
-        _canvas.DrawBitmap(skBitmap, srcRect.ToSKRect(), destRect.ToSKRect(), paint);
+        _canvas.DrawBitmap(skBitmap, srcRect.ToSKRect(), destRect.ToSKRect(), _imagePaint);
     }
 
     public void DrawImage(ICanvasBitmap bitmap, Rect destRect, Rect srcRect, float opacity)
@@ -175,22 +234,90 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
         DrawImage(bitmap, destRect, srcRect, opacity, ImageInterpolation.NearestNeighbor);
     }
 
+    /// <summary>
+    /// Draws pixels from a byte array. Uses cached bitmap pool to avoid per-frame allocations.
+    /// </summary>
+    /// <remarks>
+    /// This method is called multiple times per frame (document surface, mask overlay, 
+    /// reference layers, etc.). Caching multiple SKBitmaps by dimension eliminates massive 
+    /// GC pressure that was causing stuttering, especially in maximized windows.
+    /// </remarks>
     public void DrawPixels(byte[] pixels, int width, int height, Rect destRect, Rect srcRect, float opacity, ImageInterpolation interpolation)
     {
-        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
-        using var bitmap = new SKBitmap(info);
+        // Get or create a cached bitmap for these dimensions
+        var bitmap = GetOrCreateCachedBitmap(width, height);
 
+        // Copy pixel data to the bitmap (this is unavoidable but much faster than allocation)
         var handle = bitmap.GetPixels();
         Marshal.Copy(pixels, 0, handle, pixels.Length);
 
-        using var paint = new SKPaint
-        {
-            Color = new SKColor(255, 255, 255, (byte)(opacity * 255)),
-            FilterQuality = MapInterpolation(interpolation),
-            IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor
-        };
+        // Configure paint and draw
+        _imagePaint.Color = new SKColor(255, 255, 255, (byte)(opacity * 255));
+        _imagePaint.FilterQuality = MapInterpolation(interpolation);
+        _imagePaint.IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor;
 
-        _canvas.DrawBitmap(bitmap, srcRect.ToSKRect(), destRect.ToSKRect(), paint);
+        _canvas.DrawBitmap(bitmap, srcRect.ToSKRect(), destRect.ToSKRect(), _imagePaint);
+    }
+
+    /// <summary>
+    /// Gets a cached bitmap with the specified dimensions, or creates one if not available.
+    /// Uses a small pool (3 bitmaps) to handle common scenarios without constant reallocation.
+    /// </summary>
+    private SKBitmap GetOrCreateCachedBitmap(int width, int height)
+    {
+        // Check primary cache (usually document surface)
+        if (_cachedBitmap != null && _cachedBitmapWidth == width && _cachedBitmapHeight == height)
+            return _cachedBitmap;
+
+        // Check secondary cache (usually mask overlay - often same as primary)
+        if (_cachedBitmap2 != null && _cachedBitmap2Width == width && _cachedBitmap2Height == height)
+            return _cachedBitmap2;
+
+        // Check tertiary cache (reference layers, tiles, etc.)
+        if (_cachedBitmap3 != null && _cachedBitmap3Width == width && _cachedBitmap3Height == height)
+            return _cachedBitmap3;
+
+        // Need to allocate or reuse a slot
+        // Priority: use empty slot, then reuse tertiary (least likely to be reused)
+        if (_cachedBitmap == null)
+        {
+            _cachedBitmap = CreateBitmap(width, height);
+            _cachedBitmapWidth = width;
+            _cachedBitmapHeight = height;
+            return _cachedBitmap;
+        }
+
+        if (_cachedBitmap2 == null)
+        {
+            _cachedBitmap2 = CreateBitmap(width, height);
+            _cachedBitmap2Width = width;
+            _cachedBitmap2Height = height;
+            return _cachedBitmap2;
+        }
+
+        if (_cachedBitmap3 == null)
+        {
+            _cachedBitmap3 = CreateBitmap(width, height);
+            _cachedBitmap3Width = width;
+            _cachedBitmap3Height = height;
+            return _cachedBitmap3;
+        }
+
+        // All slots are full and none match - reuse slot 3 (least likely to match primary use cases)
+        _cachedBitmap3?.Dispose();
+        _cachedBitmap3 = CreateBitmap(width, height);
+        _cachedBitmap3Width = width;
+        _cachedBitmap3Height = height;
+        return _cachedBitmap3;
+    }
+
+    /// <summary>
+    /// Creates a new SKBitmap with the specified dimensions.
+    /// </summary>
+    private static SKBitmap CreateBitmap(int width, int height)
+    {
+        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+        return new SKBitmap(info);
     }
 
     // ????????????????????????????????????????????????????????????????????
@@ -202,8 +329,9 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
         if (format.NativeFormat is not SKFont skFont)
             throw new ArgumentException("Expected SKFont", nameof(format));
 
-        using var paint = CreateFillPaint(color);
-        _canvas.DrawText(text, x, y + skFont.Size, skFont, paint);
+        _fillPaint.Color = color.ToSKColor();
+        _fillPaint.IsAntialias = true; // Text always antialiased
+        _canvas.DrawText(text, x, y + skFont.Size, skFont, _fillPaint);
     }
 
     public ITextFormat CreateTextFormat(string fontFamily, float fontSize, FontWeight fontWeight = FontWeight.Normal)

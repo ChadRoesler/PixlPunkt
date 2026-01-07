@@ -46,6 +46,7 @@
             <!-- Main canvas - SkiaSharp canvas -->
             <skia:SKXamlCanvas x:Name="CanvasView"
                                Grid.Row="1" Grid.Column="1"
+                               IgnorePixelScaling="True"
                                PaintSurface="CanvasView_PaintSurface"
                                PointerPressed="CanvasView_PointerPressed"
                                PointerMoved="CanvasView_PointerMoved"
