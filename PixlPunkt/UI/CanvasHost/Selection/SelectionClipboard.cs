@@ -7,7 +7,6 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 using static PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem;
 using SelectionRegion = PixlPunkt.Core.Selection.SelectionRegion;
 
@@ -240,7 +239,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             _state.Region.EnsureSize(docW2, docH2);
             _state.Region.Clear();
 
-            var pasteRect = CreateRect(px, py, w, h);
+            var pasteRect = new RectInt32(px, py, w, h);
             _state.Region.AddRect(pasteRect);
 
             _state.Active = true;
@@ -352,7 +351,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             if (_state.Floating)
                 _commitFloating?.Invoke();
 
-            var r = CreateRect(0, 0, docW, docH);
+            var r = new RectInt32(0, 0, docW, docH);
 
             _state.Region.EnsureSize(docW, docH);
             _state.Region.Clear();
@@ -478,7 +477,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                     {
                         if (region.Contains(x, y))
                         {
-                            _state.Region.AddRect(CreateRect(x, y, 1, 1));
+                            _state.Region.AddRect(new RectInt32(x, y, 1, 1));
                         }
                     }
                 }

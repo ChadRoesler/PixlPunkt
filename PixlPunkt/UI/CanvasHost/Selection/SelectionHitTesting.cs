@@ -1,7 +1,6 @@
 using System;
 using PixlPunkt.Core.Viewport;
 using Windows.Foundation;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 using static PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem;
 
 namespace PixlPunkt.UI.CanvasHost.Selection
@@ -206,7 +205,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
 
             // Get selection rect in doc space (can have negative coordinates when off-canvas)
             var rDoc = _state.Floating
-                ? CreateRect(_state.FloatX, _state.FloatY, _state.ScaledW, _state.ScaledH)
+                ? new Windows.Graphics.RectInt32(_state.FloatX, _state.FloatY, _state.ScaledW, _state.ScaledH)
                 : Normalize(_state.Rect);
 
             // Convert to view space - note that x/y can be negative relative to canvas origin

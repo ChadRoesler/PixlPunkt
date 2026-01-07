@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -7,7 +8,6 @@ using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.History;
 using PixlPunkt.Core.Imaging;
-using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Tools.Selection;
 using PixlPunkt.UI.CanvasHost.Selection;
@@ -15,7 +15,6 @@ using Windows.Foundation;
 using Windows.Graphics;
 using Windows.System;
 using Windows.UI.Core;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 using RotHandle = PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotHandle;
 // Alias for subsystem types
 using SelDrag = PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelDrag;
@@ -426,7 +425,7 @@ namespace PixlPunkt.UI.CanvasHost
                 for (int y = 0; y < snapshot.BufferHeight; y++)
                     for (int x = 0; x < snapshot.BufferWidth; x++)
                         if (snapshot.Buffer[(y * snapshot.BufferWidth + x) * 4 + 3] > 0)
-                            _selRegion.AddRect(CreateRect(x, y, 1, 1));
+                            _selRegion.AddRect(new RectInt32(x, y, 1, 1));
             }
             else
             {
@@ -944,9 +943,9 @@ namespace PixlPunkt.UI.CanvasHost
         // DRAWING
         // ═══════════════════════════════════════════════════════════════
 
-        private void Selection_Draw(ICanvasRenderer renderer)
+        private void Selection_Draw(CanvasControl sender, CanvasDrawEventArgs args)
         {
-            _selRenderer?.Draw(renderer);
+            _selRenderer?.Draw(sender, args);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1041,7 +1040,7 @@ namespace PixlPunkt.UI.CanvasHost
             for (int y = 0; y < _selState.BufferHeight; y++)
                 for (int x = 0; x < _selState.BufferWidth; x++)
                     if (_selState.Buffer[(y * _selState.BufferWidth + x) * 4 + 3] > 0)
-                        _selRegion.AddRect(CreateRect(x, y, 1, 1));
+                        _selRegion.AddRect(new RectInt32(x, y, 1, 1));
 
             _selState.Rect = _selRegion.Bounds;
             _toolState?.SetSelectionScale(100.0, 100.0, _selState.ScaleLink);
@@ -1115,7 +1114,7 @@ namespace PixlPunkt.UI.CanvasHost
             int rh = Math.Min(tileH, Document.PixelHeight - ry);
             if (rw <= 0 || rh <= 0) return false;
 
-            tileRect = CreateRect(rx, ry, rw, rh);
+            tileRect = new RectInt32(rx, ry, rw, rh);
             return true;
         }
 

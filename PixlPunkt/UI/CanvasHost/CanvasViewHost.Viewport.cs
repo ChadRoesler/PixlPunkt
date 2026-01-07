@@ -163,7 +163,6 @@ namespace PixlPunkt.UI.CanvasHost
 
         /// <summary>
         /// Updates the current visible document rectangle and raises ViewportChanged if it changed.
-        /// Also invalidates rulers to keep them in sync.
         /// </summary>
         private void UpdateViewport()
         {
@@ -185,9 +184,6 @@ namespace PixlPunkt.UI.CanvasHost
                 {
                     _currentViewport = empty;
                     ViewportChanged?.Invoke(_currentViewport);
-                    // Invalidate rulers when viewport changes
-                    HorizontalRulerCanvas?.Invalidate();
-                    VerticalRulerCanvas?.Invalidate();
                 }
                 return;
             }
@@ -213,10 +209,6 @@ namespace PixlPunkt.UI.CanvasHost
 
             _currentViewport = rect;
             ViewportChanged?.Invoke(rect);
-            
-            // Invalidate rulers when viewport changes (pan/zoom)
-            HorizontalRulerCanvas?.Invalidate();
-            VerticalRulerCanvas?.Invalidate();
         }
     }
 }

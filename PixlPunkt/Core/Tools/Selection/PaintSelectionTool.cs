@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml.Input;
-using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Tools.Selection
 {
@@ -74,7 +73,7 @@ namespace PixlPunkt.Core.Tools.Selection
         }
 
         /// <inheritdoc/>
-        public override void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase)
+        public override void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase)
         {
             // Brush cursor preview is handled by the main brush overlay system in CanvasViewHost.BrushOverlay.cs
             // This method is intentionally empty - PaintSelect participates in the standard brush overlay
@@ -208,7 +207,7 @@ namespace PixlPunkt.Core.Tools.Selection
                     if (px < 0 || py < 0 || px >= w || py >= h)
                         continue;
 
-                    region.AddRect(CreateRect(px, py, 1, 1));
+                    region.AddRect(new Windows.Graphics.RectInt32(px, py, 1, 1));
                 }
             }
 

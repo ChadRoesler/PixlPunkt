@@ -1,21 +1,32 @@
 ﻿using System;
+using System.Numerics;
+using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.UI.Xaml;
 using Windows.UI;
 
 namespace PixlPunkt.UI.Rendering
 {
     /// <summary>
-    /// Provides pattern background configuration and theme-aware colors.
-    /// Used by SkiaSharp-based canvas controls for checkerboard/stripe backgrounds.
+    /// Generates and caches a Win2D pattern brush (e.g. stripes / checkerboard) in a DPI‑aware way.
+    /// Reusable by canvas hosts, layer previews, thumbnails, etc.
     /// </summary>
-    /// <remarks>
-    /// This service manages color schemes for transparency patterns (checkerboard/stripes).
-    /// Individual controls create their own SKShader/SKBitmap for rendering using these colors.
-    /// </remarks>
     public sealed class PatternBackgroundService : IDisposable
     {
+        private CanvasImageBrush? _brush;
+        private CanvasDevice? _device;
+        private int _cachedBandPx;
+        private int _cachedTileSize;
+        private BackgroundPatternKind _cachedKind;
         private Color _cachedLight;
         private Color _cachedDark;
+        private double _cachedRasterScale;
+        private int _cachedRepeatCycles;
+
+        // Sized image caching
+        private CanvasRenderTarget? _sizedRt;
+        private int _cachedWidthPx;
+        private int _cachedHeightPx;
 
         public float StripeBandDip { get; set; } = 8f;               // logical DIP width of one light OR dark band
         public int RepeatCycles { get; set; } = 8;                    // number of light+dark periods per tile side
@@ -44,11 +55,6 @@ namespace PixlPunkt.UI.Rendering
         // Expose current scheme (read‑only)
         public (Color Light, Color Dark) CurrentScheme => (LightColor, DarkColor);
 
-        /// <summary>
-        /// Event raised when colors or pattern settings change.
-        /// </summary>
-        public event Action? Changed;
-
         // Apply explicit theme (overrides AutoTheme if called directly)
         public void ApplyTheme(ElementTheme theme)
         {
@@ -69,52 +75,205 @@ namespace PixlPunkt.UI.Rendering
             if (LightColor == scheme.Light && DarkColor == scheme.Dark) return;
             LightColor = scheme.Light;
             DarkColor = scheme.Dark;
-            Invalidate(); // notify consumers
+            Invalidate(); // force rebuild
         }
 
         /// <summary>
-        /// Calculates the band size in pixels for the given DPI scale.
+        /// Returns a cached or newly built pattern brush for the given device + raster scale.
+        /// Tiled brush mode: small texture, wraps seamlessly; band width constant in screen DIPs.
         /// </summary>
-        /// <param name="rasterizationScale">DPI rasterization scale.</param>
-        /// <returns>Band size in pixels.</returns>
-        public int GetBandPixelSize(double rasterizationScale)
+        public CanvasImageBrush GetBrush(CanvasDevice device, double rasterizationScale)
         {
-            return Math.Max(1, (int)Math.Round(StripeBandDip * rasterizationScale));
-        }
-
-        /// <summary>
-        /// Calculates the tile size in pixels for the given DPI scale.
-        /// </summary>
-        /// <param name="rasterizationScale">DPI rasterization scale.</param>
-        /// <returns>Tile size in pixels.</returns>
-        public int GetTilePixelSize(double rasterizationScale)
-        {
-            int bandPx = GetBandPixelSize(rasterizationScale);
+            int bandPx = Math.Max(1, (int)Math.Round(StripeBandDip * rasterizationScale));
             int period = bandPx * 2;
-            return period * Math.Max(1, RepeatCycles);
-        }
+            int tileSize = period * Math.Max(1, RepeatCycles);
 
-        /// <summary>
-        /// Checks if cached colors need update.
-        /// </summary>
-        /// <returns>True if colors changed since last check.</returns>
-        public bool ColorsChanged()
-        {
-            bool changed = _cachedLight != LightColor || _cachedDark != DarkColor;
+            bool needsRebuild =
+                _brush == null ||
+                _device != device ||
+                bandPx != _cachedBandPx ||
+                tileSize != _cachedTileSize ||
+                PatternKind != _cachedKind ||
+                LightColor != _cachedLight ||
+                DarkColor != _cachedDark ||
+                Math.Abs(rasterizationScale - _cachedRasterScale) > 0.0001 ||
+                RepeatCycles != _cachedRepeatCycles;
+
+            if (!needsRebuild)
+                return _brush!;
+
+            DisposeBrushOnly();
+
+            _device = device;
+            _cachedBandPx = bandPx;
+            _cachedTileSize = tileSize;
+            _cachedKind = PatternKind;
             _cachedLight = LightColor;
             _cachedDark = DarkColor;
-            return changed;
+            _cachedRasterScale = rasterizationScale;
+            _cachedRepeatCycles = RepeatCycles;
+
+            var rt = new CanvasRenderTarget(device, tileSize, tileSize, 96);
+            var pixels = new Color[tileSize * tileSize];
+
+            switch (PatternKind)
+            {
+                case BackgroundPatternKind.Stripes:
+                    {
+                        int periodLocal = period;
+                        for (int y = 0; y < tileSize; y++)
+                        {
+                            int rowIndex = y * tileSize;
+                            for (int x = 0; x < tileSize; x++)
+                            {
+                                bool light = ((x + y) % periodLocal) < bandPx;
+                                pixels[rowIndex + x] = light ? LightColor : DarkColor;
+                            }
+                        }
+                        break;
+                    }
+                case BackgroundPatternKind.Checkerboard:
+                    {
+                        int square = bandPx;
+                        for (int y = 0; y < tileSize; y++)
+                        {
+                            int rowIndex = y * tileSize;
+                            int cy = y / square;
+                            for (int x = 0; x < tileSize; x++)
+                            {
+                                int cx = x / square;
+                                bool light = ((cx + cy) & 1) == 0;
+                                pixels[rowIndex + x] = light ? LightColor : DarkColor;
+                            }
+                        }
+                        break;
+                    }
+                case BackgroundPatternKind.Solid:
+                    {
+                        for (int i = 0; i < pixels.Length; i++) pixels[i] = LightColor;
+                        break;
+                    }
+            }
+
+            rt.SetPixelColors(pixels);
+
+            _brush = new CanvasImageBrush(device, rt)
+            {
+                ExtendX = CanvasEdgeBehavior.Wrap,
+                ExtendY = CanvasEdgeBehavior.Wrap,
+                Interpolation = CanvasImageInterpolation.NearestNeighbor,
+                Transform = Matrix3x2.Identity
+            };
+
+            rt.Dispose();
+            return _brush;
         }
 
-        /// <summary>Force consumers to rebuild their pattern resources.</summary>
+        /// <summary>
+        /// Returns a DPI-aware image exactly matching the given DIP area.
+        /// This avoids any tiling seam and keeps band width constant, regardless of zoom.
+        /// Rebuilt only when device, DPI, pattern settings, or area changes.
+        /// </summary>
+        public CanvasRenderTarget GetSizedImage(CanvasDevice device, double rasterizationScale, float areaWidthDip, float areaHeightDip)
+        {
+            int bandPx = Math.Max(1, (int)Math.Round(StripeBandDip * rasterizationScale));
+            int widthPx = Math.Max(1, (int)Math.Ceiling(areaWidthDip * rasterizationScale));
+            int heightPx = Math.Max(1, (int)Math.Ceiling(areaHeightDip * rasterizationScale));
+
+            bool needsRebuild =
+                _sizedRt == null ||
+                _device != device ||
+                bandPx != _cachedBandPx ||
+                widthPx != _cachedWidthPx ||
+                heightPx != _cachedHeightPx ||
+                PatternKind != _cachedKind ||
+                LightColor != _cachedLight ||
+                DarkColor != _cachedDark ||
+                Math.Abs(rasterizationScale - _cachedRasterScale) > 0.0001;
+
+            if (!needsRebuild)
+                return _sizedRt!;
+
+            DisposeSizedOnly();
+
+            _device = device;
+            _cachedBandPx = bandPx;
+            _cachedWidthPx = widthPx;
+            _cachedHeightPx = heightPx;
+            _cachedKind = PatternKind;
+            _cachedLight = LightColor;
+            _cachedDark = DarkColor;
+            _cachedRasterScale = rasterizationScale;
+
+            var rt = new CanvasRenderTarget(device, widthPx, heightPx, 96);
+            var pixels = new Color[widthPx * heightPx];
+
+            switch (PatternKind)
+            {
+                case BackgroundPatternKind.Stripes:
+                    {
+                        int period = bandPx * 2;
+                        for (int y = 0; y < heightPx; y++)
+                        {
+                            int rowIndex = y * widthPx;
+                            for (int x = 0; x < widthPx; x++)
+                            {
+                                bool light = ((x + y) % period) < bandPx;
+                                pixels[rowIndex + x] = light ? LightColor : DarkColor;
+                            }
+                        }
+                        break;
+                    }
+                case BackgroundPatternKind.Checkerboard:
+                    {
+                        int square = bandPx;
+                        for (int y = 0; y < heightPx; y++)
+                        {
+                            int rowIndex = y * widthPx;
+                            int cy = y / square;
+                            for (int x = 0; x < widthPx; x++)
+                            {
+                                int cx = x / square;
+                                bool light = ((cx + cy) & 1) == 0;
+                                pixels[rowIndex + x] = light ? LightColor : DarkColor;
+                            }
+                        }
+                        break;
+                    }
+                case BackgroundPatternKind.Solid:
+                    {
+                        for (int i = 0; i < pixels.Length; i++) pixels[i] = LightColor;
+                        break;
+                    }
+            }
+
+            rt.SetPixelColors(pixels);
+            _sizedRt = rt;
+            return _sizedRt;
+        }
+
+        /// <summary>Force rebuild on next GetBrush/GetSizedImage.</summary>
         public void Invalidate()
         {
-            Changed?.Invoke();
+            DisposeBrushOnly();
+            DisposeSizedOnly();
+        }
+
+        private void DisposeBrushOnly()
+        {
+            _brush?.Dispose();
+            _brush = null;
+        }
+        private void DisposeSizedOnly()
+        {
+            _sizedRt?.Dispose();
+            _sizedRt = null;
         }
 
         public void Dispose()
         {
-            // No resources to dispose - SkiaSharp resources are owned by consumers
+            DisposeBrushOnly();
+            DisposeSizedOnly();
         }
     }
 }

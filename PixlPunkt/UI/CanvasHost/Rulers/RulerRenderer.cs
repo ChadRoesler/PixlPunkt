@@ -1,19 +1,23 @@
 using System;
+using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml;
-using SkiaSharp;
 using Windows.Foundation;
 using Windows.UI;
 
 namespace PixlPunkt.UI.CanvasHost.Rulers
 {
+
     /// <summary>
-    /// Renders rulers with tile-based tick marks using SkiaSharp.
+    /// Renders rulers with tile-based tick marks.
     /// </summary>
     /// <remarks>
     /// Tick mark system based on tile size:
     /// - Large mark: Every tile (tileSize pixels)
     /// - Medium mark: Every tile/2 (rounded: >= 0.5 rounds up)
     /// - Small mark: Every tile/4 (rounded: >= 0.5 rounds up)
+    /// 
+    /// Example for 16x16 tile: Large at 16, Medium at 8, Small at 4, 12
+    /// Example for 15x15 tile: Large at 15, Medium at 8, Small at 4, 12
     /// </remarks>
     public sealed class RulerRenderer
     {
@@ -25,6 +29,8 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
         private const float LARGE_TICK_HEIGHT = 14f;
         private const float MEDIUM_TICK_HEIGHT = 9f;
         private const float SMALL_TICK_HEIGHT = 5f;
+
+
 
         // Colors
         private static Color RulerBackground = Color.FromArgb(255, 40, 40, 40);
@@ -53,8 +59,10 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
             }
         }
 
+
         /// <summary>
         /// Calculates the rounded interval based on tile size and divisor.
+        /// Uses standard rounding: >= 0.5 rounds up, else rounds down.
         /// </summary>
         private static int RoundedInterval(int tileSize, int divisor)
         {
@@ -65,8 +73,17 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
         /// <summary>
         /// Draws the horizontal ruler (along the top).
         /// </summary>
+        /// <param name="ds">Drawing session.</param>
+        /// <param name="canvasDest">The document rectangle in the MAIN canvas coordinates (not ruler coordinates).</param>
+        /// <param name="scale">Current zoom scale.</param>
+        /// <param name="docWidth">Document width in pixels.</param>
+        /// <param name="tileWidth">Tile width for tick marks.</param>
+        /// <param name="rulerLeft">Left edge of ruler drawing area.</param>
+        /// <param name="rulerRight">Right edge of ruler drawing area.</param>
+        /// <param name="cursorDocX">Current cursor document X position (for highlight).</param>
+        /// /// <param name="theme">Current theme.</param>
         public static void DrawHorizontalRuler(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             Rect canvasDest,
             double scale,
             int docWidth,
@@ -76,24 +93,25 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
             int? cursorDocX,
             ElementTheme theme)
         {
-            SetRuleTheme(theme);
-
             // Ruler background
-            using var bgPaint = new SKPaint { Color = ToSKColor(RulerBackground), IsAntialias = false };
-            canvas.DrawRect(rulerLeft, 0, rulerRight - rulerLeft, RULER_THICKNESS, bgPaint);
-
-            // Border
-            using var borderPaint = new SKPaint { Color = ToSKColor(RulerBorder), IsAntialias = false, StrokeWidth = 1, Style = SKPaintStyle.Stroke };
-            canvas.DrawLine(rulerLeft, RULER_THICKNESS, rulerRight, RULER_THICKNESS, borderPaint);
+            SetRuleTheme(theme);
+            var rulerRect = new Rect(rulerLeft, 0, rulerRight - rulerLeft, RULER_THICKNESS);
+            ds.FillRectangle(rulerRect, RulerBackground);
+            ds.DrawLine(rulerLeft, RULER_THICKNESS, rulerRight, RULER_THICKNESS, RulerBorder, 1f);
 
             // Calculate tick intervals
             int largeInterval = tileWidth;
             int mediumInterval = RoundedInterval(tileWidth, 2);
             int smallInterval = RoundedInterval(tileWidth, 4);
 
+            // Ensure minimum intervals
             if (mediumInterval < 1) mediumInterval = 1;
             if (smallInterval < 1) smallInterval = 1;
 
+            // The horizontal ruler is positioned in the same column as the main canvas.
+            // canvasDest.X is where doc X=0 appears in the main canvas coordinate system.
+            // Since the ruler is in the same column, the same X offset applies.
+            // We just need to convert from main canvas coordinates.
             float docOriginScreenX = (float)canvasDest.X;
 
             // Draw cursor highlight
@@ -102,8 +120,7 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
                 float cursorScreenX = docOriginScreenX + (float)(cursorDocX.Value * scale);
                 if (cursorScreenX >= rulerLeft && cursorScreenX <= rulerRight)
                 {
-                    using var highlightPaint = new SKPaint { Color = ToSKColor(CursorHighlight), IsAntialias = false };
-                    canvas.DrawRect(cursorScreenX - 1, 0, 3, RULER_THICKNESS, highlightPaint);
+                    ds.FillRectangle(cursorScreenX - 1, 0, 3, RULER_THICKNESS, CursorHighlight);
                 }
             }
 
@@ -112,15 +129,6 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
             bool drawSmall = pixelsPerDocPixel >= 2f;
             bool drawMedium = pixelsPerDocPixel >= 1f;
             bool drawLabels = pixelsPerDocPixel >= 4f;
-
-            using var tickPaint = new SKPaint { Color = ToSKColor(TickColor), IsAntialias = false, StrokeWidth = 1 };
-            using var textPaint = new SKPaint
-            {
-                Color = ToSKColor(LabelColor),
-                IsAntialias = true,
-                TextSize = 9,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI")
-            };
 
             // Draw tick marks
             for (int docX = 0; docX <= docWidth; docX++)
@@ -131,9 +139,14 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
 
                 TickType tickType = GetTickType(docX, largeInterval, mediumInterval, smallInterval);
 
-                if (tickType == TickType.None) continue;
-                if (tickType == TickType.Small && !drawSmall) continue;
-                if (tickType == TickType.Medium && !drawMedium) continue;
+                if (tickType == TickType.None)
+                    continue;
+
+                if (tickType == TickType.Small && !drawSmall)
+                    continue;
+
+                if (tickType == TickType.Medium && !drawMedium)
+                    continue;
 
                 float tickHeight = tickType switch
                 {
@@ -143,12 +156,18 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
                     _ => 0
                 };
 
-                canvas.DrawLine(screenX, RULER_THICKNESS - tickHeight, screenX, RULER_THICKNESS, tickPaint);
+                ds.DrawLine(screenX, RULER_THICKNESS - tickHeight, screenX, RULER_THICKNESS, TickColor, 1f);
 
                 // Draw label for large ticks
                 if (tickType == TickType.Large && drawLabels && docX > 0)
                 {
-                    canvas.DrawText(docX.ToString(), screenX + 2, 11, textPaint);
+                    var text = docX.ToString();
+                    ds.DrawText(text, screenX + 2, 2, LabelColor,
+                        new Microsoft.Graphics.Canvas.Text.CanvasTextFormat
+                        {
+                            FontSize = 9,
+                            FontFamily = "Segoe UI"
+                        });
                 }
             }
         }
@@ -156,8 +175,17 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
         /// <summary>
         /// Draws the vertical ruler (along the left).
         /// </summary>
+        /// <param name="ds">Drawing session.</param>
+        /// <param name="canvasDest">The document rectangle in the MAIN canvas coordinates (not ruler coordinates).</param>
+        /// <param name="scale">Current zoom scale.</param>
+        /// <param name="docHeight">Document height in pixels.</param>
+        /// <param name="tileHeight">Tile height for tick marks.</param>
+        /// <param name="rulerTop">Top edge of ruler drawing area.</param>
+        /// <param name="rulerBottom">Bottom edge of ruler drawing area.</param>
+        /// <param name="cursorDocY">Current cursor document Y position (for highlight).</param>
+        /// <param name="theme">Current theme.</param>
         public static void DrawVerticalRuler(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             Rect canvasDest,
             double scale,
             int docHeight,
@@ -167,24 +195,24 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
             int? cursorDocY,
             ElementTheme theme)
         {
-            SetRuleTheme(theme);
-
             // Ruler background
-            using var bgPaint = new SKPaint { Color = ToSKColor(RulerBackground), IsAntialias = false };
-            canvas.DrawRect(0, rulerTop, RULER_THICKNESS, rulerBottom - rulerTop, bgPaint);
-
-            // Border
-            using var borderPaint = new SKPaint { Color = ToSKColor(RulerBorder), IsAntialias = false, StrokeWidth = 1, Style = SKPaintStyle.Stroke };
-            canvas.DrawLine(RULER_THICKNESS, rulerTop, RULER_THICKNESS, rulerBottom, borderPaint);
+            SetRuleTheme(theme);
+            var rulerRect = new Rect(0, rulerTop, RULER_THICKNESS, rulerBottom - rulerTop);
+            ds.FillRectangle(rulerRect, RulerBackground);
+            ds.DrawLine(RULER_THICKNESS, rulerTop, RULER_THICKNESS, rulerBottom, RulerBorder, 1f);
 
             // Calculate tick intervals
             int largeInterval = tileHeight;
             int mediumInterval = RoundedInterval(tileHeight, 2);
             int smallInterval = RoundedInterval(tileHeight, 4);
 
+            // Ensure minimum intervals
             if (mediumInterval < 1) mediumInterval = 1;
             if (smallInterval < 1) smallInterval = 1;
 
+            // The vertical ruler is positioned in the same row as the main canvas.
+            // canvasDest.Y is where doc Y=0 appears in the main canvas coordinate system.
+            // Since the ruler is in the same row, the same Y offset applies.
             float docOriginScreenY = (float)canvasDest.Y;
 
             // Draw cursor highlight
@@ -193,8 +221,7 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
                 float cursorScreenY = docOriginScreenY + (float)(cursorDocY.Value * scale);
                 if (cursorScreenY >= rulerTop && cursorScreenY <= rulerBottom)
                 {
-                    using var highlightPaint = new SKPaint { Color = ToSKColor(CursorHighlight), IsAntialias = false };
-                    canvas.DrawRect(0, cursorScreenY - 1, RULER_THICKNESS, 3, highlightPaint);
+                    ds.FillRectangle(0, cursorScreenY - 1, RULER_THICKNESS, 3, CursorHighlight);
                 }
             }
 
@@ -203,15 +230,6 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
             bool drawSmall = pixelsPerDocPixel >= 2f;
             bool drawMedium = pixelsPerDocPixel >= 1f;
             bool drawLabels = pixelsPerDocPixel >= 4f;
-
-            using var tickPaint = new SKPaint { Color = ToSKColor(TickColor), IsAntialias = false, StrokeWidth = 1 };
-            using var textPaint = new SKPaint
-            {
-                Color = ToSKColor(LabelColor),
-                IsAntialias = true,
-                TextSize = 8,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI")
-            };
 
             // Draw tick marks
             for (int docY = 0; docY <= docHeight; docY++)
@@ -222,9 +240,14 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
 
                 TickType tickType = GetTickType(docY, largeInterval, mediumInterval, smallInterval);
 
-                if (tickType == TickType.None) continue;
-                if (tickType == TickType.Small && !drawSmall) continue;
-                if (tickType == TickType.Medium && !drawMedium) continue;
+                if (tickType == TickType.None)
+                    continue;
+
+                if (tickType == TickType.Small && !drawSmall)
+                    continue;
+
+                if (tickType == TickType.Medium && !drawMedium)
+                    continue;
 
                 float tickHeight = tickType switch
                 {
@@ -234,16 +257,22 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
                     _ => 0
                 };
 
-                canvas.DrawLine(RULER_THICKNESS - tickHeight, screenY, RULER_THICKNESS, screenY, tickPaint);
+                ds.DrawLine(RULER_THICKNESS - tickHeight, screenY, RULER_THICKNESS, screenY, TickColor, 1f);
 
-                // Draw label for large ticks (vertical text)
+                // Draw label for large ticks (rotated text simulation - just offset)
                 if (tickType == TickType.Large && drawLabels && docY > 0)
                 {
                     var text = docY.ToString();
-                    float charY = screenY + 10;
+                    // Draw vertically - each character on its own line
+                    float charY = screenY + 2;
                     foreach (char c in text)
                     {
-                        canvas.DrawText(c.ToString(), 3, charY, textPaint);
+                        ds.DrawText(c.ToString(), 3, charY, LabelColor,
+                            new Microsoft.Graphics.Canvas.Text.CanvasTextFormat
+                            {
+                                FontSize = 8,
+                                FontFamily = "Segoe UI"
+                            });
                         charY += 8;
                     }
                 }
@@ -253,32 +282,45 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
         /// <summary>
         /// Draws the corner square where rulers meet.
         /// </summary>
-        public static void DrawCorner(SKCanvas canvas, ElementTheme theme)
+        public static void DrawCorner(CanvasDrawingSession ds)
         {
-            SetRuleTheme(theme);
-
-            using var bgPaint = new SKPaint { Color = ToSKColor(RulerBackground), IsAntialias = false };
-            canvas.DrawRect(0, 0, CORNER_SIZE, CORNER_SIZE, bgPaint);
-
-            using var borderPaint = new SKPaint { Color = ToSKColor(RulerBorder), IsAntialias = false, StrokeWidth = 1, Style = SKPaintStyle.Stroke };
-            canvas.DrawLine(CORNER_SIZE, 0, CORNER_SIZE, CORNER_SIZE, borderPaint);
-            canvas.DrawLine(0, CORNER_SIZE, CORNER_SIZE, CORNER_SIZE, borderPaint);
+            var cornerRect = new Rect(0, 0, CORNER_SIZE, CORNER_SIZE);
+            ds.FillRectangle(cornerRect, RulerBackground);
+            ds.DrawLine(CORNER_SIZE, 0, CORNER_SIZE, CORNER_SIZE, RulerBorder, 1f);
+            ds.DrawLine(0, CORNER_SIZE, CORNER_SIZE, CORNER_SIZE, RulerBorder, 1f);
         }
 
         /// <summary>
         /// Determines the tick type for a given position.
+        /// Priority: Large > Medium > Small > None
         /// </summary>
         private static TickType GetTickType(int position, int largeInterval, int mediumInterval, int smallInterval)
         {
-            if (position == 0) return TickType.Large;
-            if (largeInterval > 0 && position % largeInterval == 0) return TickType.Large;
-            if (mediumInterval > 0 && position % mediumInterval == 0) return TickType.Medium;
-            if (smallInterval > 0 && position % smallInterval == 0) return TickType.Small;
+            // Position 0 is always a large tick (origin)
+            if (position == 0)
+                return TickType.Large;
+
+            // Check large (tile boundary)
+            if (largeInterval > 0 && position % largeInterval == 0)
+                return TickType.Large;
+
+            // Check medium (tile/2)
+            if (mediumInterval > 0 && position % mediumInterval == 0)
+                return TickType.Medium;
+
+            // Check small (tile/4)
+            if (smallInterval > 0 && position % smallInterval == 0)
+                return TickType.Small;
+
             return TickType.None;
         }
 
-        private static SKColor ToSKColor(Color c) => new SKColor(c.R, c.G, c.B, c.A);
-
-        private enum TickType { None, Small, Medium, Large }
+        private enum TickType
+        {
+            None,
+            Small,
+            Medium,
+            Large
+        }
     }
 }

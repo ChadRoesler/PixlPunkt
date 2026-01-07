@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Numerics;
+using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -11,7 +12,6 @@ using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Painting;
 using PixlPunkt.Core.Palette;
-using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Structs;
 using PixlPunkt.Core.Symmetry;
@@ -19,15 +19,13 @@ using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Viewport;
 using PixlPunkt.UI.Helpers;
 using PixlPunkt.UI.Rendering;
-using SkiaSharp;
-using SkiaSharp.Views.Windows;
 using Windows.Graphics;
 using Windows.UI;
 
 namespace PixlPunkt.UI.CanvasHost
 {
     /// <summary>
-    /// Hosts a SkiaSharp SKXamlCanvas for rendering and interacting with a pixel-art document.
+    /// Hosts a Win2D CanvasControl for rendering and interacting with a pixel-art document.
     /// 
     /// This is the core partial class containing:
     /// - Fields and properties
@@ -123,15 +121,10 @@ namespace PixlPunkt.UI.CanvasHost
         private PaletteService? _palette;
 
         // ════════════════════════════════════════════════════════════════════
-        // FIELDS - RENDERING (SKIASHARP)
+        // FIELDS - RENDERING
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>Cached checkerboard pattern shader for transparency background.</summary>
-        private SKShader? _checkerboardShader;
-
-        /// <summary>Cached checkerboard pattern bitmap.</summary>
-        private SKBitmap? _checkerboardBitmap;
-
+        private CanvasImageBrush? _stripeBrush;
         private bool _showPixelGrid = false;
         private bool _showTileGrid = true;
         private bool _showTileAnimationMappings = false;
@@ -175,7 +168,16 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - EXTERNAL DROPPER MODE (for color picker windows)
         // ════════════════════════════════════════════════════════════════════
 
+        /// <summary>
+        /// When true, all canvas pointer input is routed to the external dropper callback.
+        /// This allows color picker windows to sample colors from the canvas.
+        /// </summary>
         private bool _externalDropperActive = false;
+
+        /// <summary>
+        /// Callback invoked when a color is sampled during external dropper mode.
+        /// The parameter is the sampled BGRA color.
+        /// </summary>
         private Action<uint>? _externalDropperCallback;
 
         // ════════════════════════════════════════════════════════════════════
@@ -196,7 +198,7 @@ namespace PixlPunkt.UI.CanvasHost
         private int _fillTolerance = 0;
 
         // ════════════════════════════════════════════════════════════════════
-        // FIELDS - SELECTION STATE
+        // FIELDS - SELECTION STATE (bridges to selection subsystem)
         // ════════════════════════════════════════════════════════════════════
 
         private SelectionRegion _selRegion = new();
@@ -209,39 +211,89 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - STAGE (CAMERA) INTERACTION
         // ════════════════════════════════════════════════════════════════════
 
+        /// <summary>Whether the stage is currently selected (from AnimationPanel).</summary>
         private bool _stageSelected;
+
+        /// <summary>Whether we're currently dragging the stage.</summary>
         private bool _stageDragging;
+
+        /// <summary>Whether we're currently resizing the stage.</summary>
         private bool _stageResizing;
+
+        /// <summary>Which corner is being dragged for resize (0=TL, 1=TR, 2=BR, 3=BL).</summary>
         private int _stageResizeCorner;
+
+        /// <summary>The stage position when drag started.</summary>
         private int _stageDragStartX, _stageDragStartY;
+
+        /// <summary>The stage size when resize started.</summary>
         private int _stageDragStartW, _stageDragStartH;
+
+        /// <summary>The pointer position when drag started.</summary>
         private int _stageDragPointerStartX, _stageDragPointerStartY;
+
+        /// <summary>Current animation mode - stage is only shown in Canvas mode.</summary>
         private Animation.AnimationMode _animationMode = Animation.AnimationMode.Tile;
+
+        /// <summary>
+        /// Tracks whether the user has pending (unsaved) edits to the stage position.
+        /// Set to true when user drags/resizes the stage, cleared when keyframe is added or frame changes.
+        /// </summary>
         private bool _stagePendingEdits;
+
+        /// <summary>
+        /// The frame index where pending edits were made. Used to clear pending state when navigating away.
+        /// </summary>
         private int _stagePendingEditsFrame;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - REFERENCE LAYER INTERACTION
         // ════════════════════════════════════════════════════════════════════
 
+        /// <summary>The currently selected reference layer for interaction.</summary>
         private ReferenceLayer? _selectedReferenceLayer;
+
+        /// <summary>Whether we're currently dragging a reference layer.</summary>
         private bool _refLayerDragging;
+
+        /// <summary>Whether we're currently resizing a reference layer.</summary>
         private bool _refLayerResizing;
+
+        /// <summary>Which corner is being dragged for resize (0=TL, 1=TR, 2=BR, 3=BL).</summary>
         private int _refLayerResizeCorner;
+
+        /// <summary>The reference layer position when drag started.</summary>
         private float _refLayerDragStartX, _refLayerDragStartY;
+
+        /// <summary>The reference layer scale when resize started.</summary>
         private float _refLayerDragStartScale;
+
+        /// <summary>The pointer document position when drag started.</summary>
         private float _refLayerDragPointerStartX, _refLayerDragPointerStartY;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - SUB-ROUTINE INTERACTION
         // ════════════════════════════════════════════════════════════════════
 
+        /// <summary>The currently selected sub-routine for interaction.</summary>
         private AnimationSubRoutine? _selectedSubRoutine;
+
+        /// <summary>Whether we're currently dragging a sub-routine.</summary>
         private bool _subRoutineDragging;
+
+        /// <summary>The sub-routine position when drag started (X).</summary>
         private double _subRoutineDragStartX;
+
+        /// <summary>The sub-routine position when drag started (Y).</summary>
         private double _subRoutineDragStartY;
+
+        /// <summary>The pointer document position when drag started (X).</summary>
         private int _subRoutineDragPointerStartX;
+
+        /// <summary>The pointer document position when drag started (Y).</summary>
         private int _subRoutineDragPointerStartY;
+
+        /// <summary>The normalized progress at which we're editing the sub-routine position.</summary>
         private float _subRoutineEditProgress;
 
         // ════════════════════════════════════════════════════════════════════
@@ -255,12 +307,19 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - INPUT CURSOR
         // ════════════════════════════════════════════════════════════════════
 
+        /// <summary>
+        /// The default cursor used for canvas painting operations.
+        /// Uses the built-in Cross cursor for precise pixel targeting.
+        /// </summary>
         private readonly InputCursor? _targetCursor;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - EXTERNAL MODIFICATION TRACKING
         // ════════════════════════════════════════════════════════════════════
 
+        /// <summary>
+        /// Flag to prevent refresh loops when we're the source of document changes.
+        /// </summary>
         private bool _isCommittingChanges;
 
         // ════════════════════════════════════════════════════════════════════
@@ -295,9 +354,7 @@ namespace PixlPunkt.UI.CanvasHost
             _stroke.SetForeground(_fg);
 
             // Selection engine
-            _selectionEngine = new SelectionEngine(
-                activeLayerProvider: () => Document.ActiveLayer,
-                docSizeProvider: () => (Document.PixelWidth, Document.PixelHeight),
+            _selectionEngine = new SelectionEngine(activeLayerProvider: () => Document.ActiveLayer, docSizeProvider: () => (Document.PixelWidth, Document.PixelHeight),
                 liftCallback: () => LiftSelectionWithHistory(),
                 commitCallback: () => CommitFloatingWithHistory()
             );
@@ -323,59 +380,11 @@ namespace PixlPunkt.UI.CanvasHost
             RaiseFrame();
         }
 
-        // ════════════════════════════════════════════════════════════════════
-        // SKIASHARP PAINT SURFACE HANDLERS
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>
-        /// Main canvas paint handler - SkiaSharp PaintSurface event.
-        /// </summary>
-        private void CanvasView_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
-        {
-            var canvas = e.Surface.Canvas;
-            var info = e.Info;
-
-            // Create our renderer abstraction
-            using var renderer = new SkiaCanvasRenderer(canvas, info.Width, info.Height);
-
-            // Delegate to the main draw method
-            CanvasView_Draw(renderer);
-        }
-
-        /// <summary>
-        /// Horizontal ruler paint handler.
-        /// </summary>
-        private void HorizontalRulerCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
-        {
-            var canvas = e.Surface.Canvas;
-            var info = e.Info;
-
-            using var renderer = new SkiaCanvasRenderer(canvas, info.Width, info.Height);
-            HorizontalRuler_Draw(renderer);
-        }
-
-        /// <summary>
-        /// Vertical ruler paint handler.
-        /// </summary>
-        private void VerticalRulerCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
-        {
-            var canvas = e.Surface.Canvas;
-            var info = e.Info;
-
-            using var renderer = new SkiaCanvasRenderer(canvas, info.Width, info.Height);
-            VerticalRuler_Draw(renderer);
-        }
-
         public void UpdateTransparencyPatternForTheme(ElementTheme theme)
         {
             try
             {
                 _patternService.ApplyTheme(theme);
-                // Invalidate checkerboard cache
-                _checkerboardShader?.Dispose();
-                _checkerboardShader = null;
-                _checkerboardBitmap?.Dispose();
-                _checkerboardBitmap = null;
                 CanvasView?.Invalidate();
             }
             catch (Exception ex)
@@ -385,18 +394,24 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ════════════════════════════════════════════════════════════════════
-        // SHARED UTILITY METHODS
+        // SHARED UTILITY METHODS (used by multiple partials)
         // ════════════════════════════════════════════════════════════════════
 
         private bool IsActiveLayerLocked
             => Document.ActiveLayer is RasterLayer rl && CanvasDocument.IsEffectivelyLocked(rl);
 
+        /// <summary>
+        /// Shows a warning that the active layer is locked and cannot be edited.
+        /// The warning auto-dismisses after a few seconds.
+        /// </summary>
         private void ShowLockedLayerWarning()
         {
+            // Don't spam warnings - only show if not already visible
             if (LockedLayerWarning.IsOpen) return;
 
             LockedLayerWarning.IsOpen = true;
 
+            // Auto-dismiss after 3 seconds
             _lockedLayerWarningTimer?.Stop();
             _lockedLayerWarningTimer = new DispatcherTimer
             {
@@ -495,6 +510,11 @@ namespace PixlPunkt.UI.CanvasHost
             CanvasView.Invalidate();
         }
 
+        /// <summary>
+        /// Handles external document modifications (e.g., from TileFrameEditorCanvas).
+        /// Refreshes the canvas if we're not currently painting (to avoid loops).
+        /// Also handles mask editing mode changes.
+        /// </summary>
         private void OnExternalDocumentModified()
         {
             // Skip if we're actively painting (we're the source of changes)
@@ -857,15 +877,17 @@ namespace PixlPunkt.UI.CanvasHost
 
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
-
         // --------------------------------------------------------------------
-        // PUBLIC API
+        // PUBLIC API - PREVIEW (PLACEHOLDERS)
         // --------------------------------------------------------------------
 
         public void PreviewPointerMoved(Vector2 worldPos, bool shift) { }
         public void PreviewPointerPressed(Vector2 worldPos, bool shift) { }
         public void PreviewPointerReleased(Vector2 worldPos, bool shift) { }
 
+        /// <summary>
+        /// Forces a redraw of the canvas. Call after external document changes.
+        /// </summary>
         public void InvalidateCanvas()
         {
             // Re-sync zoom controller with potentially changed document size
@@ -883,6 +905,12 @@ namespace PixlPunkt.UI.CanvasHost
             RaiseFrame();
         }
 
+        /// <summary>
+        /// Forces a redraw of the canvas after a resize operation, adjusting the viewport
+        /// to keep the original content at the same screen position.
+        /// </summary>
+        /// <param name="contentOffsetX">How many pixels the content was shifted right in the new canvas.</param>
+        /// <param name="contentOffsetY">How many pixels the content was shifted down in the new canvas.</param>
         public void InvalidateCanvasAfterResize(int contentOffsetX, int contentOffsetY)
         {
             // Re-sync zoom controller with the new document size

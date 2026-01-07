@@ -1,10 +1,9 @@
 using System;
+using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PixlPunkt.UI.Rendering;
-using SkiaSharp;
-using SkiaSharp.Views.Windows;
 using Windows.Foundation;
 using Windows.UI;
 
@@ -16,11 +15,6 @@ namespace PixlPunkt.UI.Layers.Controls
             DependencyProperty.Register(nameof(Source), typeof(ImageSource), typeof(LayerPreviewHost),
                 new PropertyMetadata(null));
         private readonly PatternBackgroundService _pattern = new();
-
-        // Cached checkerboard pattern
-        private SKShader? _checkerboardShader;
-        private SKBitmap? _checkerboardBitmap;
-
         public ImageSource Source
         {
             get => (ImageSource)GetValue(SourceProperty);
@@ -44,18 +38,14 @@ namespace PixlPunkt.UI.Layers.Controls
             Unloaded += (_, __) =>
             {
                 TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
-                _checkerboardShader?.Dispose();
-                _checkerboardBitmap?.Dispose();
             };
 
             SizeChanged += (_, __) => BgCanvas.Invalidate();
         }
-
         private void OnStripeColorsChanged()
         {
             ApplyStripeColors();
             InvalidatePattern();
-            InvalidateCheckerboardCache();
             BgCanvas.Invalidate();
         }
 
@@ -79,15 +69,6 @@ namespace PixlPunkt.UI.Layers.Controls
         }
 
         private void InvalidatePattern() => _pattern.Invalidate();
-
-        private void InvalidateCheckerboardCache()
-        {
-            _checkerboardShader?.Dispose();
-            _checkerboardShader = null;
-            _checkerboardBitmap?.Dispose();
-            _checkerboardBitmap = null;
-        }
-
         private void HookDpi()
         {
             var xr = XamlRoot;
@@ -104,80 +85,38 @@ namespace PixlPunkt.UI.Layers.Controls
             {
                 _lastScale = s;
                 InvalidatePattern();
-                InvalidateCheckerboardCache();
                 BgCanvas.Invalidate();
             }
         }
 
-        private void BgCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+
+
+        private void BgCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
         {
-            var canvas = e.Surface.Canvas;
+            var ds = args.DrawingSession;
 
-            float w = (float)BgCanvas.ActualWidth;
-            float h = (float)BgCanvas.ActualHeight;
-            if (w <= 0 || h <= 0)
-            {
-                canvas.Clear(SKColors.Transparent);
-                return;
-            }
+            float w = (float)sender.ActualWidth;
+            float h = (float)sender.ActualHeight;
+            if (w <= 0 || h <= 0) return;
 
-            // Get colors from pattern service
-            var (lightColor, darkColor) = _pattern.CurrentScheme;
+            double dpi = XamlRoot?.RasterizationScale ?? 1.0;
+            var img = _pattern.GetSizedImage(sender.Device, dpi, w, h);
 
-            // Draw checkerboard background
-            int squareSize = 4; // Smaller squares for layer previews
-            EnsureCheckerboardShader(squareSize, lightColor, darkColor);
+            // snap to whole pixels
+            float tx = 0f, ty = 0f;
+            var target = new Rect(tx, ty, w, h);
+            var src = new Rect(0, 0, img.SizeInPixels.Width, img.SizeInPixels.Height);
 
-            if (_checkerboardShader != null)
-            {
-                using var paint = new SKPaint
-                {
-                    Shader = _checkerboardShader,
-                    IsAntialias = false
-                };
-                canvas.DrawRect(0, 0, w, h, paint);
-            }
-            else
-            {
-                // Fallback: just fill with light color
-                canvas.Clear(new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A));
-            }
+            ds.DrawImage(img, target, src);
+
 
             // Clear any explicit RenderTransform previously set; rely on XAML Stretch="Uniform" to fit the image.
+            // This avoids using ImageSource dimensions (not available) and keeps behavior simple and correct.
             if (PreviewImage != null && PreviewImage.RenderTransform != null)
             {
                 PreviewImage.RenderTransform = null;
                 PreviewImage.RenderTransformOrigin = new Point(0.5, 0.5);
             }
-        }
-
-        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
-        {
-            if (_checkerboardBitmap != null && _checkerboardShader != null)
-                return;
-
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
-
-            int tileSize = squareSize * 2;
-            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
-            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
-
-            for (int y = 0; y < tileSize; y++)
-            {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    int cx = x / squareSize;
-                    int cy = y / squareSize;
-                    bool isLight = ((cx + cy) & 1) == 0;
-                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
-                }
-            }
-
-            using var image = SKImage.FromBitmap(_checkerboardBitmap);
-            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
         }
     }
 }

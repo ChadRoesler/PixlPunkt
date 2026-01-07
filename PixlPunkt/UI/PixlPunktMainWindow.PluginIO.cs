@@ -4,7 +4,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.IO;
 using PixlPunkt.Core.Plugins;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI
 {
@@ -335,8 +334,8 @@ namespace PixlPunkt.UI
                     // Create document from imported image
                     var width = imageResult.Width;
                     var height = imageResult.Height;
-                    var tileSize = CreateSize(8, 8);
-                    var tileCounts = CreateSize(
+                    var tileSize = new Windows.Graphics.SizeInt32(8, 8);
+                    var tileCounts = new Windows.Graphics.SizeInt32(
                         Math.Max(1, width / 8),
                         Math.Max(1, height / 8));
 

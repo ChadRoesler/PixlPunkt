@@ -1,16 +1,35 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.UI;
 using PixlPunkt.Core.Animation;
-using SkiaSharp;
 using Windows.Foundation;
 using Windows.UI;
 
 namespace PixlPunkt.UI.Animation
 {
     /// <summary>
-    /// Renders audio waveforms using SkiaSharp for timeline visualization.
+    /// Renders audio waveforms to Win2D canvases for timeline visualization.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Supports multiple rendering modes:
+    /// <list type="bullet">
+    /// <item>Mono: Single color waveform centered on track</item>
+    /// <item>Stereo: Split left/right channels with different colors</item>
+    /// <item>Spectrum: Color varies based on amplitude</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// Optimized for real-time rendering during timeline scrolling by:
+    /// <list type="bullet">
+    /// <item>Only rendering visible portion of waveform</item>
+    /// <item>Using geometry batching for efficient drawing</item>
+    /// <item>Caching color brushes</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
     public sealed class AudioWaveformRenderer
     {
         // ====================================================================
@@ -23,11 +42,22 @@ namespace PixlPunkt.UI.Animation
         // COLOR SCHEMES
         // ====================================================================
 
+        /// <summary>Default mono waveform color (teal/cyan).</summary>
         public static readonly Color MonoColor = Color.FromArgb(200, 0, 200, 200);
+
+        /// <summary>Mono waveform fill color (semi-transparent).</summary>
         public static readonly Color MonoFillColor = Color.FromArgb(80, 0, 200, 200);
+
+        /// <summary>Left channel color for stereo mode (cyan).</summary>
         public static readonly Color LeftChannelColor = Color.FromArgb(200, 0, 200, 255);
+
+        /// <summary>Right channel color for stereo mode (magenta).</summary>
         public static readonly Color RightChannelColor = Color.FromArgb(200, 255, 100, 200);
+
+        /// <summary>Background color for the audio track row.</summary>
         public static readonly Color BackgroundColor = Color.FromArgb(40, 100, 100, 100);
+
+        /// <summary>Playhead position indicator color.</summary>
         public static readonly Color PlayheadColor = Color.FromArgb(255, 255, 100, 100);
 
         // ====================================================================
@@ -35,10 +65,16 @@ namespace PixlPunkt.UI.Animation
         // ====================================================================
 
         /// <summary>
-        /// Renders a waveform to the SKCanvas.
+        /// Renders a waveform to the drawing session.
         /// </summary>
+        /// <param name="ds">The Win2D drawing session.</param>
+        /// <param name="audioTrack">The audio track state containing waveform data.</param>
+        /// <param name="bounds">The bounds to render within.</param>
+        /// <param name="visibleStartMs">Start of visible time range in milliseconds.</param>
+        /// <param name="visibleEndMs">End of visible time range in milliseconds.</param>
+        /// <param name="colorMode">The waveform color mode.</param>
         public static void Render(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             AudioTrackState audioTrack,
             Rect bounds,
             double visibleStartMs,
@@ -49,13 +85,12 @@ namespace PixlPunkt.UI.Animation
                 return;
 
             // Draw background
-            using var bgPaint = new SKPaint { Color = ToSKColor(BackgroundColor), IsAntialias = false };
-            canvas.DrawRect(bounds.ToSKRect(), bgPaint);
+            ds.FillRectangle(bounds, BackgroundColor);
 
             // If no waveform data yet, show loading indicator
             if (audioTrack.WaveformData.Count == 0)
             {
-                DrawLoadingIndicator(canvas, audioTrack, bounds);
+                DrawLoadingIndicator(ds, audioTrack, bounds);
                 return;
             }
 
@@ -70,23 +105,29 @@ namespace PixlPunkt.UI.Animation
             switch (colorMode)
             {
                 case WaveformColorMode.Mono:
-                    RenderMonoWaveform(canvas, visiblePoints, bounds, visibleStartMs, msPerPixel, centerY, maxAmplitude);
+                    RenderMonoWaveform(ds, visiblePoints, bounds, visibleStartMs, msPerPixel, centerY, maxAmplitude);
                     break;
                 case WaveformColorMode.Stereo:
-                    RenderStereoWaveform(canvas, visiblePoints, bounds, visibleStartMs, msPerPixel, centerY, maxAmplitude);
+                    RenderStereoWaveform(ds, visiblePoints, bounds, visibleStartMs, msPerPixel, centerY, maxAmplitude);
                     break;
                 case WaveformColorMode.Spectrum:
-                    RenderSpectrumWaveform(canvas, visiblePoints, bounds, visibleStartMs, msPerPixel, centerY, maxAmplitude);
+                    RenderSpectrumWaveform(ds, visiblePoints, bounds, visibleStartMs, msPerPixel, centerY, maxAmplitude);
                     break;
             }
 
             // Draw center line
-            using var centerPaint = new SKPaint { Color = new SKColor(255, 255, 255, 60), StrokeWidth = 0.5f, IsAntialias = false };
-            canvas.DrawLine((float)bounds.X, centerY, (float)(bounds.X + bounds.Width), centerY, centerPaint);
+            ds.DrawLine(
+                (float)bounds.X, centerY,
+                (float)(bounds.X + bounds.Width), centerY,
+                Color.FromArgb(60, 255, 255, 255),
+                0.5f);
         }
 
+        /// <summary>
+        /// Renders a mono (single color) waveform.
+        /// </summary>
         private static void RenderMonoWaveform(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             IEnumerable<WaveformPoint> points,
             Rect bounds,
             double startMs,
@@ -94,9 +135,6 @@ namespace PixlPunkt.UI.Animation
             float centerY,
             float maxAmplitude)
         {
-            using var fillPaint = new SKPaint { Color = ToSKColor(MonoFillColor), IsAntialias = false };
-            using var linePaint = new SKPaint { Color = ToSKColor(MonoColor), StrokeWidth = 1f, IsAntialias = false };
-
             float lastX = float.NaN;
             float lastY1 = centerY;
             float lastY2 = centerY;
@@ -105,6 +143,7 @@ namespace PixlPunkt.UI.Animation
             {
                 float x = (float)(bounds.X + (point.TimeMs - startMs) / msPerPixel);
 
+                // Skip if outside bounds
                 if (x < bounds.X - 1 || x > bounds.X + bounds.Width + 1)
                     continue;
 
@@ -115,13 +154,14 @@ namespace PixlPunkt.UI.Animation
                 float y2 = centerY + amplitude;
 
                 // Draw filled bar
-                canvas.DrawRect(x, y1, 1.5f, amplitude * 2, fillPaint);
+                ds.FillRectangle(x, y1, 1.5f, amplitude * 2, MonoFillColor);
 
                 // Draw outline
                 if (!float.IsNaN(lastX))
                 {
-                    canvas.DrawLine(lastX, lastY1, x, y1, linePaint);
-                    canvas.DrawLine(lastX, lastY2, x, y2, linePaint);
+                    // Connect to previous point with lines for smooth appearance
+                    ds.DrawLine(lastX, lastY1, x, y1, MonoColor, 1f);
+                    ds.DrawLine(lastX, lastY2, x, y2, MonoColor, 1f);
                 }
 
                 lastX = x;
@@ -130,8 +170,11 @@ namespace PixlPunkt.UI.Animation
             }
         }
 
+        /// <summary>
+        /// Renders a stereo waveform with separate left/right channels.
+        /// </summary>
         private static void RenderStereoWaveform(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             IEnumerable<WaveformPoint> points,
             Rect bounds,
             double startMs,
@@ -139,9 +182,6 @@ namespace PixlPunkt.UI.Animation
             float centerY,
             float maxAmplitude)
         {
-            using var leftPaint = new SKPaint { Color = ToSKColor(LeftChannelColor), IsAntialias = false };
-            using var rightPaint = new SKPaint { Color = ToSKColor(RightChannelColor), IsAntialias = false };
-
             foreach (var point in points)
             {
                 float x = (float)(bounds.X + (point.TimeMs - startMs) / msPerPixel);
@@ -151,16 +191,19 @@ namespace PixlPunkt.UI.Animation
 
                 // Left channel goes up
                 float leftHeight = Math.Max(point.LeftPeak * maxAmplitude, MinWaveformHeight);
-                canvas.DrawRect(x, centerY - leftHeight, 1f, leftHeight, leftPaint);
+                ds.FillRectangle(x, centerY - leftHeight, 1f, leftHeight, LeftChannelColor);
 
                 // Right channel goes down
                 float rightHeight = Math.Max(point.RightPeak * maxAmplitude, MinWaveformHeight);
-                canvas.DrawRect(x, centerY, 1f, rightHeight, rightPaint);
+                ds.FillRectangle(x, centerY, 1f, rightHeight, RightChannelColor);
             }
         }
 
+        /// <summary>
+        /// Renders a spectrum-colored waveform (color varies by amplitude).
+        /// </summary>
         private static void RenderSpectrumWaveform(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             IEnumerable<WaveformPoint> points,
             Rect bounds,
             double startMs,
@@ -168,8 +211,6 @@ namespace PixlPunkt.UI.Animation
             float centerY,
             float maxAmplitude)
         {
-            using var paint = new SKPaint { IsAntialias = false };
-
             foreach (var point in points)
             {
                 float x = (float)(bounds.X + (point.TimeMs - startMs) / msPerPixel);
@@ -180,19 +221,26 @@ namespace PixlPunkt.UI.Animation
                 float amplitude = point.AveragePeak;
                 float height = Math.Max(amplitude * maxAmplitude, MinWaveformHeight);
 
-                paint.Color = ToSKColor(GetSpectrumColor(amplitude));
-                canvas.DrawRect(x, centerY - height, 1.5f, height * 2, paint);
+                // Color interpolation: low amplitude = blue, mid = green, high = red/orange
+                var color = GetSpectrumColor(amplitude);
+
+                ds.FillRectangle(x, centerY - height, 1.5f, height * 2, color);
             }
         }
 
+        /// <summary>
+        /// Gets a spectrum color based on amplitude (0-1).
+        /// </summary>
         private static Color GetSpectrumColor(float amplitude)
         {
+            // Blue -> Cyan -> Green -> Yellow -> Orange -> Red
             amplitude = Math.Clamp(amplitude, 0f, 1f);
 
             byte r, g, b;
 
             if (amplitude < 0.25f)
             {
+                // Blue to Cyan
                 float t = amplitude / 0.25f;
                 r = 0;
                 g = (byte)(t * 200);
@@ -200,6 +248,7 @@ namespace PixlPunkt.UI.Animation
             }
             else if (amplitude < 0.5f)
             {
+                // Cyan to Green
                 float t = (amplitude - 0.25f) / 0.25f;
                 r = 0;
                 g = 200;
@@ -207,6 +256,7 @@ namespace PixlPunkt.UI.Animation
             }
             else if (amplitude < 0.75f)
             {
+                // Green to Yellow
                 float t = (amplitude - 0.5f) / 0.25f;
                 r = (byte)(t * 255);
                 g = 200;
@@ -214,6 +264,7 @@ namespace PixlPunkt.UI.Animation
             }
             else
             {
+                // Yellow to Red
                 float t = (amplitude - 0.75f) / 0.25f;
                 r = 255;
                 g = (byte)((1 - t) * 200);
@@ -223,8 +274,11 @@ namespace PixlPunkt.UI.Animation
             return Color.FromArgb(200, r, g, b);
         }
 
+        /// <summary>
+        /// Draws a loading indicator when waveform is being generated.
+        /// </summary>
         private static void DrawLoadingIndicator(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             AudioTrackState audioTrack,
             Rect bounds)
         {
@@ -238,38 +292,41 @@ namespace PixlPunkt.UI.Animation
             float barY = centerY - barHeight / 2;
 
             // Background
-            using var bgPaint = new SKPaint { Color = new SKColor(100, 100, 100, 100), IsAntialias = true };
-            canvas.DrawRoundRect(barX, barY, barWidth, barHeight, 2, 2, bgPaint);
+            ds.FillRoundedRectangle(barX, barY, barWidth, barHeight, 2, 2,
+                Color.FromArgb(100, 100, 100, 100));
 
             // Progress
             if (progress > 0)
             {
-                using var progressPaint = new SKPaint { Color = ToSKColor(MonoColor), IsAntialias = true };
-                canvas.DrawRoundRect(barX, barY, barWidth * progress, barHeight, 2, 2, progressPaint);
+                ds.FillRoundedRectangle(barX, barY, barWidth * progress, barHeight, 2, 2,
+                    MonoColor);
             }
 
             // Text
+            var textFormat = new Microsoft.Graphics.Canvas.Text.CanvasTextFormat
+            {
+                FontSize = 10,
+                HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Center,
+                VerticalAlignment = Microsoft.Graphics.Canvas.Text.CanvasVerticalAlignment.Center
+            };
+
             string text = audioTrack.IsGeneratingWaveform
                 ? $"Generating waveform... {(int)(progress * 100)}%"
                 : "Loading audio...";
 
-            using var textPaint = new SKPaint
-            {
-                Color = new SKColor(200, 200, 200, 180),
-                TextSize = 10,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI"),
-                TextAlign = SKTextAlign.Center
-            };
-
-            canvas.DrawText(text, (float)(bounds.X + bounds.Width / 2), centerY + 16, textPaint);
+            ds.DrawText(text, bounds, Color.FromArgb(180, 200, 200, 200), textFormat);
         }
 
         /// <summary>
         /// Renders a playhead indicator at the specified position.
         /// </summary>
+        /// <param name="ds">The drawing session.</param>
+        /// <param name="bounds">The waveform bounds.</param>
+        /// <param name="positionMs">Current playback position in milliseconds.</param>
+        /// <param name="visibleStartMs">Start of visible range.</param>
+        /// <param name="visibleEndMs">End of visible range.</param>
         public static void RenderPlayhead(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             Rect bounds,
             double positionMs,
             double visibleStartMs,
@@ -282,61 +339,53 @@ namespace PixlPunkt.UI.Animation
             float x = (float)(bounds.X + (positionMs - visibleStartMs) / msPerPixel);
 
             // Draw playhead line
-            using var linePaint = new SKPaint { Color = ToSKColor(PlayheadColor), StrokeWidth = 2f, IsAntialias = false };
-            canvas.DrawLine(x, (float)bounds.Y, x, (float)(bounds.Y + bounds.Height), linePaint);
+            ds.DrawLine(x, (float)bounds.Y, x, (float)(bounds.Y + bounds.Height), PlayheadColor, 2f);
 
             // Draw small triangle at top
             float triangleSize = 6f;
-            using var path = new SKPath();
-            path.MoveTo(x - triangleSize / 2, (float)bounds.Y);
-            path.LineTo(x + triangleSize / 2, (float)bounds.Y);
-            path.LineTo(x, (float)bounds.Y + triangleSize);
-            path.Close();
+            var pathBuilder = new CanvasPathBuilder(ds);
+            pathBuilder.BeginFigure(x - triangleSize / 2, (float)bounds.Y);
+            pathBuilder.AddLine(x + triangleSize / 2, (float)bounds.Y);
+            pathBuilder.AddLine(x, (float)bounds.Y + triangleSize);
+            pathBuilder.EndFigure(CanvasFigureLoop.Closed);
 
-            using var fillPaint = new SKPaint { Color = ToSKColor(PlayheadColor), IsAntialias = true };
-            canvas.DrawPath(path, fillPaint);
+            using var geometry = CanvasGeometry.CreatePath(pathBuilder);
+            ds.FillGeometry(geometry, PlayheadColor);
         }
 
         /// <summary>
         /// Renders the audio track filename label.
         /// </summary>
         public static void RenderLabel(
-            SKCanvas canvas,
+            CanvasDrawingSession ds,
             AudioTrackState audioTrack,
             Rect bounds)
         {
             if (audioTrack == null || !audioTrack.IsLoaded)
                 return;
 
-            string label = $"? {audioTrack.Settings.DisplayName}";
-
-            float x = (float)bounds.X + 4;
-            float y = (float)bounds.Y + 12;
-
-            // Measure text for background
-            using var textPaint = new SKPaint
+            var textFormat = new Microsoft.Graphics.Canvas.Text.CanvasTextFormat
             {
-                Color = SKColors.White,
-                TextSize = 10,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyleWeight.SemiBold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
+                FontSize = 10,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             };
 
-            var textBounds = new SKRect();
-            textPaint.MeasureText(label, ref textBounds);
+            string label = $"?? {audioTrack.Settings.DisplayName}";
+
+            // Draw with slight offset from left edge
+            float x = (float)bounds.X + 4;
+            float y = (float)bounds.Y + 2;
 
             // Background for readability
-            using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 180), IsAntialias = true };
-            canvas.DrawRoundRect(x - 2, (float)bounds.Y + 2, textBounds.Width + 4, textBounds.Height + 4, 2, 2, bgPaint);
+            var layout = new Microsoft.Graphics.Canvas.Text.CanvasTextLayout(ds, label, textFormat, (float)bounds.Width - 8, 16);
+            var textBounds = layout.LayoutBounds;
+            ds.FillRoundedRectangle(
+                x - 2, y - 1,
+                (float)textBounds.Width + 4, (float)textBounds.Height + 2,
+                2, 2,
+                Color.FromArgb(180, 0, 0, 0));
 
-            canvas.DrawText(label, x, y, textPaint);
+            ds.DrawText(label, x, y, Colors.White, textFormat);
         }
-
-        private static SKColor ToSKColor(Color c) => new SKColor(c.R, c.G, c.B, c.A);
-    }
-
-    internal static class RectExtensions
-    {
-        public static SKRect ToSKRect(this Rect r) => new SKRect((float)r.X, (float)r.Y, (float)(r.X + r.Width), (float)(r.Y + r.Height));
     }
 }

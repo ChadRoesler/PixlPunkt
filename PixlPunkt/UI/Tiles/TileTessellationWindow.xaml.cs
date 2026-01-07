@@ -1,5 +1,6 @@
 using System;
-using System.Runtime.InteropServices;
+using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -9,9 +10,8 @@ using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Tile;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.UI.Rendering;
-using SkiaSharp;
-using SkiaSharp.Views.Windows;
 using Windows.Foundation;
+using Windows.Graphics.DirectX;
 using Windows.System;
 using Windows.UI;
 
@@ -80,8 +80,6 @@ namespace PixlPunkt.UI.Tiles
         // ====================================================================
 
         private readonly PatternBackgroundService _pattern = new();
-        private SKShader? _checkerboardShader;
-        private SKBitmap? _checkerboardBitmap;
 
         // ====================================================================
         // CONSTRUCTION
@@ -91,15 +89,13 @@ namespace PixlPunkt.UI.Tiles
         {
             InitializeComponent();
 
-            // Set initial window size using XAML properties or content sizing
-            // AppWindow.Resize is not available on all Uno platforms
+            var appWindow = this.AppWindow;
+            appWindow.Resize(new Windows.Graphics.SizeInt32(600, 550));
 
             if (Content is FrameworkElement root)
             {
                 root.Loaded += Root_Loaded;
                 root.KeyDown += Root_KeyDown;
-                root.Width = 600;
-                root.Height = 550;
             }
 
             Closed += TileTessellationWindow_Closed;
@@ -136,10 +132,6 @@ namespace PixlPunkt.UI.Tiles
 
             // Auto-commit changes on close (no history needed - already tracked)
             CommitToTileSet();
-
-            // Dispose SkiaSharp resources
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
         }
 
         private void Root_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -164,7 +156,6 @@ namespace PixlPunkt.UI.Tiles
         {
             ApplyStripeColors();
             _pattern.Invalidate();
-            InvalidateCheckerboardCache();
             TessellationCanvas?.Invalidate();
         }
 
@@ -185,14 +176,6 @@ namespace PixlPunkt.UI.Tiles
                 _pattern.LightColor = light;
                 _pattern.DarkColor = dark;
             }
-        }
-
-        private void InvalidateCheckerboardCache()
-        {
-            _checkerboardShader?.Dispose();
-            _checkerboardShader = null;
-            _checkerboardBitmap?.Dispose();
-            _checkerboardBitmap = null;
         }
 
         // ====================================================================
@@ -235,6 +218,8 @@ namespace PixlPunkt.UI.Tiles
             var tilePixels = _tileSet.GetTilePixels(_tileId);
             if (tilePixels != null && tilePixels.Length == _workingPixels.Length)
             {
+                // Apply reverse offset to get working pixels
+                // (tile set stores the "committed" state, working pixels have offset applied)
                 Buffer.BlockCopy(tilePixels, 0, _workingPixels, 0, tilePixels.Length);
             }
         }
@@ -247,6 +232,7 @@ namespace PixlPunkt.UI.Tiles
             if (_document == null || _tileSet == null || _tileId < 0 || _strokeBeforePixels == null)
                 return;
 
+            // Get the current tile state (after the stroke)
             var currentPixels = _tileSet.GetTilePixels(_tileId);
             if (currentPixels == null)
                 return;
@@ -273,6 +259,11 @@ namespace PixlPunkt.UI.Tiles
         /// <summary>
         /// Binds the window to a specific tile from a tile set.
         /// </summary>
+        /// <param name="tileSet">The tile set containing the tile.</param>
+        /// <param name="tileId">The ID of the tile to edit.</param>
+        /// <param name="palette">The palette service for colors.</param>
+        /// <param name="toolState">The tool state for brush settings.</param>
+        /// <param name="document">The document for history support.</param>
         public void BindTile(TileSet tileSet, int tileId, PaletteService? palette = null, ToolState? toolState = null, CanvasDocument? document = null)
         {
             _tileSet = tileSet;
@@ -354,6 +345,9 @@ namespace PixlPunkt.UI.Tiles
         // COORDINATE TRANSLATION
         // ====================================================================
 
+        /// <summary>
+        /// Converts screen position to canvas coordinates.
+        /// </summary>
         private (int canvasX, int canvasY) ScreenToCanvas(Point screenPos)
         {
             int canvasX = (int)Math.Floor(screenPos.X / _zoom);
@@ -361,32 +355,52 @@ namespace PixlPunkt.UI.Tiles
             return (canvasX, canvasY);
         }
 
+        /// <summary>
+        /// Converts canvas coordinates to tile-local coordinates with wrap-around.
+        /// </summary>
         private (int tileX, int tileY) CanvasToTileLocal(int canvasX, int canvasY)
         {
+            // Apply offset and wrap to tile coordinates
             int tileX = ((canvasX - _offsetX) % _tileWidth + _tileWidth) % _tileWidth;
             int tileY = ((canvasY - _offsetY) % _tileHeight + _tileHeight) % _tileHeight;
             return (tileX, tileY);
+        }
+
+        /// <summary>
+        /// Gets which tile cell (grid position) contains the canvas coordinates.
+        /// </summary>
+        private (int gridX, int gridY) CanvasToGridCell(int canvasX, int canvasY)
+        {
+            int gridX = canvasX / _tileWidth;
+            int gridY = canvasY / _tileHeight;
+            return (gridX, gridY);
         }
 
         // ====================================================================
         // TILE PIXEL PAINTING
         // ====================================================================
 
+        /// <summary>
+        /// Paints a single pixel at tile-local coordinates with wrap-around.
+        /// </summary>
         private void PaintPixel(int tileX, int tileY, uint color)
         {
             if (_workingPixels == null) return;
 
+            // Wrap coordinates
             int x = ((tileX % _tileWidth) + _tileWidth) % _tileWidth;
             int y = ((tileY % _tileHeight) + _tileHeight) % _tileHeight;
 
             int idx = (y * _tileWidth + x) * 4;
             if (idx < 0 || idx + 3 >= _workingPixels.Length) return;
 
+            // Extract BGRA components
             byte b = (byte)(color & 0xFF);
             byte g = (byte)((color >> 8) & 0xFF);
             byte r = (byte)((color >> 16) & 0xFF);
             byte a = (byte)((color >> 24) & 0xFF);
 
+            // Alpha blend with existing pixel
             if (a < 255)
             {
                 byte existB = _workingPixels[idx];
@@ -415,6 +429,9 @@ namespace PixlPunkt.UI.Tiles
             }
         }
 
+        /// <summary>
+        /// Stamps the brush at the given tile-local coordinates.
+        /// </summary>
         private void StampBrush(int tileX, int tileY)
         {
             int radius = (_brushSize - 1) / 2;
@@ -426,10 +443,11 @@ namespace PixlPunkt.UI.Tiles
                 {
                     bool inBrush = _brushShape == BrushShape.Circle
                         ? (dx * dx + dy * dy) <= (radius * radius + radius)
-                        : true;
+                        : true; // Square
 
                     if (inBrush)
                     {
+                        // Calculate alpha falloff based on density
                         byte pixelAlpha = CalculateBrushAlpha(dx, dy, radius);
                         if (pixelAlpha > 0)
                         {
@@ -441,6 +459,9 @@ namespace PixlPunkt.UI.Tiles
             }
         }
 
+        /// <summary>
+        /// Calculates brush alpha at offset based on density falloff.
+        /// </summary>
         private byte CalculateBrushAlpha(int dx, int dy, int radius)
         {
             if (radius == 0) return _brushOpacity;
@@ -458,11 +479,47 @@ namespace PixlPunkt.UI.Tiles
 
             double span = Math.Max(0.001, r - hardRadius);
             double t = (dist - hardRadius) / span;
-            double falloff = 1.0 - (t * t) * (3 - 2 * t);
+            double falloff = 1.0 - (t * t) * (3 - 2 * t); // Smoothstep
 
             return (byte)Math.Round(_brushOpacity * falloff);
         }
 
+        /// <summary>
+        /// Draws a line between two tile-local positions using Bresenham.
+        /// </summary>
+        private void StampLine(int x0, int y0, int x1, int y1)
+        {
+            int dx = Math.Abs(x1 - x0);
+            int dy = Math.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
+
+            while (true)
+            {
+                StampBrush(x0, y0);
+
+                if (x0 == x1 && y0 == y1) break;
+
+                int e2 = 2 * err;
+                if (e2 > -dy)
+                {
+                    err -= dy;
+                    x0 += sx;
+                }
+                if (e2 < dx)
+                {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws a line between two canvas positions using Bresenham.
+        /// Each point is converted to tile-local coordinates with wrap-around,
+        /// allowing seamless drawing across tile boundaries.
+        /// </summary>
         private void StampLineCanvas(int canvasX0, int canvasY0, int canvasX1, int canvasY1)
         {
             int dx = Math.Abs(canvasX1 - canvasX0);
@@ -473,6 +530,7 @@ namespace PixlPunkt.UI.Tiles
 
             while (true)
             {
+                // Convert canvas position to tile-local coordinates (with wrap)
                 var (tileX, tileY) = CanvasToTileLocal(canvasX0, canvasY0);
                 StampBrush(tileX, tileY);
 
@@ -505,6 +563,7 @@ namespace PixlPunkt.UI.Tiles
 
             var (canvasX, canvasY) = ScreenToCanvas(pt.Position);
 
+            // Validate canvas position is within bounds
             int canvasWidth = _tileWidth * _gridSize;
             int canvasHeight = _tileHeight * _gridSize;
             if (canvasX < 0 || canvasX >= canvasWidth || canvasY < 0 || canvasY >= canvasHeight)
@@ -512,6 +571,7 @@ namespace PixlPunkt.UI.Tiles
 
             var (tileX, tileY) = CanvasToTileLocal(canvasX, canvasY);
 
+            // Capture before state for history at stroke start
             var currentTilePixels = _tileSet.GetTilePixels(_tileId);
             if (currentTilePixels != null)
             {
@@ -522,6 +582,7 @@ namespace PixlPunkt.UI.Tiles
             _hasLastPos = true;
             _lastTileX = tileX;
             _lastTileY = tileY;
+            // Also track the last canvas position for proper line interpolation
             _lastCanvasX = canvasX;
             _lastCanvasY = canvasY;
 
@@ -530,6 +591,7 @@ namespace PixlPunkt.UI.Tiles
             TessellationCanvas.CapturePointer(e.Pointer);
             TessellationCanvas.Invalidate();
 
+            // Live update - push changes immediately to TileSet for real-time preview
             PushLiveUpdate();
         }
 
@@ -538,9 +600,11 @@ namespace PixlPunkt.UI.Tiles
             var pt = e.GetCurrentPoint(TessellationCanvas);
             var (canvasX, canvasY) = ScreenToCanvas(pt.Position);
 
+            // Update hover position for cursor preview
             _hoverCanvasX = canvasX;
             _hoverCanvasY = canvasY;
 
+            // Validate hover is within canvas bounds
             int canvasWidth = _tileWidth * _gridSize;
             int canvasHeight = _tileHeight * _gridSize;
             _hoverValid = canvasX >= 0 && canvasX < canvasWidth &&
@@ -548,11 +612,13 @@ namespace PixlPunkt.UI.Tiles
 
             if (_isPainting && _workingPixels != null && pt.Properties.IsLeftButtonPressed)
             {
+                // Clamp canvas coordinates to valid range for line drawing
                 int clampedCanvasX = Math.Clamp(canvasX, 0, canvasWidth - 1);
                 int clampedCanvasY = Math.Clamp(canvasY, 0, canvasHeight - 1);
 
                 if (_hasLastPos)
                 {
+                    // Draw line in canvas coordinates to handle tile boundary crossings properly
                     StampLineCanvas(_lastCanvasX, _lastCanvasY, clampedCanvasX, clampedCanvasY);
                 }
                 else
@@ -568,6 +634,7 @@ namespace PixlPunkt.UI.Tiles
                 _lastTileY = lastTileY;
                 _hasLastPos = true;
 
+                // Live update - push changes during drag for real-time preview
                 PushLiveUpdate();
             }
 
@@ -582,7 +649,10 @@ namespace PixlPunkt.UI.Tiles
                 _hasLastPos = false;
                 TessellationCanvas.ReleasePointerCaptures();
 
+                // Final live update to ensure tile is in sync
                 PushLiveUpdate();
+
+                // Push to history now that stroke is complete
                 PushStrokeToHistory();
             }
         }
@@ -597,27 +667,40 @@ namespace PixlPunkt.UI.Tiles
         // COMMIT / REVERT
         // ====================================================================
 
+        /// <summary>
+        /// Commits the working pixels to the TileSet.
+        /// </summary>
         private void CommitToTileSet()
         {
             if (_tileSet == null || _tileId < 0 || _workingPixels == null) return;
 
+            // Apply current offset before committing
             byte[] finalPixels = ApplyOffset(_workingPixels, _offsetX, _offsetY);
             _tileSet.UpdateTilePixels(_tileId, finalPixels);
         }
 
+        /// <summary>
+        /// Pushes the current working pixels to the TileSet for live preview.
+        /// This triggers TileSetChanged event which updates TilePanel and main canvas.
+        /// </summary>
         private void PushLiveUpdate()
         {
             if (_tileSet == null || _tileId < 0 || _workingPixels == null)
                 return;
 
+            // Apply current offset before pushing
             byte[] previewPixels = ApplyOffset(_workingPixels, _offsetX, _offsetY);
             _tileSet.UpdateTilePixels(_tileId, previewPixels);
         }
 
+        /// <summary>
+        /// Reverts to the original tile pixels.
+        /// </summary>
         private void RevertToOriginal()
         {
             if (_originalPixels == null || _workingPixels == null || _tileSet == null) return;
 
+            // Capture current state before revert for history
             var currentPixels = _tileSet.GetTilePixels(_tileId);
             if (currentPixels != null && _document != null)
             {
@@ -645,6 +728,7 @@ namespace PixlPunkt.UI.Tiles
             if (OffsetYBox != null) OffsetYBox.Value = 0;
             _updatingControls = false;
 
+            // Push revert to tile set
             _tileSet.UpdateTilePixels(_tileId, _originalPixels);
 
             TessellationCanvas?.Invalidate();
@@ -669,39 +753,37 @@ namespace PixlPunkt.UI.Tiles
         // RENDERING
         // ====================================================================
 
-        private void TessellationCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        private void TessellationCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
         {
             if (_workingPixels == null || _tileWidth <= 0 || _tileHeight <= 0)
                 return;
 
-            var canvas = e.Surface.Canvas;
-            canvas.Clear(SKColors.Transparent);
+            var ds = args.DrawingSession;
+            ds.Antialiasing = CanvasAntialiasing.Aliased;
 
             int canvasWidth = _tileWidth * _gridSize * _zoom;
             int canvasHeight = _tileHeight * _gridSize * _zoom;
 
-            // Draw transparency checkerboard background
-            var (lightColor, darkColor) = _pattern.CurrentScheme;
-            EnsureCheckerboardShader(8, lightColor, darkColor);
-
-            if (_checkerboardShader != null)
-            {
-                using var bgPaint = new SKPaint { Shader = _checkerboardShader, IsAntialias = false };
-                canvas.DrawRect(0, 0, canvasWidth, canvasHeight, bgPaint);
-            }
+            // Draw transparency stripe background
+            double dpi = sender.XamlRoot?.RasterizationScale ?? 1.0;
+            var bgImg = _pattern.GetSizedImage(sender.Device, dpi, canvasWidth, canvasHeight);
+            var bgSrc = new Rect(0, 0, bgImg.SizeInPixels.Width, bgImg.SizeInPixels.Height);
+            var bgDst = new Rect(0, 0, canvasWidth, canvasHeight);
+            ds.DrawImage(bgImg, bgDst, bgSrc);
 
             // Apply offset to get preview pixels
             byte[] previewPixels = ApplyOffset(_workingPixels, _offsetX, _offsetY);
 
             // Create bitmap from working pixels
-            var info = new SKImageInfo(_tileWidth, _tileHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
-            using var tileBitmap = new SKBitmap(info);
-            var handle = tileBitmap.GetPixels();
-            Marshal.Copy(previewPixels, 0, handle, previewPixels.Length);
+            using var tileBitmap = CanvasBitmap.CreateFromBytes(
+                sender.Device,
+                previewPixels,
+                _tileWidth,
+                _tileHeight,
+                DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                96.0f);
 
             // Render grid of tiles
-            using var tilePaint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
-
             for (int gy = 0; gy < _gridSize; gy++)
             {
                 for (int gx = 0; gx < _gridSize; gx++)
@@ -711,29 +793,33 @@ namespace PixlPunkt.UI.Tiles
                     float destW = _tileWidth * _zoom;
                     float destH = _tileHeight * _zoom;
 
-                    var destRect = new SKRect(destX, destY, destX + destW, destY + destH);
-                    var srcRect = new SKRect(0, 0, _tileWidth, _tileHeight);
+                    var destRect = new Rect(destX, destY, destW, destH);
+                    var srcRect = new Rect(0, 0, _tileWidth, _tileHeight);
 
-                    canvas.DrawBitmap(tileBitmap, srcRect, destRect, tilePaint);
+                    ds.DrawImage(
+                        tileBitmap,
+                        destRect,
+                        srcRect,
+                        1.0f,
+                        CanvasImageInterpolation.NearestNeighbor);
                 }
             }
 
             // Draw grid lines if enabled
             if (_showGrid)
             {
-                var gridColor = new SKColor(255, 255, 255, 128);
-                using var gridPaint = new SKPaint { Color = gridColor, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = false };
+                var gridColor = Color.FromArgb(128, 255, 255, 255);
 
                 for (int gx = 1; gx < _gridSize; gx++)
                 {
                     float x = gx * _tileWidth * _zoom;
-                    canvas.DrawLine(x, 0, x, canvasHeight, gridPaint);
+                    ds.DrawLine(x, 0, x, canvasHeight, gridColor, 1f);
                 }
 
                 for (int gy = 1; gy < _gridSize; gy++)
                 {
                     float y = gy * _tileHeight * _zoom;
-                    canvas.DrawLine(0, y, canvasWidth, y, gridPaint);
+                    ds.DrawLine(0, y, canvasWidth, y, gridColor, 1f);
                 }
 
                 // Highlight center tile (editable area)
@@ -744,71 +830,49 @@ namespace PixlPunkt.UI.Tiles
                 float highlightW = _tileWidth * _zoom;
                 float highlightH = _tileHeight * _zoom;
 
-                using var highlightPaint = new SKPaint { Color = new SKColor(0, 160, 255, 200), Style = SKPaintStyle.Stroke, StrokeWidth = 2f, IsAntialias = true };
-                canvas.DrawRect(highlightX, highlightY, highlightW, highlightH, highlightPaint);
+                var highlightColor = Color.FromArgb(200, 0, 160, 255);
+                ds.DrawRectangle(highlightX, highlightY, highlightW, highlightH, highlightColor, 2f);
             }
 
             // Draw brush cursor overlay
             if (_hoverValid)
             {
-                DrawBrushCursor(canvas);
+                DrawBrushCursor(ds);
             }
         }
 
-        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
-        {
-            if (_checkerboardBitmap != null && _checkerboardShader != null)
-                return;
-
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
-
-            int tileSize = squareSize * 2;
-            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
-            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
-
-            for (int y = 0; y < tileSize; y++)
-            {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    int cx = x / squareSize;
-                    int cy = y / squareSize;
-                    bool isLight = ((cx + cy) & 1) == 0;
-                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
-                }
-            }
-
-            using var image = SKImage.FromBitmap(_checkerboardBitmap);
-            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
-        }
-
-        private void DrawBrushCursor(SKCanvas canvas)
+        /// <summary>
+        /// Draws the brush cursor preview at the hover position.
+        /// </summary>
+        private void DrawBrushCursor(CanvasDrawingSession ds)
         {
             float centerX = _hoverCanvasX * _zoom + _zoom / 2f;
             float centerY = _hoverCanvasY * _zoom + _zoom / 2f;
             float radius = _brushSize * _zoom / 2f;
 
-            var cursorColor = new SKColor(255, 255, 255, 200);
-            var shadowColor = new SKColor(0, 0, 0, 128);
-
-            using var cursorPaint = new SKPaint { Color = cursorColor, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true };
-            using var shadowPaint = new SKPaint { Color = shadowColor, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true };
+            var cursorColor = Color.FromArgb(200, 255, 255, 255);
+            var shadowColor = Color.FromArgb(128, 0, 0, 0);
 
             if (_brushShape == BrushShape.Circle)
             {
-                canvas.DrawOval(centerX + 1, centerY + 1, radius, radius, shadowPaint);
-                canvas.DrawOval(centerX, centerY, radius, radius, cursorPaint);
+                // Shadow
+                ds.DrawEllipse(centerX + 1, centerY + 1, radius, radius, shadowColor, 1f);
+                // Cursor
+                ds.DrawEllipse(centerX, centerY, radius, radius, cursorColor, 1f);
             }
             else
             {
                 float half = _brushSize * _zoom / 2f;
-                canvas.DrawRect(centerX - half + 1, centerY - half + 1, _brushSize * _zoom, _brushSize * _zoom, shadowPaint);
-                canvas.DrawRect(centerX - half, centerY - half, _brushSize * _zoom, _brushSize * _zoom, cursorPaint);
+                // Shadow
+                ds.DrawRectangle(centerX - half + 1, centerY - half + 1, _brushSize * _zoom, _brushSize * _zoom, shadowColor, 1f);
+                // Cursor
+                ds.DrawRectangle(centerX - half, centerY - half, _brushSize * _zoom, _brushSize * _zoom, cursorColor, 1f);
             }
         }
 
+        /// <summary>
+        /// Applies pixel offset with wrap-around.
+        /// </summary>
         private byte[] ApplyOffset(byte[] source, int offsetX, int offsetY)
         {
             var result = new byte[source.Length];
@@ -875,6 +939,8 @@ namespace PixlPunkt.UI.Tiles
             _updatingControls = false;
 
             TessellationCanvas?.Invalidate();
+
+            // Live update for offset changes
             PushLiveUpdate();
         }
 
@@ -889,6 +955,8 @@ namespace PixlPunkt.UI.Tiles
             _updatingControls = false;
 
             TessellationCanvas?.Invalidate();
+
+            // Live update for offset changes
             PushLiveUpdate();
         }
 
@@ -903,6 +971,8 @@ namespace PixlPunkt.UI.Tiles
             _updatingControls = false;
 
             TessellationCanvas?.Invalidate();
+
+            // Live update for offset changes
             PushLiveUpdate();
         }
 
@@ -917,6 +987,8 @@ namespace PixlPunkt.UI.Tiles
             _updatingControls = false;
 
             TessellationCanvas?.Invalidate();
+
+            // Live update for offset changes
             PushLiveUpdate();
         }
 
@@ -929,6 +1001,7 @@ namespace PixlPunkt.UI.Tiles
         {
             CommitToTileSet();
 
+            // Update original to new state so revert goes to this point
             if (_workingPixels != null && _originalPixels != null)
             {
                 byte[] finalPixels = ApplyOffset(_workingPixels, _offsetX, _offsetY);
@@ -936,6 +1009,7 @@ namespace PixlPunkt.UI.Tiles
                 Buffer.BlockCopy(finalPixels, 0, _workingPixels, 0, finalPixels.Length);
             }
 
+            // Reset offset to 0 (offset is now baked in)
             _offsetX = 0;
             _offsetY = 0;
 

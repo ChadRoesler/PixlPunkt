@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using PixlPunkt.Core.Rendering;
+using Microsoft.Graphics.Canvas;
 using Windows.Foundation;
+using Windows.Graphics.DirectX;
 using Windows.UI;
 
 namespace PixlPunkt.UI.CanvasHost
@@ -64,16 +65,27 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Draws the document surface with sub-routines interleaved based on Z-order.
         /// </summary>
-        /// <param name="renderer">The canvas renderer.</param>
+        /// <param name="ds">The canvas drawing session.</param>
+        /// <param name="device">The canvas device for bitmap creation.</param>
         /// <param name="dest">The destination rectangle in screen coordinates.</param>
-        private void DrawDocumentWithInterleavedSubRoutines(ICanvasRenderer renderer, Rect dest)
+        /// <remarks>
+        /// <para>
+        /// This method serves as the entry point for interleaved rendering. It determines whether
+        /// complex interleaving is needed based on the current animation mode and active sub-routines.
+        /// </para>
+        /// <para>
+        /// Call this instead of simple <c>CompositeTo + DrawDocumentSurface</c> when sub-routines
+        /// need to respect layer Z-ordering.
+        /// </para>
+        /// </remarks>
+        private void DrawDocumentWithInterleavedSubRoutines(CanvasDrawingSession ds, CanvasDevice device, Rect dest)
         {
             var animState = Document?.CanvasAnimationState;
 
             // If not in canvas animation mode, use simple rendering
             if (_animationMode != Animation.AnimationMode.Canvas || animState == null)
             {
-                DrawSimpleCompositeInternal(renderer, dest);
+                DrawSimpleCompositeInternal(ds, device, dest);
                 return;
             }
 
@@ -89,30 +101,61 @@ namespace PixlPunkt.UI.CanvasHost
             if (activeSubRoutines.Count == 0)
             {
                 // No active sub-routines, use simple rendering
-                DrawSimpleCompositeInternal(renderer, dest);
-                DrawSubRoutineOverlayInternal(renderer, dest); // Still draw selection handles if any
+                DrawSimpleCompositeInternal(ds, device, dest);
+                DrawSubRoutineOverlayInternal(ds, dest); // Still draw selection handles if any
                 return;
             }
 
             // Complex path: interleave sub-routines with layers based on Z-order
-            DrawInterleavedCompositeInternal(renderer, dest, activeSubRoutines);
+            DrawInterleavedCompositeInternal(ds, device, dest, activeSubRoutines);
         }
 
         /// <summary>
         /// Simple composite rendering: all layers composited together, then drawn.
         /// </summary>
-        private void DrawSimpleCompositeInternal(ICanvasRenderer renderer, Rect dest)
+        /// <param name="ds">The canvas drawing session.</param>
+        /// <param name="device">The canvas device for bitmap creation.</param>
+        /// <param name="dest">The destination rectangle in screen coordinates.</param>
+        /// <remarks>
+        /// Used when no sub-routines are active or when not in canvas animation mode.
+        /// This is the fast path that delegates to <see cref="Core.Document.CanvasDocument.CompositeTo"/>.
+        /// </remarks>
+        private void DrawSimpleCompositeInternal(CanvasDrawingSession ds, CanvasDevice device, Rect dest)
         {
             EnsureComposite();
             Document.CompositeTo(_composite!);
             FrameReady?.Invoke(_composite!.Pixels, _composite.Width, _composite.Height);
-            DrawDocumentSurface(renderer, dest);
+            DrawDocumentSurface(ds, device, dest);
         }
 
         /// <summary>
         /// Interleaved composite rendering: layers and sub-routines composited in Z-order.
         /// </summary>
-        private void DrawInterleavedCompositeInternal(ICanvasRenderer renderer, Rect dest,
+        /// <param name="ds">The canvas drawing session.</param>
+        /// <param name="device">The canvas device for bitmap creation.</param>
+        /// <param name="dest">The destination rectangle in screen coordinates.</param>
+        /// <param name="activeSubRoutines">List of active sub-routines with their render info.</param>
+        /// <remarks>
+        /// <para>
+        /// This method implements the core Z-order interleaving algorithm. It builds a unified
+        /// list of layers and sub-routines, sorts them by Z-order, and composites them in order.
+        /// </para>
+        /// <para><strong>Algorithm:</strong></para>
+        /// <list type="number">
+        /// <item>Collect all visible layers with their computed Z-orders (inverted track index).</item>
+        /// <item>Collect all active sub-routines with their explicit Z-order values.</item>
+        /// <item>Sort all items by Z-order ascending (lowest first = rendered behind).</item>
+        /// <item>Apply tie-breaking: sub-routines before layers; among sub-routines, reverse collection order.</item>
+        /// <item>Composite each item onto the output surface in sorted order.</item>
+        /// </list>
+        /// <para><strong>Consistency with UI:</strong></para>
+        /// <para>
+        /// This method uses the same Z-order logic as <c>AnimationPanel.BuildOrderedTrackList()</c>
+        /// but sorts in ascending order for rendering (vs. descending for UI display). This ensures
+        /// the rendered output matches what users see in the timeline panel.
+        /// </para>
+        /// </remarks>
+        private void DrawInterleavedCompositeInternal(CanvasDrawingSession ds, CanvasDevice device, Rect dest,
             List<Core.Animation.SubRoutineRenderInfo> activeSubRoutines)
         {
             var animState = Document.CanvasAnimationState;
@@ -135,16 +178,21 @@ namespace PixlPunkt.UI.CanvasHost
             _composite!.Clear(0x00000000);
 
             // Build ordered list using the SAME logic as AnimationPanel.BuildOrderedTrackList()
+            // Include an index for stable secondary sorting
+            // Tuple: (zOrder, isLayer, insertionOrder, layer, subRoutine, name)
+            // insertionOrder is used to break ties: higher = later in collection = lower in UI = render first
             var renderItems = new List<(int zOrder, bool isLayer, int insertionOrder, Core.Document.Layer.RasterLayer? layer, Core.Animation.SubRoutineRenderInfo? subRoutine, string name)>();
 
             int trackCount = animState.Tracks.Count;
             int insertionCounter = 0;
 
-            // Add layers with inverted index as Z-order
+            // Add layers with inverted index as Z-order (same as BuildOrderedTrackList)
+            // Track 0 (Foreground/top in UI) gets highest Z, track N-1 (Background) gets Z=0
             for (int i = 0; i < trackCount; i++)
             {
                 var track = animState.Tracks[i];
                 
+                // Find this track's layer in the visible layers
                 if (layerIdToLayer.TryGetValue(track.LayerId, out var rasterLayer))
                 {
                     int zOrder = trackCount - 1 - i;
@@ -152,31 +200,41 @@ namespace PixlPunkt.UI.CanvasHost
                 }
             }
 
-            // Add sub-routines with their ZOrder
+            // Add sub-routines with their ZOrder (same as BuildOrderedTrackList)
+            // The collection order determines their relative position when Z values are equal
             int subRoutineIndex = 0;
             foreach (var subRoutine in activeSubRoutines)
             {
+                // Use subRoutineIndex as the insertion order - this preserves their collection order
                 renderItems.Add((subRoutine.ZOrder, false, subRoutineIndex++, null, subRoutine, subRoutine.SubRoutine.DisplayName));
             }
 
-            // Sort for RENDERING (ascending Z = lowest first = behind)
+            // Sort for RENDERING (ascending Z = lowest first = behind):
+            // 1. Primary: Z-order ascending (lowest Z renders first = behind)
+            // 2. Secondary (same Z): sub-routines (false) before layers (true) 
+            // 3. Tertiary (same Z, both sub-routines): HIGHER insertionOrder first (they appear lower in UI, should render behind)
             renderItems.Sort((a, b) =>
             {
                 int cmp = a.zOrder.CompareTo(b.zOrder);
                 if (cmp != 0) return cmp;
                 
+                // Same Z-order: sub-routines before layers
                 int typeCmp = a.isLayer.CompareTo(b.isLayer);
                 if (typeCmp != 0) return typeCmp;
                 
+                // Same Z, same type: for sub-routines, REVERSE the insertion order
+                // Higher insertion order = later in collection = lower in UI = should render FIRST (behind)
+                // So we compare b to a (descending)
                 if (!a.isLayer && !b.isLayer)
                 {
                     return b.insertionOrder.CompareTo(a.insertionOrder);
                 }
                 
+                // For layers with same Z (shouldn't happen normally), use insertion order ascending
                 return a.insertionOrder.CompareTo(b.insertionOrder);
             });
 
-            // Render in Z-order
+            // Render in Z-order (lowest first = behind, highest last = in front)
             foreach (var item in renderItems)
             {
                 if (item.isLayer && item.layer != null)
@@ -191,13 +249,24 @@ namespace PixlPunkt.UI.CanvasHost
 
             FrameReady?.Invoke(_composite.Pixels, _composite.Width, _composite.Height);
 
-            // Draw the interleaved composite using the renderer
-            var srcRect = new Rect(0, 0, _composite.Width, _composite.Height);
-            renderer.DrawPixels(_composite.Pixels, _composite.Width, _composite.Height,
-                dest, srcRect, 1.0f, ImageInterpolation.NearestNeighbor);
+            // Draw the interleaved composite
+            using var bmp = CanvasBitmap.CreateFromBytes(
+                device,
+                _composite.Pixels,
+                _composite.Width,
+                _composite.Height,
+                DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                96.0f);
+
+            ds.DrawImage(
+                bmp,
+                dest,
+                new Rect(0, 0, _composite.Width, _composite.Height),
+                1.0f,
+                CanvasImageInterpolation.NearestNeighbor);
 
             // Draw mask overlay when editing a mask
-            DrawMaskOverlay(renderer, dest);
+            DrawMaskOverlay(ds, device, dest);
 
             // Draw selection handles for selected sub-routine (overlays, not composited)
             if (_selectedSubRoutine != null)
@@ -205,7 +274,7 @@ namespace PixlPunkt.UI.CanvasHost
                 var selectedInfo = activeSubRoutines.FirstOrDefault(r => r.SubRoutine == _selectedSubRoutine);
                 if (selectedInfo != null)
                 {
-                    DrawSubRoutineSelectionOverlayForInterleaved(renderer, dest, scale, selectedInfo);
+                    DrawSubRoutineSelectionOverlayForInterleaved(ds, dest, scale, selectedInfo);
                 }
             }
         }
@@ -213,7 +282,13 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Draws sub-routine selection overlay when no interleaved rendering is needed.
         /// </summary>
-        private void DrawSubRoutineOverlayInternal(ICanvasRenderer renderer, Rect dest)
+        /// <param name="ds">The canvas drawing session.</param>
+        /// <param name="dest">The destination rectangle in screen coordinates.</param>
+        /// <remarks>
+        /// Called after simple compositing to draw selection handles for any selected sub-routine,
+        /// even when the sub-routine isn't currently active (e.g., current frame outside its range).
+        /// </remarks>
+        private void DrawSubRoutineOverlayInternal(CanvasDrawingSession ds, Rect dest)
         {
             if (_selectedSubRoutine == null || _animationMode != Animation.AnimationMode.Canvas)
                 return;
@@ -229,13 +304,18 @@ namespace PixlPunkt.UI.CanvasHost
             var selectedInfo = activeSubRoutines.FirstOrDefault(r => r.SubRoutine == _selectedSubRoutine);
             if (selectedInfo != null)
             {
-                DrawSubRoutineSelectionOverlayForInterleaved(renderer, dest, scale, selectedInfo);
+                DrawSubRoutineSelectionOverlayForInterleaved(ds, dest, scale, selectedInfo);
             }
         }
 
         /// <summary>
         /// Composites a single layer onto the internal composite surface.
         /// </summary>
+        /// <param name="layer">The raster layer to composite.</param>
+        /// <remarks>
+        /// Uses standard alpha compositing (Porter-Duff "over" operator) with the layer's opacity.
+        /// The layer must have the same dimensions as the composite surface.
+        /// </remarks>
         private void CompositeLayerToComposite(Core.Document.Layer.RasterLayer layer)
         {
             if (_composite == null) return;
@@ -282,6 +362,16 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Composites a sub-routine's current frame onto the composite surface.
         /// </summary>
+        /// <param name="renderInfo">The sub-routine render info containing frame data and transform.</param>
+        /// <remarks>
+        /// <para>
+        /// Applies the sub-routine's interpolated transform (position, scale, rotation) when compositing.
+        /// Uses nearest-neighbor sampling to preserve pixel art sharpness.
+        /// </para>
+        /// <para>
+        /// Position values are pixel-snapped (rounded) to avoid sub-pixel rendering artifacts.
+        /// </para>
+        /// </remarks>
         private void CompositeSubRoutineToComposite(Core.Animation.SubRoutineRenderInfo renderInfo)
         {
             if (_composite == null) return;
@@ -439,7 +529,15 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Draws selection handles for a sub-routine as an overlay (not composited).
         /// </summary>
-        private void DrawSubRoutineSelectionOverlayForInterleaved(ICanvasRenderer renderer, Rect dest, float scale,
+        /// <param name="ds">The canvas drawing session.</param>
+        /// <param name="dest">The destination rectangle in screen coordinates.</param>
+        /// <param name="scale">The current zoom scale.</param>
+        /// <param name="renderInfo">The sub-routine render info.</param>
+        /// <remarks>
+        /// Selection handles are drawn as screen-space overlays after compositing,
+        /// so they always appear on top regardless of Z-order.
+        /// </remarks>
+        private void DrawSubRoutineSelectionOverlayForInterleaved(CanvasDrawingSession ds, Rect dest, float scale,
             Core.Animation.SubRoutineRenderInfo renderInfo)
         {
             double posX = renderInfo.PositionX;
@@ -457,13 +555,13 @@ namespace PixlPunkt.UI.CanvasHost
             float screenW = scaledWidth * scale;
             float screenH = scaledHeight * scale;
 
-            DrawSubRoutineSelectionInternal(renderer, screenX, screenY, screenW, screenH, renderInfo.Rotation);
+            DrawSubRoutineSelectionInternal(ds, screenX, screenY, screenW, screenH, renderInfo.Rotation);
         }
 
         /// <summary>
         /// Draws selection handles around a selected sub-routine.
         /// </summary>
-        private void DrawSubRoutineSelectionInternal(ICanvasRenderer renderer, float x, float y, float w, float h, float rotation)
+        private void DrawSubRoutineSelectionInternal(CanvasDrawingSession ds, float x, float y, float w, float h, float rotation)
         {
             var outlineColor = SubRoutineOutlineSelectedColor;
             var handleColor = SubRoutineHandleColor;
@@ -473,19 +571,19 @@ namespace PixlPunkt.UI.CanvasHost
             if (Math.Abs(rotation) < 0.01f)
             {
                 // No rotation - draw simple rectangle
-                renderer.DrawRectangle(x, y, w, h, outlineColor, outlineWidth);
+                ds.DrawRectangle(x, y, w, h, outlineColor, outlineWidth);
 
                 // Draw corner handles
-                DrawSubRoutineHandle(renderer, x, y, handleSize, handleColor, outlineColor);
-                DrawSubRoutineHandle(renderer, x + w, y, handleSize, handleColor, outlineColor);
-                DrawSubRoutineHandle(renderer, x, y + h, handleSize, handleColor, outlineColor);
-                DrawSubRoutineHandle(renderer, x + w, y + h, handleSize, handleColor, outlineColor);
+                DrawSubRoutineHandle(ds, x, y, handleSize, handleColor, outlineColor);
+                DrawSubRoutineHandle(ds, x + w, y, handleSize, handleColor, outlineColor);
+                DrawSubRoutineHandle(ds, x, y + h, handleSize, handleColor, outlineColor);
+                DrawSubRoutineHandle(ds, x + w, y + h, handleSize, handleColor, outlineColor);
 
                 // Draw center handle (for moving)
                 float centerX = x + w / 2f;
                 float centerY = y + h / 2f;
-                renderer.FillEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, handleColor);
-                renderer.DrawEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, outlineColor, 1f);
+                ds.FillEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, handleColor);
+                ds.DrawEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, outlineColor, 1f);
             }
             else
             {
@@ -515,29 +613,29 @@ namespace PixlPunkt.UI.CanvasHost
                 for (int i = 0; i < 4; i++)
                 {
                     int next = (i + 1) % 4;
-                    renderer.DrawLine(corners[i], corners[next], outlineColor, outlineWidth);
+                    ds.DrawLine(corners[i], corners[next], outlineColor, outlineWidth);
                 }
 
                 // Draw corner handles at rotated positions
                 foreach (var corner in corners)
                 {
-                    DrawSubRoutineHandle(renderer, corner.X, corner.Y, handleSize, handleColor, outlineColor);
+                    DrawSubRoutineHandle(ds, corner.X, corner.Y, handleSize, handleColor, outlineColor);
                 }
 
                 // Draw center handle
-                renderer.FillEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, handleColor);
-                renderer.DrawEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, outlineColor, 1f);
+                ds.FillEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, handleColor);
+                ds.DrawEllipse(centerX, centerY, handleSize / 2f, handleSize / 2f, outlineColor, 1f);
             }
         }
 
         /// <summary>
         /// Draws a single sub-routine selection handle (square).
         /// </summary>
-        private static void DrawSubRoutineHandle(ICanvasRenderer renderer, float x, float y, float size, Color fill, Color stroke)
+        private static void DrawSubRoutineHandle(CanvasDrawingSession ds, float x, float y, float size, Color fill, Color stroke)
         {
             float half = size / 2f;
-            renderer.FillRectangle(x - half, y - half, size, size, fill);
-            renderer.DrawRectangle(x - half, y - half, size, size, stroke, 1f);
+            ds.FillRectangle(x - half, y - half, size, size, fill);
+            ds.DrawRectangle(x - half, y - half, size, size, stroke, 1f);
         }
     }
 }

@@ -10,7 +10,6 @@ using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Tile;
 using Windows.Graphics;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Document
 {
@@ -568,7 +567,7 @@ namespace PixlPunkt.Core.Document
             int tilesY = br.ReadInt32();
 
             var name = displayNameOverride ?? storedName ?? "Untitled";
-            var doc = new CanvasDocument(name, pixelWidth, pixelHeight, CreateSize(tileW, tileH), CreateSize(tilesX, tilesY));
+            var doc = new CanvasDocument(name, pixelWidth, pixelHeight, new SizeInt32(tileW, tileH), new SizeInt32(tilesX, tilesY));
 
             // Tile set
             ReadTileSet(br, doc);

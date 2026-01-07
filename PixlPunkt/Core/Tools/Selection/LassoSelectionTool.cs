@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.UI;
 using Microsoft.UI.Xaml.Input;
-using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
-using Windows.UI;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Tools.Selection
 {
@@ -83,17 +82,24 @@ namespace PixlPunkt.Core.Tools.Selection
         public override void Configure(ToolSettingsBase settings) { }
 
         /// <inheritdoc/>
-        public override void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase)
+        public override void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase)
         {
             if (!_polygonActive || _vertices.Count == 0)
                 return;
 
-            var whiteColor = Colors.White;
-            var blackColor = Colors.Black;
-            var semiWhite = Color.FromArgb(128, 255, 255, 255);
-            var semiBlack = Color.FromArgb(128, 0, 0, 0);
+            var dashStyleWhite = new CanvasStrokeStyle
+            {
+                DashStyle = CanvasDashStyle.Dash,
+                DashOffset = antsPhase,
+                CustomDashStyle = new float[] { ANTS_ON, ANTS_OFF }
+            };
+            var dashStyleBlack = new CanvasStrokeStyle
+            {
+                DashStyle = CanvasDashStyle.Dash,
+                DashOffset = antsPhase + ANTS_ON,
+                CustomDashStyle = new float[] { ANTS_ON, ANTS_OFF }
+            };
 
-            // Draw polygon edges with marching ants pattern
             for (int i = 0; i < _vertices.Count - 1; i++)
             {
                 float x1 = (float)(destRect.X + _vertices[i].X * scale);
@@ -101,10 +107,10 @@ namespace PixlPunkt.Core.Tools.Selection
                 float x2 = (float)(destRect.X + _vertices[i + 1].X * scale);
                 float y2 = (float)(destRect.Y + _vertices[i + 1].Y * scale);
 
-                DrawDashedLine(renderer, x1, y1, x2, y2, whiteColor, blackColor, ANTS_THICKNESS, ANTS_ON, ANTS_OFF, antsPhase);
+                ds.DrawLine(x1, y1, x2, y2, Colors.White, ANTS_THICKNESS, dashStyleWhite);
+                ds.DrawLine(x1, y1, x2, y2, Colors.Black, ANTS_THICKNESS, dashStyleBlack);
             }
 
-            // Draw rubber-band line from last vertex to mouse position
             if (_currentMousePos.HasValue)
             {
                 var lastVertex = _vertices[_vertices.Count - 1];
@@ -113,20 +119,20 @@ namespace PixlPunkt.Core.Tools.Selection
                 float x2 = (float)(destRect.X + _currentMousePos.Value.X * scale);
                 float y2 = (float)(destRect.Y + _currentMousePos.Value.Y * scale);
 
-                DrawDashedLine(renderer, x1, y1, x2, y2, whiteColor, blackColor, ANTS_THICKNESS, ANTS_ON, ANTS_OFF, antsPhase);
+                ds.DrawLine(x1, y1, x2, y2, Colors.White, ANTS_THICKNESS, dashStyleWhite);
+                ds.DrawLine(x1, y1, x2, y2, Colors.Black, ANTS_THICKNESS, dashStyleBlack);
 
-                // Draw closing preview line (to first vertex)
                 if (_vertices.Count >= 2)
                 {
                     var firstVertex = _vertices[0];
                     float fx = (float)(destRect.X + firstVertex.X * scale);
                     float fy = (float)(destRect.Y + firstVertex.Y * scale);
 
-                    DrawDashedLine(renderer, x2, y2, fx, fy, semiWhite, semiBlack, 1f, ANTS_ON, ANTS_OFF, antsPhase);
+                    ds.DrawLine(x2, y2, fx, fy, Windows.UI.Color.FromArgb(128, 255, 255, 255), 1f, dashStyleWhite);
+                    ds.DrawLine(x2, y2, fx, fy, Windows.UI.Color.FromArgb(128, 0, 0, 0), 1f, dashStyleBlack);
                 }
             }
 
-            // Draw vertex markers
             for (int i = 0; i < _vertices.Count; i++)
             {
                 float vx = (float)(destRect.X + _vertices[i].X * scale);
@@ -134,67 +140,14 @@ namespace PixlPunkt.Core.Tools.Selection
 
                 if (i == 0 && _vertices.Count >= 3)
                 {
-                    // First vertex (close point) - larger and green
-                    renderer.FillEllipse(vx, vy, VERTEX_SIZE + 2f, VERTEX_SIZE + 2f, Colors.LimeGreen);
-                    renderer.DrawEllipse(vx, vy, VERTEX_SIZE + 2f, VERTEX_SIZE + 2f, Colors.Black, 1f);
+                    ds.FillCircle(vx, vy, VERTEX_SIZE + 2f, Colors.LimeGreen);
+                    ds.DrawCircle(vx, vy, VERTEX_SIZE + 2f, Colors.Black, 1f);
                 }
                 else
                 {
-                    // Other vertices - white with black outline
-                    renderer.FillEllipse(vx, vy, VERTEX_SIZE, VERTEX_SIZE, Colors.White);
-                    renderer.DrawEllipse(vx, vy, VERTEX_SIZE, VERTEX_SIZE, Colors.Black, 1f);
+                    ds.FillCircle(vx, vy, VERTEX_SIZE, Colors.White);
+                    ds.DrawCircle(vx, vy, VERTEX_SIZE, Colors.Black, 1f);
                 }
-            }
-        }
-
-        /// <summary>
-        /// Draws a dashed line with alternating colors (simulating marching ants).
-        /// </summary>
-        private static void DrawDashedLine(ICanvasRenderer renderer, float x1, float y1, float x2, float y2,
-            Color color1, Color color2, float thickness, float dashOn, float dashOff, float phase)
-        {
-            float dx = x2 - x1;
-            float dy = y2 - y1;
-            float length = MathF.Sqrt(dx * dx + dy * dy);
-            if (length < 0.001f) return;
-
-            // Normalize direction
-            float nx = dx / length;
-            float ny = dy / length;
-
-            float dashLength = dashOn + dashOff;
-            float pos = -phase % dashLength;
-            if (pos < 0) pos += dashLength;
-
-            while (pos < length)
-            {
-                float startPos = Math.Max(0, pos);
-                float endPos = Math.Min(length, pos + dashOn);
-
-                if (endPos > startPos)
-                {
-                    float sx = x1 + nx * startPos;
-                    float sy = y1 + ny * startPos;
-                    float ex = x1 + nx * endPos;
-                    float ey = y1 + ny * endPos;
-
-                    renderer.DrawLine(sx, sy, ex, ey, color1, thickness);
-                }
-
-                // Draw the "off" portion with color2
-                float offStart = pos + dashOn;
-                float offEnd = Math.Min(length, pos + dashLength);
-                if (offEnd > offStart && offStart < length)
-                {
-                    float sx = x1 + nx * Math.Max(0, offStart);
-                    float sy = y1 + ny * Math.Max(0, offStart);
-                    float ex = x1 + nx * offEnd;
-                    float ey = y1 + ny * offEnd;
-
-                    renderer.DrawLine(sx, sy, ex, ey, color2, thickness);
-                }
-
-                pos += dashLength;
             }
         }
 
@@ -382,11 +335,11 @@ namespace PixlPunkt.Core.Tools.Selection
                         {
                             case SelectionCombineMode.Add:
                             case SelectionCombineMode.Replace:
-                                region.AddRect(CreateRect(x, y, 1, 1));
+                                region.AddRect(new Windows.Graphics.RectInt32(x, y, 1, 1));
                                 break;
 
                             case SelectionCombineMode.Subtract:
-                                region.SubtractRect(CreateRect(x, y, 1, 1));
+                                region.SubtractRect(new Windows.Graphics.RectInt32(x, y, 1, 1));
                                 break;
                         }
                     }

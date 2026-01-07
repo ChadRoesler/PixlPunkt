@@ -32,7 +32,7 @@ namespace PixlPunkt.Core.Tools.Settings
     /// <param name="MinWidth">Minimum window width in logical pixels. Default is 400.</param>
     /// <param name="MinHeight">Minimum window height in logical pixels. Default is 300.</param>
     /// <param name="MaxScreenFraction">Maximum fraction of screen to occupy (0.0-1.0). Default is 0.90.</param>
-    public sealed partial record CustomWindowOption(
+    public sealed record CustomWindowOption(
         string Id,
         string Label,
         Icon? Icon,

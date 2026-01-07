@@ -6,7 +6,6 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI.Dialogs.Import
 {
@@ -169,8 +168,8 @@ namespace PixlPunkt.UI.Dialogs.Import
             }
 
             // Store results
-            TileSize = CreateSize(tileW, tileH);
-            TileCounts = CreateSize(tilesX, tilesY);
+            TileSize = new SizeInt32(tileW, tileH);
+            TileCounts = new SizeInt32(tilesX, tilesY);
 
             // Update UI
             int canvasW = tileW * tilesX;

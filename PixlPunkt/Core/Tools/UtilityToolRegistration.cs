@@ -32,7 +32,7 @@ namespace PixlPunkt.Core.Tools
     /// <param name="DisplayName">Human-readable name for UI display.</param>
     /// <param name="Settings">Tool-specific settings object.</param>
     /// <param name="HandlerFactory">Factory function to create the utility handler.</param>
-    public sealed partial record UtilityToolRegistration(
+    public sealed record UtilityToolRegistration(
         string Id,
         string DisplayName,
         ToolSettingsBase? Settings,

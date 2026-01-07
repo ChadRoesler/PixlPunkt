@@ -1,15 +1,14 @@
 using System;
 using System.Numerics;
+using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Painting.Dithering;
 using PixlPunkt.Core.Painting.Painters;
-using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
-using GradientStop = PixlPunkt.Core.Tools.Settings.GradientStop;
 
 namespace PixlPunkt.UI.CanvasHost
 {
@@ -137,7 +136,7 @@ namespace PixlPunkt.UI.CanvasHost
         // GRADIENT PREVIEW RENDERING
         // ====================================================================
 
-        private void DrawGradientFillPreview(ICanvasRenderer renderer, Rect dest)
+        private void DrawGradientFillPreview(CanvasDrawingSession ds, Rect dest)
         {
             if (_toolState == null) return;
 
@@ -166,22 +165,21 @@ namespace PixlPunkt.UI.CanvasHost
             // Draw gradient line with endpoints
             var lineColor = Windows.UI.Color.FromArgb(200, 255, 255, 255);
             var dotColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
-            var outlineColor = Windows.UI.Color.FromArgb(255, 0, 0, 0);
 
-            renderer.DrawLine(startScreenX, startScreenY, endScreenX, endScreenY, lineColor, 2);
+            ds.DrawLine(startScreenX, startScreenY, endScreenX, endScreenY, lineColor, 2);
 
             // Start point (filled circle)
-            renderer.FillEllipse(startScreenX, startScreenY, 4, 4, dotColor);
-            renderer.DrawEllipse(startScreenX, startScreenY, 4, 4, outlineColor, 1);
+            ds.FillCircle(startScreenX, startScreenY, 4, dotColor);
+            ds.DrawCircle(startScreenX, startScreenY, 4, Windows.UI.Color.FromArgb(255, 0, 0, 0), 1);
 
             // End point (empty circle)
-            renderer.DrawEllipse(endScreenX, endScreenY, 4, 4, dotColor, 2);
+            ds.DrawCircle(endScreenX, endScreenY, 4, dotColor, 2);
 
             // Draw gradient type indicator
-            DrawGradientTypeIndicator(renderer, dest, settings.GradientType, length);
+            DrawGradientTypeIndicator(ds, dest, settings.GradientType, length);
         }
 
-        private void DrawGradientTypeIndicator(ICanvasRenderer renderer, Rect dest, GradientType type, double length)
+        private void DrawGradientTypeIndicator(CanvasDrawingSession ds, Rect dest, GradientType type, double length)
         {
             if (length < 10) return; // Too small to show indicator
 
@@ -193,9 +191,9 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 case GradientType.Radial:
                     // Draw concentric circles
-                    renderer.DrawEllipse(centerX, centerY, 15, 15, indicatorColor, 1);
-                    renderer.DrawEllipse(centerX, centerY, 10, 10, indicatorColor, 1);
-                    renderer.DrawEllipse(centerX, centerY, 5, 5, indicatorColor, 1);
+                    ds.DrawCircle(centerX, centerY, 15, indicatorColor, 1);
+                    ds.DrawCircle(centerX, centerY, 10, indicatorColor, 1);
+                    ds.DrawCircle(centerX, centerY, 5, indicatorColor, 1);
                     break;
 
                 case GradientType.Angular:
@@ -207,17 +205,17 @@ namespace PixlPunkt.UI.CanvasHost
                         float y1 = centerY + 5 * MathF.Sin(angle);
                         float x2 = centerX + 15 * MathF.Cos(angle);
                         float y2 = centerY + 15 * MathF.Sin(angle);
-                        renderer.DrawLine(x1, y1, x2, y2, indicatorColor, 1);
+                        ds.DrawLine(x1, y1, x2, y2, indicatorColor, 1);
                     }
                     break;
 
                 case GradientType.Diamond:
                     // Draw diamond shape
                     float size = 12;
-                    renderer.DrawLine(centerX, centerY - size, centerX + size, centerY, indicatorColor, 1);
-                    renderer.DrawLine(centerX + size, centerY, centerX, centerY + size, indicatorColor, 1);
-                    renderer.DrawLine(centerX, centerY + size, centerX - size, centerY, indicatorColor, 1);
-                    renderer.DrawLine(centerX - size, centerY, centerX, centerY - size, indicatorColor, 1);
+                    ds.DrawLine(centerX, centerY - size, centerX + size, centerY, indicatorColor, 1);
+                    ds.DrawLine(centerX + size, centerY, centerX, centerY + size, indicatorColor, 1);
+                    ds.DrawLine(centerX, centerY + size, centerX - size, centerY, indicatorColor, 1);
+                    ds.DrawLine(centerX - size, centerY, centerX, centerY - size, indicatorColor, 1);
                     break;
 
                     // Linear has no special indicator (line is sufficient)

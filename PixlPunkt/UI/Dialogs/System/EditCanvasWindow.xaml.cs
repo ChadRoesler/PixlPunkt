@@ -4,7 +4,6 @@ using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.History;
 using Windows.Graphics;
-using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI.Dialogs
 {
@@ -186,7 +185,7 @@ namespace PixlPunkt.UI.Dialogs
             _document.ResizeCanvas(newPixelW, newPixelH, offsetX, offsetY);
 
             // Update tile counts
-            _document.SetTileCounts(CreateSize(newTileW, newTileH));
+            _document.SetTileCounts(new SizeInt32(newTileW, newTileH));
         }
 
         /// <summary>
