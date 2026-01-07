@@ -49,8 +49,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _host.UpdateViewport();
                 // Always invalidate rulers during pan, even if viewport rect didn't change
                 // (the document position changes even when fully visible)
-                _host.HorizontalRulerCanvas?.Invalidate();
-                _host.VerticalRulerCanvas?.Invalidate();
+                _host.InvalidateRulers();
+                _host.InvalidateMainCanvas();
             }
 
             public void ZoomAt(Point screenPos, double factor)
@@ -77,7 +77,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _host.BackgroundSampledLive?.Invoke(bgra);
             }
 
-            public void RequestRedraw() => _host.CanvasView.Invalidate();
+            public void RequestRedraw() => _host.InvalidateMainCanvas();
 
             public void CapturePointer()
             {
@@ -87,7 +87,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             public void ReleasePointer()
             {
-                _host.CanvasView.ReleasePointerCaptures();
+                _host._mainCanvas.ReleasePointerCaptures();
             }
 
             public event Action<uint>? ForegroundSampled;

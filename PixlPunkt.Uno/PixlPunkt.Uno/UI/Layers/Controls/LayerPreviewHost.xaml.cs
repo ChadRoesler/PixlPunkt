@@ -5,6 +5,9 @@ using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Uno.UI.Rendering;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
+#if HAS_UNO
+using Uno.WinUI.Graphics2DSK;
+#endif
 using Windows.Foundation;
 using Windows.UI;
 
@@ -16,6 +19,13 @@ namespace PixlPunkt.Uno.UI.Layers.Controls
             DependencyProperty.Register(nameof(Source), typeof(ImageSource), typeof(LayerPreviewHost),
                 new PropertyMetadata(null));
         private readonly PatternBackgroundService _pattern = new();
+
+#if HAS_UNO
+        // SKCanvasElement instance for hardware-accelerated rendering (Uno platforms)
+        private LayerPreviewElement? _bgCanvasElement;
+#endif
+        // SKXamlCanvas fallback for WinAppSdk
+        private SKXamlCanvas? _bgCanvasXaml;
 
         // Cached checkerboard pattern
         private SKShader? _checkerboardShader;
@@ -33,6 +43,9 @@ namespace PixlPunkt.Uno.UI.Layers.Controls
         {
             InitializeComponent();
 
+            // Initialize canvas element based on platform
+            InitializeCanvasElement();
+
             Loaded += (_, __) =>
             {
                 HookDpi();
@@ -48,7 +61,49 @@ namespace PixlPunkt.Uno.UI.Layers.Controls
                 _checkerboardBitmap?.Dispose();
             };
 
-            SizeChanged += (_, __) => BgCanvas.Invalidate();
+            SizeChanged += (_, __) => InvalidateBgCanvas();
+        }
+
+        /// <summary>
+        /// Creates and initializes the appropriate canvas element based on platform.
+        /// </summary>
+        private void InitializeCanvasElement()
+        {
+#if HAS_UNO
+            // Use SKCanvasElement on Uno platforms for better performance
+            if (SKCanvasElement.IsSupportedOnCurrentPlatform())
+            {
+                _bgCanvasElement = new LayerPreviewElement
+                {
+                    DrawCallback = RenderBackground
+                };
+                BgCanvasContainer.Children.Add(_bgCanvasElement);
+                return;
+            }
+#endif
+            // Fall back to SKXamlCanvas on WinAppSdk or unsupported Uno platforms
+            _bgCanvasXaml = new SKXamlCanvas();
+            _bgCanvasXaml.PaintSurface += BgCanvas_PaintSurface;
+            BgCanvasContainer.Children.Add(_bgCanvasXaml);
+        }
+
+        /// <summary>
+        /// Invalidates the background canvas to trigger a redraw.
+        /// </summary>
+        private void InvalidateBgCanvas()
+        {
+#if HAS_UNO
+            _bgCanvasElement?.Invalidate();
+#endif
+            _bgCanvasXaml?.Invalidate();
+        }
+
+        /// <summary>
+        /// Paint surface handler for SKXamlCanvas (WinAppSdk fallback).
+        /// </summary>
+        private void BgCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            RenderBackground(e.Surface.Canvas, e.Info.Width, e.Info.Height);
         }
 
         private void OnStripeColorsChanged()
@@ -56,7 +111,7 @@ namespace PixlPunkt.Uno.UI.Layers.Controls
             ApplyStripeColors();
             InvalidatePattern();
             InvalidateCheckerboardCache();
-            BgCanvas.Invalidate();
+            InvalidateBgCanvas();
         }
 
         private void ApplyStripeColors()
@@ -105,17 +160,16 @@ namespace PixlPunkt.Uno.UI.Layers.Controls
                 _lastScale = s;
                 InvalidatePattern();
                 InvalidateCheckerboardCache();
-                BgCanvas.Invalidate();
+                InvalidateBgCanvas();
             }
         }
 
-        private void BgCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        /// <summary>
+        /// Main render callback for both SKCanvasElement and SKXamlCanvas.
+        /// </summary>
+        private void RenderBackground(SKCanvas canvas, float width, float height)
         {
-            var canvas = e.Surface.Canvas;
-
-            float w = (float)BgCanvas.ActualWidth;
-            float h = (float)BgCanvas.ActualHeight;
-            if (w <= 0 || h <= 0)
+            if (width <= 0 || height <= 0)
             {
                 canvas.Clear(SKColors.Transparent);
                 return;
@@ -135,7 +189,7 @@ namespace PixlPunkt.Uno.UI.Layers.Controls
                     Shader = _checkerboardShader,
                     IsAntialias = false
                 };
-                canvas.DrawRect(0, 0, w, h, paint);
+                canvas.DrawRect(0, 0, width, height, paint);
             }
             else
             {

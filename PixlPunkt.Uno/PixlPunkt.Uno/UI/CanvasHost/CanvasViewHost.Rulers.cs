@@ -34,6 +34,56 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
         private const float GuideHitThreshold = 6f;
 
+        // ====================================================================
+        // RULER ELEMENT HELPERS
+        // ====================================================================
+
+        /// <summary>
+        /// Helper to get the horizontal ruler as a FrameworkElement for shared operations.
+        /// </summary>
+        private FrameworkElement _horizontalRuler =>
+#if HAS_UNO
+            _horizontalRulerElement ?? (FrameworkElement?)_horizontalRulerXaml ?? throw new InvalidOperationException("Horizontal ruler not initialized");
+#else
+            _horizontalRulerXaml ?? throw new InvalidOperationException("Horizontal ruler not initialized");
+#endif
+
+        /// <summary>
+        /// Helper to get the vertical ruler as a FrameworkElement for shared operations.
+        /// </summary>
+        private FrameworkElement _verticalRuler =>
+#if HAS_UNO
+            _verticalRulerElement ?? (FrameworkElement?)_verticalRulerXaml ?? throw new InvalidOperationException("Vertical ruler not initialized");
+#else
+            _verticalRulerXaml ?? throw new InvalidOperationException("Vertical ruler not initialized");
+#endif
+
+        /// <summary>
+        /// Invalidates the horizontal ruler.
+        /// </summary>
+        private void InvalidateHorizontalRuler()
+        {
+#if HAS_UNO
+            _horizontalRulerElement?.Invalidate();
+#endif
+            _horizontalRulerXaml?.Invalidate();
+        }
+
+        /// <summary>
+        /// Invalidates the vertical ruler.
+        /// </summary>
+        private void InvalidateVerticalRuler()
+        {
+#if HAS_UNO
+            _verticalRulerElement?.Invalidate();
+#endif
+            _verticalRulerXaml?.Invalidate();
+        }
+
+        // ====================================================================
+        // PROPERTIES
+        // ====================================================================
+
         /// <summary>Gets or sets whether rulers are visible.</summary>
         public bool ShowRulers
         {
@@ -55,7 +105,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 if (_guideService != null)
                 {
                     _guideService.GuidesVisible = value;
-                    CanvasView.Invalidate();
+                    InvalidateMainCanvas();
                 }
             }
         }
@@ -87,7 +137,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 {
                     _hoveredGuide.IsSelected = false;
                     _hoveredGuide = null;
-                    CanvasView.Invalidate();
+                    InvalidateMainCanvas();
                 }
 
                 UpdateLockGuidesIndicator();
@@ -131,8 +181,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 }
             }
 
-            HorizontalRulerCanvas.Invalidate();
-            VerticalRulerCanvas.Invalidate();
+            InvalidateRulers();
         }
 
         private void UpdateSnapIndicator()
@@ -213,9 +262,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
         private void OnGuidesChanged()
         {
-            CanvasView.Invalidate();
-            HorizontalRulerCanvas.Invalidate();
-            VerticalRulerCanvas.Invalidate();
+            InvalidateMainCanvas();
+            InvalidateRulers();
         }
 
         // ====================================================================
@@ -257,7 +305,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             if (_isDraggingGuideOnCanvas && _dragGuide != null)
             {
-                var pos = e.GetCurrentPoint(CanvasView).Position;
+                var pos = e.GetCurrentPoint(_mainCanvas).Position;
 
                 if (_dragGuide.IsHorizontal)
                 {
@@ -268,11 +316,11 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _dragGuide.Position = ViewXToDocX(pos.X);
                 }
 
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
-            var currentPos = e.GetCurrentPoint(CanvasView).Position;
+            var currentPos = e.GetCurrentPoint(_mainCanvas).Position;
             var newHovered = FindGuideAtScreenPosition(currentPos);
 
             if (newHovered != _hoveredGuide)
@@ -285,7 +333,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 if (_hoveredGuide != null)
                     _hoveredGuide.IsSelected = true;
 
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
             }
 
             return false;
@@ -299,8 +347,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (_guideService == null || !_guideService.GuidesVisible)
                 return false;
 
-            var pos = e.GetCurrentPoint(CanvasView).Position;
-            var props = e.GetCurrentPoint(CanvasView).Properties;
+            var pos = e.GetCurrentPoint(_mainCanvas).Position;
+            var props = e.GetCurrentPoint(_mainCanvas).Properties;
             var guide = FindGuideAtScreenPosition(pos);
 
             if (guide == null)
@@ -310,7 +358,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             {
                 _guideService.RemoveGuide(guide);
                 _hoveredGuide = null;
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -318,7 +366,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             {
                 _dragGuide = guide;
                 _isDraggingGuideOnCanvas = true;
-                CanvasView.CapturePointer(e.Pointer);
+                _mainCanvas.CapturePointer(e.Pointer);
                 return true;
             }
 
@@ -330,7 +378,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (!_isDraggingGuideOnCanvas || _dragGuide == null)
                 return false;
 
-            var pos = e.GetCurrentPoint(CanvasView).Position;
+            var pos = e.GetCurrentPoint(_mainCanvas).Position;
 
             if (_dragGuide.IsHorizontal)
             {
@@ -351,8 +399,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             _dragGuide = null;
             _isDraggingGuideOnCanvas = false;
-            CanvasView.ReleasePointerCaptures();
-            CanvasView.Invalidate();
+            _mainCanvas.ReleasePointerCaptures();
+            InvalidateMainCanvas();
             return true;
         }
 
@@ -395,10 +443,10 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             renderer.Clear(Color.FromArgb(0, 0, 0, 0));
 
             // Don't draw if layout hasn't happened yet
-            if (CanvasView.ActualWidth <= 0 || CanvasView.ActualHeight <= 0)
+            if (_mainCanvas.ActualWidth <= 0 || _mainCanvas.ActualHeight <= 0)
                 return;
 
-            // Get the dest rect from zoom controller (in logical pixels relative to CanvasView)
+            // Get the dest rect from zoom controller (in logical pixels relative to _mainCanvas)
             var dest = _zoom.GetDestRect();
             int docWidth = Document.PixelWidth;
             int tileWidth = Document.TileSize.Width;
@@ -447,10 +495,10 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             renderer.Clear(Color.FromArgb(0, 0, 0, 0));
 
             // Don't draw if layout hasn't happened yet
-            if (CanvasView.ActualWidth <= 0 || CanvasView.ActualHeight <= 0)
+            if (_mainCanvas.ActualWidth <= 0 || _mainCanvas.ActualHeight <= 0)
                 return;
 
-            // Get the dest rect from zoom controller (in logical pixels relative to CanvasView)
+            // Get the dest rect from zoom controller (in logical pixels relative to _mainCanvas)
             var dest = _zoom.GetDestRect();
             int docHeight = Document.PixelHeight;
             int tileHeight = Document.TileSize.Height;
@@ -494,7 +542,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (_guidesLocked || _guideService == null || !_showRulers) return;
 
-            var pos = e.GetCurrentPoint(HorizontalRulerCanvas).Position;
+            var pos = e.GetCurrentPoint(_horizontalRuler).Position;
             int docY = ScreenYToDocYFromHorizontalRuler(pos.Y);
 
             _dragGuide = _guideService.FindGuideAt(docY, isHorizontal: true, threshold: (int)(4 / _zoom.Scale) + 1);
@@ -504,7 +552,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _dragGuide = _guideService.AddHorizontalGuide(0);
             }
 
-            HorizontalRulerCanvas.CapturePointer(e.Pointer);
+            _horizontalRuler.CapturePointer(e.Pointer);
             e.Handled = true;
         }
 
@@ -512,12 +560,12 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (_dragGuide == null) return;
 
-            var pos = e.GetCurrentPoint(CanvasView).Position;
+            var pos = e.GetCurrentPoint(_mainCanvas).Position;
             int docY = ViewYToDocY(pos.Y);
 
             _dragGuide.Position = docY;
-            CanvasView.Invalidate();
-            HorizontalRulerCanvas.Invalidate();
+            InvalidateMainCanvas();
+            InvalidateHorizontalRuler();
             e.Handled = true;
         }
 
@@ -525,7 +573,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (_dragGuide == null) return;
 
-            var pos = e.GetCurrentPoint(CanvasView).Position;
+            var pos = e.GetCurrentPoint(_mainCanvas).Position;
             int docY = ViewYToDocY(pos.Y);
 
             if (docY < 0 || docY > Document.PixelHeight)
@@ -534,7 +582,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             }
 
             _dragGuide = null;
-            HorizontalRulerCanvas.ReleasePointerCaptures();
+            _horizontalRuler.ReleasePointerCaptures();
             e.Handled = true;
         }
 
@@ -546,7 +594,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (_guidesLocked || _guideService == null || !_showRulers) return;
 
-            var pos = e.GetCurrentPoint(VerticalRulerCanvas).Position;
+            var pos = e.GetCurrentPoint(_verticalRuler).Position;
             int docX = ScreenXToDocXFromVerticalRuler(pos.X);
 
             _dragGuide = _guideService.FindGuideAt(docX, isHorizontal: false, threshold: (int)(4 / _zoom.Scale) + 1);
@@ -556,7 +604,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _dragGuide = _guideService.AddVerticalGuide(0);
             }
 
-            VerticalRulerCanvas.CapturePointer(e.Pointer);
+            _verticalRuler.CapturePointer(e.Pointer);
             e.Handled = true;
         }
 
@@ -564,12 +612,12 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (_dragGuide == null) return;
 
-            var pos = e.GetCurrentPoint(CanvasView).Position;
+            var pos = e.GetCurrentPoint(_mainCanvas).Position;
             int docX = ViewXToDocX(pos.X);
 
             _dragGuide.Position = docX;
-            CanvasView.Invalidate();
-            VerticalRulerCanvas.Invalidate();
+            InvalidateMainCanvas();
+            InvalidateVerticalRuler();
             e.Handled = true;
         }
 
@@ -577,7 +625,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (_dragGuide == null) return;
 
-            var pos = e.GetCurrentPoint(CanvasView).Position;
+            var pos = e.GetCurrentPoint(_mainCanvas).Position;
             int docX = ViewXToDocX(pos.X);
 
             if (docX < 0 || docX > Document.PixelWidth)
@@ -586,7 +634,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             }
 
             _dragGuide = null;
-            VerticalRulerCanvas.ReleasePointerCaptures();
+            _verticalRuler.ReleasePointerCaptures();
             e.Handled = true;
         }
 

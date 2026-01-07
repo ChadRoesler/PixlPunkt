@@ -213,7 +213,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selAngleDeg = 0.0;
 
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
 
             _toolState?.SetSelectionPresence(active: true, floating: true);
             _toolState?.SetSelectionScale(100.0, 100.0, false);
@@ -304,7 +304,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _selBuf = null;
 
                 Document.RaiseStructureChanged();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 return;
             }
@@ -371,7 +371,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             HistoryStateChanged?.Invoke();
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             SetCursor(InputSystemCursorShape.Arrow);
 
             _toolState?.SetSelectionPresence(_selActive, _selFloating);
@@ -426,7 +426,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -466,7 +466,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -736,7 +736,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             HistoryStateChanged?.Invoke();
             Document.RaiseStructureChanged();
             Document.RaiseDocumentModified(); // Notify animation panels of pixel changes
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -770,7 +770,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Selection transform/commit undo needs UI refresh
             if (isSelectionTransform || isSelectionCommit)
             {
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 Document.RaiseDocumentModified(); // Notify animation panels
                 return;
@@ -779,7 +779,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Always recomposite after pixel-changing undo
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             Document.RaiseDocumentModified(); // Notify animation panels
             RaiseFrame();
@@ -812,7 +812,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Selection transform/commit redo needs UI refresh
             if (isSelectionTransform || isSelectionCommit)
             {
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 Document.RaiseDocumentModified(); // Notify animation panels
                 return;
@@ -821,7 +821,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Always recomposite after pixel-changing redo
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             Document.RaiseDocumentModified(); // Notify animation panels
             RaiseFrame();

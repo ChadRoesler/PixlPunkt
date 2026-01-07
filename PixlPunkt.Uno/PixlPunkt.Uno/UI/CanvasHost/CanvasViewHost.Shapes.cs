@@ -61,8 +61,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _sy = _ey = y;
             _shapeDrag = true;
 
-            CanvasView.CapturePointer(e.Pointer);
-            CanvasView.Invalidate();
+            _mainCanvas.CapturePointer(e.Pointer);
+            InvalidateMainCanvas();
         }
 
         private void HandleShapeMoved(Point pos)
@@ -80,7 +80,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             y = Math.Clamp(y, 0, h - 1);
 
             UpdateShapeEndpointsWithModifiers(x, y);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         private void HandleShapeReleased()
@@ -258,11 +258,11 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Commit without pushing to history (already pushed above)
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             RaiseFrame();
 
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
         }
 
         // ════════════════════════════════════════════════════════════════════

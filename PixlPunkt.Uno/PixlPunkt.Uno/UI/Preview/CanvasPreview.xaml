@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="PixlPunkt.Uno.UI.Preview.CanvasPreview"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -41,8 +41,12 @@
                 CornerRadius="8"
                 Padding="8"
                 Margin="-3,0,-3,-3">
-            <skia:SKXamlCanvas x:Name="PreviewCanvas"
-                               PaintSurface="PreviewCanvas_PaintSurface"/>
+            <!-- Container for canvas element - created in code-behind (SKCanvasElement on Uno, SKXamlCanvas on WinAppSdk) -->
+            <Grid x:Name="PreviewCanvasContainer"
+                  PointerPressed="PreviewCanvas_PointerPressed"
+                  PointerMoved="PreviewCanvas_PointerMoved"
+                  PointerReleased="PreviewCanvas_PointerReleased"
+                  PointerExited="PreviewCanvas_PointerExited" />
         </Border>
     </Grid>
 </UserControl>

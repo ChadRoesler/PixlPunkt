@@ -28203,7 +28203,8 @@
             - Viewport tracking and events
             </summary>
             <summary>
-            Hosts a SkiaSharp SKXamlCanvas for rendering and interacting with a pixel-art document.
+            Hosts an SKCanvasElement for rendering and interacting with a pixel-art document.
+            Uses Uno's direct Skia integration for hardware-accelerated rendering.
             
             This is the core partial class containing:
             - Fields and properties
@@ -28735,6 +28736,26 @@
             Draws frame number labels on a tile animation frame.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._horizontalRuler">
+            <summary>
+            Helper to get the horizontal ruler as a FrameworkElement for shared operations.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._verticalRuler">
+            <summary>
+            Helper to get the vertical ruler as a FrameworkElement for shared operations.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.InvalidateHorizontalRuler">
+            <summary>
+            Invalidates the horizontal ruler.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.InvalidateVerticalRuler">
+            <summary>
+            Invalidates the vertical ruler.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.ShowRulers">
             <summary>Gets or sets whether rulers are visible.</summary>
         </member>
@@ -29084,7 +29105,7 @@
         <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.CenterOnDocumentPoint(System.Double,System.Double)">
             <summary>
             Recenters the view so that the given document-space point appears near
-            the center of the CanvasView.
+            the center of the _mainCanvas.
             </summary>
         </member>
         <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.CanvasActualSize">
@@ -29152,6 +29173,39 @@
         <member name="P:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.CurrentBrushOverlay">
             <summary>Current brush overlay snapshot (for preview/minimap).</summary>
         </member>
+        <member name="F:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._mainCanvasElement">
+            <summary>Main canvas element using SKCanvasElement for hardware-accelerated rendering.</summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._horizontalRulerElement">
+            <summary>Horizontal ruler element.</summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._verticalRulerElement">
+            <summary>Vertical ruler element.</summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._mainCanvasXaml">
+            <summary>Main canvas using SKXamlCanvas (WinAppSdk fallback).</summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._horizontalRulerXaml">
+            <summary>Horizontal ruler using SKXamlCanvas (WinAppSdk fallback).</summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._verticalRulerXaml">
+            <summary>Vertical ruler using SKXamlCanvas (WinAppSdk fallback).</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._mainCanvas">
+            <summary>
+            Helper to get the main canvas as a FrameworkElement for shared operations.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.InvalidateMainCanvas">
+            <summary>
+            Invalidates the main canvas.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.InvalidateRulers">
+            <summary>
+            Invalidates the rulers.
+            </summary>
+        </member>
         <member name="F:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost._symmetryService">
             <summary>
             Symmetry service for live stroke mirroring.
@@ -29185,19 +29239,27 @@
             Handles control unload to clean up resources like the render hook and timers.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.CanvasView_PaintSurface(System.Object,SkiaSharp.Views.Windows.SKPaintSurfaceEventArgs)">
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.InitializeCanvasElements">
             <summary>
-            Main canvas paint handler - SkiaSharp PaintSurface event.
+            Creates and initializes the SKCanvasElement instances.
+            SKCanvasElement provides hardware-accelerated rendering via direct Skia integration.
+            On WinAppSDK, falls back to SKXamlCanvas.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.HorizontalRulerCanvas_PaintSurface(System.Object,SkiaSharp.Views.Windows.SKPaintSurfaceEventArgs)">
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.RenderMainCanvas(PixlPunkt.Uno.Core.Rendering.ICanvasRenderer)">
             <summary>
-            Horizontal ruler paint handler.
+            Main canvas render callback - receives ICanvasRenderer from MainCanvasElement.
+            Delegates to CanvasView_Draw in the Rendering partial class.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.VerticalRulerCanvas_PaintSurface(System.Object,SkiaSharp.Views.Windows.SKPaintSurfaceEventArgs)">
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.RenderHorizontalRuler(SkiaSharp.SKCanvas,System.Single,System.Single)">
             <summary>
-            Vertical ruler paint handler.
+            Horizontal ruler render callback.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.RenderVerticalRuler(SkiaSharp.SKCanvas,System.Single,System.Single)">
+            <summary>
+            Vertical ruler render callback.
             </summary>
         </member>
         <member name="M:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost.OnEffectiveToolChangedForPreview(System.String)">
@@ -29358,6 +29420,82 @@
             <summary>
             Notifies that the user has interacted with the canvas.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.CanvasHost.HorizontalRulerElement">
+            <summary>
+            High-performance SKCanvasElement for the horizontal ruler.
+            Uses Uno's direct Skia integration for hardware-accelerated rendering.
+            </summary>
+            <remarks>
+            <para>
+            This element is only available on Uno Skia platforms (Desktop, WebAssembly).
+            On WinAppSdk (Windows), the code-behind uses SKXamlCanvas directly.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.HorizontalRulerElement.DrawCallback">
+            <summary>
+            Gets or sets the callback invoked during rendering.
+            The callback receives the SKCanvas and the width/height of the drawing area.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.HorizontalRulerElement.RenderOverride(SkiaSharp.SKCanvas,Windows.Foundation.Size)">
+            <summary>
+            Renders the ruler content using the registered callback.
+            </summary>
+            <param name="canvas">The SKCanvas to draw on.</param>
+            <param name="area">The available drawing area size.</param>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.CanvasHost.MainCanvasElement">
+            <summary>
+            High-performance SKCanvasElement for the main document canvas.
+            Uses Uno's direct Skia integration for hardware-accelerated rendering
+            without the buffer copying overhead of SKXamlCanvas.
+            </summary>
+            <remarks>
+            <para>
+            This element is only available on Uno Skia platforms (Desktop, WebAssembly).
+            On WinAppSdk (Windows), the code-behind uses SKXamlCanvas directly.
+            </para>
+            <para>
+            SKCanvasElement provides significant performance improvements over SKXamlCanvas:
+            </para>
+            <list type="bullet">
+            <item>Hardware acceleration via OpenGL (when available)</item>
+            <item>No buffer copying - draws directly to the app's Skia surface</item>
+            <item>Reduced GC pressure</item>
+            </list>
+            <para>
+            This element requires Skia rendering to be enabled (desktop targets or SkiaRenderer feature).
+            Check <see cref="M:Uno.WinUI.Graphics2DSK.SKCanvasElement.IsSupportedOnCurrentPlatform"/> before instantiation.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.MainCanvasElement.DrawCallback">
+            <summary>
+            Gets or sets the callback invoked during rendering.
+            </summary>
+            <remarks>
+            The callback receives an <see cref="T:PixlPunkt.Uno.Core.Rendering.ICanvasRenderer"/> that wraps the SKCanvas,
+            providing a consistent API whether using SKXamlCanvas or SKCanvasElement.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.MainCanvasElement.LastWidth">
+            <summary>
+            Gets the last rendered width in pixels.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.MainCanvasElement.LastHeight">
+            <summary>
+            Gets the last rendered height in pixels.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.MainCanvasElement.RenderOverride(SkiaSharp.SKCanvas,Windows.Foundation.Size)">
+            <summary>
+            Renders the canvas content using the registered callback.
+            </summary>
+            <param name="canvas">The SKCanvas to draw on. Origin is already translated to element position.</param>
+            <param name="area">The available drawing area size.</param>
         </member>
         <member name="T:PixlPunkt.Uno.UI.CanvasHost.Rulers.RulerRenderer">
             <summary>
@@ -30310,6 +30448,31 @@
             <summary>
             Flips a BGRA buffer vertically (mirror top-bottom).
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.CanvasHost.VerticalRulerElement">
+            <summary>
+            High-performance SKCanvasElement for the vertical ruler.
+            Uses Uno's direct Skia integration for hardware-accelerated rendering.
+            </summary>
+            <remarks>
+            <para>
+            This element is only available on Uno Skia platforms (Desktop, WebAssembly).
+            On WinAppSdk (Windows), the code-behind uses SKXamlCanvas directly.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.CanvasHost.VerticalRulerElement.DrawCallback">
+            <summary>
+            Gets or sets the callback invoked during rendering.
+            The callback receives the SKCanvas and the width/height of the drawing area.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.CanvasHost.VerticalRulerElement.RenderOverride(SkiaSharp.SKCanvas,Windows.Foundation.Size)">
+            <summary>
+            Renders the ruler content using the registered callback.
+            </summary>
+            <param name="canvas">The SKCanvas to draw on.</param>
+            <param name="area">The available drawing area size.</param>
         </member>
         <member name="E:PixlPunkt.Uno.UI.ColorPick.ColorPickerWindow.DropperModeRequested">
             <summary>
@@ -32304,6 +32467,72 @@
             Shows the flyout at the specified element for the given folder.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement">
+            <summary>
+            High-performance SKCanvasElement for layer preview background rendering.
+            Uses Uno's direct Skia integration for hardware-accelerated checkerboard pattern.
+            </summary>
+            <remarks>
+            <para>
+            This element is only available on Uno Skia platforms (Desktop, WebAssembly).
+            On WinAppSdk (Windows), the code-behind uses SKXamlCanvas directly.
+            </para>
+            <para>
+            This element renders the checkerboard transparency pattern behind layer previews.
+            Using SKCanvasElement instead of SKXamlCanvas provides:
+            </para>
+            <list type="bullet">
+            <item>Hardware acceleration via OpenGL (when available)</item>
+            <item>No buffer copying - draws directly to the app's Skia surface</item>
+            <item>Reduced GC pressure</item>
+            </list>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement.DrawCallback">
+            <summary>
+            Gets or sets the callback invoked during rendering.
+            </summary>
+            <remarks>
+            The callback receives the SKCanvas and the available drawing area dimensions.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement.LastWidth">
+            <summary>
+            Gets the last rendered width in pixels.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement.LastHeight">
+            <summary>
+            Gets the last rendered height in pixels.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement.RenderOverride(SkiaSharp.SKCanvas,Windows.Foundation.Size)">
+            <summary>
+            Renders the layer preview background using the registered callback.
+            </summary>
+            <param name="canvas">The SKCanvas to draw on.</param>
+            <param name="area">The available drawing area size.</param>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost.InitializeCanvasElement">
+            <summary>
+            Creates and initializes the appropriate canvas element based on platform.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost.InvalidateBgCanvas">
+            <summary>
+            Invalidates the background canvas to trigger a redraw.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost.BgCanvas_PaintSurface(System.Object,SkiaSharp.Views.Windows.SKPaintSurfaceEventArgs)">
+            <summary>
+            Paint surface handler for SKXamlCanvas (WinAppSdk fallback).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost.RenderBackground(SkiaSharp.SKCanvas,System.Single,System.Single)">
+            <summary>
+            Main render callback for both SKCanvasElement and SKXamlCanvas.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Uno.UI.Layers.Controls.LayersPanelMenuFlyout">
             <summary>
             Reusable MenuFlyout for the Layers panel background (empty area).
@@ -33667,6 +33896,26 @@
             Gets the appropriate clear color based on the current theme.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.InitializeCanvasElement">
+            <summary>
+            Creates and initializes the appropriate canvas element based on platform.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.InvalidatePreviewCanvas">
+            <summary>
+            Invalidates the preview canvas to trigger a redraw.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.GetPointerCaptureElement">
+            <summary>
+            Gets the UI element used for pointer capture.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.PreviewCanvas_PaintSurface(System.Object,SkiaSharp.Views.Windows.SKPaintSurfaceEventArgs)">
+            <summary>
+            Paint surface handler for SKXamlCanvas (WinAppSdk fallback).
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.Attach(PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost)">
             <summary>
             Attach this preview to a CanvasViewHost.
@@ -33677,10 +33926,56 @@
             Unhook from the current host.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.CompositeShiftLinePreviewIntoBuffer(System.Byte[])">
+        <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.RenderPreview(SkiaSharp.SKCanvas,System.Single,System.Single)">
             <summary>
-            Composites the shift-line preview into the working buffer.
+            Main render callback for both SKCanvasElement and SKXamlCanvas.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Preview.CanvasPreviewElement">
+            <summary>
+            High-performance SKCanvasElement for canvas preview rendering.
+            Uses Uno's direct Skia integration for hardware-accelerated rendering
+            without the buffer copying overhead of SKXamlCanvas.
+            </summary>
+            <remarks>
+            <para>
+            This element is only available on Uno Skia platforms (Desktop, WebAssembly).
+            On WinAppSdk (Windows), the code-behind uses SKXamlCanvas directly.
+            </para>
+            <para>
+            SKCanvasElement provides significant performance improvements over SKXamlCanvas:
+            </para>
+            <list type="bullet">
+            <item>Hardware acceleration via OpenGL (when available)</item>
+            <item>No buffer copying - draws directly to the app's Skia surface</item>
+            <item>Reduced GC pressure</item>
+            </list>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.Preview.CanvasPreviewElement.DrawCallback">
+            <summary>
+            Gets or sets the callback invoked during rendering.
+            </summary>
+            <remarks>
+            The callback receives the SKCanvas and the available drawing area dimensions.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.Preview.CanvasPreviewElement.LastWidth">
+            <summary>
+            Gets the last rendered width in pixels.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.Preview.CanvasPreviewElement.LastHeight">
+            <summary>
+            Gets the last rendered height in pixels.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreviewElement.RenderOverride(SkiaSharp.SKCanvas,Windows.Foundation.Size)">
+            <summary>
+            Renders the preview content using the registered callback.
+            </summary>
+            <param name="canvas">The SKCanvas to draw on.</param>
+            <param name="area">The available drawing area size.</param>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Rendering.PatternBackgroundService">
             <summary>
@@ -37468,192 +37763,222 @@
             Builder for PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost
             </summary>
         </member>
-        <member name="T:PixlPunkt.Uno.MetadataBuilder_661">
-            <summary>
-            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.HslSquare
-            </summary>
-        </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_662">
             <summary>
-            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.HueSlider
+            Builder for Uno.WinUI.Graphics2DSK.SKCanvasElement
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_661">
+            <summary>
+            Builder for PixlPunkt.Uno.UI.CanvasHost.HorizontalRulerElement
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_663">
             <summary>
-            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.LadderRow
+            Builder for PixlPunkt.Uno.UI.CanvasHost.MainCanvasElement
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_664">
             <summary>
-            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.TriangleCurveEditor
+            Builder for PixlPunkt.Uno.UI.CanvasHost.VerticalRulerElement
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_665">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Controls.ColorSwatchButton
+            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.HslSquare
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_666">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Controls.CollapsibleSplitter
+            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.HueSlider
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_667">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal
+            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.LadderRow
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_668">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Controls.PaletteSwatchRow
+            Builder for PixlPunkt.Uno.UI.ColorPick.Controls.TriangleCurveEditor
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_669">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Controls.SectionCard
+            Builder for PixlPunkt.Uno.UI.Controls.ColorSwatchButton
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_670">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.NewCanvasDialog
+            Builder for PixlPunkt.Uno.UI.Controls.CollapsibleSplitter
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_671">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.UpdateAvailableDialog
+            Builder for PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_672">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.ImportTilesDialog
+            Builder for PixlPunkt.Uno.UI.Controls.PaletteSwatchRow
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_673">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.AnimationExportDialog
+            Builder for PixlPunkt.Uno.UI.Controls.SectionCard
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_674">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BatchTileAnimationExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.NewCanvasDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_675">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BrushExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.UpdateAvailableDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_676">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.CursorExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.ImportTilesDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_677">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ExportProgressDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.AnimationExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_678">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.IconExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BatchTileAnimationExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_679">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ImageExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BrushExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_680">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.TimelapseExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.CursorExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_681">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Import.ImageImportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ExportProgressDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_682">
             <summary>
-            Builder for PixlPunkt.Uno.UI.History.HistoryPanel
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.IconExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_683">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.LayersPanel
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ImageExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_684">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerFolderMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.TimelapseExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_685">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost
+            Builder for PixlPunkt.Uno.UI.Dialogs.Import.ImageImportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_686">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayersPanelMenuFlyout
+            Builder for PixlPunkt.Uno.UI.History.HistoryPanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_687">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.RasterLayerMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.LayersPanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_688">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.ReferenceLayerMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerFolderMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_689">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.PalettePanel
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_690">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.QuickSwatches
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_691">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.Controls.PalettePanelMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayersPanelMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_692">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.Controls.SwatchMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.RasterLayerMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_693">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Preview.CanvasPreview
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.ReferenceLayerMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_694">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Settings.ShortcutSettingsPanel
+            Builder for PixlPunkt.Uno.UI.Palette.PalettePanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_695">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Settings.ShortcutEditDialog
+            Builder for PixlPunkt.Uno.UI.Palette.QuickSwatches
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_696">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Tiles.TilePanel
+            Builder for PixlPunkt.Uno.UI.Palette.Controls.PalettePanelMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_697">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Tools.ToolOptionsBar
+            Builder for PixlPunkt.Uno.UI.Palette.Controls.SwatchMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_698">
+            <summary>
+            Builder for PixlPunkt.Uno.UI.Preview.CanvasPreview
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_699">
+            <summary>
+            Builder for PixlPunkt.Uno.UI.Preview.CanvasPreviewElement
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_700">
+            <summary>
+            Builder for PixlPunkt.Uno.UI.Settings.ShortcutSettingsPanel
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_701">
+            <summary>
+            Builder for PixlPunkt.Uno.UI.Settings.ShortcutEditDialog
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_702">
+            <summary>
+            Builder for PixlPunkt.Uno.UI.Tiles.TilePanel
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_703">
+            <summary>
+            Builder for PixlPunkt.Uno.UI.Tools.ToolOptionsBar
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_704">
             <summary>
             Builder for PixlPunkt.Uno.UI.Tools.ToolRail
             </summary>

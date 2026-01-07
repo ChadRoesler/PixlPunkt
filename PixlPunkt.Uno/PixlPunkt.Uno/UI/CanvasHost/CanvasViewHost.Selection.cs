@@ -168,7 +168,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (_selState == null) return;
             bool isTransforming = _selState.Drag == SelDrag.Scale || _selState.Drag == SelDrag.Rotate || _selState.Drag == SelDrag.Move;
             if ((_selState.Active || _selState.HavePreview || (_selState.Drag == SelDrag.Marquee && (ActiveSelectionTool?.NeedsContinuousRender ?? false))) && !isTransforming)
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -207,7 +207,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selHitTest.GetScale = () => _zoom.Scale;
 
             // Wire up dependencies for transform operations
-            _selTransform.RequestRedraw = () => CanvasView.Invalidate();
+            _selTransform.RequestRedraw = () => InvalidateMainCanvas();
             _selTransform.GetToolState = () => _toolState;
             _selTransform.GetApplyFromTool = () => _selApplyFromTool;
             _selTransform.SetPushToTool = v => _selPushToTool = v;
@@ -224,7 +224,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selClipboard.GetDocHeight = () => Document.PixelHeight;
             _selClipboard.GetZoom = () => _zoom;
             _selClipboard.GetHoverPosition = () => (_hoverX, _hoverY, _hoverValid);
-            _selClipboard.RequestRedraw = () => CanvasView.Invalidate();
+            _selClipboard.RequestRedraw = () => InvalidateMainCanvas();
             _selClipboard.CommitFloating = () => CommitFloatingWithHistory();
             _selClipboard.ApplyWithHistory = (rect, mutator) => ApplyWithHistory(rect, mutator, "Delete Selection");
             _selClipboard.SetCursor = SetCursor;
@@ -242,7 +242,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selectionToolContext = new SelectionToolContext
             {
                 GetSelectionRegion = () => _selRegion,
-                RequestRedraw = () => CanvasView.Invalidate(),
+                RequestRedraw = () => InvalidateMainCanvas(),
                 GetDocumentSize = () => (Document.PixelWidth, Document.PixelHeight),
                 GetActiveLayer = () => Document.ActiveLayer as RasterLayer,
                 GetBrushOffsets = () => _stroke?.GetCurrentBrushOffsets() ?? Array.Empty<(int, int)>()
@@ -401,7 +401,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Notify tool state of selection presence change
             _toolState?.SetSelectionPresence(_selState.Active, false);
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -445,7 +445,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selState.PreviewBuf = null;
 
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -564,7 +564,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             _selState.Dirty = true;
             _selState.Changed = true;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -618,7 +618,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             }
 
             _selTransform?.FlipHorizontal(useGlobalAxis);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>Flips the selection vertically.</summary>
@@ -632,7 +632,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             }
 
             _selTransform?.FlipVertical(useGlobalAxis);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>Sets selection scale in percent.</summary>
@@ -647,14 +647,14 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (!IsSelectTool || _selState == null) return false;
 
-            var pos = e.GetPosition(CanvasView);
+            var pos = e.GetPosition(_mainCanvas);
             if (!TryGetDocInside(pos, out var x, out var y)) return false;
             if (!TryGetTileRectAtDocPos(x, y, out var r)) return false;
             if (Document.ActiveLayer is not RasterLayer rl) return false;
 
             _selState.Drag = SelDrag.None;
             _selState.HavePreview = false;
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
 
             if (_selState.Floating) CommitFloatingWithHistory();
 
@@ -674,7 +674,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selState.ResetTransform();
             _selState.NotifyToolState();
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             e.Handled = true;
             return true;
         }
@@ -683,7 +683,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (!IsSelectTool || _selState == null || _selHitTest == null || _selTransform == null) return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             if (!pt.Properties.IsLeftButtonPressed) return false;
 
             var viewPos = pt.Position;
@@ -698,7 +698,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     if (!_selState.Floating) LiftSelectionWithHistory();
                     // Capture snapshot for potential history
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     _selState.Dirty = true;
                     return true;
                 }
@@ -719,7 +719,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     if (!_selState.Floating) LiftSelectionWithHistory();
                     // Capture snapshot for history - include buffer since rotate bakes transforms
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     _selState.Dirty = true;
                     return true;
                 }
@@ -739,7 +739,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _selState.ScaleStartScaleY = _selState.ScaleY;
                     // Capture snapshot for history - include buffer since scale bakes transforms
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     _selState.Dirty = true;
                     return true;
                 }
@@ -754,7 +754,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _selState.MoveStartY = my;
                     // Capture snapshot for history
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     _selState.Dirty = true;
                     return true;
                 }
@@ -764,7 +764,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _selState.Clear();
                 _toolState?.SetSelectionPresence(false, false);
                 ActiveSelectionTool?.Cancel();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -791,7 +791,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 var docPos = new Point(docPosX, docPosY);
                 ActiveSelectionTool?.PointerPressed(docPos, e);
 
-                CanvasView.CapturePointer(e.Pointer);
+                _mainCanvas.CapturePointer(e.Pointer);
                 return true;
             }
 
@@ -802,7 +802,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (!IsSelectTool || _selState == null || _selHitTest == null || _selTransform == null) return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var viewPos = pt.Position;
             UpdateSelectionCursor(viewPos);
 
@@ -836,7 +836,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                         OffsetSelectionRegion(dx, dy);
                         _selState.Dirty = true;
                         _selState.Changed = true;
-                        CanvasView.Invalidate();
+                        InvalidateMainCanvas();
                     }
                     return true;
 
@@ -846,7 +846,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                         _selTransform.UpdateScaleFromHandle(docX, docY);
                         _selState.Dirty = true;
                         _selState.Changed = true;
-                        CanvasView.Invalidate();
+                        InvalidateMainCanvas();
                     }
                     return true;
 
@@ -856,7 +856,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                         UpdateRotation(docX, docY);
                         _selState.Dirty = true;
                         _selState.Changed = true;
-                        CanvasView.Invalidate();
+                        InvalidateMainCanvas();
                     }
                     return true;
 
@@ -877,7 +877,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             if (_selState.Drag == SelDrag.Marquee)
             {
-                var viewPos = e.GetCurrentPoint(CanvasView).Position;
+                var viewPos = e.GetCurrentPoint(_mainCanvas).Position;
                 // Use unclamped doc coordinates - the tool handles clamping
                 var (docX, docY) = ViewToDoc(viewPos);
                 var docPos = new Point(docX, docY);
@@ -934,9 +934,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selState.Drag = SelDrag.None;
             _selState.ActiveHandle = SelHandle.None;
             _selState.DragStartSnapshot = null;
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
             _selState.Dirty = false;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             return true;
         }
 

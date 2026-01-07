@@ -22,6 +22,9 @@ using PixlPunkt.Uno.UI.Helpers;
 using PixlPunkt.Uno.UI.Rendering;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
+#if HAS_UNO
+using Uno.WinUI.Graphics2DSK;
+#endif
 using Windows.Graphics;
 using Windows.UI;
 using PixlPunkt.Uno.Core.Platform;
@@ -30,7 +33,8 @@ using Microsoft.UI.Dispatching;
 namespace PixlPunkt.Uno.UI.CanvasHost
 {
     /// <summary>
-    /// Hosts a SkiaSharp SKXamlCanvas for rendering and interacting with a pixel-art document.
+    /// Hosts an SKCanvasElement for rendering and interacting with a pixel-art document.
+    /// Uses Uno's direct Skia integration for hardware-accelerated rendering.
     /// 
     /// This is the core partial class containing:
     /// - Fields and properties
@@ -103,6 +107,72 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         public BrushOverlaySnapshot CurrentBrushOverlay => _currentBrushOverlay;
 
         public uint ForegroundColor => _fg;
+
+        // ════════════════════════════════════════════════════════════════════
+        // FIELDS - SKCANVASELEMENT INSTANCES (Uno platforms)
+        // ════════════════════════════════════════════════════════════════════
+
+#if HAS_UNO
+        /// <summary>Main canvas element using SKCanvasElement for hardware-accelerated rendering.</summary>
+        private MainCanvasElement? _mainCanvasElement;
+
+        /// <summary>Horizontal ruler element.</summary>
+        private HorizontalRulerElement? _horizontalRulerElement;
+
+        /// <summary>Vertical ruler element.</summary>
+        private VerticalRulerElement? _verticalRulerElement;
+#endif
+
+        // ════════════════════════════════════════════════════════════════════
+        // FIELDS - SKXAMLCANVAS INSTANCES (WinAppSdk fallback)
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>Main canvas using SKXamlCanvas (WinAppSdk fallback).</summary>
+        private SKXamlCanvas? _mainCanvasXaml;
+
+        /// <summary>Horizontal ruler using SKXamlCanvas (WinAppSdk fallback).</summary>
+        private SKXamlCanvas? _horizontalRulerXaml;
+
+        /// <summary>Vertical ruler using SKXamlCanvas (WinAppSdk fallback).</summary>
+        private SKXamlCanvas? _verticalRulerXaml;
+
+        // ════════════════════════════════════════════════════════════════════
+        // CANVAS ABSTRACTION HELPERS
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Helper to get the main canvas as a FrameworkElement for shared operations.
+        /// </summary>
+        private FrameworkElement _mainCanvas =>
+#if HAS_UNO
+            _mainCanvasElement ?? (FrameworkElement?)_mainCanvasXaml ?? throw new InvalidOperationException("Canvas not initialized");
+#else
+            _mainCanvasXaml ?? throw new InvalidOperationException("Canvas not initialized");
+#endif
+
+        /// <summary>
+        /// Invalidates the main canvas.
+        /// </summary>
+        private void InvalidateMainCanvas()
+        {
+#if HAS_UNO
+            _mainCanvasElement?.Invalidate();
+#endif
+            _mainCanvasXaml?.Invalidate();
+        }
+
+        /// <summary>
+        /// Invalidates the rulers.
+        /// </summary>
+        private void InvalidateRulers()
+        {
+#if HAS_UNO
+            _horizontalRulerElement?.Invalidate();
+            _verticalRulerElement?.Invalidate();
+#endif
+            _horizontalRulerXaml?.Invalidate();
+            _verticalRulerXaml?.Invalidate();
+        }
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - CORE SYSTEMS
@@ -306,6 +376,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Use built-in Cross cursor for precise pixel targeting
             _targetCursor = InputSystemCursor.Create(InputSystemCursorShape.Cross);
 
+            // Create and add SKCanvasElement instances
+            InitializeCanvasElements();
+
             // Initialize view and selection bounds
             _zoom.SetDocSize(doc.PixelWidth, doc.PixelHeight);
             _selRegion.EnsureSize(doc.PixelWidth, doc.PixelHeight);
@@ -327,7 +400,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             Document.ActiveLayerChanged += () =>
             {
                 ResetStrokeForActive();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke(); // allow UI to refresh CanUndo/CanRedo
             };
             Document.BeforeStructureChanged += CaptureForCrossfade;
@@ -364,46 +437,109 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _checkerboardPaint = null;
         }
 
-        // ════════════════════════════════════════════════════════════════════
-        // SKIASHARP PAINT SURFACE HANDLERS
-        // ════════════════════════════════════════════════════════════════════
+        /// <summary>
+        /// Creates and initializes the SKCanvasElement instances.
+        /// SKCanvasElement provides hardware-accelerated rendering via direct Skia integration.
+        /// On WinAppSDK, falls back to SKXamlCanvas.
+        /// </summary>
+        private void InitializeCanvasElements()
+        {
+#if HAS_UNO
+            // On Uno platforms, verify SKCanvasElement support
+            if (!SKCanvasElement.IsSupportedOnCurrentPlatform())
+            {
+                throw new PlatformNotSupportedException(
+                    "SKCanvasElement is not supported on this platform. " +
+                    "Ensure you are running on a Skia-rendered target (desktop, android with SkiaRenderer, etc.).");
+            }
+
+            // Create main canvas element using SKCanvasElement for hardware-accelerated rendering
+            _mainCanvasElement = new MainCanvasElement();
+            _mainCanvasElement.DrawCallback = RenderMainCanvas;
+            CanvasContainer.Children.Add(_mainCanvasElement);
+
+            // Create horizontal ruler element
+            _horizontalRulerElement = new HorizontalRulerElement
+            {
+                DrawCallback = RenderHorizontalRuler
+            };
+            HorizontalRulerContainer.Children.Add(_horizontalRulerElement);
+
+            // Create vertical ruler element
+            _verticalRulerElement = new VerticalRulerElement
+            {
+                DrawCallback = RenderVerticalRuler
+            };
+            VerticalRulerContainer.Children.Add(_verticalRulerElement);
+#else
+            // On WinAppSDK, use SKXamlCanvas as fallback
+            _mainCanvasXaml = new SKXamlCanvas();
+            _mainCanvasXaml.PaintSurface += MainCanvasXaml_PaintSurface;
+            CanvasContainer.Children.Add(_mainCanvasXaml);
+
+            // Create horizontal ruler using SKXamlCanvas
+            _horizontalRulerXaml = new SKXamlCanvas();
+            _horizontalRulerXaml.PaintSurface += HorizontalRulerXaml_PaintSurface;
+            HorizontalRulerContainer.Children.Add(_horizontalRulerXaml);
+
+            // Create vertical ruler using SKXamlCanvas
+            _verticalRulerXaml = new SKXamlCanvas();
+            _verticalRulerXaml.PaintSurface += VerticalRulerXaml_PaintSurface;
+            VerticalRulerContainer.Children.Add(_verticalRulerXaml);
+#endif
+        }
+
+#if !HAS_UNO
+        /// <summary>
+        /// Paint surface handler for main canvas (WinAppSDK fallback).
+        /// </summary>
+        private void MainCanvasXaml_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            using var renderer = new SkiaCanvasRenderer(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+            RenderMainCanvas(renderer);
+        }
 
         /// <summary>
-        /// Main canvas paint handler - SkiaSharp PaintSurface event.
+        /// Paint surface handler for horizontal ruler (WinAppSDK fallback).
         /// </summary>
-        private void CanvasView_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        private void HorizontalRulerXaml_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var canvas = e.Surface.Canvas;
-            var info = e.Info;
+            RenderHorizontalRuler(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+        }
 
-            // Create our renderer abstraction
-            using var renderer = new SkiaCanvasRenderer(canvas, info.Width, info.Height);
+        /// <summary>
+        /// Paint surface handler for vertical ruler (WinAppSDK fallback).
+        /// </summary>
+        private void VerticalRulerXaml_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            RenderVerticalRuler(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+        }
+#endif
 
-            // Delegate to the main draw method
+        /// <summary>
+        /// Main canvas render callback - receives ICanvasRenderer from MainCanvasElement.
+        /// Delegates to CanvasView_Draw in the Rendering partial class.
+        /// </summary>
+        private void RenderMainCanvas(ICanvasRenderer renderer)
+        {
             CanvasView_Draw(renderer);
         }
 
         /// <summary>
-        /// Horizontal ruler paint handler.
+        /// Horizontal ruler render callback.
         /// </summary>
-        private void HorizontalRulerCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        private void RenderHorizontalRuler(SKCanvas canvas, float width, float height)
         {
-            var canvas = e.Surface.Canvas;
-            var info = e.Info;
-
-            using var renderer = new SkiaCanvasRenderer(canvas, info.Width, info.Height);
+            using var renderer = new SkiaCanvasRenderer(canvas, width, height);
             HorizontalRuler_Draw(renderer);
         }
 
         /// <summary>
-        /// Vertical ruler paint handler.
+        /// Vertical ruler render callback.
         /// </summary>
-        private void VerticalRulerCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        private void RenderVerticalRuler(SKCanvas canvas, float width, float height)
         {
-            var canvas = e.Surface.Canvas;
-            var info = e.Info;
-
-            using var renderer = new SkiaCanvasRenderer(canvas, info.Width, info.Height);
+            using var renderer = new SkiaCanvasRenderer(canvas, width, height);
             VerticalRuler_Draw(renderer);
         }
 
@@ -419,7 +555,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _checkerboardBitmap = null;
                 _checkerboardPaint?.Dispose();
                 _checkerboardPaint = null;
-                CanvasView?.Invalidate();
+                InvalidateMainCanvas();
             }
             catch (Exception ex)
             {
@@ -480,7 +616,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             _fg = bgra;
             _stroke.SetForeground(_fg);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void ApplyBrush(BrushSettings s, uint fg)
@@ -494,7 +630,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _brushDensity = s.Density;
             uint merged = (fg & 0x00FFFFFFu) | ((uint)_brushOpacity << 24);
             SetForeground(merged);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void AdjustBrushSize(int delta)
@@ -507,7 +643,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             _brushSize = Math.Clamp(s, MinBrushSize, MaxBrushSize);
             _stroke.SetBrushSize(_brushSize);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void SetBrushOpacity(int a)
@@ -516,13 +652,13 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _stroke.SetOpacity(_brushOpacity);
             _fg = (_fg & 0x00FFFFFFu) | ((uint)_brushOpacity << 24);
             _stroke.SetForeground(_fg);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void SetBrushShape(BrushShape shape)
         {
             _stroke.SetBrushShape(shape);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -535,7 +671,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _selRegion.EnsureSize(Document.PixelWidth, Document.PixelHeight);
             UpdateActiveLayerPreview();
             UpdateViewport();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         private void OnExternalDocumentModified()
@@ -548,7 +684,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             // Refresh to pick up changes from external sources (e.g., TileFrameEditorCanvas)
             // This also handles mask editing mode toggling which fires StructureChanged
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             RaiseFrame();
         }
 
@@ -613,7 +749,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _fg = (_fg & 0x00FFFFFFu) | ((uint)_brushOpacity << 24);
                 _stroke.SetForeground(_fg);
             }
-            CanvasView?.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -753,7 +889,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             }
 
             // Redraw canvas to update symmetry overlay
-            CanvasView?.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -833,7 +969,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 // Redraw if any transform parameters changed
                 if (needsRedraw)
                 {
-                    CanvasView.Invalidate();
+                    InvalidateMainCanvas();
                 }
             }
             finally
@@ -841,7 +977,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _selApplyFromTool = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -922,7 +1058,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             ResetStrokeForActive();
 
             // Invalidate and re-render
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             RaiseFrame();
         }
 
@@ -949,7 +1085,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             // Update viewport and invalidate
             UpdateViewport();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             RaiseFrame();
         }
 
@@ -984,7 +1120,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _stagePendingEdits = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -1007,7 +1143,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _stagePendingEdits = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -1025,7 +1161,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _stageSelected = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // --------------------------------------------------------------------
@@ -1064,7 +1200,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _subRoutineDragging = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -1212,7 +1348,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         private void ForceInvalidate()
         {
             // Always queue the invalidation
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
 
             // During active painting, periodically force synchronous processing
             if (_isActivePainting)
@@ -1228,7 +1364,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     
                     // UpdateLayout() forces XAML to process pending layout/render requests
                     // This is the key to getting synchronous-ish rendering on Skia
-                    CanvasView.UpdateLayout();
+                    _mainCanvas.UpdateLayout();
                 }
             }
         }

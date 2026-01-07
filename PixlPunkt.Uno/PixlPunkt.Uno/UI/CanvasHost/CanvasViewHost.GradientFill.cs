@@ -41,8 +41,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _gradientStartY = _gradientEndY = y;
             _gradientDrag = true;
 
-            CanvasView.CapturePointer(e.Pointer);
-            CanvasView.Invalidate();
+            _mainCanvas.CapturePointer(e.Pointer);
+            InvalidateMainCanvas();
         }
 
         private void HandleGradientFillMoved(Point pos)
@@ -87,7 +87,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             _gradientEndX = x;
             _gradientEndY = y;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         private void HandleGradientFillReleased()
@@ -126,11 +126,11 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // Composite and update
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             RaiseFrame();
 
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
         }
 
         // ====================================================================

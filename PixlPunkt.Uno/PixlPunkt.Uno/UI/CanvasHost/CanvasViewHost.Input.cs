@@ -35,35 +35,33 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
         private void WireCanvasEvents()
         {
-            CanvasView.Loaded += (_, __) => 
+            _mainCanvas.Loaded += (_, __) => 
             {
                 DoFit();
                 // Explicitly invalidate rulers after fit to ensure they draw correctly
-                HorizontalRulerCanvas?.Invalidate();
-                VerticalRulerCanvas?.Invalidate();
+                InvalidateRulers();
             };
 
-            CanvasView.SizeChanged += (_, __) =>
+            _mainCanvas.SizeChanged += (_, __) =>
             {
-                _zoom.SetViewportSize(CanvasView.ActualWidth, CanvasView.ActualHeight);
+                _zoom.SetViewportSize(_mainCanvas.ActualWidth, _mainCanvas.ActualHeight);
                 UpdateViewport();
                 ZoomLevel.Text = ZoomLevelText;
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 // Ensure rulers redraw when canvas size changes
-                HorizontalRulerCanvas?.Invalidate();
-                VerticalRulerCanvas?.Invalidate();
+                InvalidateRulers();
             };
 
             // SkiaSharp PaintSurface is wired in XAML via PaintSurface="CanvasView_PaintSurface"
             // No need to wire it here since we use the event handler directly
 
-            CanvasView.PointerExited += CanvasView_PointerExited;
-            CanvasView.PointerEntered += CanvasView_PointerEntered;
+            _mainCanvas.PointerExited += CanvasView_PointerExited;
+            _mainCanvas.PointerEntered += CanvasView_PointerEntered;
 
-            CanvasView.PointerCaptureLost += CanvasView_PointerCaptureLost;
-            CanvasView.PointerCanceled += CanvasView_PointerCanceled;
+            _mainCanvas.PointerCaptureLost += CanvasView_PointerCaptureLost;
+            _mainCanvas.PointerCanceled += CanvasView_PointerCanceled;
 
-            CanvasView.DoubleTapped += CanvasView_DoubleTapped;
+            _mainCanvas.DoubleTapped += CanvasView_DoubleTapped;
         }
 
         private void CommitIfPaintingLost()
@@ -239,7 +237,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (_toolState?.ActiveToolId != ToolIds.Symmetry)
                 return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             if (!pt.Properties.IsLeftButtonPressed) return false;
 
             var hitType = HitTestSymmetryAxis(pt.Position);
@@ -247,7 +245,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             _symmetryAxisDragging = true;
             _symmetryAxisDragType = hitType;
-            CanvasView.CapturePointer(e.Pointer);
+            _mainCanvas.CapturePointer(e.Pointer);
             return true;
         }
 
@@ -262,7 +260,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             var settings = _toolState?.Symmetry;
             if (settings == null) return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var docPos = _zoom.ScreenToDoc(pt.Position);
 
             int docWidth = Document.PixelWidth;
@@ -282,7 +280,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     break;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             return true;
         }
 
@@ -295,7 +293,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (!_symmetryAxisDragging) return false;
 
             _symmetryAxisDragging = false;
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
             return true;
         }
 
@@ -313,7 +311,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // ════════════════════════════════════════════════════════════════════
             if (_externalDropperActive && _externalDropperCallback != null)
             {
-                var extPt = e.GetCurrentPoint(CanvasView);
+                var extPt = e.GetCurrentPoint(_mainCanvas);
                 var extDocPos = ScreenToDocPoint(extPt.Position);
 
                 int extX = (int)extDocPos.X;
@@ -377,7 +375,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             if (Selection_PointerPressed(e)) return;
 
-            var p = e.GetCurrentPoint(CanvasView);
+            var p = e.GetCurrentPoint(_mainCanvas);
             var props = p.Properties;
             var screenPos = p.Position;
             var docPos = ScreenToDocPoint(screenPos);
@@ -407,7 +405,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     // Dropper tool active - use dropper directly (handles its own RMB)
                     if (dropperHandler?.PointerPressed(screenPos, docPos, props) == true)
                     {
-                        CanvasView.CapturePointer(e.Pointer);
+                        _mainCanvas.CapturePointer(e.Pointer);
                         return;
                     }
                 }
@@ -417,7 +415,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _toolState?.BeginOverrideById(ToolIds.Dropper);
                     if (dropperHandler?.PointerPressed(screenPos, docPos, props) == true)
                     {
-                        CanvasView.CapturePointer(e.Pointer);
+                        _mainCanvas.CapturePointer(e.Pointer);
                         return;
                     }
                 }
@@ -429,7 +427,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             {
                 if (panHandler?.PointerPressed(screenPos, docPos, props) == true)
                 {
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return;
                 }
             }
@@ -439,7 +437,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             {
                 if (panHandler?.PointerPressed(screenPos, docPos, props) == true)
                 {
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return;
                 }
             }
@@ -458,7 +456,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             {
                 if (dropperHandler?.PointerPressed(screenPos, docPos, props) == true)
                 {
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return;
                 }
             }
@@ -469,7 +467,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             {
                 if (activeHandler.PointerPressed(screenPos, docPos, props))
                 {
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return;
                 }
             }
@@ -556,12 +554,12 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             // External dropper mode - still update hover for cursor overlay
             if (_externalDropperActive)
             {
-                var extPt = e.GetCurrentPoint(CanvasView);
+                var extPt = e.GetCurrentPoint(_mainCanvas);
                 UpdateHover(extPt.Position);
                 return;
             }
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var screenPos = pt.Position;
 
             // ════════════════════════════════════════════════════════════════════
@@ -829,7 +827,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             if (Selection_PointerReleased(e)) return;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var props = pt.Properties;
             var screenPos = pt.Position;
             var docPos = ScreenToDocPoint(screenPos);
@@ -880,14 +878,14 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _isPainting = false;
                     _hasLastDocPos = false;
                     CommitStroke();
-                    CanvasView.ReleasePointerCaptures();
+                    _mainCanvas.ReleasePointerCaptures();
                     _pendingStrokeFromOutside = false;
                     return;
                 }
                 if (_pendingStrokeFromOutside)
                 {
                     _pendingStrokeFromOutside = false;
-                    CanvasView.ReleasePointerCaptures();
+                    _mainCanvas.ReleasePointerCaptures();
                     return;
                 }
             }
@@ -913,13 +911,13 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _isPainting = false;
                 _hasLastDocPos = false;
                 CommitStroke();
-                CanvasView.ReleasePointerCaptures();
+                _mainCanvas.ReleasePointerCaptures();
             }
 
             if (_pendingStrokeFromOutside)
             {
                 _pendingStrokeFromOutside = false;
-                CanvasView.ReleasePointerCaptures();
+                _mainCanvas.ReleasePointerCaptures();
             }
         }
 
@@ -940,12 +938,12 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             CursorYText.Text = "--";
 
             OnBrushMoved(System.Numerics.Vector2.Zero, 0);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         private void CanvasView_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
         {
-            var cp = e.GetCurrentPoint(CanvasView);
+            var cp = e.GetCurrentPoint(_mainCanvas);
             var screenPos = cp.Position;
             UpdateHover(screenPos);
 
@@ -1073,7 +1071,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             UpdateCursorCoordinatesDisplay(cx, cy);
 
             OnBrushMoved(new System.Numerics.Vector2(cx, cy), (float)((_brushSize - 1) * 0.5));
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -1136,7 +1134,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             var animState = Document.CanvasAnimationState;
             if (animState == null || !animState.Stage.Enabled) return null;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var docPos = ScreenToDocPoint(pt.Position);
             int docX = (int)docPos.X;
             int docY = (int)docPos.Y;
@@ -1209,7 +1207,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             var animState = Document.CanvasAnimationState;
             if (animState == null || !animState.Stage.Enabled) return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             if (!pt.Properties.IsLeftButtonPressed) return false;
 
             var screenPos = pt.Position;
@@ -1232,7 +1230,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _stageDragPointerStartX = docX;
                 _stageDragPointerStartY = docY;
 
-                CanvasView.CapturePointer(e.Pointer);
+                _mainCanvas.CapturePointer(e.Pointer);
                 return true;
             }
 
@@ -1247,7 +1245,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _stageDragPointerStartX = docX;
                 _stageDragPointerStartY = docY;
 
-                CanvasView.CapturePointer(e.Pointer);
+                _mainCanvas.CapturePointer(e.Pointer);
                 return true;
             }
 
@@ -1265,7 +1263,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             var animState = Document.CanvasAnimationState;
             if (animState == null) return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var screenPos = pt.Position;
             var docPos = ScreenToDocPoint(screenPos);
             int docX = (int)docPos.X;
@@ -1404,7 +1402,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 stage.StageWidth = newW;
                 stage.StageHeight = newH;
 
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -1433,7 +1431,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 stage.StageX = newX;
                 stage.StageY = newY;
 
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -1458,7 +1456,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             _stageDragging = false;
             _stageResizing = false;
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
             return true;
         }
 
@@ -1485,7 +1483,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (animState == null)
                 return null;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var docPos = ScreenToDocPoint(pt.Position);
             int docX = (int)docPos.X;
             int docY = (int)docPos.Y;
@@ -1556,7 +1554,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (animState == null)
                 return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             if (!pt.Properties.IsLeftButtonPressed)
                 return false;
 
@@ -1582,7 +1580,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _subRoutineDragPointerStartY = docY;
                 _subRoutineEditProgress = progress;
 
-                CanvasView.CapturePointer(e.Pointer);
+                _mainCanvas.CapturePointer(e.Pointer);
                 return true;
             }
 
@@ -1598,7 +1596,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (!_subRoutineDragging || _selectedSubRoutine == null)
                 return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var screenPos = pt.Position;
             var docPos = ScreenToDocPoint(screenPos);
             int docX = (int)docPos.X;
@@ -1649,7 +1647,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 }
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             return true;
         }
 
@@ -1663,7 +1661,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 return false;
 
             _subRoutineDragging = false;
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
 
             // Notify that the selected sub-routine has changed (for timeline refresh)
             if (_selectedSubRoutine != null)
@@ -1673,7 +1671,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 // The SubRoutineChanged event will fire automatically when properties change
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             return true;
         }
     }

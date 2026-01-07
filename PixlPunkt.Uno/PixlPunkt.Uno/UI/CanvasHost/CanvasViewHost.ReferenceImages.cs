@@ -189,7 +189,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         {
             if (Document == null) return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             if (!pt.Properties.IsLeftButtonPressed)
                 return false;
 
@@ -215,7 +215,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     float cy = _selectedReferenceLayer.CenterY;
                     _refLayerRotationStartAngle = MathF.Atan2(docY - cy, docX - cx) * 180f / MathF.PI;
 
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
 
@@ -232,7 +232,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _refLayerDragPointerStartX = docX;
                     _refLayerDragPointerStartY = docY;
 
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
 
@@ -249,7 +249,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _refLayerDragPointerStartX = docX;
                     _refLayerDragPointerStartY = docY;
 
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
 
@@ -262,7 +262,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     _refLayerDragPointerStartX = docX;
                     _refLayerDragPointerStartY = docY;
 
-                    CanvasView.CapturePointer(e.Pointer);
+                    _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
             }
@@ -281,8 +281,8 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _refLayerDragPointerStartX = docX;
                 _refLayerDragPointerStartY = docY;
 
-                CanvasView.CapturePointer(e.Pointer);
-                CanvasView.Invalidate();
+                _mainCanvas.CapturePointer(e.Pointer);
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -294,7 +294,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 {
                     // Deselect the locked layer and let the click pass through
                     _selectedReferenceLayer = null;
-                    CanvasView.Invalidate();
+                    InvalidateMainCanvas();
                     // Don't return true - let other handlers process this click
                     return false;
                 }
@@ -309,7 +309,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 if (insideCanvas)
                 {
                     _selectedReferenceLayer = null;
-                    CanvasView.Invalidate();
+                    InvalidateMainCanvas();
                     // Don't return true - let other handlers process this click
                 }
             }
@@ -332,7 +332,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (_selectedReferenceLayer == null)
                 return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var screenPos = pt.Position;
             var docPos = ScreenToDocPoint(screenPos);
             float docX = (float)docPos.X;
@@ -366,7 +366,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
                 _selectedReferenceLayer.Rotation = newRotation;
 
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -516,7 +516,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                     }
                 }
 
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -529,7 +529,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _selectedReferenceLayer.PositionX = _refLayerDragStartX + deltaX;
                 _selectedReferenceLayer.PositionY = _refLayerDragStartY + deltaY;
 
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 return true;
             }
 
@@ -548,7 +548,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             _refLayerDragging = false;
             _refLayerResizing = false;
             _refLayerRotating = false;
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
 
             // Restore default cursor
             ProtectedCursor = _targetCursor;
@@ -594,7 +594,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
                 // Select the new layer
                 _selectedReferenceLayer = refLayer;
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
             }
             catch (Exception ex)
             {
@@ -611,7 +611,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             Document.RemoveReferenceLayer(_selectedReferenceLayer);
             _selectedReferenceLayer = null;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -623,7 +623,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
 
             _selectedReferenceLayer.ResetTransform();
             _selectedReferenceLayer.FitToCanvas(Document.PixelWidth, Document.PixelHeight);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -634,7 +634,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (_selectedReferenceLayer == null) return;
 
             _selectedReferenceLayer.Locked = !_selectedReferenceLayer.Locked;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -645,7 +645,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             if (_selectedReferenceLayer == null) return;
 
             _selectedReferenceLayer.Visible = !_selectedReferenceLayer.Visible;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
     }
 }

@@ -290,7 +290,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _shiftLineActive = false;
             }
 
-            CanvasView.CapturePointer(e.Pointer);
+            _mainCanvas.CapturePointer(e.Pointer);
         }
 
         private void HandleJumbleMoved(Point pos)
@@ -424,7 +424,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 }
 
                 UpdateActiveLayerPreview();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 RaiseFrame();
             }
@@ -509,7 +509,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _shiftLineActive = false;
             }
 
-            CanvasView.CapturePointer(e.Pointer);
+            _mainCanvas.CapturePointer(e.Pointer);
         }
 
         private void UpdateStrokeEngineSelectionMask()
@@ -753,7 +753,7 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             UpdateActiveLayerPreview();
             AutoCaptureKeyframeIfNeeded();
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             RaiseFrame();
         }

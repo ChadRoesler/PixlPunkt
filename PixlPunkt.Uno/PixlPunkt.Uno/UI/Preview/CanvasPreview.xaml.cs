@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Microsoft.UI;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Uno.Core.Coloring.Helpers;
@@ -11,6 +12,9 @@ using PixlPunkt.Uno.UI.CanvasHost;
 using PixlPunkt.Uno.UI.Rendering;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
+#if HAS_UNO
+using Uno.WinUI.Graphics2DSK;
+#endif
 using Windows.Foundation;
 using Windows.UI;
 
@@ -19,6 +23,13 @@ namespace PixlPunkt.Uno.UI.Preview
     public sealed partial class CanvasPreview : UserControl
     {
         private CanvasViewHost? _host;
+
+#if HAS_UNO
+        // SKCanvasElement instance for hardware-accelerated rendering (Uno platforms)
+        private CanvasPreviewElement? _previewCanvasElement;
+#endif
+        // SKXamlCanvas fallback for WinAppSdk
+        private SKXamlCanvas? _previewCanvasXaml;
 
         // Latest composited frame
         private byte[]? _pixels;
@@ -49,6 +60,10 @@ namespace PixlPunkt.Uno.UI.Preview
         // Empty state (no attached canvas)
         private bool _isEmpty = true;
 
+        // Track last known dimensions for layout calculations
+        private float _lastWidth;
+        private float _lastHeight;
+
         public string ZoomText => $"{_zoom * 100:0}%";
         public bool IsEmpty => _isEmpty;
 
@@ -57,30 +72,28 @@ namespace PixlPunkt.Uno.UI.Preview
         /// </summary>
         private Color GetThemeClearColor()
         {
-            // Check the actual theme of the control
             var theme = ActualTheme;
-            return theme == Microsoft.UI.Xaml.ElementTheme.Light
-                ? Color.FromArgb(255, 249, 249, 249)  // Light theme background
-                : Color.FromArgb(255, 24, 24, 24);     // Dark theme background
+            return theme == ElementTheme.Light
+                ? Color.FromArgb(255, 249, 249, 249)
+                : Color.FromArgb(255, 24, 24, 24);
         }
 
         public CanvasPreview()
         {
             InitializeComponent();
 
+            // Initialize canvas element based on platform
+            InitializeCanvasElement();
+
             ZoomInButton.Click += (_, __) => AdjustZoom(1.25f);
             ZoomOutButton.Click += (_, __) => AdjustZoom(1.0f / 1.25f);
             FitButton.Click += (_, __) => ResetZoom();
 
-            SizeChanged += (_, __) => PreviewCanvas.Invalidate();
+            SizeChanged += (_, __) => InvalidatePreviewCanvas();
 
-            PreviewCanvas.PointerPressed += PreviewCanvas_PointerPressed;
-            PreviewCanvas.PointerMoved += PreviewCanvas_PointerMoved;
-            PreviewCanvas.PointerReleased += PreviewCanvas_PointerReleased;
-            PreviewCanvas.PointerExited += PreviewCanvas_PointerExited;
             ResetToEmpty();
 
-            // ── Stripe theme hookup ─────────────────────────────────────
+            // Stripe theme hookup
             ApplyStripeColors();
             TransparencyStripeMixer.ColorsChanged += OnStripeColorsChanged;
             Unloaded += (_, __) => 
@@ -91,12 +104,68 @@ namespace PixlPunkt.Uno.UI.Preview
             };
         }
 
+        /// <summary>
+        /// Creates and initializes the appropriate canvas element based on platform.
+        /// </summary>
+        private void InitializeCanvasElement()
+        {
+#if HAS_UNO
+            // Use SKCanvasElement on Uno platforms for better performance
+            if (SKCanvasElement.IsSupportedOnCurrentPlatform())
+            {
+                _previewCanvasElement = new CanvasPreviewElement
+                {
+                    DrawCallback = RenderPreview
+                };
+                PreviewCanvasContainer.Children.Add(_previewCanvasElement);
+                return;
+            }
+#endif
+            // Fall back to SKXamlCanvas on WinAppSdk or unsupported Uno platforms
+            _previewCanvasXaml = new SKXamlCanvas();
+            _previewCanvasXaml.PaintSurface += PreviewCanvas_PaintSurface;
+            PreviewCanvasContainer.Children.Add(_previewCanvasXaml);
+        }
+
+        /// <summary>
+        /// Invalidates the preview canvas to trigger a redraw.
+        /// </summary>
+        private void InvalidatePreviewCanvas()
+        {
+#if HAS_UNO
+            _previewCanvasElement?.Invalidate();
+#endif
+            _previewCanvasXaml?.Invalidate();
+        }
+
+        /// <summary>
+        /// Gets the UI element used for pointer capture.
+        /// </summary>
+        private UIElement GetPointerCaptureElement()
+        {
+#if HAS_UNO
+            if (_previewCanvasElement != null)
+                return _previewCanvasElement;
+#endif
+            return _previewCanvasXaml ?? (UIElement)PreviewCanvasContainer;
+        }
+
+        /// <summary>
+        /// Paint surface handler for SKXamlCanvas (WinAppSdk fallback).
+        /// </summary>
+        private void PreviewCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            _lastWidth = e.Info.Width;
+            _lastHeight = e.Info.Height;
+            RenderPreview(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+        }
+
         private void OnStripeColorsChanged()
         {
             ApplyStripeColors();
             _patternService.Invalidate();
             InvalidateCheckerboardCache();
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void InvalidateCheckerboardCache()
@@ -126,6 +195,10 @@ namespace PixlPunkt.Uno.UI.Preview
                 _patternService.LightColor = light;
                 _patternService.DarkColor = dark;
             }
+
+            // Disable AutoTheme so the PatternBackgroundService uses the explicit 
+            // colors from TransparencyStripeMixer instead of syncing with ActualTheme
+            _patternService.AutoTheme = false;
         }
 
         /// <summary>
@@ -148,11 +221,10 @@ namespace PixlPunkt.Uno.UI.Preview
             _isEmpty = false;
             ResetZoom();
 
-            // Ensure stripes match current theme immediately
             ApplyStripeColors();
             _patternService.Invalidate();
 
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         /// <summary>
@@ -168,7 +240,7 @@ namespace PixlPunkt.Uno.UI.Preview
                 _host = null;
             }
             ResetToEmpty();
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void ResetToEmpty()
@@ -185,7 +257,6 @@ namespace PixlPunkt.Uno.UI.Preview
             _workingBufferSize = 0;
         }
 
-        // Frame from host
         private void OnFrameReady(byte[] pixels, int width, int height)
         {
             if (_host == null) return;
@@ -194,41 +265,55 @@ namespace PixlPunkt.Uno.UI.Preview
             _docHeight = height;
             _isEmpty = false;
 
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void OnBrushOverlayChanged(Vector2 center, float radius)
         {
-            // Simply grab the complete snapshot - main canvas is source of truth
             _brushOverlay = _host?.CurrentBrushOverlay ?? BrushOverlaySnapshot.Empty;
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void OnViewportChanged(Rect rect)
         {
             _viewport = rect;
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void AdjustZoom(float factor)
         {
             _zoom = Math.Clamp(_zoom * factor, 0.25f, 8.0f);
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void ResetZoom()
         {
             _zoom = 1.0f;
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
-        private bool TryGetLayout(out double offsetX, out double offsetY, out double scale)
+        private float GetLastWidth()
+        {
+#if HAS_UNO
+            if (_previewCanvasElement != null)
+                return _previewCanvasElement.LastWidth;
+#endif
+            return _lastWidth;
+        }
+
+        private float GetLastHeight()
+        {
+#if HAS_UNO
+            if (_previewCanvasElement != null)
+                return _previewCanvasElement.LastHeight;
+#endif
+            return _lastHeight;
+        }
+
+        private bool TryGetLayout(float availW, float availH, out double offsetX, out double offsetY, out double scale)
         {
             offsetX = offsetY = scale = 0;
             if (_docWidth <= 0 || _docHeight <= 0) return false;
-
-            double availW = PreviewCanvas.ActualWidth;
-            double availH = PreviewCanvas.ActualHeight;
             if (availW <= 0 || availH <= 0) return false;
 
             double fitScale = Math.Min(availW / _docWidth, availH / _docHeight);
@@ -246,7 +331,7 @@ namespace PixlPunkt.Uno.UI.Preview
         private bool TryScreenToDoc(Point screenPt, out double docX, out double docY)
         {
             docX = docY = 0;
-            if (!TryGetLayout(out double ox, out double oy, out double scale)) return false;
+            if (!TryGetLayout(GetLastWidth(), GetLastHeight(), out double ox, out double oy, out double scale)) return false;
 
             double localX = screenPt.X - ox;
             double localY = screenPt.Y - oy;
@@ -263,12 +348,13 @@ namespace PixlPunkt.Uno.UI.Preview
         private void PreviewCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
             if (_isEmpty || _host == null) return;
-            var pt = e.GetCurrentPoint(PreviewCanvas);
+            var captureElement = GetPointerCaptureElement();
+            var pt = e.GetCurrentPoint(captureElement);
             if (!pt.Properties.IsLeftButtonPressed) return;
             if (TryScreenToDoc(pt.Position, out double docX, out double docY))
             {
                 _dragging = true;
-                PreviewCanvas.CapturePointer(e.Pointer);
+                captureElement.CapturePointer(e.Pointer);
                 _host.CenterOnDocumentPoint(docX, docY);
             }
         }
@@ -276,7 +362,8 @@ namespace PixlPunkt.Uno.UI.Preview
         private void PreviewCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
             if (_isEmpty || _host == null || !_dragging) return;
-            var pt = e.GetCurrentPoint(PreviewCanvas);
+            var captureElement = GetPointerCaptureElement();
+            var pt = e.GetCurrentPoint(captureElement);
             if (TryScreenToDoc(pt.Position, out double docX, out double docY))
                 _host.CenterOnDocumentPoint(docX, docY);
         }
@@ -286,7 +373,7 @@ namespace PixlPunkt.Uno.UI.Preview
             if (_dragging)
             {
                 _dragging = false;
-                PreviewCanvas.ReleasePointerCaptures();
+                GetPointerCaptureElement().ReleasePointerCaptures();
             }
         }
 
@@ -295,13 +382,17 @@ namespace PixlPunkt.Uno.UI.Preview
             if (_dragging)
             {
                 _dragging = false;
-                PreviewCanvas.ReleasePointerCaptures();
+                GetPointerCaptureElement().ReleasePointerCaptures();
             }
         }
 
-        private void PreviewCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        /// <summary>
+        /// Main render callback for both SKCanvasElement and SKXamlCanvas.
+        /// </summary>
+        private void RenderPreview(SKCanvas canvas, float width, float height)
         {
-            var canvas = e.Surface.Canvas;
+            _lastWidth = width;
+            _lastHeight = height;
 
             // Use theme-aware clear color
             var clearColor = GetThemeClearColor();
@@ -309,7 +400,7 @@ namespace PixlPunkt.Uno.UI.Preview
 
             if (_isEmpty) return;
             if (_pixels == null || _docWidth <= 0 || _docHeight <= 0) return;
-            if (!TryGetLayout(out double ox, out double oy, out double scale)) return;
+            if (!TryGetLayout(width, height, out double ox, out double oy, out double scale)) return;
 
             float canvasW = (float)(_docWidth * scale);
             float canvasH = (float)(_docHeight * scale);
@@ -329,46 +420,38 @@ namespace PixlPunkt.Uno.UI.Preview
             }
             System.Buffer.BlockCopy(_pixels, 0, _workingBuffer, 0, _pixels.Length);
 
-            // ═══════════════════════════════════════════════════════════════
-            // BRUSH OVERLAYS - Trust snapshot.Visible completely
-            // ═══════════════════════════════════════════════════════════════
-
-            // 1. Shift-line preview (during shift+drag line drawing)
+            // BRUSH OVERLAYS
             if (_brushOverlay.IsShiftLineDrag && _host != null)
             {
                 CompositeShiftLinePreviewIntoBuffer(_workingBuffer);
             }
-            // 2. Brush cursor ghost (filled preview for brush tool)
             else if (_brushOverlay.Visible && _brushOverlay.FillGhost && _brushOverlay.Mask != null && _brushOverlay.Mask.Count > 0 && _host != null)
             {
                 CompositeBrushGhostIntoBuffer(_workingBuffer);
             }
 
-            // 3. Shape start point hover (when hovering with shape tool before drag starts)
             if (_brushOverlay.ShowShapeStartPoint && _host != null)
             {
                 CompositeShapeStartPointIntoBuffer(_workingBuffer);
             }
 
-            // 4. Shape preview overlay (during shape drag)
             if (_brushOverlay.IsShapeDrag && _host != null)
             {
                 CompositeShapePreviewIntoBuffer(_workingBuffer);
             }
 
-            // Render the composited image as a single bitmap
+            // Render the composited image
             using var compositeBmp = new SKBitmap(_docWidth, _docHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
             System.Runtime.InteropServices.Marshal.Copy(_workingBuffer, 0, compositeBmp.GetPixels(), requiredSize);
 
             using var paint = new SKPaint
             {
-                FilterQuality = SKFilterQuality.None, // Nearest neighbor
+                FilterQuality = SKFilterQuality.None,
                 IsAntialias = false
             };
             canvas.DrawBitmap(compositeBmp, new SKRect(0, 0, _docWidth, _docHeight), destRect, paint);
 
-            // 5. Brush outline (for non-brush tools - keep visible even during painting)
-            // Show outline if: (1) normal hover state OR (2) outline mode with valid mask (even if Visible=false during painting)
+            // Brush outline
             bool showOutline = _brushOverlay.Mask != null && _brushOverlay.Mask.Count > 0 && !_brushOverlay.FillGhost && !_brushOverlay.IsShiftLineDrag;
             if (showOutline)
             {
@@ -386,7 +469,7 @@ namespace PixlPunkt.Uno.UI.Preview
                 using var viewportPaint = new SKPaint
                 {
                     Style = SKPaintStyle.Stroke,
-                    Color = new SKColor(0, 191, 255), // DeepSkyBlue
+                    Color = new SKColor(0, 191, 255),
                     StrokeWidth = 1.5f,
                     IsAntialias = true
                 };
@@ -396,7 +479,7 @@ namespace PixlPunkt.Uno.UI.Preview
 
         private void DrawCheckerboardBackground(SKCanvas canvas, SKRect destRect)
         {
-            _patternService.SyncWith(ActualTheme);
+            // Don't call SyncWith(ActualTheme) - we use explicit colors from TransparencyStripeMixer
             var (lightColor, darkColor) = _patternService.CurrentScheme;
 
             int squareSize = 8;
@@ -451,9 +534,6 @@ namespace PixlPunkt.Uno.UI.Preview
 
         // ...existing overlay compositing methods...
 
-        /// <summary>
-        /// Composites the shift-line preview into the working buffer.
-        /// </summary>
         private void CompositeShiftLinePreviewIntoBuffer(byte[] workingBuf)
         {
             uint fgColor = _host!.ForegroundColor;
@@ -614,7 +694,7 @@ namespace PixlPunkt.Uno.UI.Preview
         {
             var set = new HashSet<(int dx, int dy)>(_brushOverlay.Mask!);
             float s = (float)scale;
-            var outlineColor = new SKColor(255, 136, 0); // Orange
+            var outlineColor = new SKColor(255, 136, 0);
 
             using var paint = new SKPaint
             {
