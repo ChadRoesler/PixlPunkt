@@ -1,9 +1,13 @@
 #############################################################################
-# PixlPunkt.Uno - Desktop (Skia) Build Workflow
+# PixlPunkt.Uno - Desktop Build Workflow
 #############################################################################
-# Builds the Uno Platform app for Desktop platforms using Skia renderer.
-# Produces builds for Windows, Linux, and macOS.
-# Triggered on pushes to main/master and pull requests affecting Uno files.
+# Builds the Uno Platform app for all Desktop platforms:
+# - Skia Desktop (Windows, Linux, macOS) - Cross-platform renderer
+# - WinAppSdk (Windows only) - Native Windows UI
+#
+# Target Frameworks:
+# - net10.0-desktop: Skia-based renderer for Windows, Linux, macOS
+# - net10.0-windows10.0.26100: WinAppSdk for native Windows
 #############################################################################
 
 name: Build Uno Desktop
@@ -31,10 +35,10 @@ env:
 
 jobs:
   #############################################################################
-  # Build Desktop Windows (Skia)
+  # Build Skia Desktop - Windows (x64)
   #############################################################################
-  build-desktop-windows:
-    name: Build Desktop Windows (x64)
+  build-skia-windows:
+    name: Skia Desktop Windows (x64)
     runs-on: windows-latest
 
     steps:
@@ -48,32 +52,29 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore dependencies
-        run: dotnet restore ${{ env.UNO_PROJECT_PATH }}
-
-      - name: Build Desktop Windows
+      - name: Build Skia Desktop Windows
         shell: pwsh
         run: |
-          Write-Host "Building Desktop Windows (Skia)..." -ForegroundColor Cyan
+          Write-Host "Building Skia Desktop Windows (x64)..." -ForegroundColor Cyan
           
           dotnet publish ${{ env.UNO_PROJECT_PATH }} `
             --configuration Release `
             --framework net10.0-desktop `
             --runtime win-x64 `
             --self-contained true `
-            --output ./publish/desktop-windows-x64 `
+            --output ./publish/skia-windows-x64 `
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=true
 
-      - name: Prepare artifacts
+      - name: Prepare artifact
         id: prepare
         shell: pwsh
         run: |
-          $zipName = "PixlPunkt-Desktop-Windows-x64.zip"
+          $zipName = "PixlPunkt-Skia-Windows-x64.zip"
           
-          if (Test-Path "./publish/desktop-windows-x64") {
-            Compress-Archive -Path "./publish/desktop-windows-x64/*" -DestinationPath $zipName
-            echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
+          if (Test-Path "./publish/skia-windows-x64") {
+            Compress-Archive -Path "./publish/skia-windows-x64/*" -DestinationPath $zipName
+            echo "artifact_name=$zipName" >> $env:GITHUB_OUTPUT
             echo "has_artifact=true" >> $env:GITHUB_OUTPUT
             Write-Host "Created: $zipName" -ForegroundColor Green
           } else {
@@ -85,15 +86,72 @@ jobs:
         if: steps.prepare.outputs.has_artifact == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: PixlPunkt-Desktop-Windows-x64
-          path: ${{ steps.prepare.outputs.zip_name }}
+          name: PixlPunkt-Skia-Windows-x64
+          path: ${{ steps.prepare.outputs.artifact_name }}
           retention-days: 30
 
   #############################################################################
-  # Build Desktop Linux (Skia)
+  # Build WinAppSdk - Windows Native (x64)
   #############################################################################
-  build-desktop-linux:
-    name: Build Desktop Linux (x64)
+  build-winappsdk:
+    name: WinAppSdk Windows (x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build WinAppSdk
+        shell: pwsh
+        run: |
+          Write-Host "Building WinAppSdk Windows (x64)..." -ForegroundColor Cyan
+          
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} `
+            --configuration Release `
+            --framework net10.0-windows10.0.26100 `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish/winappsdk-x64 `
+            -p:PublishSingleFile=false `
+            -p:PublishReadyToRun=true `
+            -p:WindowsPackageType=None
+
+      - name: Prepare artifact
+        id: prepare
+        shell: pwsh
+        run: |
+          $zipName = "PixlPunkt-WinAppSdk-x64.zip"
+          
+          if (Test-Path "./publish/winappsdk-x64") {
+            Compress-Archive -Path "./publish/winappsdk-x64/*" -DestinationPath $zipName
+            echo "artifact_name=$zipName" >> $env:GITHUB_OUTPUT
+            echo "has_artifact=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Created: $zipName" -ForegroundColor Green
+          } else {
+            echo "has_artifact=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Warning: No build output found" -ForegroundColor Yellow
+          }
+
+      - name: Upload artifact
+        if: steps.prepare.outputs.has_artifact == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt-WinAppSdk-x64
+          path: ${{ steps.prepare.outputs.artifact_name }}
+          retention-days: 30
+
+  #############################################################################
+  # Build Skia Desktop - Linux (x64) - Also works for WSL
+  #############################################################################
+  build-skia-linux:
+    name: Skia Desktop Linux (x64)
     runs-on: ubuntu-latest
 
     steps:
@@ -107,41 +165,45 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Install dependencies
+      - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+          sudo apt-get install -y \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libgl1-mesa-dev \
+            libfontconfig1-dev
 
-      - name: Restore dependencies
-        run: dotnet restore ${{ env.UNO_PROJECT_PATH }}
-
-      - name: Build Desktop Linux
+      - name: Build Skia Desktop Linux
         run: |
-          echo "Building Desktop Linux (Skia)..."
+          echo "Building Skia Desktop Linux (x64)..."
           
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
             --configuration Release \
             --framework net10.0-desktop \
             --runtime linux-x64 \
             --self-contained true \
-            --output ./publish/desktop-linux-x64 \
+            --output ./publish/skia-linux-x64 \
             -p:PublishSingleFile=false \
             -p:PublishReadyToRun=true
 
-      - name: Prepare artifacts
+      - name: Prepare artifact
         id: prepare
         run: |
-          TAR_NAME="PixlPunkt-Desktop-Linux-x64.tar.gz"
+          TAR_NAME="PixlPunkt-Skia-Linux-x64.tar.gz"
           
-          if [ -d "./publish/desktop-linux-x64" ]; then
+          if [ -d "./publish/skia-linux-x64" ]; then
             # Make executable
-            chmod +x ./publish/desktop-linux-x64/PixlPunkt.Uno || true
+            chmod +x ./publish/skia-linux-x64/PixlPunkt.Uno || true
             
             # Create tarball
             cd ./publish
-            tar -czvf ../$TAR_NAME desktop-linux-x64
+            tar -czvf ../$TAR_NAME skia-linux-x64
             cd ..
-            echo "tar_name=$TAR_NAME" >> $GITHUB_OUTPUT
+            echo "artifact_name=$TAR_NAME" >> $GITHUB_OUTPUT
             echo "has_artifact=true" >> $GITHUB_OUTPUT
             echo "Created: $TAR_NAME"
           else
@@ -153,15 +215,15 @@ jobs:
         if: steps.prepare.outputs.has_artifact == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: PixlPunkt-Desktop-Linux-x64
-          path: ${{ steps.prepare.outputs.tar_name }}
+          name: PixlPunkt-Skia-Linux-x64
+          path: ${{ steps.prepare.outputs.artifact_name }}
           retention-days: 30
 
   #############################################################################
-  # Build Desktop macOS (Skia)
+  # Build Skia Desktop - macOS (x64 and ARM64)
   #############################################################################
-  build-desktop-macos:
-    name: Build Desktop macOS (${{ matrix.arch }})
+  build-skia-macos:
+    name: Skia Desktop macOS (${{ matrix.arch }})
     runs-on: macos-latest
     
     strategy:
@@ -185,37 +247,34 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore dependencies
-        run: dotnet restore ${{ env.UNO_PROJECT_PATH }}
-
-      - name: Build Desktop macOS
+      - name: Build Skia Desktop macOS
         run: |
-          echo "Building Desktop macOS (${{ matrix.arch }})..."
+          echo "Building Skia Desktop macOS (${{ matrix.arch }})..."
           
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
             --configuration Release \
             --framework net10.0-desktop \
             --runtime ${{ matrix.rid }} \
             --self-contained true \
-            --output ./publish/desktop-macos-${{ matrix.arch }} \
+            --output ./publish/skia-macos-${{ matrix.arch }} \
             -p:PublishSingleFile=false \
             -p:PublishReadyToRun=true
 
-      - name: Prepare artifacts
+      - name: Prepare artifact
         id: prepare
         run: |
           ARCH="${{ matrix.arch }}"
-          ZIP_NAME="PixlPunkt-Desktop-macOS-$ARCH.zip"
+          ZIP_NAME="PixlPunkt-Skia-macOS-$ARCH.zip"
           
-          if [ -d "./publish/desktop-macos-$ARCH" ]; then
+          if [ -d "./publish/skia-macos-$ARCH" ]; then
             # Make executable
-            chmod +x ./publish/desktop-macos-$ARCH/PixlPunkt.Uno || true
+            chmod +x ./publish/skia-macos-$ARCH/PixlPunkt.Uno || true
             
             # Create ZIP
             cd ./publish
-            zip -r ../$ZIP_NAME desktop-macos-$ARCH
+            zip -r ../$ZIP_NAME skia-macos-$ARCH
             cd ..
-            echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+            echo "artifact_name=$ZIP_NAME" >> $GITHUB_OUTPUT
             echo "has_artifact=true" >> $GITHUB_OUTPUT
             echo "Created: $ZIP_NAME"
           else
@@ -227,50 +286,66 @@ jobs:
         if: steps.prepare.outputs.has_artifact == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: PixlPunkt-Desktop-macOS-${{ matrix.arch }}
-          path: ${{ steps.prepare.outputs.zip_name }}
+          name: PixlPunkt-Skia-macOS-${{ matrix.arch }}
+          path: ${{ steps.prepare.outputs.artifact_name }}
           retention-days: 30
 
   #############################################################################
   # Combine All Desktop Artifacts
   #############################################################################
   combine-artifacts:
-    name: Combine Desktop Artifacts
+    name: Combine All Desktop Artifacts
     runs-on: ubuntu-latest
-    needs: [build-desktop-windows, build-desktop-linux, build-desktop-macos]
-    if: success()
+    needs: [build-skia-windows, build-winappsdk, build-skia-linux, build-skia-macos]
+    if: always() && !cancelled()
 
     steps:
-      - name: Download Windows artifact
+      - name: Download Skia Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: PixlPunkt-Desktop-Windows-x64
+          name: PixlPunkt-Skia-Windows-x64
           path: ./release
         continue-on-error: true
 
-      - name: Download Linux artifact
+      - name: Download WinAppSdk artifact
         uses: actions/download-artifact@v4
         with:
-          name: PixlPunkt-Desktop-Linux-x64
+          name: PixlPunkt-WinAppSdk-x64
           path: ./release
         continue-on-error: true
 
-      - name: Download macOS x64 artifact
+      - name: Download Skia Linux artifact
         uses: actions/download-artifact@v4
         with:
-          name: PixlPunkt-Desktop-macOS-x64
+          name: PixlPunkt-Skia-Linux-x64
           path: ./release
         continue-on-error: true
 
-      - name: Download macOS arm64 artifact
+      - name: Download Skia macOS x64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: PixlPunkt-Desktop-macOS-arm64
+          name: PixlPunkt-Skia-macOS-x64
           path: ./release
         continue-on-error: true
 
-      - name: List artifacts
-        run: ls -R ./release || echo "No artifacts found"
+      - name: Download Skia macOS arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt-Skia-macOS-arm64
+          path: ./release
+        continue-on-error: true
+
+      - name: List all artifacts
+        run: |
+          echo "=== Combined Release Artifacts ==="
+          ls -lah ./release/ 2>/dev/null || echo "No artifacts found"
+          echo ""
+          echo "=== Summary ==="
+          echo "Skia Windows:    $([ -f ./release/PixlPunkt-Skia-Windows-x64.zip ] && echo '?' || echo '?')"
+          echo "WinAppSdk:       $([ -f ./release/PixlPunkt-WinAppSdk-x64.zip ] && echo '?' || echo '?')"
+          echo "Skia Linux:      $([ -f ./release/PixlPunkt-Skia-Linux-x64.tar.gz ] && echo '?' || echo '?')"
+          echo "Skia macOS x64:  $([ -f ./release/PixlPunkt-Skia-macOS-x64.zip ] && echo '?' || echo '?')"
+          echo "Skia macOS arm64:$([ -f ./release/PixlPunkt-Skia-macOS-arm64.zip ] && echo '?' || echo '?')"
 
       - name: Upload combined release
         uses: actions/upload-artifact@v4
