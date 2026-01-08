@@ -46,6 +46,158 @@ namespace PixlPunkt.Uno.UI
             if (e.Key == VirtualKey.Shift) _shiftDown = true;
             if (e.Key == VirtualKey.Control) _ctrlDown = true;
 
+            // ─────────────────────────────────────────────────────────────────
+            // UNIVERSAL SHORTCUTS (Ctrl+Z, Ctrl+Y, Ctrl+C, etc.)
+            // On Uno Skia platforms, KeyboardAccelerator.Invoked doesn't fire
+            // reliably, so we handle these shortcuts here as a fallback.
+            // ─────────────────────────────────────────────────────────────────
+            bool ctrl = _ctrlDown || (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) &
+                         Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+            bool shift = _shiftDown || (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) &
+                         Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+
+            if (ctrl && !IsTextInputFocused())
+            {
+                switch (e.Key)
+                {
+                    // Undo: Ctrl+Z
+                    case VirtualKey.Z when !shift:
+                        if (CurrentHost?.CanUndo == true)
+                        {
+                            CurrentHost.Undo();
+                            UpdateHistoryUI();
+                            e.Handled = true;
+                            return;
+                        }
+                        break;
+
+                    // Redo: Ctrl+Y or Ctrl+Shift+Z
+                    case VirtualKey.Y:
+                    case VirtualKey.Z when shift:
+                        if (CurrentHost?.CanRedo == true)
+                        {
+                            CurrentHost.Redo();
+                            UpdateHistoryUI();
+                            e.Handled = true;
+                            return;
+                        }
+                        break;
+
+                    // Copy: Ctrl+C
+                    case VirtualKey.C:
+                        if (CurrentHost?.HasSelection == true)
+                        {
+                            CurrentHost.CopySelection();
+                            e.Handled = true;
+                            return;
+                        }
+                        break;
+
+                    // Cut: Ctrl+X
+                    case VirtualKey.X:
+                        if (CurrentHost?.HasSelection == true)
+                        {
+                            CurrentHost.CutSelection();
+                            e.Handled = true;
+                            return;
+                        }
+                        break;
+
+                    // Paste: Ctrl+V
+                    case VirtualKey.V:
+                        CurrentHost?.PasteClipboard();
+                        e.Handled = true;
+                        return;
+
+                    // Select All: Ctrl+A
+                    case VirtualKey.A:
+                        CurrentHost?.Selection_SelectAll();
+                        e.Handled = true;
+                        return;
+
+                    // New: Ctrl+N
+                    case VirtualKey.N:
+                        _ = NewCanvasAsync();
+                        e.Handled = true;
+                        return;
+
+                    // Open: Ctrl+O
+                    case VirtualKey.O:
+                        _ = OpenDocumentAsync();
+                        e.Handled = true;
+                        return;
+
+                    // Save: Ctrl+S
+                    case VirtualKey.S when !shift:
+                        _ = SaveDocumentAsync();
+                        e.Handled = true;
+                        return;
+
+                    // Save As: Ctrl+Shift+S
+                    case VirtualKey.S when shift:
+                        _ = SaveDocumentAsAsync();
+                        e.Handled = true;
+                        return;
+
+                    // Invert Selection: Ctrl+Shift+I
+                    case VirtualKey.I when shift:
+                        CurrentHost?.Selection_InvertSelection();
+                        e.Handled = true;
+                        return;
+
+                    // Zoom In: Ctrl+Plus (Add key)
+                    case VirtualKey.Add:
+                        CurrentHost?.ZoomIn();
+                        e.Handled = true;
+                        return;
+
+                    // Zoom Out: Ctrl+Minus (Subtract key)
+                    case VirtualKey.Subtract:
+                        CurrentHost?.ZoomOut();
+                        e.Handled = true;
+                        return;
+
+                    // Fit to Screen: Ctrl+Home
+                    case VirtualKey.Home:
+                        CurrentHost?.Fit();
+                        e.Handled = true;
+                        return;
+
+                    // Actual Size: Ctrl+End
+                    case VirtualKey.End:
+                        CurrentHost?.CanvasActualSize();
+                        e.Handled = true;
+                        return;
+                }
+            }
+
+            // Delete/Backspace: Delete selection
+            if ((e.Key == VirtualKey.Delete || e.Key == VirtualKey.Back) && !IsTextInputFocused() && !_suspendToolAccelerators)
+            {
+                if (CurrentHost?.HasSelection == true)
+                {
+                    CurrentHost.DeleteSelection();
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            // Enter: Commit selection
+            if (e.Key == VirtualKey.Enter && !IsTextInputFocused() && !_suspendToolAccelerators)
+            {
+                CurrentHost?.CommitSelection();
+                e.Handled = true;
+                return;
+            }
+
+            // Escape: Cancel selection
+            if (e.Key == VirtualKey.Escape && !IsTextInputFocused() && !_suspendToolAccelerators)
+            {
+                CurrentHost?.CancelSelection();
+                e.Handled = true;
+                return;
+            }
+
             // Skip tool shortcuts if text input is focused or accelerators are suspended
             if (IsTextInputFocused() || _suspendToolAccelerators)
             {
@@ -125,12 +277,6 @@ namespace PixlPunkt.Uno.UI
             // DYNAMIC TOOL SHORTCUTS (from ToolSettingsBase.Shortcut)
             // This allows tools to define their own shortcuts declaratively
             // ─────────────────────────────────────────────────────────────────
-            bool ctrl = _ctrlDown || (e.KeyStatus.IsMenuKeyDown == false &&
-                        (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) &
-                         Windows.UI.Core.CoreVirtualKeyStates.Down) != 0);
-            bool shift = _shiftDown ||
-                        (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) &
-                         Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
             bool alt = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) &
                         Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
 

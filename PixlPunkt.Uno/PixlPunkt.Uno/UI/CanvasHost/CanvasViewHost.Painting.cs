@@ -242,6 +242,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             UpdateStrokeEngineSelectionMask();
             BeginLiveTilePropagation();
 
+            // Suppress live preview updates on Uno Skia platforms during painting
+            RasterLayer.SuppressLivePreviewUpdates = true;
+
             if (TryGetDocWithBrushOverlap(p.Position, out var x, out var y))
             {
                 _isPainting = true;
@@ -441,6 +444,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
             bool shiftHeld = IsKeyDown(Windows.System.VirtualKey.Shift);
             UpdateStrokeEngineSelectionMask();
             BeginLiveTilePropagation();
+
+            // Suppress live preview updates on Uno Skia platforms during painting
+            RasterLayer.SuppressLivePreviewUpdates = true;
 
             _pixelPerfectActive = ShouldUsePixelPerfect() && !shiftHeld;
             if (_pixelPerfectActive) _pixelPerfectFilter.Reset();
@@ -718,6 +724,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
         private void CommitStroke()
         {
             _isActivePainting = false;
+
+            // Re-enable live preview updates now that painting is complete
+            RasterLayer.SuppressLivePreviewUpdates = false;
 
             // Stop the rapid invalidation timer
             StopPaintInvalidationTimer();

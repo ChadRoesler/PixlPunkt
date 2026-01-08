@@ -134,6 +134,21 @@ namespace PixlPunkt.Uno.UI.Controls
         /// </summary>
         private bool _pointerPressed;
 
+        /// <summary>
+        /// Debounce timer to prevent rapid toggle operations.
+        /// </summary>
+        private DispatcherTimer? _debounceTimer;
+
+        /// <summary>
+        /// Whether we're currently in a debounce period (ignore clicks).
+        /// </summary>
+        private bool _isDebouncing;
+
+        /// <summary>
+        /// Debounce delay in milliseconds.
+        /// </summary>
+        private const int DebounceDelayMs = 200;
+
         // ====================================================================
         // EVENTS
         // ====================================================================
@@ -185,13 +200,9 @@ namespace PixlPunkt.Uno.UI.Controls
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            // Cleanup pointer events to prevent memory leaks
-            PointerPressed -= OnPointerPressed;
-            PointerMoved -= OnPointerMoved;
-            PointerReleased -= OnPointerReleased;
-            PointerCaptureLost -= OnPointerCaptureLost;
-            PointerEntered -= OnPointerEntered;
-            PointerExited -= OnPointerExited;
+            // Cleanup timer
+            _debounceTimer?.Stop();
+            _debounceTimer = null;
         }
 
         /// <summary>
@@ -307,10 +318,31 @@ namespace PixlPunkt.Uno.UI.Controls
                 targetRow.Height = new GridLength(restoreHeight, GridUnitType.Pixel);
             }
 
-            // Force the parent Grid to re-measure and re-arrange
+            // Force immediate layout update to ensure changes propagate throughout the visual tree
+            // This prevents layout issues on Desktop/WSL where panels appear misaligned until interaction
             grid.InvalidateMeasure();
             grid.InvalidateArrange();
             grid.UpdateLayout();
+        }
+
+        /// <summary>
+        /// Starts the debounce timer to prevent rapid toggle operations.
+        /// </summary>
+        private void StartDebounce()
+        {
+            _isDebouncing = true;
+
+            _debounceTimer?.Stop();
+            _debounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(DebounceDelayMs)
+            };
+            _debounceTimer.Tick += (_, __) =>
+            {
+                _isDebouncing = false;
+                _debounceTimer?.Stop();
+            };
+            _debounceTimer.Start();
         }
 
         // ====================================================================
@@ -418,9 +450,11 @@ namespace PixlPunkt.Uno.UI.Controls
             if (_pointerPressed)
             {
                 // If we didn't exceed drag threshold, treat as a click -> toggle collapse
-                if (!_dragThresholdExceeded)
+                // But only if we're not in a debounce period (prevents double-click issues)
+                if (!_dragThresholdExceeded && !_isDebouncing)
                 {
                     IsCollapsed = !IsCollapsed;
+                    StartDebounce();
                 }
 
                 _pointerPressed = false;

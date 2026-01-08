@@ -272,7 +272,7 @@
         </StackPanel>
 
         <!-- ROW 3: Workspace -->
-        <Grid Grid.Row="2" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <Grid x:Name="WorkspaceGrid" Grid.Row="2" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftSidebarColumn" Width="Auto" MinWidth="102"/>
                 <ColumnDefinition Width="6"/>
@@ -334,7 +334,8 @@
                     Height="6"
                     CollapseAbove="False"
                     DefaultExpandedHeight="180"
-                    MinExpandedHeight="120"/>
+                    MinExpandedHeight="120"
+                    VerticalAlignment="Stretch"/>
 
                 <!-- Animation Panel -->
                 <animation:AnimationPanel x:Name="AnimationPanel" 

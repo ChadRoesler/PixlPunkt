@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Uno.Core.Animation;
+using PixlPunkt.Uno.Core.Document.Layer;
 using PixlPunkt.Uno.Core.Enums;
 using PixlPunkt.Uno.Core.Tools;
 using PixlPunkt.Uno.Core.Tools.Utility;
@@ -72,6 +73,9 @@ namespace PixlPunkt.Uno.UI.CanvasHost
                 _isActivePainting = false;
                 _hasLastDocPos = false;
                 // Note: Don't reset _shiftLineActive - we want the origin to persist for shift-click
+                
+                // Re-enable live preview updates when painting is lost/canceled
+                RasterLayer.SuppressLivePreviewUpdates = false;
                 
                 // Stop the rapid invalidation timer
                 StopPaintInvalidationTimer();

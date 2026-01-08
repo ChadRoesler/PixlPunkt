@@ -19,6 +19,35 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.Uno.UITests", "Pi
 		{94DA9B44-63D4-4B19-8778-2D2B0B10980C} = {94DA9B44-63D4-4B19-8778-2D2B0B10980C}
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8DEB0975-6B3B-4E8E-B95E-E3E0E9363164}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{DCDD5C83-5AE2-4E8B-A81E-8C7196D6DB40}"
+	ProjectSection(SolutionItems) = preProject
+		scripts\Generate-SigningCertificate.ps1 = scripts\Generate-SigningCertificate.ps1
+		scripts\github-secrets.txt = scripts\github-secrets.txt
+		scripts\PixlPunkt.cer = scripts\PixlPunkt.cer
+		scripts\PixlPunkt.pfx = scripts\PixlPunkt.pfx
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{81F70FB3-7063-49B6-BEC3-83F529C13D8A}"
+	ProjectSection(SolutionItems) = preProject
+		.github\PULL_REQUEST_TEMPLATE.md = .github\PULL_REQUEST_TEMPLATE.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{DFE16839-9789-4D3A-8B0E-5DB1EDDF21C9}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build-app.yml = .github\workflows\build-app.yml
+		.github\workflows\build-sdk.yml = .github\workflows\build-sdk.yml
+		.github\workflows\nuget-publish.yml = .github\workflows\nuget-publish.yml
+		.github\workflows\release.yml = .github\workflows\release.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ISSUE_TEMPLATE", "ISSUE_TEMPLATE", "{9E16D6DE-0101-470D-990D-5DFBB21DE4A4}"
+	ProjectSection(SolutionItems) = preProject
+		.github\ISSUE_TEMPLATE\bug_report.md = .github\ISSUE_TEMPLATE\bug_report.md
+		.github\ISSUE_TEMPLATE\feature_request.md = .github\ISSUE_TEMPLATE\feature_request.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,6 +87,12 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{DCDD5C83-5AE2-4E8B-A81E-8C7196D6DB40} = {8DEB0975-6B3B-4E8E-B95E-E3E0E9363164}
+		{81F70FB3-7063-49B6-BEC3-83F529C13D8A} = {8DEB0975-6B3B-4E8E-B95E-E3E0E9363164}
+		{DFE16839-9789-4D3A-8B0E-5DB1EDDF21C9} = {81F70FB3-7063-49B6-BEC3-83F529C13D8A}
+		{9E16D6DE-0101-470D-990D-5DFBB21DE4A4} = {81F70FB3-7063-49B6-BEC3-83F529C13D8A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9E1BAE2F-CFB3-4022-8303-AE3CFDBD5546}

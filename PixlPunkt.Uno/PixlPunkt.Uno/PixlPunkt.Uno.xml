@@ -7353,6 +7353,24 @@
             </para>
             </remarks>
         </member>
+        <member name="P:PixlPunkt.Uno.Core.Document.Layer.RasterLayer.SuppressLivePreviewUpdates">
+            <summary>
+            When true, suppresses automatic preview updates during pixel changes.
+            Used on Uno Skia platforms to defer preview updates until stroke completion.
+            </summary>
+            <remarks>
+            <para>
+            On Uno Skia platforms (Desktop, Desktop WSL), WriteableBitmap updates during
+            live painting can be expensive and may not render correctly. Setting this to true
+            during active painting defers preview updates until <see cref="M:PixlPunkt.Uno.Core.Document.Layer.RasterLayer.UpdatePreview"/> 
+            is explicitly called (e.g., on stroke commit).
+            </para>
+            <para>
+            This is a static property because it applies to all layers during a painting operation.
+            Set to true when painting begins, false when stroke is committed.
+            </para>
+            </remarks>
+        </member>
         <member name="M:PixlPunkt.Uno.Core.Document.Layer.RasterLayer.OnEffectRegistered(PixlPunkt.PluginSdk.Effects.IEffectRegistration)">
             <summary>
             Called when a new effect is registered (e.g., plugin loaded).
@@ -7571,7 +7589,7 @@
             </para>
             <para>
             Includes reentrancy protection to prevent recursive updates.
-            If the surface dimensions have changed, the preview bitmap is recreated.
+            On Uno Skia platforms, a new WriteableBitmap is created each time to force UI invalidation.
             </para>
             </remarks>
         </member>
@@ -27859,6 +27877,24 @@
             Provides a zoomed, focused editing experience for a single tile.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.Animation.__internal.__AnimationPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Animation.__internal.__FrameEditPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Animation.__internal.__PlaybackPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Animation.__internal.__ReelListPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Animation.__internal.__StagePreviewPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Animation.__internal.__TileFrameEditorCanvas_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="T:PixlPunkt.Uno.UI.Ascii.GlyphSetEditorWindow">
             <summary>
             Window for creating and editing custom ASCII glyph sets.
@@ -28059,6 +28095,15 @@
             <summary>
             Template for glyph set items.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Ascii.__internal.__GlyphSetEditorWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.CanvasArea.__internal.__DocumentWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.CanvasArea.__internal.__SelectionOverlay_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.CanvasHost.CanvasViewHost">
             <summary>
@@ -30474,6 +30519,9 @@
             <param name="canvas">The SKCanvas to draw on.</param>
             <param name="area">The available drawing area size.</param>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.CanvasHost.__internal.__CanvasViewHost_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="E:PixlPunkt.Uno.UI.ColorPick.ColorPickerWindow.DropperModeRequested">
             <summary>
             Event raised when the dropper button is toggled on, requesting canvas pick mode.
@@ -30690,6 +30738,18 @@
             <param name="t">Parameter [0, 1].</param>
             <returns>Point on the curve.</returns>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.ColorPick.Controls.__internal.__HslSquare_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.ColorPick.Controls.__internal.__HueSlider_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.ColorPick.Controls.__internal.__LadderRow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.ColorPick.Controls.__internal.__TriangleCurveEditor_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="E:PixlPunkt.Uno.UI.ColorPick.GradientWindow.DropperModeRequested">
             <summary>
             Event raised when the dropper button is toggled on, requesting canvas pick mode.
@@ -30707,6 +30767,12 @@
             <summary>
             Gets whether dropper mode is currently active.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.ColorPick.__internal.__ColorPickerWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.ColorPick.__internal.__GradientWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Controls.CollapsibleSplitter">
             <summary>
@@ -30796,6 +30862,21 @@
             Whether a pointer press is active (for click detection).
             </summary>
         </member>
+        <member name="F:PixlPunkt.Uno.UI.Controls.CollapsibleSplitter._debounceTimer">
+            <summary>
+            Debounce timer to prevent rapid toggle operations.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.Controls.CollapsibleSplitter._isDebouncing">
+            <summary>
+            Whether we're currently in a debounce period (ignore clicks).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.Controls.CollapsibleSplitter.DebounceDelayMs">
+            <summary>
+            Debounce delay in milliseconds.
+            </summary>
+        </member>
         <member name="E:PixlPunkt.Uno.UI.Controls.CollapsibleSplitter.CollapsedChanged">
             <summary>
             Raised when the collapsed state changes.
@@ -30819,6 +30900,11 @@
         <member name="M:PixlPunkt.Uno.UI.Controls.CollapsibleSplitter.ApplyCollapsedState">
             <summary>
             Applies the collapsed or expanded state to the target column.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Controls.CollapsibleSplitter.StartDebounce">
+            <summary>
+            Starts the debounce timer to prevent rapid toggle operations.
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal">
@@ -30910,6 +30996,21 @@
             Whether a pointer press is active (for click detection).
             </summary>
         </member>
+        <member name="F:PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal._debounceTimer">
+            <summary>
+            Debounce timer to prevent rapid toggle operations.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal._isDebouncing">
+            <summary>
+            Whether we're currently in a debounce period (ignore clicks).
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal.DebounceDelayMs">
+            <summary>
+            Debounce delay in milliseconds.
+            </summary>
+        </member>
         <member name="E:PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal.CollapsedChanged">
             <summary>
             Raised when the collapsed state changes.
@@ -30933,6 +31034,11 @@
         <member name="M:PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal.ApplyCollapsedState">
             <summary>
             Applies the collapsed or expanded state to the target row.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.UI.Controls.CollapsibleSplitterHorizontal.StartDebounce">
+            <summary>
+            Starts the debounce timer to prevent rapid toggle operations.
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Controls.PaletteSwatchRow">
@@ -31007,6 +31113,45 @@
             <summary>
             Raised when the minimized state changes, allowing parent containers to adjust layout.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Controls.WrapPanel">
+            <summary>
+            A panel that positions child elements sequentially from left to right, breaking content to the next line at the edge of the containing box.
+            Subsequent ordering happens sequentially from top to bottom or from right to left, depending on the value of the Orientation property.
+            This is a simplified implementation compatible with Uno Platform Skia.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Uno.UI.Controls.WrapPanel.OrientationProperty">
+            <summary>
+            Identifies the Orientation dependency property.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.UI.Controls.WrapPanel.Orientation">
+            <summary>
+            Gets or sets the orientation of the WrapPanel.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Controls.WrapPanel.UvSize">
+            <summary>
+            Helper struct for orientation-independent size calculations.
+            U = primary axis (width for horizontal, height for vertical)
+            V = secondary axis (height for horizontal, width for vertical)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Controls.__internal.__CollapsibleSplitter_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Controls.__internal.__CollapsibleSplitterHorizontal_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Controls.__internal.__ColorSwatchButton_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Controls.__internal.__PaletteSwatchRow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Controls.__internal.__SectionCard_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Converters.BgraToBrushConverter">
             <summary>
@@ -31914,6 +32059,30 @@
             Builds the export settings from current UI values.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__AnimationExportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__BatchTileAnimationExportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__BrushExportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__CursorExportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__ExportProgressDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__IconExportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__ImageExportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Export.__internal.__TimelapseExportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="T:PixlPunkt.Uno.UI.Dialogs.Import.ImageImportDialog">
             <summary>
             Dialog for importing images with tile-based canvas configuration.
@@ -31984,6 +32153,9 @@
             <summary>
             Updates calculated canvas dimensions based on current settings.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.Import.__internal.__ImageImportDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Dialogs.ShortcutConflictWarningDialog">
             <summary>
@@ -32186,6 +32358,18 @@
             <summary>
             Gets the source tile set for size comparison during import.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.__internal.__EditCanvasWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.__internal.__ImportTilesDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.__internal.__NewCanvasDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Dialogs.__internal.__UpdateAvailableDialog_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Helpers.LayerTreeTemplateSelector">
             <summary>
@@ -32431,6 +32615,9 @@
             Creates and initializes a folder picker (cross-platform).
             </summary>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.History.__internal.__HistoryPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="T:PixlPunkt.Uno.UI.Layers.Controls.LayerFolderMenuFlyout">
             <summary>
             Reusable MenuFlyout for LayerFolder context menu.
@@ -32653,6 +32840,21 @@
             <summary>
             Shows the flyout at the specified element for the given reference layer.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.Controls.__internal.__LayerFolderMenuFlyout_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.Controls.__internal.__LayerPreviewHost_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.Controls.__internal.__LayersPanelMenuFlyout_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.Controls.__internal.__RasterLayerMenuFlyout_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.Controls.__internal.__ReferenceLayerMenuFlyout_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Layers.DynamicEffectTemplateSelector">
             <summary>
@@ -32968,6 +33170,15 @@
             and is never saved to the document.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.__internal.__LayerSettingsWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.__internal.__LayersPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Layers.__internal.__ReferenceLayerSettingsWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="T:PixlPunkt.Uno.UI.Palette.Controls.PalettePanelMenuFlyout">
             <summary>
             Reusable MenuFlyout for the Palette panel background (empty area).
@@ -32998,6 +33209,12 @@
             <summary>
             Shows the flyout at the specified element for the given swatch.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Palette.Controls.__internal.__PalettePanelMenuFlyout_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Palette.Controls.__internal.__SwatchMenuFlyout_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Palette.PalettePanel">
             <summary>
@@ -33147,6 +33364,12 @@
             Finds an ancestor element in the visual tree with the specified name.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.Palette.__internal.__PalettePanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Palette.__internal.__QuickSwatches_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="T:PixlPunkt.Uno.UI.Panels.PanelInfo">
             <summary>
             Defines information about a dockable panel.
@@ -33276,6 +33499,9 @@
             Removes the content from this window so it can be returned to the main window.
             </summary>
             <returns>The content element that was hosted.</returns>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Panels.__internal.__PanelWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.PixlPunktMainWindow">
             <summary>
@@ -33891,6 +34117,14 @@
             Shows an About dialog with version information.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Uno.UI.PixlPunktMainWindow.OnRootSizeChanged(System.Object,Microsoft.UI.Xaml.SizeChangedEventArgs)">
+            <summary>
+            Handles Root SizeChanged to force layout refresh on Uno Skia platforms.
+            This fixes an issue where pixel-width Grid columns don't properly reposition
+            their children when the window is resized.
+            Uses throttling to reduce GC pressure and prevent layout thrashing.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Uno.UI.Preview.CanvasPreview.GetThemeClearColor">
             <summary>
             Gets the appropriate clear color based on the current theme.
@@ -33976,6 +34210,9 @@
             </summary>
             <param name="canvas">The SKCanvas to draw on.</param>
             <param name="area">The available drawing area size.</param>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Preview.__internal.__CanvasPreview_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Rendering.PatternBackgroundService">
             <summary>
@@ -34083,6 +34320,12 @@
             Dialog for editing a single keyboard shortcut.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Uno.UI.Settings.__internal.__SettingsWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Settings.__internal.__ShortcutSettingsPanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
         <member name="T:PixlPunkt.Uno.UI.Tiles.TilePanel">
             <summary>
             Tile panel for managing the document's tile set.
@@ -34154,6 +34397,12 @@
             <summary>
             Binds the window to a specific tile from a tile set.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Tiles.__internal.__TilePanel_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Tiles.__internal.__TileTessellationWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.UI.Tools.ToolOptionFactory">
             <summary>
@@ -34401,6 +34650,15 @@
             <summary>
             Unchecks all tool buttons.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Tools.__internal.__ToolOptionsBar_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.Tools.__internal.__ToolRail_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
+        </member>
+        <member name="T:PixlPunkt.Uno.UI.__internal.__PixlPunktMainWindow_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.__KeyEqualityProvider">
             <summary>
@@ -37830,158 +38088,166 @@
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_674">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.NewCanvasDialog
+            Builder for PixlPunkt.Uno.UI.Controls.WrapPanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_675">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.UpdateAvailableDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.NewCanvasDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_676">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.ImportTilesDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.UpdateAvailableDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_677">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.AnimationExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.ImportTilesDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_678">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BatchTileAnimationExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.AnimationExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_679">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BrushExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BatchTileAnimationExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_680">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.CursorExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.BrushExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_681">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ExportProgressDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.CursorExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_682">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.IconExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ExportProgressDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_683">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ImageExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.IconExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_684">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Export.TimelapseExportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.ImageExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_685">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Dialogs.Import.ImageImportDialog
+            Builder for PixlPunkt.Uno.UI.Dialogs.Export.TimelapseExportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_686">
             <summary>
-            Builder for PixlPunkt.Uno.UI.History.HistoryPanel
+            Builder for PixlPunkt.Uno.UI.Dialogs.Import.ImageImportDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_687">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.LayersPanel
+            Builder for PixlPunkt.Uno.UI.History.HistoryPanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_688">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerFolderMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.LayersPanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_689">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerFolderMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_690">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewElement
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_691">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayersPanelMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayerPreviewHost
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_692">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.RasterLayerMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.LayersPanelMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_693">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Layers.Controls.ReferenceLayerMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.RasterLayerMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_694">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.PalettePanel
+            Builder for PixlPunkt.Uno.UI.Layers.Controls.ReferenceLayerMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_695">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.QuickSwatches
+            Builder for PixlPunkt.Uno.UI.Palette.PalettePanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_696">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.Controls.PalettePanelMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Palette.QuickSwatches
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_697">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Palette.Controls.SwatchMenuFlyout
+            Builder for PixlPunkt.Uno.UI.Palette.Controls.PalettePanelMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_698">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Preview.CanvasPreview
+            Builder for PixlPunkt.Uno.UI.Palette.Controls.SwatchMenuFlyout
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_699">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Preview.CanvasPreviewElement
+            Builder for PixlPunkt.Uno.UI.Preview.CanvasPreview
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_700">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Settings.ShortcutSettingsPanel
+            Builder for PixlPunkt.Uno.UI.Preview.CanvasPreviewElement
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_701">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Settings.ShortcutEditDialog
+            Builder for PixlPunkt.Uno.UI.Settings.ShortcutSettingsPanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_702">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Tiles.TilePanel
+            Builder for PixlPunkt.Uno.UI.Settings.ShortcutEditDialog
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_703">
             <summary>
-            Builder for PixlPunkt.Uno.UI.Tools.ToolOptionsBar
+            Builder for PixlPunkt.Uno.UI.Tiles.TilePanel
             </summary>
         </member>
         <member name="T:PixlPunkt.Uno.MetadataBuilder_704">
             <summary>
+            Builder for PixlPunkt.Uno.UI.Tools.ToolOptionsBar
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.MetadataBuilder_705">
+            <summary>
             Builder for PixlPunkt.Uno.UI.Tools.ToolRail
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.__internal.__App_Dummy">
+            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.Uno.__Sources__.EmbeddedXamlSourcesProvider">
             <summary>

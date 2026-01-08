@@ -85,7 +85,37 @@ namespace PixlPunkt.Uno.Core.Document.Layer
             Surface.PixelsChanged += OnSurfacePixelsChanged;
         }
 
-        private void OnSurfacePixelsChanged() => UpdatePreview();
+        // ════════════════════════════════════════════════════════════════════
+        // LIVE PREVIEW SUPPRESSION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// When true, suppresses automatic preview updates during pixel changes.
+        /// Used on Uno Skia platforms to defer preview updates until stroke completion.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// On Uno Skia platforms (Desktop, Desktop WSL), WriteableBitmap updates during
+        /// live painting can be expensive and may not render correctly. Setting this to true
+        /// during active painting defers preview updates until <see cref="UpdatePreview"/> 
+        /// is explicitly called (e.g., on stroke commit).
+        /// </para>
+        /// <para>
+        /// This is a static property because it applies to all layers during a painting operation.
+        /// Set to true when painting begins, false when stroke is committed.
+        /// </para>
+        /// </remarks>
+        public static bool SuppressLivePreviewUpdates { get; set; }
+
+        private void OnSurfacePixelsChanged()
+        {
+            // Skip automatic preview updates during active painting on Uno Skia platforms
+            // Preview will be updated explicitly when stroke is committed
+            if (!SuppressLivePreviewUpdates)
+            {
+                UpdatePreview();
+            }
+        }
 
         /// <summary>
         /// Called when a new effect is registered (e.g., plugin loaded).
@@ -477,7 +507,7 @@ namespace PixlPunkt.Uno.Core.Document.Layer
         /// </para>
         /// <para>
         /// Includes reentrancy protection to prevent recursive updates.
-        /// If the surface dimensions have changed, the preview bitmap is recreated.
+        /// On Uno Skia platforms, a new WriteableBitmap is created each time to force UI invalidation.
         /// </para>
         /// </remarks>
         public void UpdatePreview()
@@ -490,35 +520,16 @@ namespace PixlPunkt.Uno.Core.Document.Layer
                 int h = Surface.Height;
                 var src = Surface.Pixels;
 
-                // Recreate preview bitmap if dimensions changed
-                if (_previewBitmap.PixelWidth != w || _previewBitmap.PixelHeight != h)
-                {
-                    _previewBitmap = new WriteableBitmap(w, h);
-                }
+                // On Uno Skia platforms, we must create a new WriteableBitmap each time
+                // because in-place pixel buffer updates don't trigger Image invalidation.
+                // This ensures the binding sees a new object and re-renders.
+                _previewBitmap = new WriteableBitmap(w, h);
 
                 using var stream = _previewBitmap.PixelBuffer.AsStream();
                 stream.Seek(0, SeekOrigin.Begin);
 
-                byte[] row = new byte[w * 4];
-
-                for (int y = 0; y < h; y++)
-                {
-                    int srcRow = y * w * 4;
-
-                    for (int x = 0; x < w; x++)
-                    {
-                        int si = srcRow + x * 4;
-                        int di = x * 4;
-
-                        // Copy BGRA as-is, preserve A so UI can composite over pattern
-                        row[di + 0] = src[si + 0];
-                        row[di + 1] = src[si + 1];
-                        row[di + 2] = src[si + 2];
-                        row[di + 3] = src[si + 3];
-                    }
-
-                    stream.Write(row, 0, row.Length);
-                }
+                // Write all pixels in one operation (faster than row-by-row)
+                stream.Write(src, 0, src.Length);
             }
             finally
             {

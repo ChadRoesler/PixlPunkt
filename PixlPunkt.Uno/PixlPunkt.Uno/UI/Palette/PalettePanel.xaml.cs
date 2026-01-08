@@ -120,15 +120,9 @@ namespace PixlPunkt.Uno.UI.Palette
         {
             if (d is PalettePanel self)
             {
-                // Update items panel item size (WrapGrid expects ItemWidth/ItemHeight on the panel instance)
-                // We need to walk the visual tree to find the WrapGrid and set its ItemWidth/ItemHeight.
+                // Update items panel layout when swatch size changes
                 self.DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (self.SwatchList.ItemsPanelRoot is WrapGrid wg)
-                    {
-                        wg.ItemWidth = (double)self.SwatchSize;
-                        wg.ItemHeight = (double)self.SwatchSize;
-                    }
                     self.SwatchList.InvalidateMeasure();
                 });
             }

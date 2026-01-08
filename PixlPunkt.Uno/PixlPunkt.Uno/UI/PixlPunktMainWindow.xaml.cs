@@ -78,6 +78,14 @@ namespace PixlPunkt.Uno.UI
 
         private readonly AutoSaveService _autoSave = new();
 
+        // ─────────────────────────────────────────────────────────────
+        // FIELDS: Layout refresh for Uno Skia
+        // ─────────────────────────────────────────────────────────────
+
+        private DispatcherTimer? _layoutRefreshTimer;
+        private double _lastRootWidth;
+        private double _lastRootHeight;
+
         // Cached delegates to avoid repeated lambda allocations
         private readonly Action<uint> _onForegroundPicked;
         private readonly Action<uint> _onPaletteForegroundChanged;
@@ -118,6 +126,11 @@ namespace PixlPunkt.Uno.UI
             InitOpenRecentMenus();
             Root.ActualThemeChanged += (_, __) => SyncStripeTheme();
             SyncStripeTheme();
+
+            // Workaround for Uno Skia layout issue: force Grid layout refresh on window resize
+            // Without this, pixel-width columns may not properly position their children
+            // Use throttled handler to reduce GC pressure
+            Root.SizeChanged += OnRootSizeChanged;
 
             // Apply custom window chrome (resizable, proper title bar merging)
             WindowHost.ApplyChrome(
@@ -1423,6 +1436,53 @@ namespace PixlPunkt.Uno.UI
             };
 
             await ShowDialogGuardedAsync(dlg);
+        }
+
+        /// <summary>
+        /// Handles Root SizeChanged to force layout refresh on Uno Skia platforms.
+        /// This fixes an issue where pixel-width Grid columns don't properly reposition
+        /// their children when the window is resized.
+        /// Uses throttling to reduce GC pressure and prevent layout thrashing.
+        /// </summary>
+        private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            // Skip if the size change is negligible (less than 1 pixel)
+            if (Math.Abs(e.NewSize.Width - _lastRootWidth) < 1 &&
+                Math.Abs(e.NewSize.Height - _lastRootHeight) < 1)
+            {
+                return;
+            }
+
+            _lastRootWidth = e.NewSize.Width;
+            _lastRootHeight = e.NewSize.Height;
+
+            // Throttle layout updates - only apply after resize stops for 50ms
+            _layoutRefreshTimer?.Stop();
+            _layoutRefreshTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(50)
+            };
+            _layoutRefreshTimer.Tick += (_, __) =>
+            {
+                _layoutRefreshTimer?.Stop();
+                _layoutRefreshTimer = null;
+
+                // Force the workspace grid to update its layout
+                // This ensures the right sidebar column stays properly anchored to the window edge
+                if (Root.FindName("WorkspaceGrid") is Grid workspaceGrid)
+                {
+                    workspaceGrid.InvalidateMeasure();
+                    workspaceGrid.InvalidateArrange();
+                }
+
+                // Also update the right sidebar's internal grid
+                if (Root.FindName("RightSidebar") is Grid rightSidebar)
+                {
+                    rightSidebar.InvalidateMeasure();
+                    rightSidebar.InvalidateArrange();
+                }
+            };
+            _layoutRefreshTimer.Start();
         }
     }
 }
