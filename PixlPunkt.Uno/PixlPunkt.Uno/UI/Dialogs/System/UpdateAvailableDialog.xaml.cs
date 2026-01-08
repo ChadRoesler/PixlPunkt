@@ -301,7 +301,7 @@ namespace PixlPunkt.Uno.UI.Dialogs
                 TextIndent = -12
             };
 
-            string prefix = number.HasValue ? $"{number}. " : "� ";
+            string prefix = number.HasValue ? $"{number}. " : "• ";
             para.Inlines.Add(new Run { Text = prefix });
 
             bool firstBlock = true;

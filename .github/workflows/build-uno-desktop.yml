@@ -1,0 +1,281 @@
+#############################################################################
+# PixlPunkt.Uno - Desktop (Skia) Build Workflow
+#############################################################################
+# Builds the Uno Platform app for Desktop platforms using Skia renderer.
+# Produces builds for Windows, Linux, and macOS.
+# Triggered on pushes to main/master and pull requests affecting Uno files.
+#############################################################################
+
+name: Build Uno Desktop
+
+on:
+  push:
+    branches: [main, master, unoSkiaSharp]
+    paths:
+      - 'PixlPunkt.Uno/**'
+      - 'PixlPunkt.PluginSdk/**'
+      - '.github/workflows/build-uno-desktop.yml'
+  pull_request:
+    branches: [main, master, unoSkiaSharp]
+    paths:
+      - 'PixlPunkt.Uno/**'
+      - 'PixlPunkt.PluginSdk/**'
+      - '.github/workflows/build-uno-desktop.yml'
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  UNO_PROJECT_PATH: 'PixlPunkt.Uno/PixlPunkt.Uno/PixlPunkt.Uno.csproj'
+
+jobs:
+  #############################################################################
+  # Build Desktop Windows (Skia)
+  #############################################################################
+  build-desktop-windows:
+    name: Build Desktop Windows (x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.UNO_PROJECT_PATH }}
+
+      - name: Build Desktop Windows
+        shell: pwsh
+        run: |
+          Write-Host "Building Desktop Windows (Skia)..." -ForegroundColor Cyan
+          
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} `
+            --configuration Release `
+            --framework net10.0-desktop `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish/desktop-windows-x64 `
+            -p:PublishSingleFile=false `
+            -p:PublishReadyToRun=true
+
+      - name: Prepare artifacts
+        id: prepare
+        shell: pwsh
+        run: |
+          $zipName = "PixlPunkt-Desktop-Windows-x64.zip"
+          
+          if (Test-Path "./publish/desktop-windows-x64") {
+            Compress-Archive -Path "./publish/desktop-windows-x64/*" -DestinationPath $zipName
+            echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
+            echo "has_artifact=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Created: $zipName" -ForegroundColor Green
+          } else {
+            echo "has_artifact=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Warning: No build output found" -ForegroundColor Yellow
+          }
+
+      - name: Upload artifact
+        if: steps.prepare.outputs.has_artifact == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-Windows-x64
+          path: ${{ steps.prepare.outputs.zip_name }}
+          retention-days: 30
+
+  #############################################################################
+  # Build Desktop Linux (Skia)
+  #############################################################################
+  build-desktop-linux:
+    name: Build Desktop Linux (x64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.UNO_PROJECT_PATH }}
+
+      - name: Build Desktop Linux
+        run: |
+          echo "Building Desktop Linux (Skia)..."
+          
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} \
+            --configuration Release \
+            --framework net10.0-desktop \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output ./publish/desktop-linux-x64 \
+            -p:PublishSingleFile=false \
+            -p:PublishReadyToRun=true
+
+      - name: Prepare artifacts
+        id: prepare
+        run: |
+          TAR_NAME="PixlPunkt-Desktop-Linux-x64.tar.gz"
+          
+          if [ -d "./publish/desktop-linux-x64" ]; then
+            # Make executable
+            chmod +x ./publish/desktop-linux-x64/PixlPunkt.Uno || true
+            
+            # Create tarball
+            cd ./publish
+            tar -czvf ../$TAR_NAME desktop-linux-x64
+            cd ..
+            echo "tar_name=$TAR_NAME" >> $GITHUB_OUTPUT
+            echo "has_artifact=true" >> $GITHUB_OUTPUT
+            echo "Created: $TAR_NAME"
+          else
+            echo "has_artifact=false" >> $GITHUB_OUTPUT
+            echo "Warning: No build output found"
+          fi
+
+      - name: Upload artifact
+        if: steps.prepare.outputs.has_artifact == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-Linux-x64
+          path: ${{ steps.prepare.outputs.tar_name }}
+          retention-days: 30
+
+  #############################################################################
+  # Build Desktop macOS (Skia)
+  #############################################################################
+  build-desktop-macos:
+    name: Build Desktop macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+        include:
+          - arch: x64
+            rid: osx-x64
+          - arch: arm64
+            rid: osx-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.UNO_PROJECT_PATH }}
+
+      - name: Build Desktop macOS
+        run: |
+          echo "Building Desktop macOS (${{ matrix.arch }})..."
+          
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} \
+            --configuration Release \
+            --framework net10.0-desktop \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            --output ./publish/desktop-macos-${{ matrix.arch }} \
+            -p:PublishSingleFile=false \
+            -p:PublishReadyToRun=true
+
+      - name: Prepare artifacts
+        id: prepare
+        run: |
+          ARCH="${{ matrix.arch }}"
+          ZIP_NAME="PixlPunkt-Desktop-macOS-$ARCH.zip"
+          
+          if [ -d "./publish/desktop-macos-$ARCH" ]; then
+            # Make executable
+            chmod +x ./publish/desktop-macos-$ARCH/PixlPunkt.Uno || true
+            
+            # Create ZIP
+            cd ./publish
+            zip -r ../$ZIP_NAME desktop-macos-$ARCH
+            cd ..
+            echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+            echo "has_artifact=true" >> $GITHUB_OUTPUT
+            echo "Created: $ZIP_NAME"
+          else
+            echo "has_artifact=false" >> $GITHUB_OUTPUT
+            echo "Warning: No build output found"
+          fi
+
+      - name: Upload artifact
+        if: steps.prepare.outputs.has_artifact == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-macOS-${{ matrix.arch }}
+          path: ${{ steps.prepare.outputs.zip_name }}
+          retention-days: 30
+
+  #############################################################################
+  # Combine All Desktop Artifacts
+  #############################################################################
+  combine-artifacts:
+    name: Combine Desktop Artifacts
+    runs-on: ubuntu-latest
+    needs: [build-desktop-windows, build-desktop-linux, build-desktop-macos]
+    if: success()
+
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-Windows-x64
+          path: ./release
+        continue-on-error: true
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-Linux-x64
+          path: ./release
+        continue-on-error: true
+
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-macOS-x64
+          path: ./release
+        continue-on-error: true
+
+      - name: Download macOS arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-macOS-arm64
+          path: ./release
+        continue-on-error: true
+
+      - name: List artifacts
+        run: ls -R ./release || echo "No artifacts found"
+
+      - name: Upload combined release
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlPunkt-Desktop-AllPlatforms
+          path: ./release/
+          retention-days: 30
+          if-no-files-found: warn

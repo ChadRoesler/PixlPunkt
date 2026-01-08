@@ -1,24 +1,25 @@
-# ???????????????????????????????????????????????????????????????????????????????
-# PixlPunkt Application - Build Workflow
-# ???????????????????????????????????????????????????????????????????????????????
+# PixlPunkt Application - Build Workflow (Legacy WinAppSdk Project)
+# DEPRECATED: This workflow builds the original WinAppSdk project.
+# For the cross-platform Uno version, see:
+#   - build-uno-winappsdk.yml (WinAppSdk MSIX)
+#   - build-uno-desktop.yml (Desktop Skia for Windows/Linux/macOS)
 # Builds the PixlPunkt application as a sideloadable MSIX package.
 # Produces signed MSIX installers for x64 and ARM64 platforms.
-# ???????????????????????????????????????????????????????????????????????????????
 
-name: Build App
+name: Build App (Legacy)
 
 on:
   push:
     branches: [main, master]
     paths:
       - 'PixlPunkt/**'
-      - 'PixlPunkt.PluginSdk/**'
+      - '!PixlPunkt.Uno/**'
       - '.github/workflows/build-app.yml'
   pull_request:
     branches: [main, master]
     paths:
       - 'PixlPunkt/**'
-      - 'PixlPunkt.PluginSdk/**'
+      - '!PixlPunkt.Uno/**'
       - '.github/workflows/build-app.yml'
   workflow_dispatch:
 
@@ -155,15 +156,15 @@ jobs:
           }
           '@
               
-              Compress-Archive -Path "$outputDir/*" -DestinationPath "PixlPunkt-$platform.zip"
+              Compress-Archive -Path "$outputDir/*" -DestinationPath "PixlPunkt-Legacy-$platform.zip"
             }
           }
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PixlPunkt-${{ matrix.platform }}
-          path: PixlPunkt-${{ matrix.platform }}.zip
+          name: PixlPunkt-Legacy-${{ matrix.platform }}
+          path: PixlPunkt-Legacy-${{ matrix.platform }}.zip
           retention-days: 30
           if-no-files-found: warn
 
@@ -177,21 +178,21 @@ jobs:
       - name: Download x64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: PixlPunkt-x64
+          name: PixlPunkt-Legacy-x64
           path: ./release
         continue-on-error: true
 
       - name: Download ARM64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: PixlPunkt-arm64
+          name: PixlPunkt-Legacy-arm64
           path: ./release
         continue-on-error: true
 
       - name: Upload combined release
         uses: actions/upload-artifact@v4
         with:
-          name: PixlPunkt-AllPlatforms
+          name: PixlPunkt-Legacy-AllPlatforms
           path: ./release/
           retention-days: 30
           if-no-files-found: warn

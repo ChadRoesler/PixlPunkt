@@ -85,7 +85,7 @@ namespace PixlPunkt.Uno.UI
             var recoverableCount = previousSession.Documents.Count;
             var docNames = string.Join("\n", previousSession.Documents
                 .Take(10)
-                .Select(d => $"� {d.Name}{(d.IsDirty ? " (unsaved changes)" : "")}"));
+                .Select(d => $"• {d.Name}{(d.IsDirty ? " (unsaved changes)" : "")}"));
 
             if (recoverableCount > 10)
             {

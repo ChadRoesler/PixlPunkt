@@ -1,6 +1,6 @@
 <Project Sdk="Uno.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-browserwasm;net10.0-desktop;net10.0</TargetFrameworks>
+    <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
 
     <OutputType>Exe</OutputType>
     <UnoSingleProject>true</UnoSingleProject>
@@ -82,6 +82,11 @@
     <Content Include="Assets\Icons\Icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- File type icons for Windows file associations -->
+    <Content Include="Assets\Icons\FileTypes\*.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Assets\Icons\FileTypes\%(Filename)%(Extension)</Link>
+    </Content>
   </ItemGroup>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
@@ -102,6 +107,15 @@
     <PackageReference Include="Xabe.FFmpeg.Downloader" />
     <PackageReference Include="NetCoreAudio" />
   </ItemGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       DESKTOP-SPECIFIC DEPENDENCIES
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <ItemGroup Condition="$(TargetFramework.Contains('desktop'))">
+    <!-- Velopack for auto-updates on Windows Desktop (Skia) -->
+    <PackageReference Include="Velopack" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj" />
   </ItemGroup>

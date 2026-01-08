@@ -19,15 +19,15 @@ namespace PixlPunkt.Uno.Core.Brush
     /// <para><strong>Scaling:</strong></para>
     /// <para>
     /// The 16x16 mask is scaled using nearest-neighbor sampling:
-    /// <br/>� Size 1-16: Scale down from 16x16
-    /// <br/>� Size 17-128: Scale up from 16x16
+    /// <br/>• Size 1-16: Scale down from 16x16
+    /// <br/>• Size 17-128: Scale up from 16x16
     /// </para>
     /// <para><strong>Pivot Point:</strong></para>
     /// <para>
     /// The pivot (PivotX, PivotY) defines the brush's anchor point as normalized coordinates (0.0-1.0):
-    /// <br/>� (0.0, 0.0) = Top-Left
-    /// <br/>� (0.5, 0.5) = Center (default)
-    /// <br/>� (1.0, 1.0) = Bottom-Right
+    /// <br/>• (0.0, 0.0) = Top-Left
+    /// <br/>• (0.5, 0.5) = Center (default)
+    /// <br/>• (1.0, 1.0) = Bottom-Right
     /// </para>
     /// </remarks>
     public sealed class BrushTemplate

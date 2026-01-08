@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using PixlPunkt.Uno.Core.Brush;
@@ -21,6 +23,11 @@ public partial class App : Application
     public static Window PixlPunktMainWindow { get; private set; } = null!;
 
     /// <summary>
+    /// File path to open on startup (from command-line arguments or file association).
+    /// </summary>
+    public static string? StartupFilePath { get; private set; }
+
+    /// <summary>
     /// Initializes the singleton application object.
     /// This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().
@@ -29,9 +36,56 @@ public partial class App : Application
     {
         this.InitializeComponent();
 
+        // Check for startup file from command-line arguments (file association)
+        ProcessStartupArguments();
+
 #if DEBUG
         System.Diagnostics.Debug.WriteLine("[PixlPunkt] App constructor completed");
 #endif
+    }
+
+    /// <summary>
+    /// Processes command-line arguments to extract file paths for file association handling.
+    /// </summary>
+    private void ProcessStartupArguments()
+    {
+        // Only Desktop (Skia on Windows/macOS/Linux) supports command-line file arguments
+        // via the Program.StartupArgs property. This code only compiles for net10.0-desktop.
+        // Other platforms handle file activation through platform-specific mechanisms.
+#if NET10_0_DESKTOP || NET9_0_DESKTOP || NET8_0_DESKTOP
+        try
+        {
+            // Get args from Desktop Program.cs
+            var args = Program.StartupArgs;
+
+            if (args != null && args.Length > 0)
+            {
+                // Find the first argument that looks like a file path
+                var filePath = args.FirstOrDefault(arg =>
+                    !string.IsNullOrWhiteSpace(arg) &&
+                    !arg.StartsWith("-") &&
+                    !arg.StartsWith("/") &&
+                    (arg.EndsWith(".pxp", StringComparison.OrdinalIgnoreCase) ||
+                     arg.EndsWith(".pxpr", StringComparison.OrdinalIgnoreCase) ||
+                     arg.EndsWith(".pxpt", StringComparison.OrdinalIgnoreCase) ||
+                     arg.EndsWith(".pbx", StringComparison.OrdinalIgnoreCase) ||
+                     arg.EndsWith(".mkr", StringComparison.OrdinalIgnoreCase) ||
+                     File.Exists(arg)));
+
+                if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                {
+                    StartupFilePath = Path.GetFullPath(filePath);
+                    System.Diagnostics.Debug.WriteLine($"[PixlPunkt] Startup file: {StartupFilePath}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PixlPunkt] Error processing startup args: {ex.Message}");
+        }
+#endif
+        // On other platforms (Android, iOS, WASM, WinAppSdk), file association
+        // is handled through platform-specific mechanisms (OnFileActivated, etc.)
     }
 
     protected Window? MainWindow { get; private set; }
@@ -91,6 +145,12 @@ public partial class App : Application
         }
 
         LoggingService.Info("PixlPunkt application starting");
+
+        // Log startup file if present
+        if (!string.IsNullOrEmpty(StartupFilePath))
+        {
+            LoggingService.Info("Startup file requested: {FilePath}", StartupFilePath);
+        }
 
         // Register built-in effects before any documents are created
         try

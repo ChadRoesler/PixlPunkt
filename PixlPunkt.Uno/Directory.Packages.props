@@ -34,5 +34,8 @@
     
     <!-- Cross-platform audio playback -->
     <PackageVersion Include="NetCoreAudio" Version="2.0.0" />
+    
+    <!-- Velopack for auto-updates on Windows Desktop -->
+    <PackageVersion Include="Velopack" Version="0.0.942" />
   </ItemGroup>
 </Project>

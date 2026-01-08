@@ -53,10 +53,10 @@ namespace PixlPunkt.Uno.UI.Dialogs
             DocumentNameTextBox.Text = _document.Name ?? "Untitled";
 
             // Document size (read-only display)
-            DocumentSizeText.Text = $"{_document.PixelWidth} � {_document.PixelHeight}";
+            DocumentSizeText.Text = $"{_document.PixelWidth} × {_document.PixelHeight}";
 
             // Tile size (read-only display)
-            TileSizeText.Text = $"{_document.TileSize.Width} � {_document.TileSize.Height}";
+            TileSizeText.Text = $"{_document.TileSize.Width} × {_document.TileSize.Height}";
 
             // Tile counts
             TileWidthBox.Value = _document.TileCounts.Width;
@@ -82,7 +82,7 @@ namespace PixlPunkt.Uno.UI.Dialogs
             string deltaWStr = deltaW == 0 ? "" : (deltaW > 0 ? $" (+{deltaW})" : $" ({deltaW})");
             string deltaHStr = deltaH == 0 ? "" : (deltaH > 0 ? $" (+{deltaH})" : $" ({deltaH})");
 
-            NewSizePreviewText.Text = $"New size: {newPixelW} � {newPixelH} px ({newTileW}{deltaWStr} � {newTileH}{deltaHStr} tiles)";
+            NewSizePreviewText.Text = $"New size: {newPixelW} × {newPixelH} px ({newTileW}{deltaWStr} × {newTileH}{deltaHStr} tiles)";
         }
 
         private void TileCount_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)

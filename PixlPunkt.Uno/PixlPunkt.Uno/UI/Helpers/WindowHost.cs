@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using PixlPunkt.Uno.Core.Enums;
+using PixlPunkt.Uno.Core.Platform;
 using Windows.Foundation;
 using Windows.UI;
 
@@ -39,6 +40,19 @@ namespace PixlPunkt.Uno.UI.Helpers
         /// </summary>
         public static bool IsLinux => RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
 
+        /// <summary>
+        /// Gets whether title bar customization is supported on the current platform.
+        /// Only WinAppSdk (net10.0-windows) supports full title bar theming.
+        /// </summary>
+        private static bool SupportsTitleBarCustomization =>
+#if WINDOWS
+            // WinAppSdk supports title bar customization
+            true;
+#else
+            // Skia Desktop, WASM, Android, iOS do not support AppWindow.TitleBar properties
+            false;
+#endif
+
         // ════════════════════════════════════════════════════════════════════
         // WINDOW SETUP
         // ════════════════════════════════════════════════════════════════════
@@ -63,20 +77,29 @@ namespace PixlPunkt.Uno.UI.Helpers
                 root.RequestedTheme = effectiveTheme;
 
             // Configure window presenter for proper chrome (min/max/close buttons)
+            // Only supported on desktop platforms with windowing support
+            // Configure window presenter for proper chrome (min/max/close buttons)
+            // Only supported on desktop platforms with windowing support
             try
             {
                 var appWindow = window.AppWindow;
                 if (appWindow != null)
                 {
+#if WINDOWS
+                    // WinAppSdk supports OverlappedPresenter
                     var presenter = Microsoft.UI.Windowing.OverlappedPresenter.Create();
                     presenter.IsResizable = resizable;
                     presenter.IsMinimizable = minimizable;
                     presenter.IsMaximizable = maximizable;
                     presenter.IsAlwaysOnTop = alwaysOnTop;
                     appWindow.SetPresenter(presenter);
+#endif
 
-                    // Apply title bar colors to match theme
-                    ApplyTitleBarTheme(appWindow, effectiveTheme);
+                    // Apply title bar colors to match theme (WinAppSdk only)
+                    if (SupportsTitleBarCustomization)
+                    {
+                        ApplyTitleBarTheme(appWindow, effectiveTheme);
+                    }
 
                     // Set window icon
                     SetWindowIcon(appWindow);
@@ -144,9 +167,12 @@ namespace PixlPunkt.Uno.UI.Helpers
 
         /// <summary>
         /// Applies theme colors to the window's title bar.
+        /// Only supported on WinAppSdk (net10.0-windows).
         /// </summary>
         private static void ApplyTitleBarTheme(Microsoft.UI.Windowing.AppWindow appWindow, ElementTheme theme)
         {
+#if WINDOWS
+            // Title bar customization is only available on WinAppSdk
             try
             {
                 var titleBar = appWindow.TitleBar;
@@ -186,6 +212,8 @@ namespace PixlPunkt.Uno.UI.Helpers
             {
                 System.Diagnostics.Debug.WriteLine($"WindowHost.ApplyTitleBarTheme: Could not apply title bar theme: {ex.Message}");
             }
+#endif
+            // On non-Windows platforms, title bar theming is not supported
         }
 
         /// <summary>
@@ -333,18 +361,21 @@ namespace PixlPunkt.Uno.UI.Helpers
             if (window.Content is FrameworkElement root)
                 root.RequestedTheme = theme;
 
-            // Also update title bar colors
-            try
+            // Also update title bar colors (WinAppSdk only)
+            if (SupportsTitleBarCustomization)
             {
-                var appWindow = window.AppWindow;
-                if (appWindow != null)
+                try
                 {
-                    ApplyTitleBarTheme(appWindow, theme);
+                    var appWindow = window.AppWindow;
+                    if (appWindow != null)
+                    {
+                        ApplyTitleBarTheme(appWindow, theme);
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"WindowHost.UpdateWindowTheme: Could not update title bar: {ex.Message}");
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.UpdateWindowTheme: Could not update title bar: {ex.Message}");
+                }
             }
         }
 
@@ -429,6 +460,31 @@ namespace PixlPunkt.Uno.UI.Helpers
             InitializePickerWithWindow(picker, window);
 
             return picker;
+        }
+
+        /// <summary>
+        /// Safely sets the default file extension on a FileSavePicker.
+        /// This property is not implemented on all platforms (Android, iOS).
+        /// </summary>
+        public static void TrySetDefaultFileExtension(Windows.Storage.Pickers.FileSavePicker picker, string extension)
+        {
+            // DefaultFileExtension is only supported on Windows/Desktop platforms
+            // On Android/iOS, this property throws NotImplementedException
+#if WINDOWS || HAS_UNO_SKIA
+            try
+            {
+                picker.DefaultFileExtension = extension;
+            }
+            catch (NotImplementedException)
+            {
+                // Silently ignore on platforms that don't support this
+                System.Diagnostics.Debug.WriteLine($"DefaultFileExtension not supported on this platform");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Could not set DefaultFileExtension: {ex.Message}");
+            }
+#endif
         }
     }
 }

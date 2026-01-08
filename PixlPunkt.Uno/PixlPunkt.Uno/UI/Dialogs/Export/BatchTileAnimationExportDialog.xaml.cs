@@ -271,7 +271,7 @@ namespace PixlPunkt.Uno.UI.Dialogs.Export
             }
             else
             {
-                OutputSizeText.Text = $"{tileW * scale}�{tileH * scale} pixels";
+                OutputSizeText.Text = $"{tileW * scale}×{tileH * scale} pixels";
             }
         }
 

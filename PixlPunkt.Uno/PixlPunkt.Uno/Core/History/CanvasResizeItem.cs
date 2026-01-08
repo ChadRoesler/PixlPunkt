@@ -41,7 +41,7 @@ namespace PixlPunkt.Uno.Core.History
         /// <summary>
         /// Gets a human-readable description of the action.
         /// </summary>
-        public string Description => $"Resize Canvas ({_beforeWidth}�{_beforeHeight} ? {_afterWidth}�{_afterHeight})";
+        public string Description => $"Resize Canvas ({_beforeWidth}×{_beforeHeight} → {_afterWidth}x{_afterHeight})";
 
         /// <summary>
         /// Snapshot of a single layer's pixel data.

@@ -406,12 +406,12 @@ namespace PixlPunkt.Uno.UI.Animation
             {
                 var stage = _animationState!.Stage;
                 StageInfoText.Text = $"Stage ({stage.StageX},{stage.StageY})";
-                OutputSizeText.Text = $"{stage.OutputWidth}�{stage.OutputHeight}";
+                OutputSizeText.Text = $"{stage.OutputWidth}×{stage.OutputHeight}";
             }
             else
             {
                 StageInfoText.Text = "Full Canvas";
-                OutputSizeText.Text = $"{_document.PixelWidth}�{_document.PixelHeight}";
+                OutputSizeText.Text = $"{_document.PixelWidth}×{_document.PixelHeight}";
             }
         }
     }

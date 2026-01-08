@@ -178,7 +178,7 @@ namespace PixlPunkt.Uno.Core.Tools.Selection
             };
 
             // **OPTIMIZATION**: For subtract mode, batch all pixel operations before triggering
-            // expensive bounds recomputation. This reduces O(pixels � W�H) to O(W�H) per stamp.
+            // expensive bounds recomputation. This reduces O(pixels → W×H) to O(W×H) per stamp.
             if (!adding)
             {
                 // Batch subtract: modify mask directly without bounds recalculation

@@ -103,7 +103,7 @@ namespace PixlPunkt.Uno.Core.Canvas
         /// Gets a display string for the template dimensions.
         /// </summary>
         [JsonIgnore]
-        public string DimensionsDisplay => $"{PixelWidth}�{PixelHeight} ({TileWidth}�{TileHeight} � {TileCountX}�{TileCountY})";
+        public string DimensionsDisplay => $"{PixelWidth}×{PixelHeight} ({TileWidth}×{TileHeight} : {TileCountX}×{TileCountY})";
 
         /// <summary>
         /// Gets the sanitized filename for this template.

@@ -105,7 +105,7 @@ namespace PixlPunkt.Uno.UI.Animation
             var timingStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             _timingBlock = new TextBlock { Text = "Frame 0 - 24", FontSize = 10, Opacity = 0.7 };
             timingStack.Children.Add(_timingBlock);
-            timingStack.Children.Add(new TextBlock { Text = "�", Opacity = 0.5 });
+            timingStack.Children.Add(new TextBlock { Text = "👁", Opacity = 0.5 });
             _durationBlock = new TextBlock { Text = "24 frames", FontSize = 10, Opacity = 0.7 };
             timingStack.Children.Add(_durationBlock);
             infoStack.Children.Add(timingStack);

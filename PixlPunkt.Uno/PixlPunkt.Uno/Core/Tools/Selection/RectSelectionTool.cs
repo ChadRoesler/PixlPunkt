@@ -161,11 +161,11 @@ namespace PixlPunkt.Uno.Core.Tools.Selection
         }
 
         /// <summary>
-        /// Draws a dimension label showing width � height near the selection rectangle.
+        /// Draws a dimension label showing width × height near the selection rectangle.
         /// </summary>
         private void DrawDimensionLabel(ICanvasRenderer renderer, float x, float y, float w, float h)
         {
-            string label = $"{_previewRect.Width} � {_previewRect.Height}";
+            string label = $"{_previewRect.Width} × {_previewRect.Height}";
 
             // Create text format
             using var textFormat = renderer.CreateTextFormat("Segoe UI", 12, FontWeight.SemiBold);

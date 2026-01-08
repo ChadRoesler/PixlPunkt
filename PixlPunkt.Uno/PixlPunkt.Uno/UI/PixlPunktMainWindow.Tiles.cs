@@ -330,8 +330,8 @@ namespace PixlPunkt.Uno.UI
                     {
                         XamlRoot = Content.XamlRoot,
                         Title = "Dimension Mismatch",
-                        Content = $"The imported tiles are {importData.TileWidth}�{importData.TileHeight} pixels, " +
-                                  $"but this document uses {doc.TileSet.TileWidth}�{doc.TileSet.TileHeight} pixel tiles.\n\n" +
+                        Content = $"The imported tiles are {importData.TileWidth}×{importData.TileHeight} pixels, " +
+                                  $"but this document uses {doc.TileSet.TileWidth}×{doc.TileSet.TileHeight} pixel tiles.\n\n" +
                                   "Tile dimensions must match.",
                         CloseButtonText = "OK"
                     });
@@ -418,8 +418,8 @@ namespace PixlPunkt.Uno.UI
                     {
                         XamlRoot = Content.XamlRoot,
                         Title = "Dimension Mismatch",
-                        Content = $"The imported tiles are {importData.TileWidth}�{importData.TileHeight} pixels, " +
-                                  $"but this document uses {doc.TileSet.TileWidth}�{doc.TileSet.TileHeight} pixel tiles.\n\n" +
+                        Content = $"The imported tiles are {importData.TileWidth}×{importData.TileHeight} pixels, " +
+                                  $"but this document uses {doc.TileSet.TileWidth}×{doc.TileSet.TileHeight} pixel tiles.\n\n" +
                                   "Tile dimensions must match.",
                         CloseButtonText = "OK"
                     });
@@ -466,14 +466,14 @@ namespace PixlPunkt.Uno.UI
 
             contentPanel.Children.Add(new TextBlock
             {
-                Text = "� Add: Adds imported tiles to the end of the tile list with new IDs.",
+                Text = "• Add: Adds imported tiles to the end of the tile list with new IDs.",
                 Opacity = 0.8,
                 TextWrapping = TextWrapping.Wrap
             });
 
             contentPanel.Children.Add(new TextBlock
             {
-                Text = "� Replace: Removes all existing tiles and mappings, then imports the new tiles with their original IDs.",
+                Text = "• Replace: Removes all existing tiles and mappings, then imports the new tiles with their original IDs.",
                 Opacity = 0.8,
                 TextWrapping = TextWrapping.Wrap
             });

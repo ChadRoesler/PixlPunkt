@@ -367,9 +367,9 @@ namespace PixlPunkt.Uno.Core.Tools.Settings
                 new List<string>
                 {
                     "None",
-                    "Bayer 2�2",
-                    "Bayer 4�4",
-                    "Bayer 8�8",
+                    "Bayer 2×2",
+                    "Bayer 4×4",
+                    "Bayer 8×8",
                     "Checker",
                     "Diagonal",
                     "Crosshatch",

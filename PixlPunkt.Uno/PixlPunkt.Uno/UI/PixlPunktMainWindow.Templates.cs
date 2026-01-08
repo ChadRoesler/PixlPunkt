@@ -195,11 +195,11 @@ namespace PixlPunkt.Uno.UI
             var infoText = new TextBlock
             {
                 Text = $"This template will include:\n" +
-                       $"� Canvas: {doc.PixelWidth}�{doc.PixelHeight} pixels\n" +
-                       $"� Layers: {doc.Layers.Count}\n" +
-                       $"� Tiles: {doc.TileSet?.Count ?? 0}\n" +
-                       $"� Tile mappings\n" +
-                       $"� Layer effects",
+                       $"• Canvas: {doc.PixelWidth}×{doc.PixelHeight} pixels\n" +
+                       $"• Layers: {doc.Layers.Count}\n" +
+                       $"• Tiles: {doc.TileSet?.Count ?? 0}\n" +
+                       $"• Tile mappings\n" +
+                       $"• Layer effects",
                 Opacity = 0.7,
                 Margin = new Thickness(0, 8, 0, 0)
             };

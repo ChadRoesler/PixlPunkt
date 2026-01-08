@@ -91,7 +91,7 @@ namespace PixlPunkt.Uno.Core.Tools.Settings
                 _constrainRotation,
                 SetConstrainRotation,
                 Order: 1,
-                Tooltip: "Snap rotation to 15� increments"
+                Tooltip: "Snap rotation to 15° increments"
             );
 
             yield return new DropdownOption(
