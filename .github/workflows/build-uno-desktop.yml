@@ -8,6 +8,9 @@
 # Target Frameworks:
 # - net10.0-desktop: Skia-based renderer for Windows, Linux, macOS
 # - net10.0-windows10.0.26100: WinAppSdk for native Windows
+#
+# NOTE: We override TargetFrameworks at build time to avoid requiring
+#       Android/iOS workloads on CI runners.
 #############################################################################
 
 name: Build Uno Desktop
@@ -57,12 +60,13 @@ jobs:
         run: |
           Write-Host "Building Skia Desktop Windows (x64)..." -ForegroundColor Cyan
           
+          # Override TargetFrameworks to only build desktop - avoids needing mobile workloads
           dotnet publish ${{ env.UNO_PROJECT_PATH }} `
             --configuration Release `
-            --framework net10.0-desktop `
             --runtime win-x64 `
             --self-contained true `
             --output ./publish/skia-windows-x64 `
+            -p:TargetFrameworks=net10.0-desktop `
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=true
 
@@ -113,12 +117,13 @@ jobs:
         run: |
           Write-Host "Building WinAppSdk Windows (x64)..." -ForegroundColor Cyan
           
+          # Override TargetFrameworks to only build WinAppSdk
           dotnet publish ${{ env.UNO_PROJECT_PATH }} `
             --configuration Release `
-            --framework net10.0-windows10.0.26100 `
             --runtime win-x64 `
             --self-contained true `
             --output ./publish/winappsdk-x64 `
+            -p:TargetFrameworks=net10.0-windows10.0.26100 `
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=true `
             -p:WindowsPackageType=None
@@ -181,12 +186,13 @@ jobs:
         run: |
           echo "Building Skia Desktop Linux (x64)..."
           
+          # Override TargetFrameworks to only build desktop - avoids needing mobile workloads
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
             --configuration Release \
-            --framework net10.0-desktop \
             --runtime linux-x64 \
             --self-contained true \
             --output ./publish/skia-linux-x64 \
+            -p:TargetFrameworks=net10.0-desktop \
             -p:PublishSingleFile=false \
             -p:PublishReadyToRun=true
 
@@ -251,12 +257,13 @@ jobs:
         run: |
           echo "Building Skia Desktop macOS (${{ matrix.arch }})..."
           
+          # Override TargetFrameworks to only build desktop - avoids needing mobile workloads
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
             --configuration Release \
-            --framework net10.0-desktop \
             --runtime ${{ matrix.rid }} \
             --self-contained true \
             --output ./publish/skia-macos-${{ matrix.arch }} \
+            -p:TargetFrameworks=net10.0-desktop \
             -p:PublishSingleFile=false \
             -p:PublishReadyToRun=true
 
