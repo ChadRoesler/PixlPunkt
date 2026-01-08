@@ -5,9 +5,9 @@
 # - Skia Desktop (Windows, Linux, macOS) - Cross-platform renderer
 # - WinAppSdk (Windows only) - Native Windows UI
 #
-# NOTE: We use a two-step approach to avoid requiring Android/iOS workloads:
-# 1. Restore only the specific target framework
-# 2. Build/publish with --no-restore
+# Target Frameworks:
+# - net10.0-desktop: Skia-based renderer for Windows, Linux, macOS
+# - net10.0-windows10.0.26100: WinAppSdk for native Windows
 #############################################################################
 
 name: Build Uno Desktop
@@ -31,7 +31,7 @@ env:
   DOTNET_VERSION: '10.0.x'
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_SKIP_WORKLOAD_INTEGRITY_CHECK: true
   UNO_PROJECT_PATH: 'PixlPunkt.Uno/PixlPunkt.Uno/PixlPunkt.Uno.csproj'
 
 jobs:
@@ -53,19 +53,12 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Install Uno workload
-        run: dotnet workload install uno-check --skip-manifest-update || true
-
-      - name: Restore for desktop only
+      - name: Install required workloads
         shell: pwsh
         run: |
-          # Restore the PluginSdk first (it's net10.0, no platform-specific)
-          dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
-          
-          # Restore the main project for desktop framework only
-          dotnet restore ${{ env.UNO_PROJECT_PATH }} `
-            /p:TargetFramework=net10.0-desktop `
-            /p:RuntimeIdentifier=win-x64
+          Write-Host "Installing Uno Platform workloads..." -ForegroundColor Cyan
+          dotnet workload install uno-sdk --skip-sign-check
+          dotnet workload list
 
       - name: Build Skia Desktop Windows
         shell: pwsh
@@ -73,7 +66,6 @@ jobs:
           Write-Host "Building Skia Desktop Windows (x64)..." -ForegroundColor Cyan
           
           dotnet publish ${{ env.UNO_PROJECT_PATH }} `
-            --no-restore `
             --configuration Release `
             --framework net10.0-desktop `
             --runtime win-x64 `
@@ -124,16 +116,12 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore for WinAppSdk only
+      - name: Install required workloads
         shell: pwsh
         run: |
-          # Restore the PluginSdk first
-          dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
-          
-          # Restore the main project for WinAppSdk framework only
-          dotnet restore ${{ env.UNO_PROJECT_PATH }} `
-            /p:TargetFramework=net10.0-windows10.0.26100 `
-            /p:RuntimeIdentifier=win-x64
+          Write-Host "Installing Uno Platform workloads..." -ForegroundColor Cyan
+          dotnet workload install uno-sdk --skip-sign-check
+          dotnet workload list
 
       - name: Build WinAppSdk
         shell: pwsh
@@ -141,7 +129,6 @@ jobs:
           Write-Host "Building WinAppSdk Windows (x64)..." -ForegroundColor Cyan
           
           dotnet publish ${{ env.UNO_PROJECT_PATH }} `
-            --no-restore `
             --configuration Release `
             --framework net10.0-windows10.0.26100 `
             --runtime win-x64 `
@@ -193,6 +180,12 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Install required workloads
+        run: |
+          echo "Installing Uno Platform workloads..."
+          dotnet workload install uno-sdk --skip-sign-check
+          dotnet workload list
+
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -205,22 +198,11 @@ jobs:
             libgl1-mesa-dev \
             libfontconfig1-dev
 
-      - name: Restore for desktop only
-        run: |
-          # Restore the PluginSdk first
-          dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
-          
-          # Restore the main project for desktop framework only
-          dotnet restore ${{ env.UNO_PROJECT_PATH }} \
-            /p:TargetFramework=net10.0-desktop \
-            /p:RuntimeIdentifier=linux-x64
-
       - name: Build Skia Desktop Linux
         run: |
           echo "Building Skia Desktop Linux (x64)..."
           
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
-            --no-restore \
             --configuration Release \
             --framework net10.0-desktop \
             --runtime linux-x64 \
@@ -286,22 +268,17 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore for desktop only
+      - name: Install required workloads
         run: |
-          # Restore the PluginSdk first
-          dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
-          
-          # Restore the main project for desktop framework only
-          dotnet restore ${{ env.UNO_PROJECT_PATH }} \
-            /p:TargetFramework=net10.0-desktop \
-            /p:RuntimeIdentifier=${{ matrix.rid }}
+          echo "Installing Uno Platform workloads..."
+          dotnet workload install uno-sdk --skip-sign-check
+          dotnet workload list
 
       - name: Build Skia Desktop macOS
         run: |
           echo "Building Skia Desktop macOS (${{ matrix.arch }})..."
           
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
-            --no-restore \
             --configuration Release \
             --framework net10.0-desktop \
             --runtime ${{ matrix.rid }} \
@@ -391,11 +368,11 @@ jobs:
           ls -lah ./release/ 2>/dev/null || echo "No artifacts found"
           echo ""
           echo "=== Summary ==="
-          echo "Skia Windows:     $([ -f ./release/PixlPunkt-Skia-Windows-x64.zip ] && echo '?' || echo '?')"
-          echo "WinAppSdk:        $([ -f ./release/PixlPunkt-WinAppSdk-x64.zip ] && echo '?' || echo '?')"
-          echo "Skia Linux:       $([ -f ./release/PixlPunkt-Skia-Linux-x64.tar.gz ] && echo '?' || echo '?')"
-          echo "Skia macOS x64:   $([ -f ./release/PixlPunkt-Skia-macOS-x64.zip ] && echo '?' || echo '?')"
-          echo "Skia macOS arm64: $([ -f ./release/PixlPunkt-Skia-macOS-arm64.zip ] && echo '?' || echo '?')"
+          echo "Skia Windows:    $([ -f ./release/PixlPunkt-Skia-Windows-x64.zip ] && echo '?' || echo '?')"
+          echo "WinAppSdk:       $([ -f ./release/PixlPunkt-WinAppSdk-x64.zip ] && echo '?' || echo '?')"
+          echo "Skia Linux:      $([ -f ./release/PixlPunkt-Skia-Linux-x64.tar.gz ] && echo '?' || echo '?')"
+          echo "Skia macOS x64:  $([ -f ./release/PixlPunkt-Skia-macOS-x64.zip ] && echo '?' || echo '?')"
+          echo "Skia macOS arm64:$([ -f ./release/PixlPunkt-Skia-macOS-arm64.zip ] && echo '?' || echo '?')"
 
       - name: Upload combined release
         uses: actions/upload-artifact@v4
