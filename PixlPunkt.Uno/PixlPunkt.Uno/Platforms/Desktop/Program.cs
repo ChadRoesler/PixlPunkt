@@ -16,14 +16,10 @@ public class Program
         // Store args for file association handling
         StartupArgs = args;
 
-#if HAS_UNO_SKIA
+#if WINDOWS
         // Velopack must be initialized as early as possible in app startup.
         // This handles Squirrel events during install/uninstall/update.
-        // Only initialize on Windows (Velopack is Windows-only for now)
-        if (OperatingSystem.IsWindows())
-        {
-            InitializeVelopack();
-        }
+        InitializeVelopack();
 #endif
 
         var host = UnoPlatformHostBuilder.Create()
@@ -37,7 +33,7 @@ public class Program
         host.Run();
     }
 
-#if HAS_UNO_SKIA
+#if WINDOWS
     /// <summary>
     /// Initializes Velopack for Windows auto-update support.
     /// Must be called as early as possible in Main().

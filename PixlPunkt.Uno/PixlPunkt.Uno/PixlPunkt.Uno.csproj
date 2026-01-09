@@ -93,9 +93,14 @@
     <DefineConstants>$(DefineConstants);HAS_UNO_SKIA</DefineConstants>
   </PropertyGroup>
 
-  <!-- Define WINDOWS_DESKTOP for Windows runtime on Skia desktop builds -->
+  <!-- Define WINDOWS for Windows runtime on Skia desktop builds (used by Velopack and file associations) -->
   <PropertyGroup Condition="$(TargetFramework.Contains('desktop')) and $(RuntimeIdentifier.StartsWith('win'))">
-    <DefineConstants>$(DefineConstants);WINDOWS_DESKTOP</DefineConstants>
+    <DefineConstants>$(DefineConstants);WINDOWS_DESKTOP;WINDOWS</DefineConstants>
+  </PropertyGroup>
+  
+  <!-- Define WINDOWS for WinAppSdk builds -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('windows10'))">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
   </PropertyGroup>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
@@ -136,10 +141,15 @@
   </ItemGroup>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       DESKTOP-SPECIFIC DEPENDENCIES
+       WINDOWS DESKTOP-SPECIFIC DEPENDENCIES (Velopack is Windows-only)
   ═══════════════════════════════════════════════════════════════════════ -->
-  <ItemGroup Condition="$(TargetFramework.Contains('desktop'))">
-    <!-- Velopack for auto-updates on Windows Desktop (Skia) -->
+  <ItemGroup Condition="$(TargetFramework.Contains('desktop')) and $(RuntimeIdentifier.StartsWith('win'))">
+    <!-- Velopack for auto-updates on Windows Desktop (Skia) only -->
+    <PackageReference Include="Velopack" />
+  </ItemGroup>
+  
+  <!-- Also include Velopack for WinAppSdk builds -->
+  <ItemGroup Condition="$(TargetFramework.Contains('windows10'))">
     <PackageReference Include="Velopack" />
   </ItemGroup>
 

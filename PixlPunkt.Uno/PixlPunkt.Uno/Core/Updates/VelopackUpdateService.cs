@@ -21,14 +21,14 @@ public sealed class VelopackUpdateService
     /// </summary>
     private const string GitHubReleasesUrl = "https://github.com/ChadRoesler/PixlPunkt";
 
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
     private Velopack.UpdateManager? _updateManager;
     private Velopack.UpdateInfo? _pendingUpdate;
 #endif
 
     private VelopackUpdateService()
     {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
         try
         {
             // Use GitHub releases as the update source
@@ -49,7 +49,7 @@ public sealed class VelopackUpdateService
     {
         get
         {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
             return _updateManager?.IsInstalled ?? false;
 #else
             return false;
@@ -64,7 +64,7 @@ public sealed class VelopackUpdateService
     {
         get
         {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
             return _updateManager?.CurrentVersion?.ToString();
 #else
             return null;
@@ -79,7 +79,7 @@ public sealed class VelopackUpdateService
     {
         get
         {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
             return _pendingUpdate != null;
 #else
             return false;
@@ -94,7 +94,7 @@ public sealed class VelopackUpdateService
     {
         get
         {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
             return _pendingUpdate?.TargetFullRelease?.Version?.ToString();
 #else
             return null;
@@ -113,7 +113,7 @@ public sealed class VelopackUpdateService
     /// <returns>True if an update is available; false otherwise.</returns>
     public async Task<bool> CheckForUpdatesAsync()
     {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
         if (_updateManager == null || !_updateManager.IsInstalled)
         {
             System.Diagnostics.Debug.WriteLine("[Velopack] Not installed via Velopack, skipping update check");
@@ -151,7 +151,7 @@ public sealed class VelopackUpdateService
     /// <returns>True if download succeeded; false otherwise.</returns>
     public async Task<bool> DownloadUpdateAsync()
     {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
         if (_updateManager == null || _pendingUpdate == null)
         {
             return false;
@@ -185,7 +185,7 @@ public sealed class VelopackUpdateService
     /// <param name="silentRestart">If true, restarts without prompting.</param>
     public void ApplyUpdateAndRestart(bool silentRestart = false)
     {
-#if HAS_UNO_SKIA && WINDOWS
+#if WINDOWS
         if (_updateManager == null || _pendingUpdate == null)
         {
             return;

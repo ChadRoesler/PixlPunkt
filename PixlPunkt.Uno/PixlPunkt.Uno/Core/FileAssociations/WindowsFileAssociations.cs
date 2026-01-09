@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+#if WINDOWS
 using Microsoft.Win32;
+#endif
 
 namespace PixlPunkt.Uno.Core.FileAssociations;
 
@@ -11,6 +13,7 @@ namespace PixlPunkt.Uno.Core.FileAssociations;
 /// </summary>
 public static class WindowsFileAssociations
 {
+#if WINDOWS
     private const string AppName = "PixlPunkt";
     private const string AppDescription = "PixlPunkt Pixel Art Editor";
 
@@ -231,6 +234,25 @@ public static class WindowsFileAssociations
         [DllImport("shell32.dll")]
         public static extern void SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
     }
+#else
+    // Non-Windows stubs - these methods do nothing on non-Windows platforms
+    
+    /// <summary>
+    /// Registers all PixlPunkt file associations (Windows-only, no-op on other platforms).
+    /// </summary>
+    public static void Register(string exePath)
+    {
+        // No-op on non-Windows
+    }
+
+    /// <summary>
+    /// Unregisters all PixlPunkt file associations (Windows-only, no-op on other platforms).
+    /// </summary>
+    public static void Unregister()
+    {
+        // No-op on non-Windows
+    }
+#endif
 }
 
 /// <summary>
