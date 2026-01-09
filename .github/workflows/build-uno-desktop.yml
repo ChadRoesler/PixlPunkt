@@ -62,32 +62,17 @@ jobs:
       - name: Restore SDK Tests
         run: dotnet restore PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj
 
-      - name: Restore Uno Tests
-        run: |
-          # Use SkiaOnly=true to avoid needing Android/iOS workloads on Linux
-          # The property is passed to the referenced PixlPunkt.Uno project via AdditionalProperties
-          dotnet restore PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj \
-            -p:SkiaOnly=true
-
       - name: Run SDK Tests
         run: |
           echo "Running PluginSdk Tests..."
           dotnet test PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj \
             --configuration Release \
-            --no-restore \
             --verbosity normal \
             --logger "trx;LogFileName=sdk-test-results.trx"
-
-      - name: Run Uno Tests
-        run: |
-          echo "Running Uno Tests..."
-          # Use SkiaOnly=true to avoid needing Android/iOS workloads on Linux
-          dotnet test PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj \
-            --configuration Release \
-            --no-restore \
-            --verbosity normal \
-            --logger "trx;LogFileName=uno-test-results.trx" \
-            -p:SkiaOnly=true
+      
+      # Note: Uno Tests are run on Windows in the build-skia-windows job
+      # because they require the Uno project which has multi-platform targets
+      # that need workloads not available on Linux runners.
 
       - name: Upload SDK test results
         uses: actions/upload-artifact@v4
@@ -95,15 +80,6 @@ jobs:
         with:
           name: sdk-test-results
           path: PixlPunkt.PluginSdk.Tests/TestResults/*.trx
-          retention-days: 30
-          if-no-files-found: ignore
-
-      - name: Upload Uno test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: uno-test-results
-          path: PixlPunkt.Uno/PixlPunkt.Uno.Tests/TestResults/*.trx
           retention-days: 30
           if-no-files-found: ignore
 
@@ -125,6 +101,24 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Run Uno Tests
+        shell: pwsh
+        run: |
+          Write-Host "Running Uno Tests on Windows..." -ForegroundColor Cyan
+          dotnet test PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj `
+            --configuration Release `
+            --verbosity normal `
+            --logger "trx;LogFileName=uno-test-results.trx"
+
+      - name: Upload Uno test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: uno-test-results
+          path: PixlPunkt.Uno/PixlPunkt.Uno.Tests/TestResults/*.trx
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Build Skia Desktop Windows
         shell: pwsh
