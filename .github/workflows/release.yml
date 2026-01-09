@@ -271,10 +271,13 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Running Uno Tests on Windows..." -ForegroundColor Cyan
+          # Use DesktopOnly=true to avoid needing Android/iOS workloads
+          # This limits the referenced PixlPunkt.Uno project to desktop targets only
           dotnet test PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj `
             --configuration Release `
             --verbosity normal `
-            --logger "trx;LogFileName=uno-test-results.trx"
+            --logger "trx;LogFileName=uno-test-results.trx" `
+            -p:DesktopOnly=true
 
       - name: Upload Uno test results
         uses: actions/upload-artifact@v4
@@ -541,3 +544,27 @@ jobs:
         id: tar
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          TAR_NAME="pixlpunkt-${VERSION}-desktop-linux-x64.tar.gz"
+          tar -czvf $TAR_NAME -C ./pkg-root .
+          echo "tar_name=$TAR_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload DEB package
+        if: steps.deb.outputs.deb_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixlpunkt-deb
+          path: ${{ steps.deb.outputs.deb_name }}
+
+      - name: Upload RPM package
+        if: steps.rpm.outputs.rpm_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixlpunkt-rpm
+          path: ${{ steps.rpm.outputs.rpm_name }}
+
+      - name: Upload tarball
+        if: steps.tar.outputs.tar_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixlpunkt-tarball
+          path: ${{ steps.tar.outputs.tar_name }}
