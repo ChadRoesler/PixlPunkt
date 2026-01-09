@@ -1,7 +1,7 @@
 #############################################################################
 # PixlPunkt.PluginSdk - Build & Package Workflow
 #############################################################################
-# Builds the Plugin SDK and produces a NuGet package artifact.
+# Builds the Plugin SDK, runs tests, and produces a NuGet package artifact.
 # Triggered on pushes to main/master and pull requests affecting SDK files.
 # Publishes to NuGet.org on version tags (sdk-v*) or manual dispatch.
 #############################################################################
@@ -13,6 +13,7 @@ on:
     branches: [main, master]
     paths:
       - 'PixlPunkt.PluginSdk/**'
+      - 'PixlPunkt.PluginSdk.Tests/**'
       - '.github/workflows/build-sdk.yml'
     tags:
       - 'sdk-v*'  # Trigger on SDK version tags like sdk-v1.0.0
@@ -20,6 +21,7 @@ on:
     branches: [main, master]
     paths:
       - 'PixlPunkt.PluginSdk/**'
+      - 'PixlPunkt.PluginSdk.Tests/**'
       - '.github/workflows/build-sdk.yml'
   workflow_dispatch:
     inputs:
@@ -86,10 +88,27 @@ jobs:
           fi
 
       - name: Restore dependencies
-        run: dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
+        run: |
+          dotnet restore PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj
+          dotnet restore PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj
 
       - name: Build SDK
         run: dotnet build PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj --configuration Release --no-restore
+
+      - name: Build Tests
+        run: dotnet build PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj --configuration Release --no-restore
+
+      - name: Run SDK Tests
+        run: dotnet test PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sdk-test-results
+          path: PixlPunkt.PluginSdk.Tests/TestResults/*.trx
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Pack NuGet package
         run: |
