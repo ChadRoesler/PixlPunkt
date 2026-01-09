@@ -18,7 +18,13 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- 
+    Pass through SkiaOnly/WinAppSdkOnly/DesktopOnly properties to the referenced project.
+    This ensures that when building tests on CI (Linux/macOS), we don't try to restore 
+    Android/iOS target frameworks which require workloads not installed on those runners.
+  -->
   <ItemGroup>
-    <ProjectReference Include="..\PixlPunkt.Uno\PixlPunkt.Uno.csproj" />
+    <ProjectReference Include="..\PixlPunkt.Uno\PixlPunkt.Uno.csproj" 
+                      AdditionalProperties="SkiaOnly=$(SkiaOnly);WinAppSdkOnly=$(WinAppSdkOnly);DesktopOnly=$(DesktopOnly)" />
   </ItemGroup>
 </Project>

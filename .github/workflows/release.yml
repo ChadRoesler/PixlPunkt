@@ -58,21 +58,35 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Restore SDK Tests
+        run: dotnet restore PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj
+
+      - name: Restore Uno Tests
+        run: |
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads on Linux
+          # The property is passed to the referenced PixlPunkt.Uno project via AdditionalProperties
+          dotnet restore PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj \
+            -p:SkiaOnly=true
+
       - name: Run SDK Tests
         run: |
           echo "=== Running PluginSdk Tests ==="
           dotnet test PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj \
             --configuration Release \
+            --no-restore \
             --verbosity normal \
             --logger "trx;LogFileName=sdk-test-results.trx"
 
       - name: Run Uno Tests
         run: |
           echo "=== Running Uno Tests ==="
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads on Linux
           dotnet test PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj \
             --configuration Release \
+            --no-restore \
             --verbosity normal \
-            --logger "trx;LogFileName=uno-test-results.trx"
+            --logger "trx;LogFileName=uno-test-results.trx" \
+            -p:SkiaOnly=true
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -199,11 +213,13 @@ jobs:
           while ($versionParts.Count -lt 4) { $versionParts += "0" }
           $msixVersion = $versionParts[0..3] -join '.'
           
+          # Use WinAppSdkOnly=true to avoid needing Android/iOS workloads
           dotnet publish $env:UNO_PROJECT_PATH `
             --configuration Release `
             --framework net10.0-windows10.0.26100 `
             --runtime ${{ matrix.rid }} `
             --self-contained true `
+            -p:WinAppSdkOnly=true `
             -p:Platform=${{ matrix.platform }} `
             -p:Version=$msixVersion `
             -p:GenerateAppxPackageOnBuild=true `
@@ -287,12 +303,14 @@ jobs:
       - name: Build Desktop Windows
         shell: pwsh
         run: |
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads
           dotnet publish ${{ env.UNO_PROJECT_PATH }} `
             --configuration Release `
             --framework net10.0-desktop `
             --runtime win-x64 `
             --self-contained true `
             --output ./publish/desktop-windows-x64 `
+            -p:SkiaOnly=true `
             -p:Version=${{ steps.version.outputs.version }} `
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=true
@@ -415,12 +433,14 @@ jobs:
 
       - name: Build Desktop Linux
         run: |
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
             --configuration Release \
             --framework net10.0-desktop \
             --runtime linux-x64 \
             --self-contained true \
             --output ./publish/desktop-linux-x64 \
+            -p:SkiaOnly=true \
             -p:Version=${{ steps.version.outputs.version }} \
             -p:PublishSingleFile=false \
             -p:PublishReadyToRun=true
@@ -456,7 +476,7 @@ jobs:
               <mime-type type="application/x-pixlpunkt"><comment>PixlPunkt Document</comment><glob pattern="*.pxp"/></mime-type>
               <mime-type type="application/x-pixlpunkt-reel"><comment>PixlPunkt Animation Reel</comment><glob pattern="*.pxpr"/></mime-type>
               <mime-type type="application/x-pixlpunkt-tileset"><comment>PixlPunkt Tileset</comment><glob pattern="*.pxpt"/></mime-type>
-              <mime-type type="application/x-pixlpunkt-brush"><comment>PixlPunkt Brush</comment><glob pattern="*.pbx"/></mime-type>
+              <mime-type type="application/x-pixlpunkte-brush"><comment>PixlPunkt Brush</comment><glob pattern="*.pbx"/></mime-type>
           </mime-info>
           EOF
           
@@ -501,7 +521,7 @@ jobs:
         id: rpm
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          RPM_NAME="pixlpunkt-${VERSION}-1.x86_64.rpm"
+          RPM_NAME="pixlpunkte-${VERSION}-1.x86_64.rpm"
           
           fpm -s dir -t rpm \
             --name pixlpunkt \
@@ -594,12 +614,14 @@ jobs:
 
       - name: Build Desktop macOS
         run: |
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads
           dotnet publish ${{ env.UNO_PROJECT_PATH }} \
             --configuration Release \
             --framework net10.0-desktop \
             --runtime ${{ matrix.rid }} \
             --self-contained true \
             --output ./publish/desktop-macos-${{ matrix.arch }} \
+            -p:SkiaOnly=true \
             -p:Version=${{ steps.version.outputs.version }} \
             -p:PublishSingleFile=false \
             -p:PublishReadyToRun=true
@@ -622,6 +644,7 @@ jobs:
           
           cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
           <?xml version="1.0" encoding="UTF-8"?>
+
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>

@@ -63,23 +63,31 @@ jobs:
         run: dotnet restore PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj
 
       - name: Restore Uno Tests
-        run: dotnet restore PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj
+        run: |
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads on Linux
+          # The property is passed to the referenced PixlPunkt.Uno project via AdditionalProperties
+          dotnet restore PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj \
+            -p:SkiaOnly=true
 
       - name: Run SDK Tests
         run: |
           echo "Running PluginSdk Tests..."
           dotnet test PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj \
             --configuration Release \
+            --no-restore \
             --verbosity normal \
             --logger "trx;LogFileName=sdk-test-results.trx"
 
       - name: Run Uno Tests
         run: |
           echo "Running Uno Tests..."
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads on Linux
           dotnet test PixlPunkt.Uno/PixlPunkt.Uno.Tests/PixlPunkt.Uno.Tests.csproj \
             --configuration Release \
+            --no-restore \
             --verbosity normal \
-            --logger "trx;LogFileName=uno-test-results.trx"
+            --logger "trx;LogFileName=uno-test-results.trx" \
+            -p:SkiaOnly=true
 
       - name: Upload SDK test results
         uses: actions/upload-artifact@v4
