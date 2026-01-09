@@ -22368,120 +22368,6 @@
             <param name="context">The utility context for canvas operations.</param>
             <returns>A new handler instance, or null if no factory is registered.</returns>
         </member>
-        <member name="T:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration">
-            <summary>
-            Registration record for a selection tool, containing all information needed to instantiate and use the tool.
-            </summary>
-            <remarks>
-            <para>
-            <see cref="T:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration"/> encapsulates:
-            </para>
-            <list type="bullet">
-            <item><strong>Id</strong>: Unique string identifier (e.g., "pixlpunkt.select.wand").</item>
-            <item><strong>DisplayName</strong>: Human-readable name shown in UI.</item>
-            <item><strong>Settings</strong>: The tool's configuration object (e.g., WandToolSettings).</item>
-            <item><strong>ToolFactory</strong>: Factory function to create the selection tool instance.</item>
-            </list>
-            </remarks>
-            <param name="Id">Unique string identifier following vendor.category.name convention.</param>
-            <param name="DisplayName">Human-readable name for UI display.</param>
-            <param name="Settings">The tool's settings object (may be null for tools without settings).</param>
-            <param name="ToolFactory">
-            Factory function that creates an <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for this tool.
-            Receives <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext"/> for dependency injection.
-            </param>
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.#ctor(System.String,System.String,PixlPunkt.Uno.Core.Tools.Settings.ToolSettingsBase,System.Func{PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext,PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool})">
-            <summary>
-            Registration record for a selection tool, containing all information needed to instantiate and use the tool.
-            </summary>
-            <remarks>
-            <para>
-            <see cref="T:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration"/> encapsulates:
-            </para>
-            <list type="bullet">
-            <item><strong>Id</strong>: Unique string identifier (e.g., "pixlpunkt.select.wand").</item>
-            <item><strong>DisplayName</strong>: Human-readable name shown in UI.</item>
-            <item><strong>Settings</strong>: The tool's configuration object (e.g., WandToolSettings).</item>
-            <item><strong>ToolFactory</strong>: Factory function to create the selection tool instance.</item>
-            </list>
-            </remarks>
-            <param name="Id">Unique string identifier following vendor.category.name convention.</param>
-            <param name="DisplayName">Human-readable name for UI display.</param>
-            <param name="Settings">The tool's settings object (may be null for tools without settings).</param>
-            <param name="ToolFactory">
-            Factory function that creates an <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for this tool.
-            Receives <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext"/> for dependency injection.
-            </param>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Id">
-            <summary>Unique string identifier following vendor.category.name convention.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.DisplayName">
-            <summary>Human-readable name for UI display.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Settings">
-            <summary>The tool's settings object (may be null for tools without settings).</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.ToolFactory">
-            <summary>
-            Factory function that creates an <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for this tool.
-            Receives <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext"/> for dependency injection.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Category">
-            <summary>
-            Gets the tool category - always Select for selection tools.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.HasTool">
-            <summary>
-            Gets whether this registration has a valid tool factory.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.CreateTool(PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext)">
-            <summary>
-            Creates a new selection tool instance using the provided context.
-            </summary>
-            <param name="context">Context providing dependencies for the tool.</param>
-            <returns>A new selection tool instance, or null if no factory is defined.</returns>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.PixlPunkt#Uno#Core#Tools#IToolBehavior#ToolId">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.InputPattern">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.HandlesRightClick">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.SuppressRmbDropper">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.SupportsModifiers">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.OverlayStyle">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.OverlayVisibleWhileActive">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.UsesPainter">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.ModifiesPixels">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Uno#Extensions#Equality#IKeyed{System#String}#Key">
-            <inheritdoc cref="!:&lt;NS.Equality&gt;.IKeyed&lt;T&gt;" />
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.GetKeyHashCode">
-            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.KeyEquals(PixlPunkt.Uno.Core.Tools.SelectionToolRegistration)">
-            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
-        </member>
         <member name="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool">
             <summary>
             Strategy interface for selection tool operations.
@@ -22988,6 +22874,120 @@
             <summary>
             Executes the magic wand selection algorithm with current settings.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration">
+            <summary>
+            Registration record for a selection tool, containing all information needed to instantiate and use the tool.
+            </summary>
+            <remarks>
+            <para>
+            <see cref="T:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration"/> encapsulates:
+            </para>
+            <list type="bullet">
+            <item><strong>Id</strong>: Unique string identifier (e.g., "pixlpunkt.select.wand").</item>
+            <item><strong>DisplayName</strong>: Human-readable name shown in UI.</item>
+            <item><strong>Settings</strong>: The tool's configuration object (e.g., WandToolSettings).</item>
+            <item><strong>ToolFactory</strong>: Factory function to create the selection tool instance.</item>
+            </list>
+            </remarks>
+            <param name="Id">Unique string identifier following vendor.category.name convention.</param>
+            <param name="DisplayName">Human-readable name for UI display.</param>
+            <param name="Settings">The tool's settings object (may be null for tools without settings).</param>
+            <param name="ToolFactory">
+            Factory function that creates an <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for this tool.
+            Receives <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext"/> for dependency injection.
+            </param>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.#ctor(System.String,System.String,PixlPunkt.Uno.Core.Tools.Settings.ToolSettingsBase,System.Func{PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext,PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool})">
+            <summary>
+            Registration record for a selection tool, containing all information needed to instantiate and use the tool.
+            </summary>
+            <remarks>
+            <para>
+            <see cref="T:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration"/> encapsulates:
+            </para>
+            <list type="bullet">
+            <item><strong>Id</strong>: Unique string identifier (e.g., "pixlpunkt.select.wand").</item>
+            <item><strong>DisplayName</strong>: Human-readable name shown in UI.</item>
+            <item><strong>Settings</strong>: The tool's configuration object (e.g., WandToolSettings).</item>
+            <item><strong>ToolFactory</strong>: Factory function to create the selection tool instance.</item>
+            </list>
+            </remarks>
+            <param name="Id">Unique string identifier following vendor.category.name convention.</param>
+            <param name="DisplayName">Human-readable name for UI display.</param>
+            <param name="Settings">The tool's settings object (may be null for tools without settings).</param>
+            <param name="ToolFactory">
+            Factory function that creates an <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for this tool.
+            Receives <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext"/> for dependency injection.
+            </param>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Id">
+            <summary>Unique string identifier following vendor.category.name convention.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.DisplayName">
+            <summary>Human-readable name for UI display.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Settings">
+            <summary>The tool's settings object (may be null for tools without settings).</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.ToolFactory">
+            <summary>
+            Factory function that creates an <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for this tool.
+            Receives <see cref="T:PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext"/> for dependency injection.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Category">
+            <summary>
+            Gets the tool category - always Select for selection tools.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.HasTool">
+            <summary>
+            Gets whether this registration has a valid tool factory.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.CreateTool(PixlPunkt.Uno.Core.Tools.Selection.SelectionToolContext)">
+            <summary>
+            Creates a new selection tool instance using the provided context.
+            </summary>
+            <param name="context">Context providing dependencies for the tool.</param>
+            <returns>A new selection tool instance, or null if no factory is defined.</returns>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.PixlPunkt#Uno#Core#Tools#IToolBehavior#ToolId">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.InputPattern">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.HandlesRightClick">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.SuppressRmbDropper">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.SupportsModifiers">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.OverlayStyle">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.OverlayVisibleWhileActive">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.UsesPainter">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.ModifiesPixels">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.Uno#Extensions#Equality#IKeyed{System#String}#Key">
+            <inheritdoc cref="!:&lt;NS.Equality&gt;.IKeyed&lt;T&gt;" />
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.GetKeyHashCode">
+            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.SelectionToolRegistration.KeyEquals(PixlPunkt.Uno.Core.Tools.SelectionToolRegistration)">
+            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
         </member>
         <member name="T:PixlPunkt.Uno.Core.Tools.Settings.BlurToolSettings">
             <summary>
@@ -25304,154 +25304,6 @@
         <member name="M:PixlPunkt.Uno.Core.Tools.ShapeToolRegistration.KeyEquals(PixlPunkt.Uno.Core.Tools.ShapeToolRegistration)">
             <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
         </member>
-        <member name="T:PixlPunkt.Uno.Core.Tools.ITileToolRegistration">
-            <summary>
-            Interface for tile tool registrations.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.ITileToolRegistration.HasHandler">
-            <summary>
-            Gets whether this tool has a handler implementation.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.ITileToolRegistration.CreateHandler(PixlPunkt.PluginSdk.Tile.ITileContext)">
-            <summary>
-            Creates a new handler instance for this tool.
-            </summary>
-            <param name="context">The tile context for canvas operations.</param>
-            <returns>A new handler instance, or null if no factory is registered.</returns>
-        </member>
-        <member name="T:PixlPunkt.Uno.Core.Tools.TileToolRegistration">
-            <summary>
-            Registration record for tile-category tools.
-            </summary>
-            <remarks>
-            <para>
-            Tile tools perform tile-based editing operations:
-            </para>
-            <list type="bullet">
-            <item><strong>TileStamper</strong>: Places tiles with optional mapping data.</item>
-            <item><strong>TileModifier</strong>: Offsets, rotates, and scales tile content.</item>
-            </list>
-            <para>
-            Each tile tool provides an <see cref="T:PixlPunkt.PluginSdk.Tile.ITileHandler"/> that encapsulates
-            its input handling logic, following the same pattern as:
-            </para>
-            <list type="bullet">
-            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
-            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
-            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
-            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> for utility tools</item>
-            </list>
-            <para><strong>Universal Behavior:</strong></para>
-            <para>
-            All tile tools support RMB tile sampling. When the user right-clicks, the tile
-            under the cursor and its mapping are captured for subsequent operations.
-            </para>
-            </remarks>
-            <param name="Id">Unique string identifier (e.g., "pixlpunkt.tile.stamper").</param>
-            <param name="DisplayName">Human-readable name for UI display.</param>
-            <param name="Settings">Tool-specific settings object.</param>
-            <param name="HandlerFactory">Factory function to create the tile handler.</param>
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.#ctor(System.String,System.String,PixlPunkt.Uno.Core.Tools.Settings.ToolSettingsBase,System.Func{PixlPunkt.PluginSdk.Tile.ITileContext,PixlPunkt.PluginSdk.Tile.ITileHandler})">
-            <summary>
-            Registration record for tile-category tools.
-            </summary>
-            <remarks>
-            <para>
-            Tile tools perform tile-based editing operations:
-            </para>
-            <list type="bullet">
-            <item><strong>TileStamper</strong>: Places tiles with optional mapping data.</item>
-            <item><strong>TileModifier</strong>: Offsets, rotates, and scales tile content.</item>
-            </list>
-            <para>
-            Each tile tool provides an <see cref="T:PixlPunkt.PluginSdk.Tile.ITileHandler"/> that encapsulates
-            its input handling logic, following the same pattern as:
-            </para>
-            <list type="bullet">
-            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
-            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
-            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
-            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> for utility tools</item>
-            </list>
-            <para><strong>Universal Behavior:</strong></para>
-            <para>
-            All tile tools support RMB tile sampling. When the user right-clicks, the tile
-            under the cursor and its mapping are captured for subsequent operations.
-            </para>
-            </remarks>
-            <param name="Id">Unique string identifier (e.g., "pixlpunkt.tile.stamper").</param>
-            <param name="DisplayName">Human-readable name for UI display.</param>
-            <param name="Settings">Tool-specific settings object.</param>
-            <param name="HandlerFactory">Factory function to create the tile handler.</param>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Id">
-            <summary>Unique string identifier (e.g., "pixlpunkt.tile.stamper").</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.DisplayName">
-            <summary>Human-readable name for UI display.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Settings">
-            <summary>Tool-specific settings object.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.HandlerFactory">
-            <summary>Factory function to create the tile handler.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Category">
-            <summary>
-            Gets the tool category - always Tile for tile tools.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.HasHandler">
-            <summary>
-            Gets whether this tool has a handler implementation.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.CreateHandler(PixlPunkt.PluginSdk.Tile.ITileContext)">
-            <summary>
-            Creates a new handler instance for this tool.
-            </summary>
-            <param name="context">The tile context for canvas operations.</param>
-            <returns>A new handler instance, or null if no factory is registered.</returns>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.PixlPunkt#Uno#Core#Tools#IToolBehavior#ToolId">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.InputPattern">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.HandlesRightClick">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.SuppressRmbDropper">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.SupportsModifiers">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.OverlayStyle">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.OverlayVisibleWhileActive">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.UsesPainter">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.ModifiesPixels">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Uno#Extensions#Equality#IKeyed{System#String}#Key">
-            <inheritdoc cref="!:&lt;NS.Equality&gt;.IKeyed&lt;T&gt;" />
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.GetKeyHashCode">
-            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.KeyEquals(PixlPunkt.Uno.Core.Tools.TileToolRegistration)">
-            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
-        </member>
         <member name="T:PixlPunkt.Uno.Core.Tools.Tile.TileAnimationHandler">
             <summary>
             Handler for the Tile Animation tool.
@@ -25715,6 +25567,154 @@
             <summary>
             Removes tile mapping at the specified grid position, leaving the pixels unchanged.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Uno.Core.Tools.ITileToolRegistration">
+            <summary>
+            Interface for tile tool registrations.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.ITileToolRegistration.HasHandler">
+            <summary>
+            Gets whether this tool has a handler implementation.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.ITileToolRegistration.CreateHandler(PixlPunkt.PluginSdk.Tile.ITileContext)">
+            <summary>
+            Creates a new handler instance for this tool.
+            </summary>
+            <param name="context">The tile context for canvas operations.</param>
+            <returns>A new handler instance, or null if no factory is registered.</returns>
+        </member>
+        <member name="T:PixlPunkt.Uno.Core.Tools.TileToolRegistration">
+            <summary>
+            Registration record for tile-category tools.
+            </summary>
+            <remarks>
+            <para>
+            Tile tools perform tile-based editing operations:
+            </para>
+            <list type="bullet">
+            <item><strong>TileStamper</strong>: Places tiles with optional mapping data.</item>
+            <item><strong>TileModifier</strong>: Offsets, rotates, and scales tile content.</item>
+            </list>
+            <para>
+            Each tile tool provides an <see cref="T:PixlPunkt.PluginSdk.Tile.ITileHandler"/> that encapsulates
+            its input handling logic, following the same pattern as:
+            </para>
+            <list type="bullet">
+            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
+            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
+            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
+            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> for utility tools</item>
+            </list>
+            <para><strong>Universal Behavior:</strong></para>
+            <para>
+            All tile tools support RMB tile sampling. When the user right-clicks, the tile
+            under the cursor and its mapping are captured for subsequent operations.
+            </para>
+            </remarks>
+            <param name="Id">Unique string identifier (e.g., "pixlpunkt.tile.stamper").</param>
+            <param name="DisplayName">Human-readable name for UI display.</param>
+            <param name="Settings">Tool-specific settings object.</param>
+            <param name="HandlerFactory">Factory function to create the tile handler.</param>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.#ctor(System.String,System.String,PixlPunkt.Uno.Core.Tools.Settings.ToolSettingsBase,System.Func{PixlPunkt.PluginSdk.Tile.ITileContext,PixlPunkt.PluginSdk.Tile.ITileHandler})">
+            <summary>
+            Registration record for tile-category tools.
+            </summary>
+            <remarks>
+            <para>
+            Tile tools perform tile-based editing operations:
+            </para>
+            <list type="bullet">
+            <item><strong>TileStamper</strong>: Places tiles with optional mapping data.</item>
+            <item><strong>TileModifier</strong>: Offsets, rotates, and scales tile content.</item>
+            </list>
+            <para>
+            Each tile tool provides an <see cref="T:PixlPunkt.PluginSdk.Tile.ITileHandler"/> that encapsulates
+            its input handling logic, following the same pattern as:
+            </para>
+            <list type="bullet">
+            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
+            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
+            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
+            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> for utility tools</item>
+            </list>
+            <para><strong>Universal Behavior:</strong></para>
+            <para>
+            All tile tools support RMB tile sampling. When the user right-clicks, the tile
+            under the cursor and its mapping are captured for subsequent operations.
+            </para>
+            </remarks>
+            <param name="Id">Unique string identifier (e.g., "pixlpunkt.tile.stamper").</param>
+            <param name="DisplayName">Human-readable name for UI display.</param>
+            <param name="Settings">Tool-specific settings object.</param>
+            <param name="HandlerFactory">Factory function to create the tile handler.</param>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Id">
+            <summary>Unique string identifier (e.g., "pixlpunkt.tile.stamper").</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.DisplayName">
+            <summary>Human-readable name for UI display.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Settings">
+            <summary>Tool-specific settings object.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.HandlerFactory">
+            <summary>Factory function to create the tile handler.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Category">
+            <summary>
+            Gets the tool category - always Tile for tile tools.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.HasHandler">
+            <summary>
+            Gets whether this tool has a handler implementation.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.CreateHandler(PixlPunkt.PluginSdk.Tile.ITileContext)">
+            <summary>
+            Creates a new handler instance for this tool.
+            </summary>
+            <param name="context">The tile context for canvas operations.</param>
+            <returns>A new handler instance, or null if no factory is registered.</returns>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.PixlPunkt#Uno#Core#Tools#IToolBehavior#ToolId">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.InputPattern">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.HandlesRightClick">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.SuppressRmbDropper">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.SupportsModifiers">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.OverlayStyle">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.OverlayVisibleWhileActive">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.UsesPainter">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.ModifiesPixels">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.TileToolRegistration.Uno#Extensions#Equality#IKeyed{System#String}#Key">
+            <inheritdoc cref="!:&lt;NS.Equality&gt;.IKeyed&lt;T&gt;" />
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.GetKeyHashCode">
+            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.TileToolRegistration.KeyEquals(PixlPunkt.Uno.Core.Tools.TileToolRegistration)">
+            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
         </member>
         <member name="T:PixlPunkt.Uno.Core.Tools.ToolIds">
             <summary>
@@ -26756,127 +26756,6 @@
         <member name="M:PixlPunkt.Uno.Core.Tools.ToolState.SetPaintSelectSize(System.Int32)">
             <summary>Sets paint select size.</summary>
         </member>
-        <member name="T:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration">
-            <summary>
-            Registration record for utility-category tools that don't paint pixels.
-            </summary>
-            <remarks>
-            <para>
-            Utility tools perform viewport or state operations without modifying pixel data:
-            </para>
-            <list type="bullet">
-            <item><strong>Pan</strong>: Scrolls the canvas viewport.</item>
-            <item><strong>Zoom</strong>: Changes canvas magnification.</item>
-            <item><strong>Dropper</strong>: Samples colors from the canvas.</item>
-            </list>
-            <para>
-            Each utility tool provides an <see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> that encapsulates
-            its input handling logic, following the same pattern as:
-            </para>
-            <list type="bullet">
-            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
-            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
-            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
-            </list>
-            </remarks>
-            <param name="Id">Unique string identifier (e.g., "pixlpunkt.utility.pan").</param>
-            <param name="DisplayName">Human-readable name for UI display.</param>
-            <param name="Settings">Tool-specific settings object.</param>
-            <param name="HandlerFactory">Factory function to create the utility handler.</param>
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.#ctor(System.String,System.String,PixlPunkt.Uno.Core.Tools.Settings.ToolSettingsBase,System.Func{PixlPunkt.Uno.Core.Tools.Utility.IUtilityContext,PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler})">
-            <summary>
-            Registration record for utility-category tools that don't paint pixels.
-            </summary>
-            <remarks>
-            <para>
-            Utility tools perform viewport or state operations without modifying pixel data:
-            </para>
-            <list type="bullet">
-            <item><strong>Pan</strong>: Scrolls the canvas viewport.</item>
-            <item><strong>Zoom</strong>: Changes canvas magnification.</item>
-            <item><strong>Dropper</strong>: Samples colors from the canvas.</item>
-            </list>
-            <para>
-            Each utility tool provides an <see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> that encapsulates
-            its input handling logic, following the same pattern as:
-            </para>
-            <list type="bullet">
-            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
-            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
-            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
-            </list>
-            </remarks>
-            <param name="Id">Unique string identifier (e.g., "pixlpunkt.utility.pan").</param>
-            <param name="DisplayName">Human-readable name for UI display.</param>
-            <param name="Settings">Tool-specific settings object.</param>
-            <param name="HandlerFactory">Factory function to create the utility handler.</param>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Id">
-            <summary>Unique string identifier (e.g., "pixlpunkt.utility.pan").</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.DisplayName">
-            <summary>Human-readable name for UI display.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Settings">
-            <summary>Tool-specific settings object.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.HandlerFactory">
-            <summary>Factory function to create the utility handler.</summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Category">
-            <summary>
-            Gets the tool category - always Utility for utility tools.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.HasHandler">
-            <summary>
-            Gets whether this tool has a handler implementation.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.CreateHandler(PixlPunkt.Uno.Core.Tools.Utility.IUtilityContext)">
-            <summary>
-            Creates a new handler instance for this tool.
-            </summary>
-            <param name="context">The utility context for canvas operations.</param>
-            <returns>A new handler instance, or null if no factory is registered.</returns>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.PixlPunkt#Uno#Core#Tools#IToolBehavior#ToolId">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.InputPattern">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.HandlesRightClick">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.SuppressRmbDropper">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.SupportsModifiers">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.OverlayStyle">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.OverlayVisibleWhileActive">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.UsesPainter">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.ModifiesPixels">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Uno#Extensions#Equality#IKeyed{System#String}#Key">
-            <inheritdoc cref="!:&lt;NS.Equality&gt;.IKeyed&lt;T&gt;" />
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.GetKeyHashCode">
-            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
-        </member>
-        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.KeyEquals(PixlPunkt.Uno.Core.Tools.UtilityToolRegistration)">
-            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
-        </member>
         <member name="T:PixlPunkt.Uno.Core.Tools.Utility.DropperHandler">
             <summary>
             Dropper tool handler - samples colors from the canvas.
@@ -27234,6 +27113,127 @@
         </member>
         <member name="M:PixlPunkt.Uno.Core.Tools.Utility.ZoomHandler.Reset">
             <inheritdoc/>
+        </member>
+        <member name="T:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration">
+            <summary>
+            Registration record for utility-category tools that don't paint pixels.
+            </summary>
+            <remarks>
+            <para>
+            Utility tools perform viewport or state operations without modifying pixel data:
+            </para>
+            <list type="bullet">
+            <item><strong>Pan</strong>: Scrolls the canvas viewport.</item>
+            <item><strong>Zoom</strong>: Changes canvas magnification.</item>
+            <item><strong>Dropper</strong>: Samples colors from the canvas.</item>
+            </list>
+            <para>
+            Each utility tool provides an <see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> that encapsulates
+            its input handling logic, following the same pattern as:
+            </para>
+            <list type="bullet">
+            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
+            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
+            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
+            </list>
+            </remarks>
+            <param name="Id">Unique string identifier (e.g., "pixlpunkt.utility.pan").</param>
+            <param name="DisplayName">Human-readable name for UI display.</param>
+            <param name="Settings">Tool-specific settings object.</param>
+            <param name="HandlerFactory">Factory function to create the utility handler.</param>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.#ctor(System.String,System.String,PixlPunkt.Uno.Core.Tools.Settings.ToolSettingsBase,System.Func{PixlPunkt.Uno.Core.Tools.Utility.IUtilityContext,PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler})">
+            <summary>
+            Registration record for utility-category tools that don't paint pixels.
+            </summary>
+            <remarks>
+            <para>
+            Utility tools perform viewport or state operations without modifying pixel data:
+            </para>
+            <list type="bullet">
+            <item><strong>Pan</strong>: Scrolls the canvas viewport.</item>
+            <item><strong>Zoom</strong>: Changes canvas magnification.</item>
+            <item><strong>Dropper</strong>: Samples colors from the canvas.</item>
+            </list>
+            <para>
+            Each utility tool provides an <see cref="T:PixlPunkt.Uno.Core.Tools.Utility.IUtilityHandler"/> that encapsulates
+            its input handling logic, following the same pattern as:
+            </para>
+            <list type="bullet">
+            <item><see cref="T:PixlPunkt.Uno.Core.Painting.IStrokePainter"/> for brush tools</item>
+            <item><see cref="T:PixlPunkt.PluginSdk.Shapes.IShapeBuilder"/> for shape tools</item>
+            <item><see cref="T:PixlPunkt.Uno.Core.Tools.Selection.ISelectionTool"/> for selection tools</item>
+            </list>
+            </remarks>
+            <param name="Id">Unique string identifier (e.g., "pixlpunkt.utility.pan").</param>
+            <param name="DisplayName">Human-readable name for UI display.</param>
+            <param name="Settings">Tool-specific settings object.</param>
+            <param name="HandlerFactory">Factory function to create the utility handler.</param>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Id">
+            <summary>Unique string identifier (e.g., "pixlpunkt.utility.pan").</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.DisplayName">
+            <summary>Human-readable name for UI display.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Settings">
+            <summary>Tool-specific settings object.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.HandlerFactory">
+            <summary>Factory function to create the utility handler.</summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Category">
+            <summary>
+            Gets the tool category - always Utility for utility tools.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.HasHandler">
+            <summary>
+            Gets whether this tool has a handler implementation.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.CreateHandler(PixlPunkt.Uno.Core.Tools.Utility.IUtilityContext)">
+            <summary>
+            Creates a new handler instance for this tool.
+            </summary>
+            <param name="context">The utility context for canvas operations.</param>
+            <returns>A new handler instance, or null if no factory is registered.</returns>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.PixlPunkt#Uno#Core#Tools#IToolBehavior#ToolId">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.InputPattern">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.HandlesRightClick">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.SuppressRmbDropper">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.SupportsModifiers">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.OverlayStyle">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.OverlayVisibleWhileActive">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.UsesPainter">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.ModifiesPixels">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.Uno#Extensions#Equality#IKeyed{System#String}#Key">
+            <inheritdoc cref="!:&lt;NS.Equality&gt;.IKeyed&lt;T&gt;" />
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.GetKeyHashCode">
+            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Tools.UtilityToolRegistration.KeyEquals(PixlPunkt.Uno.Core.Tools.UtilityToolRegistration)">
+            <inheritdoc cref="T:Uno.Extensions.Equality.IKeyEquatable`1" />
         </member>
         <member name="T:PixlPunkt.Uno.Core.Updates.UpdateInfo">
             <summary>
