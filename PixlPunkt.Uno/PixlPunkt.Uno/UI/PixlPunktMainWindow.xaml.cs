@@ -154,6 +154,15 @@ namespace PixlPunkt.Uno.UI
 
             Root.GotFocus += OnAnyGotFocus;
             Root.LostFocus += OnAnyLostFocus;
+
+            // ─────────────────────────────────────────────────────────────────
+            // SKIA KEYBOARD FIX: Ensure Root maintains keyboard focus
+            // On Uno Skia platforms, KeyDown events only fire when the element
+            // has focus. We need to aggressively restore focus to Root after
+            // any interaction that might steal it (clicking buttons, panels, etc.)
+            // ─────────────────────────────────────────────────────────────────
+            Root.PointerPressed += OnRootPointerPressed;
+
             SetupMergedTitleBar();
 
             // Palette / tool initialization - track if configured palette failed to load
@@ -1167,6 +1176,29 @@ namespace PixlPunkt.Uno.UI
         {
             if (IsTextInputFocused()) return;
             SuspendToolAccelerators(false);
+        }
+
+        /// <summary>
+        /// Handles pointer press on Root to ensure keyboard focus is restored.
+        /// On Uno Skia platforms, KeyDown events only fire when the element has focus.
+        /// This handler ensures that clicking anywhere in the app restores focus to Root,
+        /// enabling tool shortcuts to work properly on desktop Linux and WSL.
+        /// </summary>
+        private void OnRootPointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            // Don't steal focus if clicking on a text input control
+            if (IsTextInputFocused()) return;
+
+            // Defer focus restoration to allow the click to be processed first
+            // This prevents interfering with button clicks, menu interactions, etc.
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                // Only restore focus if we're not in a text input
+                if (!IsTextInputFocused())
+                {
+                    Root.Focus(FocusState.Programmatic);
+                }
+            });
         }
 
         private void SuspendToolAccelerators(bool suspend)

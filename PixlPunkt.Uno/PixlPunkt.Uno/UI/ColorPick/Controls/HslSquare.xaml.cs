@@ -111,7 +111,6 @@ namespace PixlPunkt.Uno.UI.ColorPick.Controls
                 _gradientBitmap?.Dispose();
                 _gradientBitmap = new SKBitmap(paintW, paintH, SKColorType.Bgra8888, SKAlphaType.Premul);
 
-                int cols = 64, rows = 64;
                 for (int iy = 0; iy < paintH; iy++)
                 {
                     double l = 1.0 - (iy / (double)(paintH - 1));

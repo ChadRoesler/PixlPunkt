@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Android.App;
 using Android.Content;
 using Android.Net;
+using Android.OS;
 using Android.Provider;
 using AndroidX.Core.Content;
 using Java.IO;
@@ -235,7 +236,7 @@ public class AndroidPlatformFileService : IPlatformFileService
 
             var shareIntent = new Intent(Intent.ActionSendMultiple);
             shareIntent.SetType(commonMimeType ?? "*/*");
-            shareIntent.PutParcelableArrayListExtra(Intent.ExtraStream, new List<IParcelable>(uris));
+            shareIntent.PutParcelableArrayListExtra(Intent.ExtraStream, uris);
             shareIntent.AddFlags(ActivityFlags.GrantReadUriPermission);
 
             var chooserIntent = Intent.CreateChooser(shareIntent, title ?? "Share Files");

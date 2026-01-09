@@ -16,41 +16,14 @@ public class Program
         // Store args for file association handling
         StartupArgs = args;
 
-#if HAS_UNO_SKIA && WINDOWS
+#if HAS_UNO_SKIA
         // Velopack must be initialized as early as possible in app startup.
         // This handles Squirrel events during install/uninstall/update.
-        var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName 
-                      ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
-
-        Velopack.VelopackApp.Build()
-            .WithFirstRun(v => 
-            {
-                // Called on first run after install
-                System.Diagnostics.Debug.WriteLine($"[Velopack] First run! Version: {v}");
-                
-                // Register file associations
-                Core.FileAssociations.WindowsFileAssociations.Register(exePath);
-            })
-            .WithAfterInstallFastCallback(v =>
-            {
-                // Called immediately after install (before first run)
-                System.Diagnostics.Debug.WriteLine($"[Velopack] After install: {v}");
-                Core.FileAssociations.WindowsFileAssociations.Register(exePath);
-            })
-            .WithAfterUpdateFastCallback(v =>
-            {
-                // Called after an update is applied
-                System.Diagnostics.Debug.WriteLine($"[Velopack] After update: {v}");
-                // Re-register in case exe path changed
-                Core.FileAssociations.WindowsFileAssociations.Register(exePath);
-            })
-            .WithBeforeUninstallFastCallback(v =>
-            {
-                // Called before uninstall
-                System.Diagnostics.Debug.WriteLine($"[Velopack] Before uninstall: {v}");
-                Core.FileAssociations.WindowsFileAssociations.Unregister();
-            })
-            .Run();
+        // Only initialize on Windows (Velopack is Windows-only for now)
+        if (OperatingSystem.IsWindows())
+        {
+            InitializeVelopack();
+        }
 #endif
 
         var host = UnoPlatformHostBuilder.Create()
@@ -63,4 +36,54 @@ public class Program
 
         host.Run();
     }
+
+#if HAS_UNO_SKIA
+    /// <summary>
+    /// Initializes Velopack for Windows auto-update support.
+    /// Must be called as early as possible in Main().
+    /// </summary>
+    private static void InitializeVelopack()
+    {
+        try
+        {
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName 
+                          ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+
+            Velopack.VelopackApp.Build()
+                .WithFirstRun(v => 
+                {
+                    // Called on first run after install
+                    System.Diagnostics.Debug.WriteLine($"[Velopack] First run! Version: {v}");
+                    
+                    // Register file associations
+                    Core.FileAssociations.WindowsFileAssociations.Register(exePath);
+                })
+                .WithAfterInstallFastCallback(v =>
+                {
+                    // Called immediately after install (before first run)
+                    System.Diagnostics.Debug.WriteLine($"[Velopack] After install: {v}");
+                    Core.FileAssociations.WindowsFileAssociations.Register(exePath);
+                })
+                .WithAfterUpdateFastCallback(v =>
+                {
+                    // Called after an update is applied
+                    System.Diagnostics.Debug.WriteLine($"[Velopack] After update: {v}");
+                    // Re-register in case exe path changed
+                    Core.FileAssociations.WindowsFileAssociations.Register(exePath);
+                })
+                .WithBeforeUninstallFastCallback(v =>
+                {
+                    // Called before uninstall
+                    System.Diagnostics.Debug.WriteLine($"[Velopack] Before uninstall: {v}");
+                    Core.FileAssociations.WindowsFileAssociations.Unregister();
+                })
+                .Run();
+        }
+        catch (Exception ex)
+        {
+            // Don't crash if Velopack fails - the app can still run
+            System.Diagnostics.Debug.WriteLine($"[Velopack] Initialization failed: {ex.Message}");
+        }
+    }
+#endif
 }

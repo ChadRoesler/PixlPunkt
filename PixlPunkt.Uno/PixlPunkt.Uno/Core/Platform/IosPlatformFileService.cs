@@ -229,10 +229,11 @@ public class IosPlatformFileService : IPlatformFileService
                 var popover = activityController.PopoverPresentationController;
                 if (popover != null)
                 {
+                    var bounds = viewController.View.Bounds;
                     popover.SourceView = viewController.View;
                     popover.SourceRect = new CoreGraphics.CGRect(
-                        viewController.View.Bounds.GetMidX(),
-                        viewController.View.Bounds.GetMidY(),
+                        bounds.X + bounds.Width / 2,
+                        bounds.Y + bounds.Height / 2,
                         0, 0);
                     popover.PermittedArrowDirections = UIPopoverArrowDirection.Any;
                 }
@@ -283,10 +284,11 @@ public class IosPlatformFileService : IPlatformFileService
                 var popover = activityController.PopoverPresentationController;
                 if (popover != null)
                 {
+                    var bounds = viewController.View.Bounds;
                     popover.SourceView = viewController.View;
                     popover.SourceRect = new CoreGraphics.CGRect(
-                        viewController.View.Bounds.GetMidX(),
-                        viewController.View.Bounds.GetMidY(),
+                        bounds.X + bounds.Width / 2,
+                        bounds.Y + bounds.Height / 2,
                         0, 0);
                     popover.PermittedArrowDirections = UIPopoverArrowDirection.Any;
                 }

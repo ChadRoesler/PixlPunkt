@@ -447,8 +447,7 @@ namespace PixlPunkt.Uno.Core.Document
                             break;
 
                         case 0x0004: // Old palette chunk (deprecated but still used)
-                            if (palette == null)
-                                palette = ReadAseOldPaletteChunk(br);
+                            palette ??= ReadAseOldPaletteChunk(br);
                             break;
                     }
 
@@ -1163,10 +1162,7 @@ namespace PixlPunkt.Uno.Core.Document
             string baseDir = Path.GetDirectoryName(filePath) ?? ".";
 
             // Load image
-            var imageElement = tilesetElement.Element("image");
-            if (imageElement == null)
-                throw new InvalidDataException("TSX tileset has no image element.");
-
+            var imageElement = tilesetElement.Element("image") ?? throw new InvalidDataException("TSX tileset has no image element.");
             string imageSrc = imageElement.Attribute("source")?.Value ?? "";
             string imagePath = Path.IsPathRooted(imageSrc) ? imageSrc : Path.Combine(baseDir, imageSrc);
 
@@ -1192,8 +1188,10 @@ namespace PixlPunkt.Uno.Core.Document
                 CreateSize(tilesX, tilesY));
 
             // Remove default layer and add our tileset layer
+#pragma warning disable IDE0150 // Prefer 'null' check over type check
             if (canvasDoc.Layers.Count == 1 && canvasDoc.Layers[0] is RasterLayer)
                 canvasDoc.RemoveLayer(0);
+#pragma warning restore IDE0150 // Prefer 'null' check over type check
 
             int layerIdx = canvasDoc.AddLayer("Tileset");
             if (canvasDoc.Layers[layerIdx] is not RasterLayer rl)
@@ -1248,8 +1246,10 @@ namespace PixlPunkt.Uno.Core.Document
                 CreateSize(tileW, tileH),
                 CreateSize(tilesX, tilesY));
 
+#pragma warning disable IDE0150 // Prefer 'null' check over type check
             if (doc.Layers.Count == 1 && doc.Layers[0] is RasterLayer)
                 doc.RemoveLayer(0);
+#pragma warning restore IDE0150 // Prefer 'null' check over type check
 
             int layerIndex = doc.AddLayer("Icon");
             if (doc.Layers[layerIndex] is not RasterLayer rl)
@@ -1336,8 +1336,10 @@ namespace PixlPunkt.Uno.Core.Document
                 CreateSize(tileW, tileH),
                 CreateSize(tilesX, tilesY));
 
+#pragma warning disable IDE0150 // Prefer 'null' check over type check
             if (doc.Layers.Count == 1 && doc.Layers[0] is RasterLayer)
                 doc.RemoveLayer(0);
+#pragma warning restore IDE0150 // Prefer 'null' check over type check
 
             int layerIndex = doc.AddLayer("Cursor");
             if (doc.Layers[layerIndex] is not RasterLayer rl)

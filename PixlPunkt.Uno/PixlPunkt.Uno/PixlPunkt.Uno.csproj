@@ -1,7 +1,27 @@
 <Project Sdk="Uno.Sdk">
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       TARGET FRAMEWORKS
+       
+       For CI builds that don't have mobile workloads installed, pass:
+         -p:DesktopOnly=true     (builds desktop + windows + wasm)
+         -p:SkiaOnly=true        (builds only net10.0-desktop)
+         -p:WinAppSdkOnly=true   (builds only net10.0-windows10.0.26100)
+  ═══════════════════════════════════════════════════════════════════════ -->
   <PropertyGroup>
-    <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    <!-- Default: all platforms -->
+    <TargetFrameworks Condition="'$(DesktopOnly)' != 'true' and '$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true'">net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    
+    <!-- DesktopOnly: excludes Android and iOS -->
+    <TargetFrameworks Condition="'$(DesktopOnly)' == 'true'">net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    
+    <!-- SkiaOnly: only Skia Desktop (for Linux/macOS CI) -->
+    <TargetFrameworks Condition="'$(SkiaOnly)' == 'true'">net10.0-desktop</TargetFrameworks>
+    
+    <!-- WinAppSdkOnly: only WinAppSdk (for Windows native builds) -->
+    <TargetFrameworks Condition="'$(WinAppSdkOnly)' == 'true'">net10.0-windows10.0.26100</TargetFrameworks>
+  </PropertyGroup>
 
+  <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UnoSingleProject>true</UnoSingleProject>
     <RootNamespace>PixlPunkt.Uno</RootNamespace>
@@ -69,6 +89,13 @@
   ═══════════════════════════════════════════════════════════════════════ -->
   <PropertyGroup Condition="$(TargetFramework.Contains('desktop'))">
     <UnoSingleProjectAllowIncrementalBuilds>true</UnoSingleProjectAllowIncrementalBuilds>
+    <!-- Define HAS_UNO_SKIA for Skia desktop builds -->
+    <DefineConstants>$(DefineConstants);HAS_UNO_SKIA</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Define WINDOWS_DESKTOP for Windows runtime on Skia desktop builds -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('desktop')) and $(RuntimeIdentifier.StartsWith('win'))">
+    <DefineConstants>$(DefineConstants);WINDOWS_DESKTOP</DefineConstants>
   </PropertyGroup>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
