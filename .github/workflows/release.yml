@@ -568,3 +568,299 @@ jobs:
         with:
           name: pixlpunkt-tarball
           path: ${{ steps.tar.outputs.tar_name }}
+
+  #############################################################################
+  # Build Desktop macOS (Skia) - with DMG
+  #############################################################################
+  build-desktop-macos:
+    name: Build Desktop macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    needs: run-tests
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+        include:
+          - arch: x64
+            rid: osx-x64
+          - arch: arm64
+            rid: osx-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Desktop macOS
+        run: |
+          echo "Building Desktop macOS (${{ matrix.arch }})..."
+          
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} \
+            --configuration Release \
+            --framework net10.0-desktop \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            --output ./publish/desktop-macos-${{ matrix.arch }} \
+            -p:SkiaOnly=true \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -p:PublishSingleFile=false \
+            -p:PublishReadyToRun=true
+
+      - name: Create macOS App Bundle
+        id: bundle
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          
+          APP_BUNDLE="./PixlPunkt.app"
+          mkdir -p "$APP_BUNDLE/Contents/MacOS"
+          mkdir -p "$APP_BUNDLE/Contents/Resources"
+          
+          # Copy executable and dependencies
+          cp -r ./publish/desktop-macos-$ARCH/* "$APP_BUNDLE/Contents/MacOS/"
+          chmod +x "$APP_BUNDLE/Contents/MacOS/PixlPunkt.Uno"
+          
+          # Copy icon if available
+          if [ -f "PixlPunkt.Uno/PixlPunkt.Uno/Assets/Icons/Icon.png" ]; then
+            cp "PixlPunkt.Uno/PixlPunkt.Uno/Assets/Icons/Icon.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
+          fi
+          
+          # Create Info.plist
+          cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key><string>PixlPunkt.Uno</string>
+              <key>CFBundleIdentifier</key><string>com.pixlpunkt.app</string>
+              <key>CFBundleName</key><string>PixlPunkt</string>
+              <key>CFBundleDisplayName</key><string>PixlPunkt</string>
+              <key>CFBundlePackageType</key><string>APPL</string>
+              <key>CFBundleShortVersionString</key><string>$VERSION</string>
+              <key>CFBundleVersion</key><string>$VERSION</string>
+              <key>LSMinimumSystemVersion</key><string>10.15</string>
+              <key>NSHighResolutionCapable</key><true/>
+              <key>CFBundleIconFile</key><string>AppIcon</string>
+              <key>CFBundleDocumentTypes</key>
+              <array>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Document</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pxp</string></array>
+                  </dict>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Reel</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pxpr</string></array>
+                  </dict>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Tileset</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pxpt</string></array>
+                  </dict>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Brush</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pbx</string></array>
+                  </dict>
+              </array>
+          </dict>
+          </plist>
+          EOF
+          
+          echo "App bundle created at $APP_BUNDLE"
+
+      - name: Create DMG
+        id: dmg
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          DMG_NAME="PixlPunkt-$VERSION-macOS-$ARCH.dmg"
+          
+          # Create DMG with Applications folder link
+          create-dmg \
+            --volname "PixlPunkt $VERSION" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "PixlPunkt.app" 150 185 \
+            --hide-extension "PixlPunkt.app" \
+            --app-drop-link 450 185 \
+            "$DMG_NAME" \
+            "./PixlPunkt.app" || true
+          
+          # Check if DMG was created
+          if [ -f "$DMG_NAME" ]; then
+            echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
+            echo "has_dmg=true" >> $GITHUB_OUTPUT
+            echo "Created: $DMG_NAME"
+          else
+            echo "has_dmg=false" >> $GITHUB_OUTPUT
+            echo "Warning: DMG creation failed, creating ZIP instead"
+          fi
+
+      - name: Create ZIP (fallback/additional)
+        id: zip
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          ZIP_NAME="PixlPunkt-$VERSION-macOS-$ARCH.zip"
+          
+          # Create ZIP of the app bundle
+          zip -r "$ZIP_NAME" PixlPunkt.app
+          
+          echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+          echo "Created: $ZIP_NAME"
+
+      - name: Upload DMG
+        if: steps.dmg.outputs.has_dmg == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-dmg-${{ matrix.arch }}
+          path: ${{ steps.dmg.outputs.dmg_name }}
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-zip-${{ matrix.arch }}
+          path: ${{ steps.zip.outputs.zip_name }}
+
+  #############################################################################
+  # Create GitHub Release
+  #############################################################################
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-sdk, build-winappsdk, build-desktop-windows, build-desktop-linux, build-desktop-macos]
+    if: always() && !cancelled() && needs.run-tests.result != 'failure'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: List artifacts
+        run: |
+          echo "=== Downloaded Artifacts ==="
+          find ./artifacts -type f -exec ls -lh {} \;
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: PixlPunkt v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: true
+          body: |
+            ## PixlPunkt v${{ steps.version.outputs.version }}
+            
+            ### Downloads
+            
+            #### Windows
+            | Package | Description |
+            |---------|-------------|
+            | `PixlPunkt-${{ steps.version.outputs.version }}-Windows-Setup.exe` | **Recommended** - Installer with auto-updates (Velopack) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-Desktop-Windows-x64-Portable.zip` | Portable version (no install) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-WinAppSdk-x64.zip` | MSIX package (Windows 10/11) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-WinAppSdk-arm64.zip` | MSIX package (Windows ARM) |
+            
+            #### macOS
+            | Package | Description |
+            |---------|-------------|
+            | `PixlPunkt-${{ steps.version.outputs.version }}-macOS-arm64.dmg` | **Recommended** for Apple Silicon (M1/M2/M3) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-macOS-x64.dmg` | For Intel Macs |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-macOS-*.zip` | ZIP alternatives |
+            
+            #### Linux
+            | Package | Description |
+            |---------|-------------|
+            | `pixlpunkt_${{ steps.version.outputs.version }}_amd64.deb` | Debian/Ubuntu package |
+            | `pixlpunkt-${{ steps.version.outputs.version }}-1.x86_64.rpm` | Fedora/RHEL package |
+            | `pixlpunkt-${{ steps.version.outputs.version }}-desktop-linux-x64.tar.gz` | Portable tarball |
+            
+            #### Plugin SDK
+            | Package | Description |
+            |---------|-------------|
+            | `PixlPunkt.PluginSdk.*.nupkg` | NuGet package for plugin development |
+            
+            ---
+            
+            ### Installation
+            
+            **Windows:** Download and run the Setup.exe installer. The app will auto-update.
+            
+            **macOS:** Download the DMG, open it, and drag PixlPunkt to Applications. On first run, right-click and select "Open" to bypass Gatekeeper.
+            
+            **Linux (Debian/Ubuntu):**
+            ```bash
+            sudo dpkg -i pixlpunkt_${{ steps.version.outputs.version }}_amd64.deb
+            sudo apt-get install -f  # Install dependencies if needed
+            ```
+            
+            **Linux (Fedora/RHEL):**
+            ```bash
+            sudo dnf install pixlpunkt-${{ steps.version.outputs.version }}-1.x86_64.rpm
+            ```
+          files: |
+            ./artifacts/sdk-package/*.nupkg
+            ./artifacts/winappsdk-x64/*.zip
+            ./artifacts/winappsdk-arm64/*.zip
+            ./artifacts/desktop-windows-setup/*.exe
+            ./artifacts/desktop-windows-x64/*.zip
+            ./artifacts/desktop-windows-velopack/*.nupkg
+            ./artifacts/desktop-windows-velopack/RELEASES
+            ./artifacts/pixlpunkt-deb/*.deb
+            ./artifacts/pixlpunkt-rpm/*.rpm
+            ./artifacts/pixlpunkt-tarball/*.tar.gz
+            ./artifacts/desktop-macos-dmg-x64/*.dmg
+            ./artifacts/desktop-macos-dmg-arm64/*.dmg
+            ./artifacts/desktop-macos-zip-x64/*.zip
+            ./artifacts/desktop-macos-zip-arm64/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
