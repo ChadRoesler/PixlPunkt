@@ -1,7 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using PixlPunkt.Uno.Core.Brush;
 using PixlPunkt.Uno.Core.Effects;
@@ -11,6 +7,10 @@ using PixlPunkt.Uno.Core.Plugins;
 using PixlPunkt.Uno.Core.Settings;
 using PixlPunkt.Uno.UI;
 using Uno.Resizetizer;
+#if NET10_0_DESKTOP || NET9_0_DESKTOP || NET8_0_DESKTOP
+using System.IO;
+using System.Linq;
+#endif
 
 namespace PixlPunkt.Uno;
 

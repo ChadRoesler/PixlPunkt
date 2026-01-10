@@ -1,7 +1,7 @@
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 #if WINDOWS
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 #endif
 
@@ -11,7 +11,7 @@ namespace PixlPunkt.Uno.Core.FileAssociations;
 /// Handles Windows file type associations for PixlPunkt.
 /// Called during Velopack install/uninstall events.
 /// </summary>
-public static class WindowsFileAssociations
+public static partial class WindowsFileAssociations
 {
 #if WINDOWS
     private const string AppName = "PixlPunkt";
@@ -36,9 +36,6 @@ public static class WindowsFileAssociations
     /// <param name="exePath">Full path to PixlPunkt.Uno.exe</param>
     public static void Register(string exePath)
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return;
-
         try
         {
             var appDir = Path.GetDirectoryName(exePath) ?? "";
@@ -69,9 +66,6 @@ public static class WindowsFileAssociations
     /// </summary>
     public static void Unregister()
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return;
-
         try
         {
             foreach (var fileType in FileTypes)
@@ -154,20 +148,19 @@ public static class WindowsFileAssociations
         try
         {
             // Remove ProgId
-            Registry.CurrentUser.DeleteSubKeyTree($@"Software\Classes\{fileType.ProgId}", false);
+            Registry.CurrentUser.DeleteSubKeyTree($@"Software\Classes\{fileType.ProgId}", throwOnMissingSubKey: false);
             
             // Remove extension association (be careful - only remove our ProgId reference)
-            using var extKey = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{fileType.Extension}", true);
+            using var extKey = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{fileType.Extension}", writable: true);
             if (extKey != null)
             {
-                var defaultValue = extKey.GetValue("") as string;
-                if (defaultValue == fileType.ProgId)
+                if (extKey.GetValue("") is string defaultValue && defaultValue == fileType.ProgId)
                 {
-                    extKey.DeleteValue("", false);
+                    extKey.DeleteValue("", throwOnMissingValue: false);
                 }
 
-                using var openWithKey = extKey.OpenSubKey("OpenWithProgIds", true);
-                openWithKey?.DeleteValue(fileType.ProgId, false);
+                using var openWithKey = extKey.OpenSubKey("OpenWithProgIds", writable: true);
+                openWithKey?.DeleteValue(fileType.ProgId, throwOnMissingValue: false);
             }
         }
         catch (Exception ex)
@@ -208,7 +201,7 @@ public static class WindowsFileAssociations
             mimeKey.SetValue("application/x-pixlpunkt-reel", "PixlPunkt.AnimationReel");
             mimeKey.SetValue("application/x-pixlpunkt-tileset", "PixlPunkt.Tileset");
             mimeKey.SetValue("application/x-pixlpunkt-brush", "PixlPunkt.Brush");
-            mimeKey.SetValue("application/x-pixlpunkt-marker", "PixlPunkt.Marker");
+            mimeKey.SetValue("application/x-pixlunkt-marker", "PixlPunkt.Marker");
         }
     }
 
@@ -217,11 +210,11 @@ public static class WindowsFileAssociations
         try
         {
             // Remove from RegisteredApplications
-            using var regAppsKey = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", true);
-            regAppsKey?.DeleteValue(AppName, false);
+            using var regAppsKey = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", writable: true);
+            regAppsKey?.DeleteValue(AppName, throwOnMissingValue: false);
 
             // Remove Capabilities
-            Registry.CurrentUser.DeleteSubKeyTree($@"Software\{AppName}", false);
+            Registry.CurrentUser.DeleteSubKeyTree($@"Software\{AppName}", throwOnMissingSubKey: false);
         }
         catch (Exception ex)
         {
@@ -229,10 +222,10 @@ public static class WindowsFileAssociations
         }
     }
 
-    private static class NativeMethods
+    private static partial class NativeMethods
     {
-        [DllImport("shell32.dll")]
-        public static extern void SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
+        [LibraryImport("shell32.dll")]
+        public static partial void SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
     }
 #else
     // Non-Windows stubs - these methods do nothing on non-Windows platforms
@@ -240,18 +233,12 @@ public static class WindowsFileAssociations
     /// <summary>
     /// Registers all PixlPunkt file associations (Windows-only, no-op on other platforms).
     /// </summary>
-    public static void Register(string exePath)
-    {
-        // No-op on non-Windows
-    }
+    public static void Register(string exePath) { }
 
     /// <summary>
     /// Unregisters all PixlPunkt file associations (Windows-only, no-op on other platforms).
     /// </summary>
-    public static void Unregister()
-    {
-        // No-op on non-Windows
-    }
+    public static void Unregister() { }
 #endif
 }
 

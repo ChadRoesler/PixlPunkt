@@ -42,34 +42,29 @@ public class Program
     {
         try
         {
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
+            // Cache exe path once - Process.GetCurrentProcess() allocates
+            var exePath = Environment.ProcessPath
+                          ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
                           ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
 
             Velopack.VelopackApp.Build()
                 .WithFirstRun(v =>
                 {
-                    // Called on first run after install
                     System.Diagnostics.Debug.WriteLine($"[Velopack] First run! Version: {v}");
-
-                    // Register file associations
                     Core.FileAssociations.WindowsFileAssociations.Register(exePath);
                 })
                 .WithAfterInstallFastCallback(v =>
                 {
-                    // Called immediately after install (before first run)
                     System.Diagnostics.Debug.WriteLine($"[Velopack] After install: {v}");
                     Core.FileAssociations.WindowsFileAssociations.Register(exePath);
                 })
                 .WithAfterUpdateFastCallback(v =>
                 {
-                    // Called after an update is applied
                     System.Diagnostics.Debug.WriteLine($"[Velopack] After update: {v}");
-                    // Re-register in case exe path changed
                     Core.FileAssociations.WindowsFileAssociations.Register(exePath);
                 })
                 .WithBeforeUninstallFastCallback(v =>
                 {
-                    // Called before uninstall
                     System.Diagnostics.Debug.WriteLine($"[Velopack] Before uninstall: {v}");
                     Core.FileAssociations.WindowsFileAssociations.Unregister();
                 })

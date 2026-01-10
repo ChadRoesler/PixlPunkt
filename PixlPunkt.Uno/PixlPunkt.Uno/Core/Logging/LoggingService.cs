@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -44,6 +45,8 @@ namespace PixlPunkt.Uno.Core.Logging
         /// </summary>
         public static void Initialize()
         {
+            if (_initialized) return;
+            
             lock (_lock)
             {
                 if (_initialized) return;
@@ -125,6 +128,8 @@ namespace PixlPunkt.Uno.Core.Logging
         /// </summary>
         public static void Shutdown()
         {
+            if (!_initialized) return;
+            
             lock (_lock)
             {
                 if (!_initialized) return;
@@ -144,100 +149,115 @@ namespace PixlPunkt.Uno.Core.Logging
             }
         }
 
-        // LOG METHODS
+        // LOG METHODS - with level checks to avoid allocations when disabled
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Debug(string message)
         {
+            if (!IsLevelEnabled(LogEventLevel.Debug)) return;
             WriteLog(LogEventLevel.Debug, message);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Debug(string messageTemplate, params object[] propertyValues)
         {
+            if (!IsLevelEnabled(LogEventLevel.Debug)) return;
             WriteLog(LogEventLevel.Debug, messageTemplate, propertyValues);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Info(string message)
         {
+            if (!IsLevelEnabled(LogEventLevel.Information)) return;
             WriteLog(LogEventLevel.Information, message);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Info(string messageTemplate, params object[] propertyValues)
         {
+            if (!IsLevelEnabled(LogEventLevel.Information)) return;
             WriteLog(LogEventLevel.Information, messageTemplate, propertyValues);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Warning(string message)
         {
+            if (!IsLevelEnabled(LogEventLevel.Warning)) return;
             WriteLog(LogEventLevel.Warning, message);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Warning(string messageTemplate, params object[] propertyValues)
         {
+            if (!IsLevelEnabled(LogEventLevel.Warning)) return;
             WriteLog(LogEventLevel.Warning, messageTemplate, propertyValues);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Error(string message)
         {
             WriteLog(LogEventLevel.Error, message);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Error(string message, Exception exception)
         {
             WriteLog(LogEventLevel.Error, exception, message);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Error(string messageTemplate, params object[] propertyValues)
         {
             WriteLog(LogEventLevel.Error, messageTemplate, propertyValues);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Fatal(string message)
         {
             WriteLog(LogEventLevel.Fatal, message);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Fatal(string message, Exception exception)
         {
             WriteLog(LogEventLevel.Fatal, exception, message);
         }
 
         // INTERNAL HELPERS
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsLevelEnabled(LogEventLevel level)
+        {
+            return _levelSwitch == null || level >= _levelSwitch.MinimumLevel;
+        }
+
         private static void WriteLog(LogEventLevel level, string message)
         {
-            if (_logger != null)
-            {
-                _logger.Write(level, message);
-            }
+            _logger?.Write(level, message);
 
+#if DEBUG
             System.Diagnostics.Debug.WriteLine($"[{level}] {message}");
+#endif
         }
 
         private static void WriteLog(LogEventLevel level, string messageTemplate, object[] propertyValues)
         {
-            if (_logger != null)
-            {
-                _logger.Write(level, messageTemplate, propertyValues);
-            }
+            _logger?.Write(level, messageTemplate, propertyValues);
 
-            try
-            {
-                var formattedMessage = string.Format(messageTemplate.Replace("{", "{{").Replace("}", "}}"), propertyValues);
-                System.Diagnostics.Debug.WriteLine($"[{level}] {formattedMessage}");
-            }
-            catch
-            {
-                System.Diagnostics.Debug.WriteLine($"[{level}] {messageTemplate}");
-            }
+#if DEBUG
+            // Best-effort debug output - just log template if formatting fails
+            System.Diagnostics.Debug.WriteLine($"[{level}] {messageTemplate}");
+#endif
         }
 
         private static void WriteLog(LogEventLevel level, Exception exception, string message)
         {
-            if (_logger != null)
-            {
-                _logger.Write(level, exception, message);
-            }
+            _logger?.Write(level, exception, message);
 
+#if DEBUG
             System.Diagnostics.Debug.WriteLine($"[{level}] {message}");
             System.Diagnostics.Debug.WriteLine(exception.ToString());
+#endif
         }
     }
 }

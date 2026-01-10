@@ -22,50 +22,28 @@ namespace PixlPunkt.Uno.Core.Settings
         /// </summary>
         public const string AppName = "PixlPunkt";
 
-        private static string? _rootDirectory;
+        // Cache platform checks once at type initialization
+        private static readonly bool _isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        private static readonly bool _isMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+        private static readonly bool _isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+
+        // Lazy-initialized root directory
+        private static readonly Lazy<string> _rootDirectory = new(GetRootDirectory, isThreadSafe: true);
         private static bool _initialized;
 
         /// <summary>
         /// Gets the root application data directory.
         /// </summary>
-        public static string RootDirectory
-        {
-            get
-            {
-                if (_rootDirectory == null)
-                {
-                    _rootDirectory = GetRootDirectory();
-                }
-                return _rootDirectory;
-            }
-        }
+        public static string RootDirectory => _rootDirectory.Value;
 
         private static string GetRootDirectory()
         {
             try
             {
-                // Use platform-specific paths that work reliably
-                
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    // Windows: Use %LocalAppData%\PixlPunkt
-                    return GetWindowsPath();
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    // macOS: Use ~/Library/Application Support/PixlPunkt
-                    return GetMacOSPath();
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    // Linux: Use ~/.local/share/PixlPunkt or $XDG_DATA_HOME/PixlPunkt
-                    return GetLinuxPath();
-                }
-                else
-                {
-                    // Unknown OS: fall back to LocalApplicationData
-                    return GetFallbackPath();
-                }
+                if (_isWindows) return GetWindowsPath();
+                if (_isMacOS) return GetMacOSPath();
+                if (_isLinux) return GetLinuxPath();
+                return GetFallbackPath();
             }
             catch (Exception ex)
             {
@@ -80,25 +58,18 @@ namespace PixlPunkt.Uno.Core.Settings
             try
             {
                 // Try to use Windows.Storage.ApplicationData for packaged apps
-                try
-                {
-                    var localFolder = Windows.Storage.ApplicationData.Current.LocalFolder;
-                    System.Diagnostics.Debug.WriteLine($"[AppPaths] Using ApplicationData.LocalFolder: {localFolder.Path}");
-                    return localFolder.Path;
-                }
-                catch (InvalidOperationException)
-                {
-                    // App is running unpackaged
-                    System.Diagnostics.Debug.WriteLine("[AppPaths] Running unpackaged on Windows");
-                }
-                catch
-                {
-                    // Windows.Storage not available or other error
-                }
+                var localFolder = Windows.Storage.ApplicationData.Current.LocalFolder;
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using ApplicationData.LocalFolder: {localFolder.Path}");
+                return localFolder.Path;
+            }
+            catch (InvalidOperationException)
+            {
+                // App is running unpackaged - fall through to LocalApplicationData
+                System.Diagnostics.Debug.WriteLine("[AppPaths] Running unpackaged on Windows");
             }
             catch
             {
-                // Outer catch for any unexpected errors
+                // Windows.Storage not available or other error - fall through
             }
 #endif
 
@@ -118,19 +89,17 @@ namespace PixlPunkt.Uno.Core.Settings
         {
             // macOS: ~/Library/Application Support/PixlPunkt
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            
+            // Fallback to HOME environment variable if UserProfile is empty
+            if (string.IsNullOrEmpty(home))
+            {
+                home = Environment.GetEnvironmentVariable("HOME");
+            }
+            
             if (!string.IsNullOrEmpty(home))
             {
                 var appSupport = Path.Combine(home, "Library", "Application Support", AppName);
                 System.Diagnostics.Debug.WriteLine($"[AppPaths] Using macOS Application Support: {appSupport}");
-                return appSupport;
-            }
-
-            // Alternative: try HOME environment variable
-            home = Environment.GetEnvironmentVariable("HOME");
-            if (!string.IsNullOrEmpty(home))
-            {
-                var appSupport = Path.Combine(home, "Library", "Application Support", AppName);
-                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using macOS HOME path: {appSupport}");
                 return appSupport;
             }
 

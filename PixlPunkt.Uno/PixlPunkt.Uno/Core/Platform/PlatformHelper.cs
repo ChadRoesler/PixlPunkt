@@ -7,23 +7,28 @@ namespace PixlPunkt.Uno.Core.Platform;
 /// </summary>
 public static class PlatformHelper
 {
+    // Cached platform detection - computed once at startup
+    private static readonly bool _isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+    private static readonly bool _isMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+    private static readonly bool _isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    private static readonly bool _isSkiaDesktop = DetectSkiaDesktop();
+    private static readonly bool _isWSL = DetectWSL();
+    private static readonly string _platformName = ComputePlatformName();
+
     /// <summary>
     /// Gets whether the app is running on Windows (native WinUI or Skia).
     /// </summary>
-    public static bool IsWindows =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+    public static bool IsWindows => _isWindows;
 
     /// <summary>
     /// Gets whether the app is running on macOS (Mac Catalyst or Skia).
     /// </summary>
-    public static bool IsMacOS =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+    public static bool IsMacOS => _isMacOS;
 
     /// <summary>
     /// Gets whether the app is running on Linux (X11, Wayland, or Framebuffer).
     /// </summary>
-    public static bool IsLinux =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    public static bool IsLinux => _isLinux;
 
     /// <summary>
     /// Gets whether the app is running on WebAssembly.
@@ -56,11 +61,6 @@ public static class PlatformHelper
 #endif
 
     /// <summary>
-    /// Cached value for Skia desktop detection (computed once at startup).
-    /// </summary>
-    private static readonly bool _isSkiaDesktop = DetectSkiaDesktop();
-
-    /// <summary>
     /// Gets whether the app is running on a Skia-based desktop target (Linux, macOS Skia, or Windows Skia).
     /// </summary>
     public static bool IsSkiaDesktop => _isSkiaDesktop;
@@ -70,28 +70,20 @@ public static class PlatformHelper
     /// </summary>
     private static bool DetectSkiaDesktop()
     {
-        // Linux is always Skia
-        if (IsLinux) return true;
+        // Linux is always Skia for desktop
+        if (_isLinux) return true;
 
         // Check for Uno Platform Skia host types at runtime
-        // This works for Windows Desktop (Skia) and macOS (Skia)
         try
         {
             // Try to find Uno.UI.Runtime.Skia assembly - if it's loaded, we're on Skia
-            var skiaAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name?.StartsWith("Uno.UI.Runtime.Skia", StringComparison.OrdinalIgnoreCase) == true);
-            
-            if (skiaAssembly != null)
-                return true;
-
-            // Alternative: Check for SkiaSharp.Views.Windows assembly usage pattern
-            // The SKXamlCanvas type only exists in Skia builds
-            var skiaViewsType = Type.GetType("SkiaSharp.Views.Windows.SKXamlCanvas, SkiaSharp.Views.Windows");
-            if (skiaViewsType != null)
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                // Check if it's the Uno-specific implementation
-                // Native WinUI uses Win2D, not SkiaSharp for canvas
-                return true;
+                var name = assembly.GetName().Name;
+                if (name != null && name.StartsWith("Uno.UI.Runtime.Skia", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
             }
         }
         catch
@@ -105,72 +97,62 @@ public static class PlatformHelper
     /// <summary>
     /// Gets whether the app is running on native WinUI (Windows App SDK).
     /// </summary>
-    public static bool IsNativeWinUI =>
-        IsWindows && !IsSkiaDesktop;
+    public static bool IsNativeWinUI => _isWindows && !_isSkiaDesktop;
 
     /// <summary>
     /// Gets whether the app is running inside WSL (Windows Subsystem for Linux).
     /// </summary>
-    public static bool IsWSL
+    public static bool IsWSL => _isWSL;
+
+    /// <summary>
+    /// Detects if we're running inside WSL (cached at startup).
+    /// </summary>
+    private static bool DetectWSL()
     {
-        get
+        if (!_isLinux) return false;
+
+        try
         {
-            if (!IsLinux) return false;
+            // Check for WSL-specific environment variable
+            var wslEnv = Environment.GetEnvironmentVariable("WSL_DISTRO_NAME");
+            if (!string.IsNullOrEmpty(wslEnv)) return true;
 
-            try
+            // Check /proc/version for Microsoft
+            const string procVersion = "/proc/version";
+            if (File.Exists(procVersion))
             {
-                // Check for WSL-specific environment variable or /proc/version content
-                var wslEnv = Environment.GetEnvironmentVariable("WSL_DISTRO_NAME");
-                if (!string.IsNullOrEmpty(wslEnv)) return true;
-
-                // Check /proc/version for Microsoft
-                if (File.Exists("/proc/version"))
-                {
-                    var version = File.ReadAllText("/proc/version");
-                    return version.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) ||
-                           version.Contains("WSL", StringComparison.OrdinalIgnoreCase);
-                }
+                var version = File.ReadAllText(procVersion);
+                return version.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) ||
+                       version.Contains("WSL", StringComparison.OrdinalIgnoreCase);
             }
-            catch
-            {
-                // Ignore errors
-            }
-
-            return false;
         }
+        catch
+        {
+            // Ignore errors
+        }
+
+        return false;
     }
 
     /// <summary>
     /// Gets a friendly name for the current platform.
     /// </summary>
-    public static string PlatformName
+    public static string PlatformName => _platformName;
+
+    private static string ComputePlatformName()
     {
-        get
-        {
-            if (IsWebAssembly) return "WebAssembly";
-            if (IsAndroid) return "Android";
-            if (IsIOS) return "iOS";
-            if (IsWSL) return "Linux (WSL)";
-            if (IsLinux) return "Linux";
-            if (IsMacOS) return IsSkiaDesktop ? "macOS (Skia)" : "macOS";
-            if (IsWindows) return IsNativeWinUI ? "Windows (WinUI)" : "Windows (Skia)";
-            return "Unknown";
-        }
+        if (IsWebAssembly) return "WebAssembly";
+        if (IsAndroid) return "Android";
+        if (IsIOS) return "iOS";
+        if (_isWSL) return "Linux (WSL)";
+        if (_isLinux) return "Linux";
+        if (_isMacOS) return _isSkiaDesktop ? "macOS (Skia)" : "macOS";
+        if (_isWindows) return !_isSkiaDesktop ? "Windows (WinUI)" : "Windows (Skia)";
+        return "Unknown";
     }
 
     /// <summary>
     /// Gets whether hardware acceleration is likely available.
     /// </summary>
-    public static bool HasHardwareAcceleration
-    {
-        get
-        {
-            // WSL2 with WSLg should have GPU acceleration
-            // Native platforms generally have it
-            // WASM depends on WebGL support
-            if (IsWSL) return true; // WSL2 with WSLg
-            if (IsWebAssembly) return true; // WebGL
-            return true; // Most platforms support it
-        }
-    }
+    public static bool HasHardwareAcceleration => true; // All modern platforms support GPU acceleration
 }

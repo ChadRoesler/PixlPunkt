@@ -1,5 +1,9 @@
 using System;
 using System.Threading.Tasks;
+#if WINDOWS
+using Velopack;
+using Velopack.Sources;
+#endif
 
 namespace PixlPunkt.Uno.Core.Updates;
 
@@ -16,91 +20,48 @@ public sealed class VelopackUpdateService
     /// </summary>
     public static VelopackUpdateService Instance => _instance ??= new VelopackUpdateService();
 
+#if WINDOWS
     /// <summary>
     /// The GitHub releases URL for PixlPunkt.
     /// </summary>
     private const string GitHubReleasesUrl = "https://github.com/ChadRoesler/PixlPunkt";
 
-#if WINDOWS
-    private Velopack.UpdateManager? _updateManager;
+    private readonly UpdateManager? _updateManager;
     private Velopack.UpdateInfo? _pendingUpdate;
-#endif
 
     private VelopackUpdateService()
     {
-#if WINDOWS
         try
         {
             // Use GitHub releases as the update source
-            var source = new Velopack.Sources.GithubSource(GitHubReleasesUrl, null, false);
-            _updateManager = new Velopack.UpdateManager(source);
+            var source = new GithubSource(GitHubReleasesUrl, null, false);
+            _updateManager = new UpdateManager(source);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[Velopack] Failed to initialize UpdateManager: {ex.Message}");
         }
-#endif
     }
 
     /// <summary>
     /// Gets whether the app was installed via Velopack and can receive updates.
     /// </summary>
-    public bool IsUpdateSupported
-    {
-        get
-        {
-#if WINDOWS
-            return _updateManager?.IsInstalled ?? false;
-#else
-            return false;
-#endif
-        }
-    }
+    public bool IsUpdateSupported => _updateManager?.IsInstalled ?? false;
 
     /// <summary>
     /// Gets the current installed version.
     /// </summary>
-    public string? CurrentVersion
-    {
-        get
-        {
-#if WINDOWS
-            return _updateManager?.CurrentVersion?.ToString();
-#else
-            return null;
-#endif
-        }
-    }
+    public string? CurrentVersion => _updateManager?.CurrentVersion?.ToString();
 
     /// <summary>
     /// Gets whether there's a pending update ready to install.
     /// </summary>
-    public bool HasPendingUpdate
-    {
-        get
-        {
-#if WINDOWS
-            return _pendingUpdate != null;
-#else
-            return false;
-#endif
-        }
-    }
+    public bool HasPendingUpdate => _pendingUpdate != null;
 
     /// <summary>
     /// Gets the version of the pending update, if any.
     /// </summary>
-    public string? PendingUpdateVersion
-    {
-        get
-        {
-#if WINDOWS
-            return _pendingUpdate?.TargetFullRelease?.Version?.ToString();
-#else
-            return null;
-#endif
-        }
-    }
+    public string? PendingUpdateVersion => _pendingUpdate?.TargetFullRelease?.Version?.ToString();
 
     /// <summary>
     /// Raised when update progress changes during download.
@@ -113,7 +74,6 @@ public sealed class VelopackUpdateService
     /// <returns>True if an update is available; false otherwise.</returns>
     public async Task<bool> CheckForUpdatesAsync()
     {
-#if WINDOWS
         if (_updateManager == null || !_updateManager.IsInstalled)
         {
             System.Diagnostics.Debug.WriteLine("[Velopack] Not installed via Velopack, skipping update check");
@@ -139,10 +99,6 @@ public sealed class VelopackUpdateService
             System.Diagnostics.Debug.WriteLine($"[Velopack] Error checking for updates: {ex.Message}");
             return false;
         }
-#else
-        await Task.CompletedTask;
-        return false;
-#endif
     }
 
     /// <summary>
@@ -151,7 +107,6 @@ public sealed class VelopackUpdateService
     /// <returns>True if download succeeded; false otherwise.</returns>
     public async Task<bool> DownloadUpdateAsync()
     {
-#if WINDOWS
         if (_updateManager == null || _pendingUpdate == null)
         {
             return false;
@@ -173,19 +128,13 @@ public sealed class VelopackUpdateService
             System.Diagnostics.Debug.WriteLine($"[Velopack] Error downloading update: {ex.Message}");
             return false;
         }
-#else
-        await Task.CompletedTask;
-        return false;
-#endif
     }
 
     /// <summary>
     /// Applies the downloaded update and restarts the application.
     /// </summary>
-    /// <param name="silentRestart">If true, restarts without prompting.</param>
-    public void ApplyUpdateAndRestart(bool silentRestart = false)
+    public void ApplyUpdateAndRestart()
     {
-#if WINDOWS
         if (_updateManager == null || _pendingUpdate == null)
         {
             return;
@@ -200,7 +149,6 @@ public sealed class VelopackUpdateService
         {
             System.Diagnostics.Debug.WriteLine($"[Velopack] Error applying update: {ex.Message}");
         }
-#endif
     }
 
     /// <summary>
@@ -212,12 +160,9 @@ public sealed class VelopackUpdateService
     {
         try
         {
-            if (await CheckForUpdatesAsync())
+            if (await CheckForUpdatesAsync() && await DownloadUpdateAsync())
             {
-                if (await DownloadUpdateAsync())
-                {
-                    onUpdateReady?.Invoke(PendingUpdateVersion ?? "unknown");
-                }
+                onUpdateReady?.Invoke(PendingUpdateVersion ?? "unknown");
             }
         }
         catch (Exception ex)
@@ -225,4 +170,54 @@ public sealed class VelopackUpdateService
             System.Diagnostics.Debug.WriteLine($"[Velopack] Background update check failed: {ex.Message}");
         }
     }
+#else
+    // Non-Windows implementation - all operations are no-ops
+
+    private VelopackUpdateService() { }
+
+    /// <summary>
+    /// Gets whether the app was installed via Velopack and can receive updates.
+    /// </summary>
+    public bool IsUpdateSupported => false;
+
+    /// <summary>
+    /// Gets the current installed version.
+    /// </summary>
+    public string? CurrentVersion => null;
+
+    /// <summary>
+    /// Gets whether there's a pending update ready to install.
+    /// </summary>
+    public bool HasPendingUpdate => false;
+
+    /// <summary>
+    /// Gets the version of the pending update, if any.
+    /// </summary>
+    public string? PendingUpdateVersion => null;
+
+    /// <summary>
+    /// Raised when update progress changes during download.
+    /// </summary>
+    public event Action<int>? DownloadProgress { add { } remove { } }
+
+    /// <summary>
+    /// Checks for available updates.
+    /// </summary>
+    public Task<bool> CheckForUpdatesAsync() => Task.FromResult(false);
+
+    /// <summary>
+    /// Downloads the pending update.
+    /// </summary>
+    public Task<bool> DownloadUpdateAsync() => Task.FromResult(false);
+
+    /// <summary>
+    /// Applies the downloaded update and restarts the application.
+    /// </summary>
+    public void ApplyUpdateAndRestart() { }
+
+    /// <summary>
+    /// Checks for updates silently in the background.
+    /// </summary>
+    public Task CheckAndDownloadInBackgroundAsync(Action<string>? onUpdateReady = null) => Task.CompletedTask;
+#endif
 }

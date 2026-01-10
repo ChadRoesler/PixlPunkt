@@ -15683,11 +15683,6 @@
             Gets whether the app is running on iOS.
             </summary>
         </member>
-        <member name="F:PixlPunkt.Uno.Core.Platform.PlatformHelper._isSkiaDesktop">
-            <summary>
-            Cached value for Skia desktop detection (computed once at startup).
-            </summary>
-        </member>
         <member name="P:PixlPunkt.Uno.Core.Platform.PlatformHelper.IsSkiaDesktop">
             <summary>
             Gets whether the app is running on a Skia-based desktop target (Linux, macOS Skia, or Windows Skia).
@@ -15706,6 +15701,11 @@
         <member name="P:PixlPunkt.Uno.Core.Platform.PlatformHelper.IsWSL">
             <summary>
             Gets whether the app is running inside WSL (Windows Subsystem for Linux).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Uno.Core.Platform.PlatformHelper.DetectWSL">
+            <summary>
+            Detects if we're running inside WSL (cached at startup).
             </summary>
         </member>
         <member name="P:PixlPunkt.Uno.Core.Platform.PlatformHelper.PlatformName">
@@ -27490,11 +27490,10 @@
             </summary>
             <returns>True if download succeeded; false otherwise.</returns>
         </member>
-        <member name="M:PixlPunkt.Uno.Core.Updates.VelopackUpdateService.ApplyUpdateAndRestart(System.Boolean)">
+        <member name="M:PixlPunkt.Uno.Core.Updates.VelopackUpdateService.ApplyUpdateAndRestart">
             <summary>
             Applies the downloaded update and restarts the application.
             </summary>
-            <param name="silentRestart">If true, restarts without prompting.</param>
         </member>
         <member name="M:PixlPunkt.Uno.Core.Updates.VelopackUpdateService.CheckAndDownloadInBackgroundAsync(System.Action{System.String})">
             <summary>

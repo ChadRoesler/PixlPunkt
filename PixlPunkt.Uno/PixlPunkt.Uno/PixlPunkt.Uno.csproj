@@ -73,10 +73,25 @@
     <!-- Suppress warnings -->
     <NoWarn>$(NoWarn);CS1591;CS0169;CS0414;CS0649;CS0067;CS0618;CS0253;CS8601;CS8604;CS8629;WMC1506</NoWarn>
     
-    <!-- Publishing -->
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <!-- Publishing - disabled by default, enable per-platform where supported -->
+    <PublishReadyToRun>False</PublishReadyToRun>
     <PublishTrimmed>False</PublishTrimmed>
+  </PropertyGroup>
+
+  <!-- Enable ReadyToRun only for Release builds with a valid RuntimeIdentifier on supported platforms -->
+  <!-- R2R requires a RuntimeIdentifier to resolve the appropriate runtime package -->
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug' and '$(RuntimeIdentifier)' != '' and ($(RuntimeIdentifier.StartsWith('win')))">
+    <PublishReadyToRun>True</PublishReadyToRun>
+  </PropertyGroup>
+
+  <!-- Android: Disable AOT compilation since trimming is not enabled -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('android'))">
+    <RunAOTCompilation>False</RunAOTCompilation>
+  </PropertyGroup>
+
+  <!-- iOS: Disable ReadyToRun (not supported) -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('ios'))">
+    <PublishReadyToRun>False</PublishReadyToRun>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug' or '$(IsUiAutomationMappingEnabled)'=='True'">
