@@ -44,8 +44,7 @@ namespace PixlPunkt.Uno.Core.Settings
         {
             try
             {
-                // Use platform-specific paths that work reliably without requiring
-                // Windows.Storage.ApplicationData (which may not work on macOS/Linux)
+                // Use platform-specific paths that work reliably
                 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
@@ -77,9 +76,10 @@ namespace PixlPunkt.Uno.Core.Settings
 
         private static string GetWindowsPath()
         {
+#if WINDOWS
             try
             {
-                // First try to use Windows.Storage.ApplicationData for packaged apps
+                // Try to use Windows.Storage.ApplicationData for packaged apps
                 try
                 {
                     var localFolder = Windows.Storage.ApplicationData.Current.LocalFolder;
@@ -91,17 +91,24 @@ namespace PixlPunkt.Uno.Core.Settings
                     // App is running unpackaged
                     System.Diagnostics.Debug.WriteLine("[AppPaths] Running unpackaged on Windows");
                 }
+                catch
+                {
+                    // Windows.Storage not available or other error
+                }
             }
             catch
             {
-                // Windows.Storage not available
+                // Outer catch for any unexpected errors
             }
+#endif
 
             // Fall back to traditional Windows path
             var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (!string.IsNullOrEmpty(localAppData))
             {
-                return Path.Combine(localAppData, AppName);
+                var path = Path.Combine(localAppData, AppName);
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using LocalApplicationData: {path}");
+                return path;
             }
 
             return GetFallbackPath();
@@ -122,7 +129,9 @@ namespace PixlPunkt.Uno.Core.Settings
             home = Environment.GetEnvironmentVariable("HOME");
             if (!string.IsNullOrEmpty(home))
             {
-                return Path.Combine(home, "Library", "Application Support", AppName);
+                var appSupport = Path.Combine(home, "Library", "Application Support", AppName);
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using macOS HOME path: {appSupport}");
+                return appSupport;
             }
 
             return GetFallbackPath();
@@ -135,7 +144,9 @@ namespace PixlPunkt.Uno.Core.Settings
             var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
             if (!string.IsNullOrEmpty(xdgDataHome))
             {
-                return Path.Combine(xdgDataHome, AppName);
+                var path = Path.Combine(xdgDataHome, AppName);
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using XDG_DATA_HOME: {path}");
+                return path;
             }
 
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -162,7 +173,9 @@ namespace PixlPunkt.Uno.Core.Settings
                 var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 if (!string.IsNullOrEmpty(localAppData))
                 {
-                    return Path.Combine(localAppData, AppName);
+                    var path = Path.Combine(localAppData, AppName);
+                    System.Diagnostics.Debug.WriteLine($"[AppPaths] Using fallback LocalApplicationData: {path}");
+                    return path;
                 }
             }
             catch (Exception ex)
@@ -171,8 +184,9 @@ namespace PixlPunkt.Uno.Core.Settings
             }
 
             // Last resort: use temp directory
-            System.Diagnostics.Debug.WriteLine("[AppPaths] WARNING: Using temp directory as fallback");
-            return Path.Combine(Path.GetTempPath(), AppName);
+            var tempPath = Path.Combine(Path.GetTempPath(), AppName);
+            System.Diagnostics.Debug.WriteLine($"[AppPaths] WARNING: Using temp directory as fallback: {tempPath}");
+            return tempPath;
         }
 
         /// <summary>

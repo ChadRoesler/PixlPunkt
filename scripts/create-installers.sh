@@ -290,11 +290,33 @@ create_mac_installer() {
     mkdir -p "$APP_BUNDLE/Contents/MacOS"
     mkdir -p "$APP_BUNDLE/Contents/Resources"
     
-    # Copy files
+    # Copy all files to MacOS directory
     cp -r "$MAC_PUBLISH"/* "$APP_BUNDLE/Contents/MacOS/"
     chmod +x "$APP_BUNDLE/Contents/MacOS/PixlPunkt.Uno"
     
-    # Copy icon
+    # CRITICAL: Create Resources symlink or copy for Uno Platform
+    # Uno Platform on macOS expects resources at Contents/MacOS/Resources/
+    # but also needs Uno.Fonts.* folders accessible from the executable directory
+    if [ ! -d "$APP_BUNDLE/Contents/MacOS/Resources" ]; then
+        mkdir -p "$APP_BUNDLE/Contents/MacOS/Resources"
+    fi
+    
+    # Move Uno resource folders into Resources/ directory
+    for folder in "$APP_BUNDLE/Contents/MacOS/Uno.Fonts."* "$APP_BUNDLE/Contents/MacOS/FluentIcons.Resources."*; do
+        if [ -d "$folder" ]; then
+            local folder_name=$(basename "$folder")
+            echo "  Moving $folder_name to Resources/"
+            mv "$folder" "$APP_BUNDLE/Contents/MacOS/Resources/"
+        fi
+    done
+    
+    # Also handle Assets folders if they need to be in Resources
+    if [ -d "$APP_BUNDLE/Contents/MacOS/Assets" ]; then
+        # Keep Assets in MacOS for the app icon, but also copy to Resources
+        cp -r "$APP_BUNDLE/Contents/MacOS/Assets" "$APP_BUNDLE/Contents/MacOS/Resources/" 2>/dev/null || true
+    fi
+    
+    # Copy icon to Resources for macOS
     if [ -f "$ICON_PATH/Icon.png" ]; then
         cp "$ICON_PATH/Icon.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
     fi

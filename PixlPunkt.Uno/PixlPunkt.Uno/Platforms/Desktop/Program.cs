@@ -42,15 +42,15 @@ public class Program
     {
         try
         {
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName 
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
                           ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
 
             Velopack.VelopackApp.Build()
-                .WithFirstRun(v => 
+                .WithFirstRun(v =>
                 {
                     // Called on first run after install
                     System.Diagnostics.Debug.WriteLine($"[Velopack] First run! Version: {v}");
-                    
+
                     // Register file associations
                     Core.FileAssociations.WindowsFileAssociations.Register(exePath);
                 })

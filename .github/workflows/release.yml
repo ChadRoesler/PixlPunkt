@@ -640,7 +640,25 @@ jobs:
           cp -r ./publish/desktop-macos-$ARCH/* "$APP_BUNDLE/Contents/MacOS/"
           chmod +x "$APP_BUNDLE/Contents/MacOS/PixlPunkt.Uno"
           
-          # Copy icon if available
+          # CRITICAL: Create Resources directory for Uno Platform
+          # Uno Platform on macOS expects resources at Contents/MacOS/Resources/
+          mkdir -p "$APP_BUNDLE/Contents/MacOS/Resources"
+          
+          # Move Uno resource folders (fonts, icons) into Resources/ directory
+          for folder in "$APP_BUNDLE/Contents/MacOS/Uno.Fonts."* "$APP_BUNDLE/Contents/MacOS/FluentIcons.Resources."*; do
+            if [ -d "$folder" ]; then
+              folder_name=$(basename "$folder")
+              echo "Moving $folder_name to Resources/"
+              mv "$folder" "$APP_BUNDLE/Contents/MacOS/Resources/"
+            fi
+          done
+          
+          # Copy Assets to Resources if they exist
+          if [ -d "$APP_BUNDLE/Contents/MacOS/Assets" ]; then
+            cp -r "$APP_BUNDLE/Contents/MacOS/Assets" "$APP_BUNDLE/Contents/MacOS/Resources/" 2>/dev/null || true
+          fi
+          
+          # Copy icon if available (for macOS Finder)
           if [ -f "PixlPunkt.Uno/PixlPunkt.Uno/Assets/Icons/Icon.png" ]; then
             cp "PixlPunkt.Uno/PixlPunkt.Uno/Assets/Icons/Icon.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
           fi
@@ -697,6 +715,8 @@ jobs:
           EOF
           
           echo "App bundle created at $APP_BUNDLE"
+          echo "Contents of MacOS/Resources:"
+          ls -la "$APP_BUNDLE/Contents/MacOS/Resources/" || echo "Resources folder empty or missing"
 
       - name: Create DMG
         id: dmg
