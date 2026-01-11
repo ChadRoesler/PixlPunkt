@@ -1,0 +1,167 @@
+<ContentDialog
+    x:Class="PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Batch Export Tile Animations"
+    PrimaryButtonText="Export Selected"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary"
+    IsPrimaryButtonEnabled="False">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                  HorizontalScrollBarVisibility="Disabled"
+                  MaxHeight="500">
+        <StackPanel Spacing="16" Width="420" Padding="4,4,16,4">
+
+            <!-- Animation Reels Selection -->
+            <StackPanel Spacing="8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Animation Reels" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Button x:Name="SelectAllButton" 
+                            Grid.Column="1" 
+                            Content="Select All" 
+                            Click="SelectAllButton_Click"
+                            Padding="8,4"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="SelectNoneButton" 
+                            Grid.Column="2" 
+                            Content="Select None" 
+                            Click="SelectNoneButton_Click"
+                            Padding="8,4"/>
+                </Grid>
+                
+                <Border BorderBrush="{ThemeResource SystemBaseMediumLowColor}" 
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        MaxHeight="200">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ListView x:Name="ReelsListView"
+                                  SelectionMode="Multiple"
+                                  SelectionChanged="ReelsListView_SelectionChanged"
+                                  Padding="4">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="4" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" 
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" 
+                                                   Text="{Binding FrameCountText}" 
+                                                   Opacity="0.7"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </ScrollViewer>
+                </Border>
+                
+                <TextBlock x:Name="SelectionInfoText" 
+                           Text="0 animations selected" 
+                           FontSize="12" 
+                           Opacity="0.7"/>
+            </StackPanel>
+
+            <!-- Export Format -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Export Format" FontWeight="SemiBold"/>
+                <ComboBox x:Name="FormatComboBox" 
+                          HorizontalAlignment="Stretch"
+                          SelectionChanged="FormatComboBox_SelectionChanged">
+                    <ComboBoxItem Tag="gif" Content="Animated GIF (.gif)" IsSelected="True"/>
+                    <ComboBoxItem Tag="mp4" Content="MP4 Video (.mp4)"/>
+                    <ComboBoxItem Tag="png" Content="PNG Image Sequence"/>
+                    <ComboBoxItem Tag="strip" Content="Sprite Strip (.png) - Horizontal"/>
+                    <ComboBoxItem Tag="pxpr" Content="Sub-Routine (.pxpr) - For Canvas Animation"/>
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Scale -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Scale:" VerticalAlignment="Center"/>
+                <NumberBox x:Name="ScaleNumberBox" 
+                           Grid.Column="1"
+                           Minimum="1" 
+                           Maximum="16" 
+                           Value="1"
+                           SpinButtonPlacementMode="Hidden"
+                           ValueChanged="ScaleNumberBox_ValueChanged"/>
+                <TextBlock x:Name="OutputSizeText" 
+                           Grid.Column="2"
+                           Text="16×16 pixels" 
+                           VerticalAlignment="Center" 
+                           Opacity="0.7"/>
+            </Grid>
+
+            <!-- Loop Option (GIF only) -->
+            <CheckBox x:Name="LoopCheckBox" 
+                      Content="Loop animations" 
+                      IsChecked="True"/>
+
+            <!-- Video Quality (Video formats only) -->
+            <StackPanel x:Name="VideoQualityPanel" Spacing="8" Visibility="Collapsed">
+                <TextBlock Text="Video Quality" FontWeight="SemiBold"/>
+                <Slider x:Name="QualitySlider" 
+                        Minimum="20" 
+                        Maximum="100" 
+                        Value="80" 
+                        HorizontalAlignment="Stretch"
+                        ValueChanged="QualitySlider_ValueChanged"/>
+                <TextBlock x:Name="QualityText" Text="80%"/>
+            </StackPanel>
+
+            <!-- FPS Override -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="70"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox x:Name="OverrideFpsCheckBox" 
+                          Content="Override FPS:" 
+                          VerticalAlignment="Center"
+                          Checked="OverrideFpsCheckBox_Changed"
+                          Unchecked="OverrideFpsCheckBox_Changed"/>
+                <NumberBox x:Name="FpsNumberBox" 
+                           Grid.Column="1"
+                           Minimum="1" 
+                           Maximum="60" 
+                           Value="12"
+                           IsEnabled="False"
+                           SpinButtonPlacementMode="Hidden"/>
+            </Grid>
+
+            <!-- Output Info -->
+            <Border Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+                    CornerRadius="4"
+                    Padding="12,8">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Output" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="OutputInfoText"
+                               Text="Each animation will be saved as: ReelName.gif"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Opacity="0.7"/>
+                    <TextBlock x:Name="TotalFramesText"
+                               Text="Total: 0 frames across 0 animations"
+                               FontSize="12"
+                               Opacity="0.7"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

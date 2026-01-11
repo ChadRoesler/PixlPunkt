@@ -26,7 +26,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
-$ProjectDir = "$ScriptDir\PixlPunkt.Uno\PixlPunkt.Uno"
+$RepoRoot = Split-Path $ScriptDir -Parent
+$ProjectDir = "$RepoRoot\PixlPunkt"
 $PublishBase = "$ProjectDir\bin\publish"
 $InstallerBase = "$ScriptDir\installers"
 $IconPath = "$ProjectDir\Assets\Icons"
@@ -68,7 +69,7 @@ function Create-WindowsInstaller {
     if (-not $SkipBuild) {
         Write-Host "📦 Building Windows x64 (Skia Desktop)..." -ForegroundColor Yellow
         
-        dotnet publish "$ProjectDir\PixlPunkt.Uno.csproj" `
+        dotnet publish "$ProjectDir\PixlPunkt.csproj" `
             --configuration Release `
             --framework net10.0-desktop `
             --runtime win-x64 `
@@ -97,7 +98,7 @@ function Create-WindowsInstaller {
         "--packId", "PixlPunkt",
         "--packVersion", $Version,
         "--packDir", $winPublish,
-        "--mainExe", "PixlPunkt.Uno.exe",
+        "--mainExe", "PixlPunkt.exe",
         "--outputDir", $winInstaller,
         "--packTitle", "PixlPunkt",
         "--packAuthors", "PixlPunkt"
@@ -148,7 +149,7 @@ function Create-LinuxInstaller {
     if (-not $SkipBuild) {
         Write-Host "📦 Building Linux x64..." -ForegroundColor Yellow
         
-        dotnet publish "$ProjectDir\PixlPunkt.Uno.csproj" `
+        dotnet publish "$ProjectDir\PixlPunkt.csproj" `
             --configuration Release `
             --framework net10.0-desktop `
             --runtime linux-x64 `
@@ -181,7 +182,7 @@ function Create-LinuxInstaller {
     }
     
     # Convert paths to WSL format
-    $wslProjectDir = wsl wslpath -u ($ScriptDir -replace '\\', '/')
+    $wslRepoRoot = wsl wslpath -u ($RepoRoot -replace '\\', '/')
     $wslPublish = wsl wslpath -u ($linuxPublish -replace '\\', '/')
     $wslInstaller = wsl wslpath -u ($linuxInstaller -replace '\\', '/')
     $wslIconPath = wsl wslpath -u ($IconPath -replace '\\', '/')
@@ -215,7 +216,7 @@ mkdir -p "`$PKG_ROOT/usr/share/icons/hicolor/256x256/apps"
 
 # Copy files
 cp -r "`$PUBLISH_DIR"/* "`$PKG_ROOT/opt/pixlpunkt/"
-chmod +x "`$PKG_ROOT/opt/pixlpunkt/PixlPunkt.Uno"
+chmod +x "`$PKG_ROOT/opt/pixlpunkt/PixlPunkt"
 
 # Create desktop entry
 cat > "`$PKG_ROOT/usr/share/applications/com.pixlpunkt.app.desktop" << 'DESKTOP'
@@ -224,7 +225,7 @@ Version=1.0
 Type=Application
 Name=PixlPunkt
 Comment=Pixel Art Editor
-Exec=/opt/pixlpunkt/PixlPunkt.Uno %F
+Exec=/opt/pixlpunkt/PixlPunkt %F
 Icon=pixlpunkt
 Terminal=false
 Categories=Graphics;2DGraphics;RasterGraphics;
@@ -240,7 +241,7 @@ cat > /tmp/after-install.sh << 'SCRIPT'
 #!/bin/bash
 update-mime-database /usr/share/mime 2>/dev/null || true
 update-desktop-database /usr/share/applications 2>/dev/null || true
-ln -sf /opt/pixlpunkt/PixlPunkt.Uno /usr/local/bin/pixlpunkt
+ln -sf /opt/pixlpunkt/PixlPunkt /usr/local/bin/pixlpunkt
 SCRIPT
 
 # Create post-remove script
@@ -330,7 +331,7 @@ function Create-MacInstaller {
     if (-not $SkipBuild) {
         Write-Host "📦 Building macOS $Arch..." -ForegroundColor Yellow
         
-        dotnet publish "$ProjectDir\PixlPunkt.Uno.csproj" `
+        dotnet publish "$ProjectDir\PixlPunkt.csproj" `
             --configuration Release `
             --framework net10.0-desktop `
             --runtime $rid `
@@ -371,7 +372,7 @@ function Create-MacInstaller {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>PixlPunkt.Uno</string>
+    <key>CFBundleExecutable</key><string>PixlPunkt</string>
     <key>CFBundleIdentifier</key><string>com.pixlpunkt.app</string>
     <key>CFBundleName</key><string>PixlPunkt</string>
     <key>CFBundleDisplayName</key><string>PixlPunkt</string>

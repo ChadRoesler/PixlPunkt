@@ -1,0 +1,85 @@
+<ContentDialog
+    x:Class="PixlPunkt.UI.Dialogs.UpdateAvailableDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:icons="using:FluentIcons.WinUI"
+    Title="Update Available"
+    PrimaryButtonText="Download Update"
+    SecondaryButtonText="Remind Me Later"
+    CloseButtonText="Skip This Version"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="16" MinWidth="400" MaxWidth="600">
+        <!-- Header with icon and version -->
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <Border Grid.Column="0" 
+                    Background="{ThemeResource AccentFillColorDefaultBrush}" 
+                    CornerRadius="8" 
+                    Padding="12">
+                <icons:SymbolIcon Symbol="ArrowDownload" FontSize="24" Foreground="White"/>
+            </Border>
+            
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                <TextBlock Text="A new version of PixlPunkt is available!" 
+                           Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock x:Name="CurrentVersionText" 
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="Current: 0.0.0"/>
+                    <TextBlock Text="→" 
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <TextBlock x:Name="NewVersionText" 
+                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                               FontWeight="SemiBold"
+                               Text="New: 0.0.0"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <!-- Pre-release badge -->
+        <Border x:Name="PreReleaseBadge" 
+                Visibility="Collapsed"
+                Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                CornerRadius="4"
+                Padding="8,4"
+                HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <icons:SymbolIcon Symbol="Warning" FontSize="14"/>
+                <TextBlock Text="This is a pre-release version" FontSize="12"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Release notes with markdown rendering -->
+        <StackPanel Spacing="8">
+            <TextBlock Text="What's New" 
+                       Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4">
+                <ScrollViewer MaxHeight="300" 
+                              VerticalScrollBarVisibility="Auto"
+                              Padding="12">
+                    <!-- StackPanel to hold mixed content (RichTextBlock paragraphs and Grid tables) -->
+                    <StackPanel x:Name="ReleaseNotesContainer" Spacing="8"/>
+                </ScrollViewer>
+            </Border>
+        </StackPanel>
+
+        <!-- Published date -->
+        <TextBlock x:Name="PublishedDateText"
+                   FontSize="12"
+                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                   Text="Published: Unknown"/>
+
+        <!-- Auto-check option -->
+        <CheckBox x:Name="AutoCheckBox"
+                  Content="Automatically check for updates on startup"
+                  IsChecked="True"/>
+    </StackPanel>
+</ContentDialog>

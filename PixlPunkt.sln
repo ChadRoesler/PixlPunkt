@@ -8,14 +8,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.ExamplePlugin", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.PluginSdk.Tests", "PixlPunkt.PluginSdk.Tests\PixlPunkt.PluginSdk.Tests.csproj", "{FC0784E9-0938-442A-A5F3-F5EB47ED9C6A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.Uno", "PixlPunkt.Uno\PixlPunkt.Uno\PixlPunkt.Uno.csproj", "{94DA9B44-63D4-4B19-8778-2D2B0B10980C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt", "PixlPunkt\PixlPunkt.csproj", "{94DA9B44-63D4-4B19-8778-2D2B0B10980C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.Uno.Tests", "PixlPunkt.Uno\PixlPunkt.Uno.Tests\PixlPunkt.Uno.Tests.csproj", "{FE0E7340-E061-4D04-957F-2985080CA0B9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt.Tests", "PixlPunkt.Tests\PixlPunkt.Tests.csproj", "{FE0E7340-E061-4D04-957F-2985080CA0B9}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8DEB0975-6B3B-4E8E-B95E-E3E0E9363164}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{DCDD5C83-5AE2-4E8B-A81E-8C7196D6DB40}"
 	ProjectSection(SolutionItems) = preProject
+		scripts\create-installers.ps1 = scripts\create-installers.ps1
+		scripts\create-installers.sh = scripts\create-installers.sh
 		scripts\Generate-SigningCertificate.ps1 = scripts\Generate-SigningCertificate.ps1
 		scripts\github-secrets.txt = scripts\github-secrets.txt
 		scripts\PixlPunkt.cer = scripts\PixlPunkt.cer

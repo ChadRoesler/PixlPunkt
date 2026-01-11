@@ -30,7 +30,7 @@ You now have a blank 16×16 canvas!
 | **Pan** | Space + drag | Move around |
 | **Zoom** | Ctrl + scroll | Zoom in/out |
 
-### Pro Tips:
+### Quick Tips:
 - Press `[` and `]` to change brush size
 - Press `X` to swap foreground/background colors
 - Hold `Shift` while drawing for straight lines
@@ -53,7 +53,7 @@ You now have a blank 16×16 canvas!
 
 ---
 
-## 4. Draw Something!
+## 4. Draw Something or don't, I'm a quickstart not a cop.
 
 Try making a simple character:
 
@@ -70,19 +70,75 @@ Remember: `Ctrl+Z` undoes mistakes!
 
 ## 5. Create a Sick Gradient Background
 
-The **Gradient Fill** tool is amazing for backgrounds:
+The **Gradient Fill** tool (`Shift+G`) is perfect for skies, sunsets, and atmospheric backgrounds:
 
 1. Add a new layer (click **+** in Layers panel)
 2. Drag it below your character layer
 3. Press `Shift+G` for Gradient Fill
-4. Choose **Custom...** and pick a sky gradient (blue → light blue)
-5. Select **Bayer 4×4** dithering for that retro look
-6. Click and drag across your canvas
+4. Choose your gradient type: **Linear**, **Radial**, **Angular**, or **Diamond**
+5. Select colors: pick a preset or create a **Custom** gradient
+6. Choose a dithering style (see below!)
+7. Click and drag across your canvas to apply
 
-### Dithering Options
-- **Bayer** - Classic retro game look
-- **Floyd-Steinberg** - Smooth, organic
-- **Riemersma** - Most natural, no streaks
+### Gradient Types
+
+| Type | Best For |
+|------|----------|
+| **Linear** | Skies, horizons, backgrounds |
+| **Radial** | Explosions, light sources, vignettes |
+| **Angular** | Color wheels, rainbow effects |
+| **Diamond** | Spotlights, centered effects |
+
+### Dithering Options Explained
+
+Dithering creates smooth transitions between colors using patterns - essential for that authentic pixel art look!
+
+#### Ordered Dithering (Consistent Patterns)
+| Style | Pattern | Best For |
+|-------|---------|----------|
+| **Bayer 2×2** | Tiny checkerboard | Small sprites, tight spaces |
+| **Bayer 4×4** | Classic retro pattern | General use, NES/SNES style |
+| **Bayer 8×8** | Large, visible pattern | Dramatic backgrounds, large art |
+| **Checker** | Simple alternating | Clean, minimal gradients |
+| **Diagonal** | Angled lines | Stylized shading, rain effects |
+| **Crosshatch** | Grid-like hatching | Textured, hand-drawn look |
+
+#### Error Diffusion (Organic, Smooth)
+| Style | Characteristics | Best For |
+|-------|-----------------|----------|
+| **Floyd-Steinberg** | Balanced diffusion, slight horizontal bias | Smooth gradients, photographs |
+| **Atkinson** | Lighter, more contrast | High-contrast art, Mac classic style |
+| **Riemersma** | Follows Hilbert curve, no streaks | Natural gradients, best quality |
+
+#### Stochastic (Random)
+| Style | Characteristics | Best For |
+|-------|-----------------|----------|
+| **Blue Noise** | Evenly distributed randomness | Subtle gradients, film grain look |
+
+### Dithering Strength & Scale
+- **Strength** (0-100%): Controls how much dithering is applied
+  - Lower = smoother transitions, more colors
+  - Higher = more visible pattern, fewer colors
+- **Scale** (1x-4x): Size of the dithering pattern
+  - 1x = fine detail
+  - 4x = chunky, bold patterns
+
+### Quick Gradient Recipes
+
+**Sunset Sky:**
+- Type: Linear (top to bottom)
+- Colors: Orange → Pink → Purple
+- Dithering: Bayer 4×4 at 70%
+
+**Retro Vignette:**
+- Type: Radial (center out)
+- Colors: Transparent → Black
+- Dithering: Blue Noise at 50%
+
+**Ocean Depth:**
+- Type: Linear (top to bottom)
+- Colors: Light blue → Dark blue → Black
+- Dithering: Riemersma at 60%
 
 ---
 
@@ -117,7 +173,95 @@ Effects are non-destructive - toggle them on/off anytime!
 
 ---
 
-## 8. Save Your Work
+## 8. Animate Your Sprites
+
+PixlPunkt has two animation systems for different needs:
+
+### Canvas Animation (Frame-by-Frame)
+Best for: Character animations, complex scenes, cutscenes
+
+This is traditional frame-by-frame animation like Aseprite:
+
+1. Open the **Timeline** panel (View → Timeline or press `T`)
+2. You'll see your layers on the left, frames across the top
+3. Click the **+** button to add a new frame
+4. Draw your next pose on the new frame
+5. Use **Onion Skinning** to see previous/next frames
+6. Press **Play** (▶) to preview your animation
+7. Adjust frame timing by right-clicking a frame
+
+#### Canvas Animation Tips:
+- **Duplicate frames**: Right-click → Duplicate for small changes
+- **Onion skin opacity**: Adjust how visible ghost frames are
+- **Loop modes**: Set to loop, ping-pong, or play once
+- **Layer keyframes**: Animate layer properties like opacity and effects!
+
+#### Stage System (Camera Animation)
+The Stage lets you animate camera movement:
+
+1. Enable **Stage Mode** in the Timeline
+2. Add **Stage Keyframes** at different points
+3. Set **Position**, **Zoom**, and **Rotation** for each keyframe
+4. PixlPunkt interpolates smoothly between them!
+
+Great for: Panning across a scene, zoom-ins for emphasis, screen shake
+
+#### Audio Tracks
+Sync your animation to music or sound effects:
+
+1. Click **Add Audio Track** in the Timeline
+2. Import an audio file (.mp3, .wav, .ogg)
+3. See the **waveform** displayed on the timeline
+4. Align your keyframes to beats and sound cues
+
+### Tile Animation (Sprite Sheets)
+Best for: Game sprites, repeated animations, memory-efficient art
+
+Tile animation uses coordinates in a tileset rather than full frames:
+
+1. Create or import a **Tileset** (a grid of animation frames)
+2. Open the **Tile Animation** panel
+3. Create a new **Reel** (an animation sequence)
+4. Add frames by clicking tiles in your tileset
+5. Set **duration** for each frame (in milliseconds)
+6. Preview with the **Play** button
+
+#### Tile Animation Tips:
+- **Reuse frames**: The same tile can appear in multiple animations
+- **Variable timing**: Each frame can have different duration
+- **Export**: Generate sprite sheets for game engines
+- **Multiple reels**: Create walk, run, jump, idle from one tileset
+
+### Animation Quick Reference
+
+| Task | Canvas Animation | Tile Animation |
+|------|------------------|----------------|
+| Add frame | Timeline **+** button | Click tile in reel editor |
+| Preview | ▶ Play button | ▶ Play button |
+| Set timing | Right-click frame | Duration field |
+| Loop | Loop mode dropdown | Loop toggle |
+| Export | File → Export Animation | File → Export Sprite Sheet |
+
+### Exporting Animations
+
+**As GIF:**
+1. File → Export Animation → GIF
+2. Set loop count (0 = infinite)
+3. Adjust quality/colors if needed
+
+**As Video (MP4/AVI):**
+1. File → Export Animation → Video
+2. Choose format and quality
+3. Great for sharing on social media!
+
+**As Sprite Sheet:**
+1. File → Export Sprite Sheet
+2. Configure rows/columns
+3. Perfect for game engines
+
+---
+
+## 9. Save Your Work
 
 ### Quick Save
 Press `Ctrl+S` to save as `.pxp` (PixlPunkt format)
@@ -130,7 +274,7 @@ Press `Ctrl+S` to save as `.pxp` (PixlPunkt format)
 
 ---
 
-## 9. Keyboard Shortcuts Cheat Sheet
+## 10. Keyboard Shortcuts Cheat Sheet
 
 ```
 File                    Tools
@@ -143,29 +287,33 @@ Ctrl+E  Export         Shift+G  Gradient Fill
 Edit                   J        Jumble
 ═════════════          M        Select Rect
 Ctrl+Z  Undo           
-Ctrl+Y  Redo           Brush Size
+Ctrl+Y  Redo           Animation
 Ctrl+C  Copy           ═════════════
-Ctrl+V  Paste          [  Smaller
-                       ]  Larger
-View                   
-═════════════          Colors
-Ctrl+0  Fit screen     ═════════════
-Ctrl+1  Actual size    X  Swap FG/BG
-                       Right-click  Pick
+Ctrl+V  Paste          T        Toggle Timeline
+                       Space    Play/Pause
+View                   ,        Previous Frame
+═════════════          .        Next Frame
+Ctrl+0  Fit screen     
+Ctrl+1  Actual size    Brush Size
+                       ═════════════
+Colors                 [  Smaller
+═════════════          ]  Larger
+X  Swap FG/BG          
+Right-click  Pick      
 ```
 
 ---
 
-## 10. Next Steps
+## 11. Next Steps
 
 Now that you know the basics:
 
 - **Read the full [User Guide](USER_GUIDE.md)** for all features
-- **Explore Gradient Fill** dithering styles
-- **Try layer effects** like Glow and Scanlines  
-- **Check out Animation** for moving sprites
-- **Add audio tracks** to sync animations to music
-- **Use the Stage** for camera pans and zooms
+- **Master Gradient Fill** - experiment with all dithering styles
+- **Try layer effects** like Glow, Scanlines, and CRT
+- **Create an animation** - start with a simple 4-frame walk cycle
+- **Use the Stage** for cinematic camera movements
+- **Import Aseprite files** - bring in existing work
 
 ---
 
@@ -174,11 +322,12 @@ Now that you know the basics:
 - **Undo everything**: Press `Ctrl+Z` repeatedly
 - **Reset tool**: Press the tool key again (e.g., `B` for Brush)
 - **Stuck zoomed in**: Press `Ctrl+0` to fit canvas to screen
+- **Animation not playing**: Check frame durations aren't set to 0
 - **Lost your work**: Check **File → Recent** for auto-backups
 - **Full documentation**: [User Guide](USER_GUIDE.md)
 
 ---
 
 <p align="center">
-  <strong>Now go forth and conquer!</strong>
+  <strong>Now go make some pixel art magic! ✨</strong>
 </p>

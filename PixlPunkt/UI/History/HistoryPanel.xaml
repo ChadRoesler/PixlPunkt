@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PixlPunkt.UI.History.HistoryPanel"
+    x:Name="Self"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ic="using:FluentIcons.WinUI"
+    xmlns:local="using:PixlPunkt.UI.History"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid RowSpacing="6">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="UndoBtn" Click="UndoBtn_Click" Padding="3"
+                        ToolTipService.ToolTip="Undo">
+                    <ic:FluentIcon Icon="ArrowUndo" FontSize="16"/>
+                </Button>
+
+                <Button x:Name="RedoBtn" Click="RedoBtn_Click" Padding="3"
+                        ToolTipService.ToolTip="Redo">
+                    <ic:FluentIcon Icon="ArrowRedo" FontSize="16"/>
+                </Button>
+
+                <TextBlock x:Name="StatusText"
+                           VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Margin="8,0,0,0"/>
+            </StackPanel>
+
+            <Button Grid.Column="1" x:Name="ClearBtn" Click="ClearBtn_Click" Padding="3"
+                    ToolTipService.ToolTip="Clear history list (does not change canvas)">
+                <ic:FluentIcon Icon="Broom" FontSize="16"/>
+            </Button>
+        </Grid>
+
+        <!-- List -->
+        <Border Grid.Row="1"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="6">
+
+            <ListView x:Name="HistoryList"
+                      SelectionMode="Single"
+                      SelectionChanged="HistoryList_SelectionChanged"
+                      TabNavigation="Once"
+                      XYFocusKeyboardNavigation="Disabled">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="6,4">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <ic:FluentIcon Icon="{Binding Icon}" 
+                                               FontSize="16" 
+                                               Foreground="{Binding Foreground}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="{Binding Foreground}"
+                                           FontWeight="{Binding Weight}"/>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+    </Grid>
+</UserControl>

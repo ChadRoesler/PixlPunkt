@@ -1,0 +1,194 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+  TILE PANEL - Tile Set Management
+═══════════════════════════════════════════════════════════════════════════════
+  Interactive tile panel with tile grid display and management tools.
+  
+  Features:
+    • New empty tile (E)
+    • Duplicate tile (D)
+    • Import tiles from another document (I)
+    • Open tile tessellator (T)
+    • Zoom in/out on tile grid (Zi/Zo)
+    • Delete tile (X)
+    • Left-click: Select tile for stamping
+    • Square grid using global transparency stripe settings
+═══════════════════════════════════════════════════════════════════════════════
+-->
+<UserControl
+    x:Class="PixlPunkt.UI.Tiles.TilePanel"
+    x:Name="Self"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ic="using:FluentIcons.WinUI"
+    xmlns:skia="using:SkiaSharp.Views.Windows"
+    xmlns:ctrl="using:PixlPunkt.UI.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="Root" RowSpacing="4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Toolbar -->
+            <RowDefinition Height="*"/>
+            <!-- Tile Grid -->
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- TOOLBAR ROW -->
+        <!-- Left: E, D, I, T | Right: Zi, Zo, X -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Action Buttons -->
+            <StackPanel 
+                Grid.Column="0"
+                Orientation="Horizontal" 
+                Spacing="4">
+                
+                <!-- E: New Empty Tile -->
+                <Button 
+                    x:Name="NewEmptyBtn"
+                    ToolTipService.ToolTip="New empty tile (E)"
+                    Click="NewEmptyBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="Add" FontSize="16"/>
+                </Button>
+
+                <!-- D: Duplicate Tile -->
+                <Button 
+                    x:Name="DuplicateBtn"
+                    ToolTipService.ToolTip="Duplicate selected tile (D)"
+                    Click="DuplicateBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="Copy" FontSize="16"/>
+                </Button>
+
+                <!-- I: Import Tiles from Document -->
+                <Button 
+                    x:Name="ImportTilesBtn"
+                    ToolTipService.ToolTip="Import tiles from another document (I)"
+                    Click="ImportTilesBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="ArrowImport" FontSize="16"/>
+                </Button>
+
+                <!-- T: Open Tile Tessellator -->
+                <Button 
+                    x:Name="TessellatorBtn"
+                    ToolTipService.ToolTip="Open tile tessellator (T)"
+                    Click="TessellatorBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="Grid" FontSize="16"/>
+                </Button>
+            </StackPanel>
+
+            <!-- Right Action Buttons -->
+            <StackPanel 
+                Grid.Column="1" 
+                Orientation="Horizontal"
+                Spacing="4">
+                
+                <!-- Zi: Zoom In -->
+                <Button 
+                    x:Name="ZoomInBtn"
+                    ToolTipService.ToolTip="Zoom in (Zi)"
+                    Click="ZoomInBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="ZoomIn" FontSize="16"/>
+                </Button>
+
+                <!-- Zo: Zoom Out -->
+                <Button 
+                    x:Name="ZoomOutBtn"
+                    ToolTipService.ToolTip="Zoom out (Zo)"
+                    Click="ZoomOutBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="ZoomOut" FontSize="16"/>
+                </Button>
+
+                <!-- X: Delete Tile -->
+                <Button 
+                    x:Name="DeleteBtn"
+                    ToolTipService.ToolTip="Delete selected tile (X)"
+                    Click="DeleteBtn_Click"
+                    Padding="3">
+                    <ic:FluentIcon Icon="Delete" FontSize="16"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- TILE GRID -->
+        <!-- Scrollable grid of tile thumbnails with transparency pattern -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <Border 
+            Grid.Row="1"
+            x:Name="TileBox"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="4"
+            Margin="-3,0,-3,-3">
+
+            <ScrollViewer 
+                x:Name="TileScroll"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled"
+                HorizontalAlignment="Stretch" 
+                VerticalAlignment="Stretch">
+
+                <ItemsControl x:Name="TileGrid" MinHeight="48">
+                    <!-- Grid Panel: Use custom WrapPanel for Uno Platform compatibility -->
+                    <!-- WrapGrid is not supported in Uno Platform Skia -->
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <ctrl:WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <!-- Tile Cell Template -->
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid 
+                                Width="{Binding TileCellSize, ElementName=Self}"
+                                Height="{Binding TileCellSize, ElementName=Self}"
+                                Margin="2"
+                                Loaded="TileCell_Loaded" 
+                                Unloaded="TileCell_Unloaded">
+
+                                <!-- SkiaSharp Canvas for pixel-perfect tile rendering with transparency pattern -->
+                                <skia:SKXamlCanvas 
+                                    x:Name="TileCanvas"
+                                    PaintSurface="TileCanvas_PaintSurface"/>
+
+                                <!-- Selection Ring (accent color for visibility) -->
+                                <Border 
+                                    x:Name="SelectionRing"
+                                    IsHitTestVisible="False"
+                                    CornerRadius="3"
+                                    BorderThickness="2"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                    Visibility="Collapsed"/>
+
+                                <!-- Hit Test Overlay -->
+                                <Border
+                                    x:Name="HitOverlay"
+                                    Background="Transparent"
+                                    Tapped="TileCell_Tapped"
+                                    DoubleTapped="TileCell_DoubleTapped"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

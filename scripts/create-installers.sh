@@ -19,8 +19,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$SCRIPT_DIR/PixlPunkt.Uno/PixlPunkt.Uno"
-PROJECT_FILE="$PROJECT_DIR/PixlPunkt.Uno.csproj"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$REPO_ROOT/PixlPunkt"
+PROJECT_FILE="$PROJECT_DIR/PixlPunkt.csproj"
 PUBLISH_BASE="$PROJECT_DIR/bin/publish"
 INSTALLER_BASE="$SCRIPT_DIR/installers"
 ICON_PATH="$PROJECT_DIR/Assets/Icons"
@@ -115,7 +116,7 @@ create_linux_installer() {
     fi
     
     # Make executable
-    chmod +x "$LINUX_PUBLISH/PixlPunkt.Uno"
+    chmod +x "$LINUX_PUBLISH/PixlPunkt"
     
     # Check for fpm
     if ! command -v fpm &> /dev/null; then
@@ -142,7 +143,7 @@ create_linux_installer() {
     
     # Copy files
     cp -r "$LINUX_PUBLISH"/* "$PKG_ROOT/opt/pixlpunkt/"
-    chmod +x "$PKG_ROOT/opt/pixlpunkt/PixlPunkt.Uno"
+    chmod +x "$PKG_ROOT/opt/pixlpunkt/PixlPunkt"
     
     # Create desktop entry
     cat > "$PKG_ROOT/usr/share/applications/com.pixlpunkt.app.desktop" << 'DESKTOP'
@@ -151,7 +152,7 @@ Version=1.0
 Type=Application
 Name=PixlPunkt
 Comment=Pixel Art Editor
-Exec=/opt/pixlpunkt/PixlPunkt.Uno %F
+Exec=/opt/pixlpunkt/PixlPunkt %F
 Icon=pixlpunkt
 Terminal=false
 Categories=Graphics;2DGraphics;RasterGraphics;
@@ -180,7 +181,7 @@ MIME
 update-mime-database /usr/share/mime 2>/dev/null || true
 update-desktop-database /usr/share/applications 2>/dev/null || true
 gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
-ln -sf /opt/pixlpunkt/PixlPunkt.Uno /usr/local/bin/pixlpunkt
+ln -sf /opt/pixlpunkt/PixlPunkt /usr/local/bin/pixlpunkt
 SCRIPT
 
     # Create post-remove script  
@@ -280,7 +281,7 @@ create_mac_installer() {
     fi
     
     # Make executable
-    chmod +x "$MAC_PUBLISH/PixlPunkt.Uno"
+    chmod +x "$MAC_PUBLISH/PixlPunkt"
     
     # Create app bundle
     echo "📦 Creating macOS App Bundle..."
@@ -292,7 +293,7 @@ create_mac_installer() {
     
     # Copy all files to MacOS directory
     cp -r "$MAC_PUBLISH"/* "$APP_BUNDLE/Contents/MacOS/"
-    chmod +x "$APP_BUNDLE/Contents/MacOS/PixlPunkt.Uno"
+    chmod +x "$APP_BUNDLE/Contents/MacOS/PixlPunkt"
     
     # CRITICAL: Create Resources symlink or copy for Uno Platform
     # Uno Platform on macOS expects resources at Contents/MacOS/Resources/
@@ -327,7 +328,7 @@ create_mac_installer() {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>PixlPunkt.Uno</string>
+    <key>CFBundleExecutable</key><string>PixlPunkt</string>
     <key>CFBundleIdentifier</key><string>com.pixlpunkt.app</string>
     <key>CFBundleName</key><string>PixlPunkt</string>
     <key>CFBundleDisplayName</key><string>PixlPunkt</string>
