@@ -21,11 +21,35 @@
 
 ## Documentation
 
+### 🚀 Quick Reference
+*For when you're in the zone and just need a reminder*
+
 | Document | Description |
 |----------|-------------|
 | **[Quick Start Guide](docs/QUICK_START.md)** | Get up and running in 5 minutes |
-| **[User Guide](docs/USER_GUIDE.md)** | Complete feature documentation |
-| **[Plugin SDK](PixlPunkt.PluginSdk/DEVELOPER_README.md)** | Create your own plugins |
+| **[Cheat Sheet](docs/CHEAT_SHEET.md)** | One-page keyboard shortcuts & tool reference |
+
+### 📚 The Wiki (Deep Dive)
+*For when you actually want to RTFM*
+
+**[→ PixlPunkt Wiki](https://github.com/ChadRoesler/PixlPunkt/wiki)**
+
+| Topic | What You'll Learn |
+|-------|-------------------|
+| [Tools](https://github.com/ChadRoesler/PixlPunkt/wiki/Tools) | Every brush, eraser, and shape tool |
+| [Gradient Fill](https://github.com/ChadRoesler/PixlPunkt/wiki/Gradient-Fill) | Dithering algorithms explained (yes, even Riemersma) |
+| [Layers & Effects](https://github.com/ChadRoesler/PixlPunkt/wiki/Layers) | Blend modes, masks, effects |
+| [Canvas Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Canvas-Animation) | Frame-by-frame, keyframes, onion skinning |
+| [Tile Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Tile-Animation) | Sprite sheets, reels, game exports |
+| [Stage & Camera](https://github.com/ChadRoesler/PixlPunkt/wiki/Stage) | Pan, zoom, rotate - cinematic camera |
+| [Shortcuts](https://github.com/ChadRoesler/PixlPunkt/wiki/Shortcuts) | Complete keyboard reference |
+
+### 🔌 Plugin Development
+
+| Document | Description |
+|----------|-------------|
+| **[Plugin SDK Guide](PixlPunkt.PluginSdk/DEVELOPER_README.md)** | Create your own tools and effects |
+| **[Example Plugin](PixlPunkt.ExamplePlugin/)** | Working code to steal from |
 
 ---
 

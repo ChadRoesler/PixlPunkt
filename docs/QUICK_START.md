@@ -20,15 +20,15 @@ You now have a blank 16×16 canvas!
 
 ## 2. Learn the Essential Tools
 
-| Tool | Key | What it does |
-|------|-----|--------------|
-| **Brush** | `B` | Paint pixels |
-| **Eraser** | `E` | Remove pixels |
-| **Fill** | `F` | Fill areas |
-| **Gradient Fill** | `Shift+G` | Fill with dithered gradients |
-| **Dropper** | Right-click | Pick colors |
-| **Pan** | Space + drag | Move around |
-| **Zoom** | Ctrl + scroll | Zoom in/out |
+| Tool | Key | Icon | What it does |
+|------|-----|:----:|--------------|
+| **Brush** | `B` | <img src="assets/icons/edit_16.png" width="16"> | Paint pixels |
+| **Eraser** | `E` | <img src="assets/icons/eraser_16.png" width="16"> | Remove pixels |
+| **Fill** | `G` | <img src="assets/icons/paint_bucket_16.png" width="16"> | Fill areas |
+| **Gradient Fill** | `Shift+G` | <img src="assets/icons/data_sunburst_16.png" width="16"> | Fill with dithered gradients |
+| **Dropper** | Right-click | <img src="assets/icons/eyedropper_16.png" width="16"> | Pick colors |
+| **Pan** | Space + drag | <img src="assets/icons/hand_left_16.png" width="16"> | Move around |
+| **Zoom** | Ctrl + scroll | <img src="assets/icons/zoom_in_16.png" width="16"> | Zoom in/out |
 
 ### Quick Tips:
 - Press `[` and `]` to change brush size
@@ -49,7 +49,7 @@ You now have a blank 16×16 canvas!
 ### Custom Color
 1. Click the large color square (foreground color)
 2. Use the color picker to choose exactly what you want
-3. Click **+** in the palette to save it
+3. Click <img src="assets/icons/add_16.png" width="16"> in the palette to save it
 
 ---
 
@@ -57,12 +57,12 @@ You now have a blank 16×16 canvas!
 
 Try making a simple character:
 
-1. Select **Brush** (`B`)
+1. Select **Brush** (`B`) <img src="assets/icons/edit_16.png" width="16">
 2. Pick a skin tone from the palette
 3. Draw the face outline
-4. Use **Fill** (`F`) to fill the inside
+4. Use **Fill** (`G`) <img src="assets/icons/paint_bucket_16.png" width="16"> to fill the inside
 5. Add eyes, hair, and details
-6. Use **Eraser** (`E`) if you make mistakes
+6. Use **Eraser** (`E`) <img src="assets/icons/eraser_16.png" width="16"> if you make mistakes
 
 Remember: `Ctrl+Z` undoes mistakes!
 
@@ -70,9 +70,9 @@ Remember: `Ctrl+Z` undoes mistakes!
 
 ## 5. Create a Sick Gradient Background
 
-The **Gradient Fill** tool (`Shift+G`) is perfect for skies, sunsets, and atmospheric backgrounds:
+The **Gradient Fill** tool (`Shift+G`) <img src="assets/icons/data_sunburst_16.png" width="16"> is perfect for skies, sunsets, and atmospheric backgrounds:
 
-1. Add a new layer (click **+** in Layers panel)
+1. Add a new layer (click <img src="assets/icons/add_16.png" width="16"> in Layers panel)
 2. Drag it below your character layer
 3. Press `Shift+G` for Gradient Fill
 4. Choose your gradient type: **Linear**, **Radial**, **Angular**, or **Diamond**
@@ -147,9 +147,9 @@ Dithering creates smooth transitions between colors using patterns - essential f
 Layers let you separate parts of your artwork:
 
 1. Look at the **Layers panel** (right side)
-2. Click **+** to add a new layer
+2. Click <img src="assets/icons/add_16.png" width="16"> to add a new layer
 3. Draw the background on one layer, character on another
-4. Toggle visibility with the eye icon
+4. Toggle visibility with the <img src="assets/icons/eye_16.png" width="16"> eye icon
 5. Reorder by dragging
 
 **Why use layers?**
@@ -169,7 +169,7 @@ Make your art pop with layer effects:
 4. Enable **Drop Shadow** - gives depth
 5. Tweak the settings to your liking
 
-Effects are non-destructive - toggle them on/off anytime!
+Effects are non-destructive - toggle them on/off anytime with <img src="assets/icons/glasses_16.png" width="16">!
 
 ---
 
@@ -184,10 +184,10 @@ This is traditional frame-by-frame animation like Aseprite:
 
 1. Open the **Timeline** panel (View → Timeline or press `T`)
 2. You'll see your layers on the left, frames across the top
-3. Click the **+** button to add a new frame
+3. Click the <img src="assets/icons/add_16.png" width="16"> button to add a new frame
 4. Draw your next pose on the new frame
-5. Use **Onion Skinning** to see previous/next frames
-6. Press **Play** (▶) to preview your animation
+5. Use **Onion Skinning** <img src="assets/icons/layer_diagonal_16.png" width="16"> to see previous/next frames
+6. Press **Play** <img src="assets/icons/play_16.png" width="16"> to preview your animation
 7. Adjust frame timing by right-clicking a frame
 
 #### Canvas Animation Tips:
@@ -197,7 +197,7 @@ This is traditional frame-by-frame animation like Aseprite:
 - **Layer keyframes**: Animate layer properties like opacity and effects!
 
 #### Stage System (Camera Animation)
-The Stage lets you animate camera movement:
+The Stage <img src="assets/icons/camera_16.png" width="16"> lets you animate camera movement:
 
 1. Enable **Stage Mode** in the Timeline
 2. Add **Stage Keyframes** at different points
@@ -220,11 +220,11 @@ Best for: Game sprites, repeated animations, memory-efficient art
 Tile animation uses coordinates in a tileset rather than full frames:
 
 1. Create or import a **Tileset** (a grid of animation frames)
-2. Open the **Tile Animation** panel
+2. Open the **Tile Animation** panel <img src="assets/icons/table_lightning_16.png" width="16">
 3. Create a new **Reel** (an animation sequence)
 4. Add frames by clicking tiles in your tileset
 5. Set **duration** for each frame (in milliseconds)
-6. Preview with the **Play** button
+6. Preview with the **Play** <img src="assets/icons/play_16.png" width="16"> button
 
 #### Tile Animation Tips:
 - **Reuse frames**: The same tile can appear in multiple animations
@@ -236,8 +236,8 @@ Tile animation uses coordinates in a tileset rather than full frames:
 
 | Task | Canvas Animation | Tile Animation |
 |------|------------------|----------------|
-| Add frame | Timeline **+** button | Click tile in reel editor |
-| Preview | ▶ Play button | ▶ Play button |
+| Add frame | Timeline <img src="assets/icons/add_16.png" width="16"> button | Click tile in reel editor |
+| Preview | <img src="assets/icons/play_16.png" width="16"> Play button | <img src="assets/icons/play_16.png" width="16"> Play button |
 | Set timing | Right-click frame | Duration field |
 | Loop | Loop mode dropdown | Loop toggle |
 | Export | File → Export Animation | File → Export Sprite Sheet |
@@ -309,17 +309,17 @@ Right-click  Pick
 Now that you know the basics:
 
 - **Read the full [User Guide](USER_GUIDE.md)** for all features
-- **Master Gradient Fill** - experiment with all dithering styles
-- **Try layer effects** like Glow, Scanlines, and CRT
+- **Master Gradient Fill** <img src="assets/icons/data_sunburst_16.png" width="16"> - experiment with all dithering styles
+- **Try layer effects** <img src="assets/icons/image_sparkle_16.png" width="16"> like Glow, Scanlines, and CRT
 - **Create an animation** - start with a simple 4-frame walk cycle
-- **Use the Stage** for cinematic camera movements
+- **Use the Stage** <img src="assets/icons/camera_16.png" width="16"> for cinematic camera movements
 - **Import Aseprite files** - bring in existing work
 
 ---
 
 ## Need Help?
 
-- **Undo everything**: Press `Ctrl+Z` repeatedly
+- **Undo everything**: Press `Ctrl+Z` repeatedly <img src="assets/icons/arrow_undo_16.png" width="16">
 - **Reset tool**: Press the tool key again (e.g., `B` for Brush)
 - **Stuck zoomed in**: Press `Ctrl+0` to fit canvas to screen
 - **Animation not playing**: Check frame durations aren't set to 0
