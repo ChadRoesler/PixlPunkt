@@ -1,0 +1,60 @@
+name: Sync Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'wiki/**'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      - name: Checkout wiki repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync wiki content
+        run: |
+          # Check if wiki folder exists in main repo
+          if [ ! -d "main/wiki" ]; then
+            echo "No wiki folder found in main repo, skipping sync"
+            exit 0
+          fi
+          
+          # Remove old wiki content (except .git)
+          find wiki-repo -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          
+          # Copy new content from main repo's wiki folder
+          cp -r main/wiki/* wiki-repo/
+          
+          # List what we're syncing
+          echo "=== Files being synced to wiki ==="
+          ls -la wiki-repo/
+
+      - name: Push to wiki
+        run: |
+          cd wiki-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if there are changes
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to sync"
+            exit 0
+          fi
+          
+          git add -A
+          git commit -m "Sync wiki from main repo @ ${{ github.sha }}"
+          git push
