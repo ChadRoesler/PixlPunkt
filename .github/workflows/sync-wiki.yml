@@ -23,7 +23,8 @@ jobs:
         with:
           repository: ${{ github.repository }}.wiki
           path: wiki-repo
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT instead of GITHUB_TOKEN for wiki write access
+          token: ${{ secrets.WIKI_PAT }}
 
       - name: Sync wiki content
         run: |
