@@ -539,7 +539,7 @@ jobs:
             --depends "libharfbuzz0b" \
             --depends "libasound2 | libasound2t64" \
             --depends "libpulse0" \
-            --recommends "ffmpeg" \
+            --deb-recommends "ffmpeg" \
             --after-install /tmp/after-install.sh \
             --after-remove /tmp/after-remove.sh \
             --package "$DEB_NAME" \
@@ -557,7 +557,7 @@ jobs:
             --name pixlpunkt \
             --version "$VERSION" \
             --architecture x86_64 \
-            --description "PixlPunkt - Modern Pixel Art Editor" \
+            --description "PixlPunkt - Modern Pixel Art Editor. Recommended: ffmpeg for animation export." \
             --url "https://github.com/ChadRoesler/PixlPunkt" \
             --license "MIT" \
             --vendor "PixlPunkt" \
@@ -589,7 +589,6 @@ jobs:
             --depends "harfbuzz" \
             --depends "alsa-lib" \
             --depends "pulseaudio-libs" \
-            --recommends "ffmpeg" \
             --after-install /tmp/after-install.sh \
             --after-remove /tmp/after-remove.sh \
             --package "$RPM_NAME" \
