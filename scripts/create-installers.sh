@@ -203,9 +203,36 @@ SCRIPT
         --description "PixlPunkt - Modern Pixel Art Editor" \
         --url "https://github.com/ChadRoesler/PixlPunkt" \
         --license "MIT" \
-        --depends "libx11-6" --depends "libxrandr2" --depends "libxinerama1" \
-        --depends "libxcursor1" --depends "libxi6" --depends "libgl1" \
+        --vendor "PixlPunkt" \
+        --maintainer "ChadRoesler <chad@pixlpunkt.dev>" \
+        --category "graphics" \
+        --depends "libc6 (>= 2.17)" \
+        --depends "libgcc-s1 | libgcc1" \
+        --depends "libstdc++6" \
+        --depends "libx11-6" \
+        --depends "libxrandr2" \
+        --depends "libxinerama1" \
+        --depends "libxcursor1" \
+        --depends "libxi6" \
+        --depends "libxext6" \
+        --depends "libxfixes3" \
+        --depends "libxrender1" \
+        --depends "libgl1 | libgl1-mesa-glx" \
+        --depends "libglu1-mesa | libglu1" \
+        --depends "libegl1 | libegl1-mesa" \
         --depends "libfontconfig1" \
+        --depends "libfreetype6" \
+        --depends "libpng16-16 | libpng12-0" \
+        --depends "zlib1g" \
+        --depends "libgtk-3-0" \
+        --depends "libglib2.0-0" \
+        --depends "libgdk-pixbuf-2.0-0 | libgdk-pixbuf2.0-0" \
+        --depends "libcairo2" \
+        --depends "libpango-1.0-0" \
+        --depends "libharfbuzz0b" \
+        --depends "libasound2 | libasound2t64" \
+        --depends "libpulse0" \
+        --recommends "ffmpeg" \
         --after-install /tmp/after-install.sh \
         --after-remove /tmp/after-remove.sh \
         --package "$LINUX_INSTALLER/pixlpunkt_${VERSION}_amd64.deb" \
@@ -222,9 +249,36 @@ SCRIPT
         --description "PixlPunkt - Modern Pixel Art Editor" \
         --url "https://github.com/ChadRoesler/PixlPunkt" \
         --license "MIT" \
-        --depends "libX11" --depends "libXrandr" --depends "libXinerama" \
-        --depends "libXcursor" --depends "libXi" --depends "mesa-libGL" \
+        --vendor "PixlPunkt" \
+        --maintainer "ChadRoesler <chad@pixlpunkt.dev>" \
+        --category "Applications/Multimedia" \
+        --depends "glibc >= 2.17" \
+        --depends "libgcc" \
+        --depends "libstdc++" \
+        --depends "libX11" \
+        --depends "libXrandr" \
+        --depends "libXinerama" \
+        --depends "libXcursor" \
+        --depends "libXi" \
+        --depends "libXext" \
+        --depends "libXfixes" \
+        --depends "libXrender" \
+        --depends "mesa-libGL" \
+        --depends "mesa-libGLU" \
+        --depends "mesa-libEGL" \
         --depends "fontconfig" \
+        --depends "freetype" \
+        --depends "libpng" \
+        --depends "zlib" \
+        --depends "gtk3" \
+        --depends "glib2" \
+        --depends "gdk-pixbuf2" \
+        --depends "cairo" \
+        --depends "pango" \
+        --depends "harfbuzz" \
+        --depends "alsa-lib" \
+        --depends "pulseaudio-libs" \
+        --recommends "ffmpeg" \
         --after-install /tmp/after-install.sh \
         --after-remove /tmp/after-remove.sh \
         --package "$LINUX_INSTALLER/pixlpunkt-${VERSION}-1.x86_64.rpm" \
