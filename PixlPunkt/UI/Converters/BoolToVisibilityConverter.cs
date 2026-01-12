@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 
@@ -22,7 +22,7 @@ namespace PixlPunkt.UI.Converters
     /// <para><strong>XAML Usage:</strong></para>
     /// <code>
     /// &lt;Button Content="Save"
-    ///         Visibility="{x:Bind HasUnsavedChanges, Converter={StaticResource BoolToVisibility}}" /&gt;
+    ///         Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibility}}" /&gt;
     /// </code>
     /// </remarks>
     /// <seealso cref="InverseBoolToVisibilityConverter"/>

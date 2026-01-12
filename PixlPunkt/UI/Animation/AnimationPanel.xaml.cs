@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentIcons.Common;
@@ -1315,6 +1315,7 @@ namespace PixlPunkt.UI.Animation
 
             _suppressSettingsValueChanges = true;
 
+            AutoKeyframeToggle.IsOn = _canvasAnimationState.AutoKeyframe;
             PingPongToggle.IsOn = _canvasAnimationState.PingPong;
             OnionSkinEnabledToggle.IsOn = _canvasAnimationState.OnionSkinEnabled;
             OnionSkinBeforeBox.Value = _canvasAnimationState.OnionSkinFramesBefore;
@@ -1322,6 +1323,12 @@ namespace PixlPunkt.UI.Animation
             OnionSkinOpacitySlider.Value = _canvasAnimationState.OnionSkinOpacity * 100;
 
             _suppressSettingsValueChanges = false;
+        }
+
+        private void AutoKeyframe_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_suppressSettingsValueChanges || _canvasAnimationState == null) return;
+            _canvasAnimationState.AutoKeyframe = AutoKeyframeToggle.IsOn;
         }
 
         private void PingPong_Toggled(object sender, RoutedEventArgs e)

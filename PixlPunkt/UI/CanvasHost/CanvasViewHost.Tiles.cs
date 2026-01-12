@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml.Input;
@@ -135,7 +135,7 @@ namespace PixlPunkt.UI.CanvasHost
                 // Refresh display
                 Document.CompositeTo(Document.Surface);
                 UpdateActiveLayerPreview();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
             }
         }
 
@@ -256,7 +256,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             Core.Logging.LoggingService.Debug("HandleTilePressed: Got handler {HandlerType} for tool {ToolId}", handler.GetType().Name, _toolState.ActiveToolId);
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var props = pt.Properties;
             var screenPos = pt.Position;
             var docPos = ScreenToDocPoint(screenPos);
@@ -295,7 +295,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (result)
             {
                 _activeTileHandler = handler;
-                CanvasView.CapturePointer(e.Pointer);
+                _mainCanvas.CapturePointer(e.Pointer);
                 UpdateTileOverlay();
                 return true;
             }
@@ -312,7 +312,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (handler == null)
                 return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var props = pt.Properties;
             var screenPos = pt.Position;
             var docPos = ScreenToDocPoint(screenPos);
@@ -337,7 +337,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (_activeTileHandler == null)
                 return false;
 
-            var pt = e.GetCurrentPoint(CanvasView);
+            var pt = e.GetCurrentPoint(_mainCanvas);
             var props = pt.Properties;
             var screenPos = pt.Position;
             var docPos = ScreenToDocPoint(screenPos);
@@ -354,7 +354,7 @@ namespace PixlPunkt.UI.CanvasHost
                 isLeft, isRight, isShift, isCtrl);
 
             _activeTileHandler = null;
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
             UpdateTileOverlay();
             return true;
         }
@@ -366,7 +366,7 @@ namespace PixlPunkt.UI.CanvasHost
         {
             var handler = GetActiveTileHandler();
             _currentTileOverlay = handler?.GetOverlayPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ====================================================================
@@ -822,7 +822,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Refresh display
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         void ITileContext.BlendLayerRect(int x, int y, int width, int height, byte[] pixels)
@@ -900,7 +900,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Refresh display
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         void ITileContext.BlendAndPropagateTiles(int x, int y, int width, int height, byte[] pixels)
@@ -1077,7 +1077,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Refresh display
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         void ITileContext.ClearLayerRect(int x, int y, int width, int height)
@@ -1114,7 +1114,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ====================================================================
@@ -1289,7 +1289,7 @@ namespace PixlPunkt.UI.CanvasHost
 
         void ITileContext.Invalidate()
         {
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         void ITileContext.CapturePointer()
@@ -1299,7 +1299,7 @@ namespace PixlPunkt.UI.CanvasHost
 
         void ITileContext.ReleasePointer()
         {
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -1485,7 +1485,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             // Refresh display
             Document.CompositeTo(Document.Surface);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -1880,7 +1880,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             // Refresh display
             Document.CompositeTo(Document.Surface);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
     }
 }

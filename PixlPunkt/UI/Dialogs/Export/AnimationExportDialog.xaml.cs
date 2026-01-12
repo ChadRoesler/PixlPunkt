@@ -303,7 +303,7 @@ namespace PixlPunkt.UI.Dialogs.Export
             if (!ExportTileAnimation && _document.CanvasAnimationState.Stage.Enabled && UseStage)
             {
                 var stage = _document.CanvasAnimationState.Stage;
-                StageInfoText.Text = $"Stage: {stage.StageWidth}×{stage.StageHeight} ? {stage.OutputWidth}×{stage.OutputHeight} output";
+                StageInfoText.Text = $"Stage: {stage.StageWidth}Ã—{stage.StageHeight} ? {stage.OutputWidth}Ã—{stage.OutputHeight} output";
                 StageInfoText.Visibility = Visibility.Visible;
             }
             else
@@ -351,7 +351,7 @@ namespace PixlPunkt.UI.Dialogs.Export
             }
 
             int scale = Scale;
-            OutputSizeText.Text = $"{w * scale}×{h * scale} pixels";
+            OutputSizeText.Text = $"{w * scale}Ã—{h * scale} pixels";
         }
 
         private async Task ShowPreviewFrameAsync(int index)

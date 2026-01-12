@@ -1,14 +1,15 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Coloring.Helpers;
 using PixlPunkt.Core.Painting;
 using PixlPunkt.Core.Plugins;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Tools;
 using Windows.Foundation;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI.CanvasHost
 {
@@ -60,8 +61,8 @@ namespace PixlPunkt.UI.CanvasHost
             _sy = _ey = y;
             _shapeDrag = true;
 
-            CanvasView.CapturePointer(e.Pointer);
-            CanvasView.Invalidate();
+            _mainCanvas.CapturePointer(e.Pointer);
+            InvalidateMainCanvas();
         }
 
         private void HandleShapeMoved(Point pos)
@@ -79,7 +80,7 @@ namespace PixlPunkt.UI.CanvasHost
             y = Math.Clamp(y, 0, h - 1);
 
             UpdateShapeEndpointsWithModifiers(x, y);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         private void HandleShapeReleased()
@@ -178,7 +179,7 @@ namespace PixlPunkt.UI.CanvasHost
             };
 
             // Check if shape overlaps any mapped tiles
-            var bounds = new Windows.Graphics.RectInt32(lx, ty, rx - lx + 1, by - ty + 1);
+            var bounds = CreateRect(lx, ty, rx - lx + 1, by - ty + 1);
             bool hasTileMapping = rl.TileMapping != null && Document.TileSet != null;
             bool affectsTiles = false;
 
@@ -257,11 +258,11 @@ namespace PixlPunkt.UI.CanvasHost
             // Commit without pushing to history (already pushed above)
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             RaiseFrame();
 
-            CanvasView.ReleasePointerCaptures();
+            _mainCanvas.ReleasePointerCaptures();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -337,7 +338,7 @@ namespace PixlPunkt.UI.CanvasHost
         // SHAPE PREVIEW RENDERING
         // ════════════════════════════════════════════════════════════════════
 
-        private void DrawShapePreview(CanvasDrawingSession ds, Rect dest)
+        private void DrawShapePreview(ICanvasRenderer renderer, Rect dest)
         {
             double s = _zoom.Scale;
 
@@ -355,16 +356,16 @@ namespace PixlPunkt.UI.CanvasHost
                     : shapeBuilder.BuildOutlinePoints(lx, ty, rx, by);
 
                 if (_shapeFilled)
-                    PreviewFilledShape(ds, dest, s, points);
+                    PreviewFilledShape(renderer, dest, s, points);
                 else
-                    PreviewBrushStroke(ds, dest, s, points);
+                    PreviewBrushStroke(renderer, dest, s, points);
             }
             else
             {
                 // Fallback to legacy preview rendering
                 if (_shapeIsEllipse)
                 {
-                    PreviewEllipse(ds, dest, s, lx, ty, rx, by, _shapeFilled);
+                    PreviewEllipse(renderer, dest, s, lx, ty, rx, by, _shapeFilled);
                 }
                 else
                 {
@@ -375,7 +376,7 @@ namespace PixlPunkt.UI.CanvasHost
                             for (int x = lx; x <= rx; x++)
                                 filled.Add((x, y));
 
-                        PreviewFilledShape(ds, dest, s, filled);
+                        PreviewFilledShape(renderer, dest, s, filled);
                     }
                     else
                     {
@@ -392,13 +393,13 @@ namespace PixlPunkt.UI.CanvasHost
                             if (rx != lx) outline.Add((rx, y2));
                         }
 
-                        PreviewBrushStroke(ds, dest, s, outline);
+                        PreviewBrushStroke(renderer, dest, s, outline);
                     }
                 }
             }
         }
 
-        private void PreviewPlot(CanvasDrawingSession ds, Rect dest, double scale, int x, int y)
+        private void PreviewPlot(ICanvasRenderer renderer, Rect dest, double scale, int x, int y)
         {
             if ((uint)x >= (uint)Document.Surface.Width || (uint)y >= (uint)Document.Surface.Height) return;
 
@@ -409,16 +410,16 @@ namespace PixlPunkt.UI.CanvasHost
             float sy = (float)(dest.Y + y * scale);
             float s = (float)scale;
 
-            ds.FillRectangle(sx, sy, s, s, ColorUtil.ToColor(after));
+            renderer.FillRectangle(sx, sy, s, s, ColorUtil.ToColor(after));
         }
 
-        private void PreviewHSpan(CanvasDrawingSession ds, Rect dest, double s, int y, int x0, int x1)
+        private void PreviewHSpan(ICanvasRenderer renderer, Rect dest, double s, int y, int x0, int x1)
         {
             if (x0 > x1) (x0, x1) = (x1, x0);
-            for (int x = x0; x <= x1; x++) PreviewPlot(ds, dest, s, x, y);
+            for (int x = x0; x <= x1; x++) PreviewPlot(renderer, dest, s, x, y);
         }
 
-        private void PreviewEllipse(CanvasDrawingSession ds, Rect dest, double s, int x0, int y0, int x1, int y1, bool filled)
+        private void PreviewEllipse(ICanvasRenderer renderer, Rect dest, double s, int x0, int y0, int x1, int y1, bool filled)
         {
             if (x0 > x1) (x0, x1) = (x1, x0);
             if (y0 > y1) (y0, y1) = (y1, y0);
@@ -466,7 +467,7 @@ namespace PixlPunkt.UI.CanvasHost
                     y0++; y1--;
                 }
 
-                PreviewFilledShape(ds, dest, s, outline);
+                PreviewFilledShape(renderer, dest, s, outline);
             }
             else
             {
@@ -492,14 +493,14 @@ namespace PixlPunkt.UI.CanvasHost
                     y0++; y1--;
                 }
 
-                PreviewBrushStroke(ds, dest, s, outline);
+                PreviewBrushStroke(renderer, dest, s, outline);
             }
         }
 
         /// <summary>
         /// Preview for filled shapes: solid interior with opacity, soft edge only on outside.
         /// </summary>
-        private void PreviewFilledShape(CanvasDrawingSession ds, Rect dest, double scale, HashSet<(int x, int y)> shapePoints)
+        private void PreviewFilledShape(ICanvasRenderer renderer, Rect dest, double scale, HashSet<(int x, int y)> shapePoints)
         {
             int w = Document.Surface.Width;
             int h = Document.Surface.Height;
@@ -517,7 +518,7 @@ namespace PixlPunkt.UI.CanvasHost
 
                 float sx = (float)(dest.X + px * scale);
                 float sy = (float)(dest.Y + py * scale);
-                ds.FillRectangle(sx, sy, (float)scale, (float)scale, ColorUtil.ToColor(after));
+                renderer.FillRectangle(sx, sy, (float)scale, (float)scale, ColorUtil.ToColor(after));
             }
 
             // Step 2: Add soft outer edge if density < 255 or strokeWidth > 1
@@ -578,7 +579,7 @@ namespace PixlPunkt.UI.CanvasHost
 
                 float sx = (float)(dest.X + pos.x * scale);
                 float sy = (float)(dest.Y + pos.y * scale);
-                ds.FillRectangle(sx, sy, (float)scale, (float)scale, ColorUtil.ToColor(after));
+                renderer.FillRectangle(sx, sy, (float)scale, (float)scale, ColorUtil.ToColor(after));
             }
         }
 
@@ -586,13 +587,13 @@ namespace PixlPunkt.UI.CanvasHost
         /// Stamps the full brush shape at each outline point independently, matching final rendering.
         /// Used for outlined (non-filled) shapes.
         /// </summary>
-        private void PreviewBrushStroke(CanvasDrawingSession ds, Rect dest, double scale, HashSet<(int x, int y)> outlinePoints)
+        private void PreviewBrushStroke(ICanvasRenderer renderer, Rect dest, double scale, HashSet<(int x, int y)> outlinePoints)
         {
             var mask = _stroke.GetCurrentBrushOffsets();
             if (mask == null || mask.Count == 0)
             {
                 foreach (var (x, y) in outlinePoints)
-                    PreviewPlot(ds, dest, scale, x, y);
+                    PreviewPlot(renderer, dest, scale, x, y);
                 return;
             }
 
@@ -627,7 +628,7 @@ namespace PixlPunkt.UI.CanvasHost
 
                 float sx = (float)(dest.X + pos.x * scale);
                 float sy = (float)(dest.Y + pos.y * scale);
-                ds.FillRectangle(sx, sy, (float)scale, (float)scale, ColorUtil.ToColor(after));
+                renderer.FillRectangle(sx, sy, (float)scale, (float)scale, ColorUtil.ToColor(after));
             }
         }
 
@@ -638,7 +639,7 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Draws brush hover preview at the shape start point on the main canvas.
         /// </summary>
-        private void DrawShapeStartPointHover(CanvasDrawingSession ds, Rect dest)
+        private void DrawShapeStartPointHover(ICanvasRenderer renderer, Rect dest)
         {
             double s = _zoom.Scale;
             var mask = _stroke.GetCurrentBrushOffsets();
@@ -663,7 +664,7 @@ namespace PixlPunkt.UI.CanvasHost
 
                 float sx = (float)(dest.X + px * s);
                 float sy = (float)(dest.Y + py * s);
-                ds.FillRectangle(sx, sy, (float)s, (float)s, ColorUtil.ToColor(after));
+                renderer.FillRectangle(sx, sy, (float)s, (float)s, ColorUtil.ToColor(after));
             }
         }
 

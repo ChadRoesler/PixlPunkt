@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Canvas
+namespace PixlPunkt.Core.Canvas
 {
     // CanvasTemplate used for dialog/template registry. Mutable properties so XAML loader can assign values.
     public class CanvasTemplate

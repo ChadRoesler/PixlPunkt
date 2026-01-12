@@ -133,6 +133,21 @@ namespace PixlPunkt.UI.Controls
         /// </summary>
         private bool _pointerPressed;
 
+        /// <summary>
+        /// Debounce timer to prevent rapid toggle operations.
+        /// </summary>
+        private DispatcherTimer? _debounceTimer;
+
+        /// <summary>
+        /// Whether we're currently in a debounce period (ignore clicks).
+        /// </summary>
+        private bool _isDebouncing;
+
+        /// <summary>
+        /// Debounce delay in milliseconds.
+        /// </summary>
+        private const int DebounceDelayMs = 200;
+
         // ====================================================================
         // EVENTS
         // ====================================================================
@@ -150,6 +165,7 @@ namespace PixlPunkt.UI.Controls
         {
             InitializeComponent();
             Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
 
             // Wire up pointer events for drag resizing AND click detection
             PointerPressed += OnPointerPressed;
@@ -179,6 +195,13 @@ namespace PixlPunkt.UI.Controls
             {
                 _previousWidth = DefaultExpandedWidth;
             }
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            // Cleanup timer
+            _debounceTimer?.Stop();
+            _debounceTimer = null;
         }
 
         /// <summary>
@@ -266,8 +289,9 @@ namespace PixlPunkt.UI.Controls
         {
             UpdateIconDirection();
 
+            var grid = FindParent<Grid>(this);
             var targetColumn = GetTargetColumn();
-            if (targetColumn == null) return;
+            if (targetColumn == null || grid == null) return;
 
             if (IsCollapsed)
             {
@@ -278,9 +302,9 @@ namespace PixlPunkt.UI.Controls
                     _previousWidth = currentWidth;
                 }
 
-                // Collapse to zero
-                targetColumn.Width = new GridLength(0);
+                // Collapse to zero - set MinWidth first to allow zero
                 targetColumn.MinWidth = 0;
+                targetColumn.Width = new GridLength(0, GridUnitType.Pixel);
             }
             else
             {
@@ -290,8 +314,34 @@ namespace PixlPunkt.UI.Controls
                     : DefaultExpandedWidth;
 
                 targetColumn.MinWidth = MinExpandedWidth;
-                targetColumn.Width = new GridLength(restoreWidth);
+                targetColumn.Width = new GridLength(restoreWidth, GridUnitType.Pixel);
             }
+
+            // Force immediate layout update to ensure changes propagate throughout the visual tree
+            // This prevents layout issues on Desktop/WSL where panels appear misaligned until interaction
+            grid.InvalidateMeasure();
+            grid.InvalidateArrange();
+            grid.UpdateLayout();
+        }
+
+        /// <summary>
+        /// Starts the debounce timer to prevent rapid toggle operations.
+        /// </summary>
+        private void StartDebounce()
+        {
+            _isDebouncing = true;
+
+            _debounceTimer?.Stop();
+            _debounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(DebounceDelayMs)
+            };
+            _debounceTimer.Tick += (_, __) =>
+            {
+                _isDebouncing = false;
+                _debounceTimer?.Stop();
+            };
+            _debounceTimer.Start();
         }
 
         // ====================================================================
@@ -399,9 +449,11 @@ namespace PixlPunkt.UI.Controls
             if (_pointerPressed)
             {
                 // If we didn't exceed drag threshold, treat as a click -> toggle collapse
-                if (!_dragThresholdExceeded)
+                // But only if we're not in a debounce period (prevents double-click issues)
+                if (!_dragThresholdExceeded && !_isDebouncing)
                 {
                     IsCollapsed = !IsCollapsed;
+                    StartDebounce();
                 }
 
                 _pointerPressed = false;
@@ -424,7 +476,7 @@ namespace PixlPunkt.UI.Controls
         // HELPERS
         // ====================================================================
 
-        private static T? FindParent<T>(DependencyObject start) where T : DependencyObject
+        private static T? FindParent<T>(DependencyObject start) where T : class
         {
             var parent = VisualTreeHelper.GetParent(start);
             while (parent != null && parent is not T)

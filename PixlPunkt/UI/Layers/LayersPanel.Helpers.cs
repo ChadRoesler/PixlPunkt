@@ -71,10 +71,10 @@ namespace PixlPunkt.UI.Layers
                 if (result != null)
                     return result;
             }
-            return null;
+            return default;
         }
 
-        private static T? FindAncestor<T>(DependencyObject start) where T : DependencyObject
+        private static T? FindAncestor<T>(DependencyObject start) where T : class
         {
             var cur = start;
             while (cur != null && cur is not T)

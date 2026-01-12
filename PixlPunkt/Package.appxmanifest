@@ -1,103 +1,110 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  xmlns:uap18="http://schemas.microsoft.com/appx/manifest/uap/windows10/18"
+  IgnorableNamespaces="uap rescap uap18">
 
-  <Identity
-    Name="PixlPunkt"
-    Publisher="CN=PixlPunkt, O=PixlPunkt, C=US"
-    Version="0.90.1.0" />
+    <Identity
+      Name="PixlPunkt"
+      Publisher="CN=PixlPunkt, O=PixlPunkt, C=US"
+      Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="4ec1c512-51ca-426e-b8b4-0a9c6dfd60d3" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+    <mp:PhoneIdentity PhoneProductId="4ec1c512-51ca-426e-b8b4-0a9c6dfd60d3" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
-  <Properties>
-    <DisplayName>PixlPunkt</DisplayName>
-    <PublisherDisplayName>PixlPunk Works</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
-  </Properties>
+    <Properties>
+        <DisplayName>PixlPunkt</DisplayName>
+        <PublisherDisplayName>PixlPunk Works</PublisherDisplayName>
+        <Logo>Assets\StoreLogo.png</Logo>
+    </Properties>
 
-  <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-  </Dependencies>
+    <Dependencies>
+        <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    </Dependencies>
 
-  <Resources>
-    <Resource Language="x-generate"/>
-  </Resources>
+    <Resources>
+        <Resource Language="x-generate"/>
+    </Resources>
 
-  <Applications>
-    <Application Id="App"
-      Executable="$targetnametoken$.exe"
-      EntryPoint="$targetentrypoint$">
-      <uap:VisualElements
-        DisplayName="Pixl Punkt"
-        Description="Pixl Punkt is a powerful tool for creating and animating pixel art."
-        BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"  Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png"/>
-        <uap:SplashScreen Image="Assets\SplashScreen.png" />
-      </uap:VisualElements>
-      <Extensions>
-        <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="pixlpunktproject">
-            <uap:SupportedFileTypes>
-              <uap:FileType ContentType="pixlpunkt/project">.pxp</uap:FileType>
-            </uap:SupportedFileTypes>
-            <uap:DisplayName>PixlPunktProject</uap:DisplayName>
-            <uap:Logo>Assets\Icons\pxpFileIcon.png</uap:Logo>
-            <uap:InfoTip>Pixl Punkt Project</uap:InfoTip>
-          </uap:FileTypeAssociation>
-        </uap:Extension>
-        <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="pixlpunktmarker">
-            <uap:SupportedFileTypes>
-              <uap:FileType ContentType="pixlpunkt/brush">.mkr</uap:FileType>
-            </uap:SupportedFileTypes>
-            <uap:DisplayName>PixlPunktMarker</uap:DisplayName>
-            <uap:Logo>Assets\Icons\mkrFileIcon.png</uap:Logo>
-            <uap:InfoTip>Pixl Punkt Brush</uap:InfoTip>
-          </uap:FileTypeAssociation>
-        </uap:Extension>
-        <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="pixlpunktplugin">
-            <uap:SupportedFileTypes>
-              <uap:FileType ContentType="pixlpunkt/plugin">.punk</uap:FileType>
-            </uap:SupportedFileTypes>
-            <uap:DisplayName>PixlPunktPlugin</uap:DisplayName>
-            <uap:Logo>Assets\Icons\punkFileIcon.png</uap:Logo>
-            <uap:InfoTip>Pixl Punkt Plugin</uap:InfoTip>
-          </uap:FileTypeAssociation>
-        </uap:Extension>
-        <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="pixlpunkttiles">
-            <uap:SupportedFileTypes>
-              <uap:FileType ContentType="pixlpunkt/tiles">.pxpt</uap:FileType>
-            </uap:SupportedFileTypes>
-            <uap:DisplayName>PixlPunktTiles</uap:DisplayName>
-            <uap:Logo>Assets\Icons\pxptFileIcon.png</uap:Logo>
-            <uap:InfoTip>Pixl Punkt Tiles</uap:InfoTip>
-          </uap:FileTypeAssociation>
-        </uap:Extension>
-        <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="pixlpunktreel">
-            <uap:SupportedFileTypes>
-              <uap:FileType ContentType="pixlpunkt/reel">.pxpr</uap:FileType>
-            </uap:SupportedFileTypes>
-            <uap:DisplayName>PixlPunktReel</uap:DisplayName>
-            <uap:Logo>Assets\Icons\pxprFileIcon.png</uap:Logo>
-            <uap:InfoTip>Pixl Punkt Reel</uap:InfoTip>
-          </uap:FileTypeAssociation>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-  </Applications>
+    <Applications>
+        <Application Id="App"
+          Executable="$targetnametoken$.exe"
+          EntryPoint="$targetentrypoint$" ResourceGroup="PixlPunkt">
+            <uap:VisualElements
+              DisplayName="Pixl Punkt"
+              Description="Pixl Punkt is a powerful tool for creating and animating pixel art."
+              BackgroundColor="transparent"
+              Square150x150Logo="Assets\Square150x150Logo.png"
+              Square44x44Logo="Assets\Square44x44Logo.png">
+              <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png" ShortName="PixlPunkt">
+                <uap:ShowNameOnTiles>
+                  <uap:ShowOn Tile="square150x150Logo"/>
+                  <uap:ShowOn Tile="wide310x150Logo"/>
+                  <uap:ShowOn Tile="square310x310Logo"/>
+                </uap:ShowNameOnTiles>
+              </uap:DefaultTile>
+                <uap:SplashScreen Image="Assets\SplashScreen.png" />
+            </uap:VisualElements>
+            <Extensions>
+                <uap:Extension Category="windows.fileTypeAssociation">
+                    <uap:FileTypeAssociation Name="pixlpunktproject">
+                        <uap:SupportedFileTypes>
+                            <uap:FileType ContentType="pixlpunkt/project">.pxp</uap:FileType>
+                        </uap:SupportedFileTypes>
+                        <uap:DisplayName>PixlPunktProject</uap:DisplayName>
+                        <uap:Logo>Assets\Icons\pxpFileIcon.png</uap:Logo>
+                        <uap:InfoTip>Pixl Punkt Project</uap:InfoTip>
+                    </uap:FileTypeAssociation>
+                </uap:Extension>
+                <uap:Extension Category="windows.fileTypeAssociation">
+                    <uap:FileTypeAssociation Name="pixlpunktmarker">
+                        <uap:SupportedFileTypes>
+                            <uap:FileType ContentType="pixlpunkt/brush">.mkr</uap:FileType>
+                        </uap:SupportedFileTypes>
+                        <uap:DisplayName>PixlPunktMarker</uap:DisplayName>
+                        <uap:Logo>Assets\Icons\mkrFileIcon.png</uap:Logo>
+                        <uap:InfoTip>Pixl Punkt Brush</uap:InfoTip>
+                    </uap:FileTypeAssociation>
+                </uap:Extension>
+                <uap:Extension Category="windows.fileTypeAssociation">
+                    <uap:FileTypeAssociation Name="pixlpunktplugin">
+                        <uap:SupportedFileTypes>
+                            <uap:FileType ContentType="pixlpunkt/plugin">.punk</uap:FileType>
+                        </uap:SupportedFileTypes>
+                        <uap:DisplayName>PixlPunktPlugin</uap:DisplayName>
+                        <uap:Logo>Assets\Icons\punkFileIcon.png</uap:Logo>
+                        <uap:InfoTip>Pixl Punkt Plugin</uap:InfoTip>
+                    </uap:FileTypeAssociation>
+                </uap:Extension>
+                <uap:Extension Category="windows.fileTypeAssociation">
+                    <uap:FileTypeAssociation Name="pixlpunkttiles">
+                        <uap:SupportedFileTypes>
+                            <uap:FileType ContentType="pixlpunkt/tiles">.pxpt</uap:FileType>
+                        </uap:SupportedFileTypes>
+                        <uap:DisplayName>PixlPunktTiles</uap:DisplayName>
+                        <uap:Logo>Assets\Icons\pxptFileIcon.png</uap:Logo>
+                        <uap:InfoTip>Pixl Punkt Tiles</uap:InfoTip>
+                    </uap:FileTypeAssociation>
+                </uap:Extension>
+                <uap:Extension Category="windows.fileTypeAssociation">
+                    <uap:FileTypeAssociation Name="pixlpunktreel">
+                        <uap:SupportedFileTypes>
+                            <uap:FileType ContentType="pixlpunkt/reel">.pxpr</uap:FileType>
+                        </uap:SupportedFileTypes>
+                        <uap:DisplayName>PixlPunktReel</uap:DisplayName>
+                        <uap:Logo>Assets\Icons\pxprFileIcon.png</uap:Logo>
+                        <uap:InfoTip>Pixl Punkt Reel</uap:InfoTip>
+                    </uap:FileTypeAssociation>
+                </uap:Extension>
+            </Extensions>
+        </Application>
+    </Applications>
 
-  <Capabilities>
-    <rescap:Capability Name="runFullTrust" />
-  </Capabilities>
+    <Capabilities>
+        <rescap:Capability Name="runFullTrust" />
+    </Capabilities>
 </Package>

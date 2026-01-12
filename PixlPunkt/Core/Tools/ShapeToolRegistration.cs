@@ -28,7 +28,7 @@ namespace PixlPunkt.Core.Tools
     /// <param name="ShapeBuilder">Shape builder for geometry generation.</param>
     /// <param name="Renderer">Shape renderer for pixel application (null = use default).</param>
     /// <param name="PainterFactory">Factory to create painter for line-based shapes (e.g., Gradient).</param>
-    public sealed record ShapeToolRegistration(
+    public sealed partial record ShapeToolRegistration(
         string Id,
         string DisplayName,
         ToolSettingsBase? Settings,

@@ -21,7 +21,7 @@ namespace PixlPunkt.Core.Tools
     /// <param name="DisplayName">Human-readable name for UI display.</param>
     /// <param name="Settings">Tool-specific settings object.</param>
     /// <param name="FillPainter">Fill painter implementation (null = use default).</param>
-    public sealed record FillToolRegistration(
+    public sealed partial record FillToolRegistration(
         string Id,
         string DisplayName,
         ToolSettingsBase? Settings,

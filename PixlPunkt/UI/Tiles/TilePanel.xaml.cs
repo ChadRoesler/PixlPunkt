@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -15,8 +13,8 @@ using PixlPunkt.Core.Tools;
 using PixlPunkt.UI.Dialogs;
 using PixlPunkt.UI.Helpers;
 using PixlPunkt.UI.Rendering;
-using Windows.Foundation;
-using Windows.Graphics.DirectX;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.UI;
 
 namespace PixlPunkt.UI.Tiles
@@ -30,8 +28,12 @@ namespace PixlPunkt.UI.Tiles
         private ToolState? _toolState;
         private PaletteService? _palette;
         private int _selectedTileId = -1;
-        private double _zoomLevel = 3.0; // Start at 3x for visibility matching layer preview (~48px)
+        private double _zoomLevel = 3.0;
         private readonly PatternBackgroundService _pattern = new();
+
+        // Cached checkerboard pattern for SkiaSharp
+        private SKShader? _checkerboardShader;
+        private SKBitmap? _checkerboardBitmap;
 
         /// <summary>
         /// Provider for accessing all open documents (set by main window).
@@ -96,6 +98,8 @@ namespace PixlPunkt.UI.Tiles
             Unloaded += (_, __) =>
             {
                 TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
+                _checkerboardShader?.Dispose();
+                _checkerboardBitmap?.Dispose();
             };
         }
 
@@ -103,27 +107,28 @@ namespace PixlPunkt.UI.Tiles
         {
             ApplyStripeColors();
             _pattern.Invalidate();
-            // Invalidate all tile backgrounds
+            InvalidateCheckerboardCache();
             RefreshAllTileVisuals();
         }
 
         private void ApplyStripeColors()
         {
-            var light = Color.FromArgb(255,
-                TransparencyStripeMixer.LightR,
-                TransparencyStripeMixer.LightG,
-                TransparencyStripeMixer.LightB);
-
-            var dark = Color.FromArgb(255,
-                TransparencyStripeMixer.DarkR,
-                TransparencyStripeMixer.DarkG,
-                TransparencyStripeMixer.DarkB);
+            var light = Color.FromArgb(255, TransparencyStripeMixer.LightR, TransparencyStripeMixer.LightG, TransparencyStripeMixer.LightB);
+            var dark = Color.FromArgb(255, TransparencyStripeMixer.DarkR, TransparencyStripeMixer.DarkG, TransparencyStripeMixer.DarkB);
 
             if (_pattern.LightColor != light || _pattern.DarkColor != dark)
             {
                 _pattern.LightColor = light;
                 _pattern.DarkColor = dark;
             }
+        }
+
+        private void InvalidateCheckerboardCache()
+        {
+            _checkerboardShader?.Dispose();
+            _checkerboardShader = null;
+            _checkerboardBitmap?.Dispose();
+            _checkerboardBitmap = null;
         }
 
         /// <summary>
@@ -167,19 +172,14 @@ namespace PixlPunkt.UI.Tiles
         {
             TileIds.Clear();
 
-            if (_document?.TileSet == null)
-                return;
+            if (_document?.TileSet == null) return;
 
             foreach (var tileId in _document.TileSet.TileIds)
-            {
                 TileIds.Add(tileId);
-            }
 
             // Select first tile if none selected
             if (_selectedTileId < 0 && TileIds.Count > 0)
-            {
                 SelectedTileId = TileIds[0];
-            }
         }
 
         private void OnTileSetChanged()
@@ -187,7 +187,6 @@ namespace PixlPunkt.UI.Tiles
             DispatcherQueue.TryEnqueue(() =>
             {
                 RefreshTileList();
-                // Also refresh all tile visuals since tile content may have changed
                 RefreshAllTileVisuals();
             });
         }
@@ -199,7 +198,6 @@ namespace PixlPunkt.UI.Tiles
         private void NewEmptyBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_document?.TileSet == null) return;
-
             int newId = _document.TileSet.AddEmptyTile();
             SelectedTileId = newId;
         }
@@ -207,186 +205,101 @@ namespace PixlPunkt.UI.Tiles
         private void DuplicateBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_document?.TileSet == null || _selectedTileId < 0) return;
-
             int newId = _document.TileSet.DuplicateTile(_selectedTileId);
-            if (newId >= 0)
-            {
-                SelectedTileId = newId;
-            }
+            if (newId >= 0) SelectedTileId = newId;
         }
 
         private async void ImportTilesBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_document?.TileSet == null) return;
 
-            // Get all open documents
             var allDocs = OpenDocumentsProvider?.Invoke() ?? Enumerable.Empty<CanvasDocument>();
-
-            // Check if there are other documents with tiles to import from
             var sourceDocs = allDocs.Where(d => d != _document && d.TileSet != null && d.TileSet.Count > 0).ToList();
+
             if (sourceDocs.Count == 0)
             {
-                await new ContentDialog
-                {
-                    XamlRoot = XamlRoot,
-                    Title = "No Source Documents",
-                    Content = "There are no other open documents with tiles to import from.",
-                    CloseButtonText = "OK"
-                }.ShowAsync();
+                await new ContentDialog { XamlRoot = XamlRoot, Title = "No Source Documents", Content = "There are no other open documents with tiles to import from.", CloseButtonText = "OK" }.ShowAsync();
                 return;
             }
 
-            // Show import dialog
-            var dialog = new ImportTilesDialog(_document, allDocs)
-            {
-                XamlRoot = XamlRoot
-            };
-
+            var dialog = new ImportTilesDialog(_document, allDocs) { XamlRoot = XamlRoot };
             var result = await dialog.ShowAsync();
-            if (result != ContentDialogResult.Primary)
-                return;
+            if (result != ContentDialogResult.Primary) return;
 
-            // Import selected tiles
             var selectedTiles = dialog.GetSelectedTiles();
-            if (selectedTiles.Count == 0)
-                return;
+            if (selectedTiles.Count == 0) return;
 
-            int importedCount = 0;
-            int skippedCount = 0;
-
+            int importedCount = 0, skippedCount = 0;
             var targetTileSet = _document.TileSet;
             var sourceTileSet = dialog.SourceTileSet;
-            bool needsScale = sourceTileSet != null &&
-                              (sourceTileSet.TileWidth != targetTileSet.TileWidth ||
-                               sourceTileSet.TileHeight != targetTileSet.TileHeight);
+            bool needsScale = sourceTileSet != null && (sourceTileSet.TileWidth != targetTileSet.TileWidth || sourceTileSet.TileHeight != targetTileSet.TileHeight);
 
             foreach (var tile in selectedTiles)
             {
                 byte[] pixelsToImport = tile.Pixels;
-
-                // Scale if needed
                 if (needsScale)
-                {
-                    pixelsToImport = ScaleTilePixels(
-                        tile.Pixels, tile.Width, tile.Height,
-                        targetTileSet.TileWidth, targetTileSet.TileHeight);
-                }
+                    pixelsToImport = ScaleTilePixels(tile.Pixels, tile.Width, tile.Height, targetTileSet.TileWidth, targetTileSet.TileHeight);
 
-                // Check for duplicates if requested
-                if (dialog.SkipDuplicates && IsDuplicateTile(pixelsToImport, targetTileSet))
-                {
-                    skippedCount++;
-                    continue;
-                }
+                if (dialog.SkipDuplicates && IsDuplicateTile(pixelsToImport, targetTileSet)) { skippedCount++; continue; }
 
-                // Add the tile
                 targetTileSet.AddTile(pixelsToImport);
                 importedCount++;
             }
 
-            // Select the last imported tile
             if (importedCount > 0 && TileIds.Count > 0)
-            {
                 SelectedTileId = TileIds[TileIds.Count - 1];
-            }
 
-            // Show summary if tiles were skipped
             if (skippedCount > 0)
-            {
-                await new ContentDialog
-                {
-                    XamlRoot = XamlRoot,
-                    Title = "Import Complete",
-                    Content = $"Imported {importedCount} tile(s).\nSkipped {skippedCount} duplicate tile(s).",
-                    CloseButtonText = "OK"
-                }.ShowAsync();
-            }
+                await new ContentDialog { XamlRoot = XamlRoot, Title = "Import Complete", Content = $"Imported {importedCount} tile(s).\nSkipped {skippedCount} duplicate tile(s).", CloseButtonText = "OK" }.ShowAsync();
         }
 
-        /// <summary>
-        /// Scales tile pixels to a new size using nearest-neighbor interpolation.
-        /// </summary>
         private static byte[] ScaleTilePixels(byte[] source, int srcW, int srcH, int dstW, int dstH)
         {
             var result = new byte[dstW * dstH * 4];
-
             for (int y = 0; y < dstH; y++)
             {
                 int srcY = y * srcH / dstH;
                 for (int x = 0; x < dstW; x++)
                 {
                     int srcX = x * srcW / dstW;
-
                     int srcIdx = (srcY * srcW + srcX) * 4;
                     int dstIdx = (y * dstW + x) * 4;
-
                     result[dstIdx] = source[srcIdx];
                     result[dstIdx + 1] = source[srcIdx + 1];
                     result[dstIdx + 2] = source[srcIdx + 2];
                     result[dstIdx + 3] = source[srcIdx + 3];
                 }
             }
-
             return result;
         }
 
-        /// <summary>
-        /// Checks if a tile with identical pixels already exists in the tile set.
-        /// </summary>
         private static bool IsDuplicateTile(byte[] pixels, TileSet tileSet)
         {
             foreach (var existingTile in tileSet.Tiles)
             {
-                if (existingTile.Pixels.Length != pixels.Length)
-                    continue;
-
+                if (existingTile.Pixels.Length != pixels.Length) continue;
                 bool match = true;
                 for (int i = 0; i < pixels.Length; i++)
-                {
-                    if (existingTile.Pixels[i] != pixels[i])
-                    {
-                        match = false;
-                        break;
-                    }
-                }
-
-                if (match)
-                    return true;
+                    if (existingTile.Pixels[i] != pixels[i]) { match = false; break; }
+                if (match) return true;
             }
-
             return false;
         }
 
-        private void TessellatorBtn_Click(object sender, RoutedEventArgs e)
-        {
-            OpenTessellationWindow();
-        }
+        private void TessellatorBtn_Click(object sender, RoutedEventArgs e) => OpenTessellationWindow();
 
-        /// <summary>
-        /// Opens the tile tessellation window for the selected tile.
-        /// </summary>
         private void OpenTessellationWindow()
         {
-            if (_document?.TileSet == null || _selectedTileId < 0)
-                return;
-
+            if (_document?.TileSet == null || _selectedTileId < 0) return;
             var tile = _document.TileSet.GetTile(_selectedTileId);
-            if (tile == null)
-                return;
+            if (tile == null) return;
 
             var win = new TileTessellationWindow();
             win.BindTile(_document.TileSet, _selectedTileId, _palette, _toolState, _document);
             win.Activate();
 
-            var appW = WindowHost.ApplyChrome(
-                win,
-                resizable: true,
-                alwaysOnTop: false,
-                minimizable: true,
-                title: $"Tile Tessellator - Tile {_selectedTileId}",
-                owner: App.PixlPunktMainWindow);
-
-            // Center on main window
+            var appW = WindowHost.ApplyChrome(win, resizable: true, alwaysOnTop: false, minimizable: true,
+                title: $"Tile Tessellator - Tile {_selectedTileId}", owner: App.PixlPunktMainWindow);
             WindowHost.Place(appW, Core.Enums.WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
 
@@ -405,15 +318,9 @@ namespace PixlPunkt.UI.Tiles
         private void DeleteBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_document?.TileSet == null || _selectedTileId < 0) return;
-
             int deletedId = _selectedTileId;
             bool removed = _document.TileSet.RemoveTile(deletedId);
-
-            if (removed)
-            {
-                // Select next available tile
-                SelectedTileId = TileIds.Count > 0 ? TileIds[0] : -1;
-            }
+            if (removed) SelectedTileId = TileIds.Count > 0 ? TileIds[0] : -1;
         }
 
         //////////////////////////////////////////////////////////////////
@@ -422,82 +329,58 @@ namespace PixlPunkt.UI.Tiles
 
         private void TileCell_Loaded(object sender, RoutedEventArgs e)
         {
-            if (sender is not Grid grid || grid.DataContext is not int tileId)
-                return;
-
-            // Setup selection ring
+            if (sender is not Grid grid || grid.DataContext is not int tileId) return;
             UpdateSelectionRing(grid, tileId);
-
-            // Invalidate the canvas to trigger initial draw
-            var canvas = grid.FindName("TileCanvas") as CanvasControl;
+            var canvas = grid.FindName("TileCanvas") as SKXamlCanvas;
             canvas?.Invalidate();
         }
 
-        private void TileCell_Unloaded(object sender, RoutedEventArgs e)
-        {
-            // Cleanup if needed
-        }
+        private void TileCell_Unloaded(object sender, RoutedEventArgs e) { }
 
         private void TileCell_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
         {
-            if (sender is not FrameworkElement element || element.DataContext is not int tileId)
-                return;
-
+            if (sender is not FrameworkElement element || element.DataContext is not int tileId) return;
             SelectedTileId = tileId;
         }
 
         private void TileCell_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
         {
-            if (sender is not FrameworkElement element || element.DataContext is not int tileId)
-                return;
-
-            // Open tessellator on double-click
+            if (sender is not FrameworkElement element || element.DataContext is not int tileId) return;
             _selectedTileId = tileId;
             OpenTessellationWindow();
         }
 
         //////////////////////////////////////////////////////////////////
-        // WIN2D TILE RENDERING
+        // SKIA SHARP TILE RENDERING
         //////////////////////////////////////////////////////////////////
 
-        /// <summary>
-        /// Draws the tile with transparency pattern background using NearestNeighbor interpolation.
-        /// </summary>
-        private void TileCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void TileCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
-            ds.Antialiasing = CanvasAntialiasing.Aliased;
+            if (sender is not SKXamlCanvas skCanvas) return;
 
-            float w = (float)sender.ActualWidth;
-            float h = (float)sender.ActualHeight;
+            var canvas = e.Surface.Canvas;
+            float w = (float)skCanvas.ActualWidth;
+            float h = (float)skCanvas.ActualHeight;
             if (w <= 0 || h <= 0) return;
 
-            // Get tile ID from DataContext
-            if (sender.DataContext is not int tileId || _document?.TileSet == null)
-            {
-                // Just draw pattern background if no tile
-                DrawPatternBackground(sender, ds, w, h);
-                return;
-            }
+            // Get tile ID from parent grid's DataContext
+            int? tileId = null;
+            if (skCanvas.Parent is Grid grid && grid.DataContext is int id)
+                tileId = id;
 
             // Draw transparency pattern background
-            DrawPatternBackground(sender, ds, w, h);
+            DrawPatternBackground(canvas, w, h);
 
-            // Get tile data
-            var tile = _document.TileSet.GetTile(tileId);
-            if (tile?.Pixels == null || tile.Pixels.Length == 0)
-                return;
+            if (tileId == null || _document?.TileSet == null) return;
+
+            var tile = _document.TileSet.GetTile(tileId.Value);
+            if (tile?.Pixels == null || tile.Pixels.Length == 0) return;
 
             // Create bitmap from tile pixels
-            using var bitmap = CanvasBitmap.CreateFromBytes(
-                sender.Device,
-                tile.Pixels,
-                tile.Width,
-                tile.Height,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f);
+            using var bitmap = new SKBitmap(tile.Width, tile.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            System.Runtime.InteropServices.Marshal.Copy(tile.Pixels, 0, bitmap.GetPixels(), tile.Pixels.Length);
 
-            // Calculate destination rect to fit the tile in the cell (centered, scaled uniformly)
+            // Calculate destination rect (centered, scaled uniformly)
             float tileW = tile.Width;
             float tileH = tile.Height;
             float scale = Math.Min(w / tileW, h / tileH);
@@ -506,30 +389,57 @@ namespace PixlPunkt.UI.Tiles
             float destX = (w - destW) / 2;
             float destY = (h - destH) / 2;
 
-            var destRect = new Rect(destX, destY, destW, destH);
-            var srcRect = new Rect(0, 0, tileW, tileH);
+            var destRect = new SKRect(destX, destY, destX + destW, destY + destH);
+            var srcRect = new SKRect(0, 0, tileW, tileH);
 
-            // Draw tile with NearestNeighbor for crisp pixel art
-            ds.DrawImage(
-                bitmap,
-                destRect,
-                srcRect,
-                1.0f,
-                CanvasImageInterpolation.NearestNeighbor);
+            using var paint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
+            canvas.DrawBitmap(bitmap, srcRect, destRect, paint);
         }
 
-        /// <summary>
-        /// Draws the transparency stripe pattern background.
-        /// </summary>
-        private void DrawPatternBackground(CanvasControl sender, CanvasDrawingSession ds, float w, float h)
+        private void DrawPatternBackground(SKCanvas canvas, float w, float h)
         {
-            double dpi = sender.XamlRoot?.RasterizationScale ?? 1.0;
-            var img = _pattern.GetSizedImage(sender.Device, dpi, w, h);
+            var (lightColor, darkColor) = _pattern.CurrentScheme;
 
-            var target = new Rect(0, 0, w, h);
-            var src = new Rect(0, 0, img.SizeInPixels.Width, img.SizeInPixels.Height);
+            int squareSize = 4;
+            EnsureCheckerboardShader(squareSize, lightColor, darkColor);
 
-            ds.DrawImage(img, target, src);
+            if (_checkerboardShader != null)
+            {
+                using var paint = new SKPaint { Shader = _checkerboardShader, IsAntialias = false };
+                canvas.DrawRect(0, 0, w, h, paint);
+            }
+            else
+            {
+                canvas.Clear(new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A));
+            }
+        }
+
+        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
+        {
+            if (_checkerboardBitmap != null && _checkerboardShader != null) return;
+
+            _checkerboardShader?.Dispose();
+            _checkerboardBitmap?.Dispose();
+
+            int tileSize = squareSize * 2;
+            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
+            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
+
+            for (int y = 0; y < tileSize; y++)
+            {
+                for (int x = 0; x < tileSize; x++)
+                {
+                    int cx = x / squareSize;
+                    int cy = y / squareSize;
+                    bool isLight = ((cx + cy) & 1) == 0;
+                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
+                }
+            }
+
+            using var image = SKImage.FromBitmap(_checkerboardBitmap);
+            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
         }
 
         //////////////////////////////////////////////////////////////////
@@ -540,11 +450,7 @@ namespace PixlPunkt.UI.Tiles
         {
             var ring = grid.FindName("SelectionRing") as Border;
             if (ring != null)
-            {
-                ring.Visibility = tileId == _selectedTileId
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
+                ring.Visibility = tileId == _selectedTileId ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void RefreshSelectionRings()
@@ -580,9 +486,7 @@ namespace PixlPunkt.UI.Tiles
                         VisualTreeHelper.GetChild(presenter, 0) is Grid grid)
                     {
                         UpdateSelectionRing(grid, tileId);
-
-                        // Invalidate the tile canvas to redraw
-                        var canvas = grid.FindName("TileCanvas") as CanvasControl;
+                        var canvas = grid.FindName("TileCanvas") as SKXamlCanvas;
                         canvas?.Invalidate();
                     }
                 }

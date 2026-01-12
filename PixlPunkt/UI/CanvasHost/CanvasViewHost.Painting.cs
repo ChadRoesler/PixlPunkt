@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using FluentIcons.Common;
 using Microsoft.UI.Input;
@@ -120,18 +120,9 @@ namespace PixlPunkt.UI.CanvasHost
 
             return (snappedX, snappedY);
         }
+
         /// <summary>
         /// Returns the brush footprint extents around the stamp point for the ACTIVE tool's brush mask.
-        ///
-        /// This is the "belt + suspenders" version:
-        /// - Uses the actual cached BrushOffsets list (built-in shapes or custom brushes)
-        /// - Computes exact min/max dx/dy (so bounds are correct for even sizes AND any asymmetric custom masks)
-        /// - Caches the computed extents per mask instance (no per-move O(n) re-scan unless the mask changes)
-        ///
-        /// Why this matters:
-        /// Tile-mapped undo relies on accurate _liveStrokeMin/Max bounds (see EndLiveTilePropagation).
-        /// If bounds miss even a 1px strip (common with even sizes and symmetric-radius math), those pixels won't be captured
-        /// and undo will "leave ghosts" on the top/left.
         /// </summary>
         private IReadOnlyList<(int dx, int dy)>? _cachedBoundsMask;
         private int _cachedMinDx, _cachedMaxDx, _cachedMinDy, _cachedMaxDy;
@@ -140,7 +131,6 @@ namespace PixlPunkt.UI.CanvasHost
                                            out int minDx, out int minDy,
                                            out int maxDx, out int maxDy)
         {
-            // Fallback to the old symmetric math if we somehow have no settings.
             if (strokeSettings == null)
             {
                 int sz = Math.Max(1, _brushSize);
@@ -152,7 +142,6 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
-            // Resolve the EXACT offsets list that painters iterate.
             IReadOnlyList<(int dx, int dy)> mask;
             if (strokeSettings is ICustomBrushSettings custom && custom.IsCustomBrushSelected)
             {
@@ -166,7 +155,6 @@ namespace PixlPunkt.UI.CanvasHost
                 mask = BrushMaskCache.Shared.GetOffsets(strokeSettings.Shape, strokeSettings.Size);
             }
 
-            // Cache extents for this mask instance.
             if (!ReferenceEquals(mask, _cachedBoundsMask))
             {
                 int minX = 0, maxX = 0, minY = 0, maxY = 0;
@@ -189,12 +177,7 @@ namespace PixlPunkt.UI.CanvasHost
                     }
                 }
 
-                // Defensive: empty mask shouldn't happen, but keep it safe.
-                if (first)
-                {
-                    minX = maxX = 0;
-                    minY = maxY = 0;
-                }
+                if (first) { minX = maxX = 0; minY = maxY = 0; }
 
                 _cachedBoundsMask = mask;
                 _cachedMinDx = minX;
@@ -217,20 +200,14 @@ namespace PixlPunkt.UI.CanvasHost
         {
             var toolId = _toolState?.ActiveToolId ?? ToolIds.Brush;
 
-            // Check for built-in brush tool
             var brushReg = ToolRegistry.Shared.GetById<BrushToolRegistration>(toolId);
-            if (brushReg != null)
-                return brushReg.CreatePainter();
+            if (brushReg != null) return brushReg.CreatePainter();
 
-            // Check for plugin brush tool
             var pluginBrushReg = ToolRegistry.Shared.GetById<PluginBrushToolRegistration>(toolId);
-            if (pluginBrushReg != null)
-                return pluginBrushReg.CreatePainter();
+            if (pluginBrushReg != null) return pluginBrushReg.CreatePainter();
 
-            // Check for shape tool
             var shapeReg = ToolRegistry.Shared.GetById<ShapeToolRegistration>(toolId);
-            if (shapeReg != null)
-                return shapeReg.CreatePainter();
+            if (shapeReg != null) return shapeReg.CreatePainter();
 
             return null;
         }
@@ -239,22 +216,16 @@ namespace PixlPunkt.UI.CanvasHost
         {
             var toolId = _toolState?.ActiveToolId ?? ToolIds.Brush;
 
-            // Check for built-in brush tool
             var brushReg = ToolRegistry.Shared.GetById<BrushToolRegistration>(toolId);
-            if (brushReg != null)
-                return brushReg.StrokeSettings;
+            if (brushReg != null) return brushReg.StrokeSettings;
 
-            // Check for plugin brush tool
             var pluginBrushReg = ToolRegistry.Shared.GetById<PluginBrushToolRegistration>(toolId);
-            if (pluginBrushReg != null)
-                return pluginBrushReg.StrokeSettings;
+            if (pluginBrushReg != null) return pluginBrushReg.StrokeSettings;
 
-            // Check for shape tool (built-in or plugin) - uses IShapeToolRegistration interface
             var shapeReg = ToolRegistry.Shared.GetById<IShapeToolRegistration>(toolId);
             if (shapeReg?.Settings is IStrokeSettings shapeStrokeSettings)
                 return shapeStrokeSettings;
 
-            // Fallback to generic settings lookup
             var registration = ToolRegistry.Shared.GetById(toolId);
             return registration?.Settings as IStrokeSettings;
         }
@@ -268,25 +239,26 @@ namespace PixlPunkt.UI.CanvasHost
             if (Document.ActiveLayer is not RasterLayer rl) return;
 
             bool shiftHeld = IsKeyDown(Windows.System.VirtualKey.Shift);
-
-            // Wire up selection mask if there's an active, non-floating selection
             UpdateStrokeEngineSelectionMask();
-
-            // Begin live tile propagation tracking
             BeginLiveTilePropagation();
+
+            // Suppress live preview updates on Uno Skia platforms during painting
+            RasterLayer.SuppressLivePreviewUpdates = true;
 
             if (TryGetDocWithBrushOverlap(p.Position, out var x, out var y))
             {
                 _isPainting = true;
+                _isActivePainting = true;
                 _pendingStrokeFromOutside = false;
 
-                // Check if this is a shift-line start
+                // Start rapid invalidation timer for Skia platforms
+                StartPaintInvalidationTimer();
+
                 if (shiftHeld)
                 {
                     _shiftLineActive = true;
                     _shiftLineOriginX = x;
                     _shiftLineOriginY = y;
-                    // Don't begin painter yet - we'll draw the line on release
                 }
                 else
                 {
@@ -295,15 +267,12 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_activePainter != null)
                     {
                         _stroke.BeginWithPainter(_activePainter, rl);
-                        LoggingService.Debug("Begin stroke with tool {ToolId} on document {Doc}", _toolState?.ActiveToolId ?? "Missing ActiveToolId", Document.Name ?? "Missing DocumentName");
                     }
 
                     var strokeSettings = GetStrokeSettingsForCurrentTool();
                     if (strokeSettings != null && _activePainter != null)
                     {
                         _stroke.StampAtWithPainter(x, y, _fg, _bgColor, strokeSettings);
-
-                        // Live propagate tile changes
                         GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
                         PropagateLiveTileChanges(x + minDx, y + minDy, x + maxDx, y + maxDy);
                     }
@@ -317,20 +286,20 @@ namespace PixlPunkt.UI.CanvasHost
             else
             {
                 _isPainting = false;
+                _isActivePainting = false;
                 _pendingStrokeFromOutside = true;
                 _hasLastDocPos = false;
                 _didMove = false;
                 _shiftLineActive = false;
             }
 
-            CanvasView.CapturePointer(e.Pointer);
+            _mainCanvas.CapturePointer(e.Pointer);
         }
 
         private void HandleJumbleMoved(Point pos)
         {
             if (Document.ActiveLayer is not RasterLayer rl) return;
 
-            // Get raw document coordinates (even if outside bounds)
             var docPt = _zoom.ScreenToDoc(pos);
             int rawX = (int)Math.Floor(docPt.X);
             int rawY = (int)Math.Floor(docPt.Y);
@@ -339,18 +308,20 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (_pendingStrokeFromOutside)
             {
-                if (!inside)
-                    return;
+                if (!inside) return;
 
                 _pendingStrokeFromOutside = false;
                 _isPainting = true;
+                _isActivePainting = true;
                 _shiftLineActive = false;
+
+                // Start rapid invalidation timer when deferred stroke starts
+                StartPaintInvalidationTimer();
 
                 _activePainter = GetPainterForCurrentTool();
                 if (_activePainter != null)
                 {
                     _stroke.BeginWithPainter(_activePainter, rl);
-                    LoggingService.Debug("Began deferred stroke for tool {ToolId} at {X},{Y}", _toolState?.ActiveToolId ?? "Missing ActiveToolId", x, y);
                 }
 
                 _hasLastDocPos = false;
@@ -359,25 +330,20 @@ namespace PixlPunkt.UI.CanvasHost
                 _lastDocY = y;
             }
 
-            if (!_isPainting)
-                return;
+            if (!_isPainting) return;
 
-            // Shift-line mode: track endpoint even when outside bounds for preview
             if (_shiftLineActive)
             {
                 bool ctrlHeld = IsKeyDown(Windows.System.VirtualKey.Control);
-                // Use raw coordinates so line can extend outside canvas
                 var (targetX, targetY) = ComputeShiftLineTarget(_shiftLineOriginX, _shiftLineOriginY, rawX, rawY, ctrlHeld);
                 _lastDocX = targetX;
                 _lastDocY = targetY;
                 _didMove = true;
-                // Update brush overlay for preview
                 OnBrushMoved(new System.Numerics.Vector2(_hoverX, _hoverY), (float)((_brushSize - 1) * 0.5));
-                CanvasView.Invalidate();
+                ForceInvalidate();
                 return;
             }
 
-            // Normal freehand painting - requires being inside bounds
             if (!inside)
             {
                 _hasLastDocPos = false;
@@ -385,7 +351,6 @@ namespace PixlPunkt.UI.CanvasHost
             }
 
             var strokeSettings = GetStrokeSettingsForCurrentTool();
-            // SAFETY: Verify both the local painter reference AND the stroke engine agree there's an active stroke
             if (_activePainter != null && strokeSettings != null && _stroke.HasActivePainterStroke)
             {
                 GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
@@ -393,8 +358,6 @@ namespace PixlPunkt.UI.CanvasHost
                 if (_hasLastDocPos)
                 {
                     _stroke.StampLineWithPainter(_lastDocX, _lastDocY, x, y, _fg, _bgColor, strokeSettings);
-
-                    // Live propagate - calculate bounds of the line
                     int minX = Math.Min(_lastDocX, x) + minDx;
                     int minY = Math.Min(_lastDocY, y) + minDy;
                     int maxX = Math.Max(_lastDocX, x) + maxDx;
@@ -404,8 +367,6 @@ namespace PixlPunkt.UI.CanvasHost
                 else
                 {
                     _stroke.StampAtWithPainter(x, y, _fg, _bgColor, strokeSettings);
-
-                    // Live propagate tile changes
                     PropagateLiveTileChanges(x + minDx, y + minDy, x + maxDx, y + maxDy);
                 }
 
@@ -416,7 +377,11 @@ namespace PixlPunkt.UI.CanvasHost
             _didMove = true;
             _hasLastDocPos = true;
 
-            CanvasView.Invalidate();
+            // Composite the changes to the visible surface
+            Document.CompositeTo(Document.Surface);
+            Document.RaiseDocumentModified();
+            // Timer handles invalidation, but call it explicitly too for responsiveness
+            ForceInvalidate();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -429,14 +394,11 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (TryGetDocInside(p.Position, out var fx, out var fy))
             {
-                // Get fill registration for the fill painter
                 var fillReg = ToolRegistry.Shared.GetById<FillToolRegistration>(ToolIds.Fill);
                 if (fillReg == null) return;
 
-                // Get the icon for the fill tool
                 var icon = fillReg.Settings?.Icon ?? Icon.PaintBucket;
 
-                // Determine if we should use selection masking
                 bool hasActiveSelection = _selState?.Active == true && !(_selState?.Floating ?? true);
                 Func<int, int, bool>? selectionMask = null;
 
@@ -445,7 +407,6 @@ namespace PixlPunkt.UI.CanvasHost
                     selectionMask = (x, y) => _selRegion.Contains(x, y);
                 }
 
-                // Create fill context from current tool settings
                 var context = new FillContext
                 {
                     Surface = rl.Surface,
@@ -456,24 +417,17 @@ namespace PixlPunkt.UI.CanvasHost
                     SelectionMask = selectionMask
                 };
 
-                // Use the fill painter (default or custom)
                 var result = fillReg.EffectiveFillPainter.FillAt(rl, fx, fy, context);
 
-                // Set the icon on the result
-                if (result != null)
-                {
-                    result.HistoryIcon = icon;
-                }
+                if (result != null) result.HistoryIcon = icon;
 
-                // Push to unified history if result supports it
                 if (result is { CanPushToHistory: true } and IHistoryItem historyItem)
                 {
                     Document.History.Push(historyItem);
-                    LoggingService.Info("Fill performed by tool {ToolId} at {X},{Y} on document {Doc}", _toolState?.ActiveToolId ?? "MissingToolId", fx, fy, Document.Name ?? "MissingDocumentName");
                 }
 
                 UpdateActiveLayerPreview();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 RaiseFrame();
             }
@@ -488,32 +442,29 @@ namespace PixlPunkt.UI.CanvasHost
             if (Document.ActiveLayer is not RasterLayer rl) return;
 
             bool shiftHeld = IsKeyDown(Windows.System.VirtualKey.Shift);
-
-            // Wire up selection mask if there's an active, non-floating selection
             UpdateStrokeEngineSelectionMask();
-
-            // Begin live tile propagation tracking
             BeginLiveTilePropagation();
 
-            // Check if pixel-perfect mode should be used for this stroke
+            // Suppress live preview updates on Uno Skia platforms during painting
+            RasterLayer.SuppressLivePreviewUpdates = true;
+
             _pixelPerfectActive = ShouldUsePixelPerfect() && !shiftHeld;
-            if (_pixelPerfectActive)
-            {
-                _pixelPerfectFilter.Reset();
-            }
+            if (_pixelPerfectActive) _pixelPerfectFilter.Reset();
 
             if (TryGetDocWithBrushOverlap(p.Position, out var x, out var y))
             {
                 _isPainting = true;
+                _isActivePainting = true;
                 _pendingStrokeFromOutside = false;
 
-                // Check if this is a shift-line start
+                // Start rapid invalidation timer for Skia platforms
+                StartPaintInvalidationTimer();
+
                 if (shiftHeld)
                 {
                     _shiftLineActive = true;
                     _shiftLineOriginX = x;
                     _shiftLineOriginY = y;
-                    // Don't begin painter yet - we'll draw the line on release
                 }
                 else
                 {
@@ -522,10 +473,6 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_activePainter != null)
                     {
                         _stroke.BeginWithPainter(_activePainter, rl);
-                        LoggingService.Debug("Paint begin: tool={ToolId}, doc={Doc}, pixelPerfect={PixelPerfect}",
-                            _toolState?.ActiveToolId ?? "Missing ActiveToolId",
-                            Document.Name ?? "Missing DocumentName",
-                            _pixelPerfectActive);
                     }
 
                     var strokeSettings = GetStrokeSettingsForCurrentTool();
@@ -533,7 +480,6 @@ namespace PixlPunkt.UI.CanvasHost
                     {
                         if (_pixelPerfectActive)
                         {
-                            // Use pixel-perfect filter - first point is always drawn
                             _pixelPerfectFilter.FilterWithLookahead(x, y, out bool shouldDraw, out int drawX, out int drawY);
                             if (shouldDraw)
                             {
@@ -545,12 +491,10 @@ namespace PixlPunkt.UI.CanvasHost
                         else
                         {
                             _stroke.StampAtWithPainter(x, y, _fg, _bgColor, strokeSettings);
-                            // Live propagate tile changes
                             GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
                             PropagateLiveTileChanges(x + minDx, x + maxDx, y + minDy, y + maxDy);
                         }
 
-                        // Recomposite for live preview and notify external listeners
                         Document.CompositeTo(Document.Surface);
                         Document.RaiseDocumentModified();
                     }
@@ -564,32 +508,26 @@ namespace PixlPunkt.UI.CanvasHost
             else
             {
                 _isPainting = false;
+                _isActivePainting = false;
                 _pendingStrokeFromOutside = true;
                 _hasLastDocPos = false;
                 _didMove = false;
                 _shiftLineActive = false;
             }
 
-            CanvasView.CapturePointer(e.Pointer);
+            _mainCanvas.CapturePointer(e.Pointer);
         }
 
-        /// <summary>
-        /// Updates the StrokeEngine's selection mask based on the current selection state.
-        /// When a non-floating selection is active, painting is constrained to selected pixels.
-        /// </summary>
         private void UpdateStrokeEngineSelectionMask()
         {
-            // Only constrain painting when there's an active, non-floating selection
             bool hasActiveSelection = _selState?.Active == true && !(_selState?.Floating ?? true);
 
             if (hasActiveSelection && !_selRegion.IsEmpty)
             {
-                // Wire up the selection region's Contains method as the mask
                 _stroke.SetSelectionMask((x, y) => _selRegion.Contains(x, y));
             }
             else
             {
-                // No active selection - clear the mask so painting is unconstrained
                 _stroke.SetSelectionMask(null);
             }
         }
@@ -598,7 +536,6 @@ namespace PixlPunkt.UI.CanvasHost
         {
             if (Document.ActiveLayer is not RasterLayer rl) return;
 
-            // Get raw document coordinates (even if outside bounds)
             var docPt = _zoom.ScreenToDoc(pos);
             int rawX = (int)Math.Floor(docPt.X);
             int rawY = (int)Math.Floor(docPt.Y);
@@ -611,19 +548,18 @@ namespace PixlPunkt.UI.CanvasHost
 
                 _pendingStrokeFromOutside = false;
                 _isPainting = true;
+                _isActivePainting = true;
                 _shiftLineActive = false;
 
-                // Reset pixel-perfect filter for deferred strokes
-                if (_pixelPerfectActive)
-                {
-                    _pixelPerfectFilter.Reset();
-                }
+                // Start rapid invalidation timer when deferred stroke starts
+                StartPaintInvalidationTimer();
+
+                if (_pixelPerfectActive) _pixelPerfectFilter.Reset();
 
                 _activePainter = GetPainterForCurrentTool();
                 if (_activePainter != null)
                 {
                     _stroke.BeginWithPainter(_activePainter, rl);
-                    LoggingService.Debug("Deferred paint started: tool={ToolId}", _toolState?.ActiveToolId ?? "Missing ActiveToolId");
                 }
 
                 _hasLastDocPos = false;
@@ -636,22 +572,18 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (!_isPainting) return;
 
-            // Shift-line mode: track endpoint even when outside bounds for preview
             if (_shiftLineActive)
             {
                 bool ctrlHeld = IsKeyDown(Windows.System.VirtualKey.Control);
-                // Use raw coordinates so line can extend outside canvas
                 var (targetX, targetY) = ComputeShiftLineTarget(_shiftLineOriginX, _shiftLineOriginY, rawX, rawY, ctrlHeld);
                 _lastDocX = targetX;
                 _lastDocY = targetY;
                 _didMove = true;
-                // Update brush overlay for preview
                 OnBrushMoved(new System.Numerics.Vector2(_hoverX, _hoverY), (float)((_brushSize - 1) * 0.5));
-                CanvasView.Invalidate();
+                ForceInvalidate();
                 return;
             }
 
-            // Normal freehand painting - requires being inside bounds
             if (!inside)
             {
                 _hasLastDocPos = false;
@@ -659,14 +591,12 @@ namespace PixlPunkt.UI.CanvasHost
             }
 
             var strokeSettings = GetStrokeSettingsForCurrentTool();
-            // SAFETY: Verify both the local painter reference AND the stroke engine agree there's an active stroke
             if (_activePainter != null && strokeSettings != null && _stroke.HasActivePainterStroke)
             {
                 GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
 
                 if (_pixelPerfectActive)
                 {
-                    // Pixel-perfect mode: filter input through lookahead algorithm
                     _pixelPerfectFilter.FilterWithLookahead(x, y, out bool shouldDraw, out int drawX, out int drawY);
 
                     if (shouldDraw)
@@ -676,7 +606,6 @@ namespace PixlPunkt.UI.CanvasHost
                             _stroke.StampLineWithPainter(_lastDocX, _lastDocY, drawX, drawY, _fg, _bgColor, strokeSettings);
                             _didMove = true;
 
-                            // Live propagate - calculate bounds of the line
                             int lineMinX = Math.Min(_lastDocX, drawX) + minDx;
                             int lineMinY = Math.Min(_lastDocY, drawY) + minDy;
                             int lineMaxX = Math.Max(_lastDocX, drawX) + maxDx;
@@ -694,17 +623,14 @@ namespace PixlPunkt.UI.CanvasHost
                         _lastDocY = drawY;
                         _hasLastDocPos = true;
                     }
-                    // If shouldDraw is false, the filter is buffering - don't update lastDoc
                 }
                 else
                 {
-                    // Normal mode - draw immediately
                     if (_hasLastDocPos)
                     {
                         _stroke.StampLineWithPainter(_lastDocX, _lastDocY, x, y, _fg, _bgColor, strokeSettings);
                         _didMove = true;
 
-                        // Live propagate - calculate bounds of the line
                         int lineMinX = Math.Min(_lastDocX, x) + minDx;
                         int lineMinY = Math.Min(_lastDocY, y) + minDy;
                         int lineMaxX = Math.Max(_lastDocX, x) + maxDx;
@@ -715,8 +641,6 @@ namespace PixlPunkt.UI.CanvasHost
                     {
                         _stroke.StampAtWithPainter(x, y, _fg, _bgColor, strokeSettings);
                         _didMove = true;
-
-                        // Live propagate tile changes
                         PropagateLiveTileChanges(x + minDx, y + minDy, x + maxDx, y + maxDy);
                     }
 
@@ -728,27 +652,20 @@ namespace PixlPunkt.UI.CanvasHost
             }
             else if (!_pixelPerfectActive)
             {
-                // Only update last position when not using pixel-perfect
-                // (pixel-perfect manages its own lastDoc state)
                 _lastDocX = x;
                 _lastDocY = y;
                 _hasLastDocPos = true;
             }
 
-            // Recomposite for live preview and notify external listeners (e.g., TileFrameEditorCanvas)
             Document.CompositeTo(Document.Surface);
             Document.RaiseDocumentModified();
-            CanvasView.Invalidate();
+            ForceInvalidate();
         }
 
-        /// <summary>
-        /// Called when painting ends (mouse released). Handles shift-line commit and pixel-perfect flush.
-        /// </summary>
         private void HandlePaintingReleased()
         {
             if (Document.ActiveLayer is not RasterLayer rl) return;
 
-            // If we were in shift-line mode, draw the line now
             if (_shiftLineActive && _isPainting)
             {
                 _activePainter = GetPainterForCurrentTool();
@@ -760,10 +677,8 @@ namespace PixlPunkt.UI.CanvasHost
                 var strokeSettings = GetStrokeSettingsForCurrentTool();
                 if (strokeSettings != null && _activePainter != null)
                 {
-                    // Draw the line from origin to last tracked position
                     _stroke.StampLineWithPainter(_shiftLineOriginX, _shiftLineOriginY, _lastDocX, _lastDocY, _fg, _bgColor, strokeSettings);
 
-                    // Live propagate - calculate bounds of the line
                     GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
 
                     int minX = Math.Min(_shiftLineOriginX, _lastDocX) + minDx;
@@ -774,7 +689,6 @@ namespace PixlPunkt.UI.CanvasHost
                     PropagateLiveTileChanges(minX, minY, maxX, maxY);
                 }
             }
-            // Flush pixel-perfect filter to draw any pending point
             else if (_pixelPerfectActive && _isPainting && _activePainter != null)
             {
                 _pixelPerfectFilter.Flush(out bool shouldDraw, out int drawX, out int drawY);
@@ -807,37 +721,38 @@ namespace PixlPunkt.UI.CanvasHost
         // STROKE COMMIT
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>Commits the current stroke to history, invalidates, and raises frame events.</summary>
         private void CommitStroke()
         {
+            _isActivePainting = false;
+
+            // Re-enable live preview updates now that painting is complete
+            RasterLayer.SuppressLivePreviewUpdates = false;
+
+            // Stop the rapid invalidation timer
+            StopPaintInvalidationTimer();
+
             if (_activePainter != null && _stroke.HasActivePainterStroke)
             {
                 var description = GetDescriptionForCurrentTool();
                 var icon = GetIconForCurrentTool();
                 var result = _stroke.CommitPainter(description, icon);
 
-                // Check if tiles were affected during this stroke (live propagation was active)
                 var tileMappedItem = EndLiveTilePropagation(description);
 
                 if (tileMappedItem != null)
                 {
-                    // Use the tile-mapped history item (includes tile definition changes)
                     tileMappedItem.HistoryIcon = icon;
                     Document.History.Push(tileMappedItem);
-                    LoggingService.Info("Committed stroke with tile mapping: {Description} on {Doc}", description, Document.Name ?? "Missing DocumentName");
                 }
                 else if (result is { CanPushToHistory: true } and Core.History.IHistoryItem historyItem)
                 {
-                    // No tiles affected, use regular history item
                     Document.History.Push(historyItem);
-                    LoggingService.Info("Committed stroke: {Description} on {Doc}", description, Document.Name ?? "Missing DocumentName");
                 }
 
                 _activePainter = null;
             }
             else
             {
-                // No painter active, but still clean up tile propagation state
                 EndLiveTilePropagation("Brush Stroke");
             }
 
@@ -845,20 +760,13 @@ namespace PixlPunkt.UI.CanvasHost
 
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-
-            // Auto-capture keyframe if the active layer has a keyframe at the current animation frame
             AutoCaptureKeyframeIfNeeded();
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             RaiseFrame();
         }
 
-        /// <summary>
-        /// Auto-captures the current layer state to its keyframe if one exists at the current frame,
-        /// or creates a new keyframe if editing on a frame without one (auto-keyframe mode).
-        /// This ensures that edits to a layer are automatically saved to animation keyframes.
-        /// </summary>
         private void AutoCaptureKeyframeIfNeeded()
         {
             if (Document.ActiveLayer is not RasterLayer rl) return;
@@ -866,38 +774,29 @@ namespace PixlPunkt.UI.CanvasHost
             var animState = Document.CanvasAnimationState;
             if (animState == null) return;
 
-            // Check if this layer has a keyframe at the current frame
+            // Always update existing keyframe if one exists at current frame
             if (animState.HasKeyframe(rl, animState.CurrentFrameIndex))
             {
-                // Re-capture the keyframe with the updated pixel data
                 animState.CaptureKeyframe(rl, animState.CurrentFrameIndex);
-                LoggingService.Debug("Auto-captured keyframe for layer {Layer} at frame {Frame}",
-                    rl.Name, animState.CurrentFrameIndex);
+                return;
             }
-            else
+
+            // If AutoKeyframe is enabled, create a new keyframe when editing a layer
+            // that has any keyframes (i.e., is participating in animation)
+            if (animState.AutoKeyframe)
             {
-                // No keyframe exists at this frame - auto-generate one
-                // This enables "edit anywhere, keyframe auto-creates" workflow
                 var track = animState.GetTrackForLayer(rl);
                 if (track != null && track.Keyframes.Count > 0)
                 {
-                    // Only auto-create if the layer already has at least one keyframe
-                    // (indicates it's part of the animation system)
                     animState.CaptureKeyframe(rl, animState.CurrentFrameIndex);
-                    LoggingService.Debug("Auto-created keyframe for layer {Layer} at frame {Frame}",
-                        rl.Name, animState.CurrentFrameIndex);
                 }
             }
         }
 
-        /// <summary>
-        /// Gets a human-readable description for the current tool's operation.
-        /// </summary>
         private string GetDescriptionForCurrentTool()
         {
             var toolId = _toolState?.ActiveToolId ?? ToolIds.Brush;
 
-            // Check if it's a known built-in tool
             var description = toolId switch
             {
                 ToolIds.Brush => "Brush Stroke",
@@ -912,33 +811,25 @@ namespace PixlPunkt.UI.CanvasHost
                 _ => null
             };
 
-            if (description != null)
-                return description;
+            if (description != null) return description;
 
-            // For plugin tools, use the display name
             var registration = ToolRegistry.Shared.GetById(toolId);
             return registration?.DisplayName ?? "Paint";
         }
 
-        /// <summary>
-        /// Gets the icon for the current tool for history display.
-        /// </summary>
         private Icon GetIconForCurrentTool()
         {
             var toolId = _toolState?.ActiveToolId ?? ToolIds.Brush;
 
-            // Get the tool's settings which contains the icon
             var registration = ToolRegistry.Shared.GetById(toolId);
             if (registration?.Settings != null)
             {
                 return registration.Settings.Icon;
             }
 
-            // Fallback to History icon if no settings available
             return Icon.History;
         }
 
-        /// <summary>Raises FrameReady with the current composited pixels.</summary>
         private void RaiseFrame()
         {
             EnsureComposite();
@@ -952,7 +843,6 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 rl.UpdatePreview();
 
-                // Also update mask preview if editing mask
                 if (rl.IsEditingMask && rl.Mask != null)
                 {
                     rl.Mask.UpdatePreview();

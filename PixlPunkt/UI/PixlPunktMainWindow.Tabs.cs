@@ -182,6 +182,10 @@ namespace PixlPunkt.UI
             // For brush templates, we use a single layer (16x16 canvas)
             // No special layer setup needed - default layer works
 
+            // Apply animation defaults from app settings
+            doc.CanvasAnimationState.ApplyDefaults();
+            doc.TileAnimationState.ApplyDefaults();
+
             _workspace.Add(doc);
             _documentPaths[doc] = null;
 

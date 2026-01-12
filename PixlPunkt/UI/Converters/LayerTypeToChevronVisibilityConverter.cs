@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 using PixlPunkt.Core.Document.Layer;
@@ -23,7 +23,7 @@ namespace PixlPunkt.UI.Converters
     /// <para><strong>XAML Usage:</strong></para>
     /// <code>
     /// &lt;TextBlock Text="▼" 
-    ///            Visibility="{x:Bind Layer, Converter={StaticResource LayerTypeToChevron}}" /&gt;
+    ///            Visibility="{Binding Layer, Converter={StaticResource LayerTypeToChevron}}" /&gt;
     /// </code>
     /// <para><strong>Use Cases:</strong></para>
     /// <para>

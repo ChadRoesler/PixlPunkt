@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml.Data;
 
 namespace PixlPunkt.UI.Converters
@@ -24,7 +24,7 @@ namespace PixlPunkt.UI.Converters
     /// <code>
     /// &lt;local:LevelToIndentDoubleConverter x:Key="LevelToIndentDouble" Indent="16" /&gt;
     /// 
-    /// &lt;Border Width="{x:Bind Depth, Converter={StaticResource LevelToIndentDouble}}" /&gt;
+    /// &lt;Border Width="{Binding Depth, Converter={StaticResource LevelToIndentDouble}}" /&gt;
     /// </code>
     /// <para><strong>Use Cases:</strong></para>
     /// <para>

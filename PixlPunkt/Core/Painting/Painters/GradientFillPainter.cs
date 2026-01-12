@@ -7,6 +7,8 @@ using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Painting.Dithering;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
+using GradientStop = PixlPunkt.Core.Tools.Settings.GradientStop;
 
 namespace PixlPunkt.Core.Painting.Painters
 {
@@ -123,7 +125,7 @@ namespace PixlPunkt.Core.Painting.Painters
 
             // Create history item from before/after comparison
             byte[] after = (byte[])pixels.Clone();
-            var rect = new RectInt32(0, 0, width, height);
+            var rect = CreateRect(0, 0, width, height);
             return PixelChangeItem.FromRegion(layer, rect, before, after, "Gradient Fill", Icon.CalendarPattern);
         }
 

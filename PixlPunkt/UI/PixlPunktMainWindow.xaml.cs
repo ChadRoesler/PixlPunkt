@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI;
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -29,6 +28,7 @@ using PixlPunkt.UI.Settings;
 using Windows.Graphics;
 using Windows.System;
 using PixlPunkt.UI.Ascii;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI
 {
@@ -57,7 +57,6 @@ namespace PixlPunkt.UI
         // FIELDS: Window / Workspace
         // ─────────────────────────────────────────────────────────────
 
-        private readonly AppWindow _appWindow;
         private readonly DocumentWorkspace _workspace = new();
         private CanvasViewHost? CurrentHost;
         private bool _suspendToolAccelerators;
@@ -78,6 +77,14 @@ namespace PixlPunkt.UI
         // ─────────────────────────────────────────────────────────────
 
         private readonly AutoSaveService _autoSave = new();
+
+        // ─────────────────────────────────────────────────────────────
+        // FIELDS: Layout refresh for Uno Skia
+        // ─────────────────────────────────────────────────────────────
+
+        private DispatcherTimer? _layoutRefreshTimer;
+        private double _lastRootWidth;
+        private double _lastRootHeight;
 
         // Cached delegates to avoid repeated lambda allocations
         private readonly Action<uint> _onForegroundPicked;
@@ -120,16 +127,21 @@ namespace PixlPunkt.UI
             Root.ActualThemeChanged += (_, __) => SyncStripeTheme();
             SyncStripeTheme();
 
+            // Workaround for Uno Skia layout issue: force Grid layout refresh on window resize
+            // Without this, pixel-width columns may not properly position their children
+            // Use throttled handler to reduce GC pressure
+            Root.SizeChanged += OnRootSizeChanged;
+
             // Apply custom window chrome (resizable, proper title bar merging)
-            _appWindow = WindowHost.ApplyChrome(
+            WindowHost.ApplyChrome(
                 this,
                 resizable: true,
                 alwaysOnTop: false,
                 minimizable: true,
+                maximizable: true,
                 title: "Pixl Punkt");
 
-            // Wire up window closing event for unsaved changes check
-            _appWindow.Closing += OnWindowClosing;
+            // Note: Window closing handled via Closed event in Uno
 
             // Collect tool accelerators defined in XAML (B,E,F,R,G,J,U etc.)
             foreach (var accel in Root.KeyboardAccelerators)
@@ -142,6 +154,15 @@ namespace PixlPunkt.UI
 
             Root.GotFocus += OnAnyGotFocus;
             Root.LostFocus += OnAnyLostFocus;
+
+            // ─────────────────────────────────────────────────────────────────
+            // SKIA KEYBOARD FIX: Ensure Root maintains keyboard focus
+            // On Uno Skia platforms, KeyDown events only fire when the element
+            // has focus. We need to aggressively restore focus to Root after
+            // any interaction that might steal it (clicking buttons, panels, etc.)
+            // ─────────────────────────────────────────────────────────────────
+            Root.PointerPressed += OnRootPointerPressed;
+
             SetupMergedTitleBar();
 
             // Palette / tool initialization - track if configured palette failed to load
@@ -330,57 +351,12 @@ namespace PixlPunkt.UI
 
         private bool _closingHandled = false;
 
-        private async void OnWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+        private void OnWindowClosed(object sender, WindowEventArgs args)
         {
             // Prevent re-entrancy
             if (_closingHandled) return;
-
-            // Check for any documents with unsaved changes
-            var dirtyDocs = GetDocumentsWithUnsavedChanges();
-            if (dirtyDocs.Count == 0)
-            {
-                // No unsaved changes - mark clean exit and allow close
-                MarkSessionCleanExit();
-                return;
-            }
-
-            // Cancel the close to show dialog
-            args.Cancel = true;
-
-            // Show confirmation dialog
-            var result = await PromptSaveAllChangesAsync(dirtyDocs);
-
-            if (result == SaveChangesResult.Cancel)
-            {
-                // User cancelled - don't close
-                return;
-            }
-
-            if (result == SaveChangesResult.Save)
-            {
-                // Try to save all dirty documents
-                foreach (var doc in dirtyDocs)
-                {
-                    var saved = await TrySaveDocumentAsync(doc);
-                    if (!saved)
-                    {
-                        // Save failed or cancelled - don't close
-                        return;
-                    }
-                }
-            }
-            // SaveChangesResult.DontSave - proceed with closing without saving
-
-            // Mark clean exit before closing
-            MarkSessionCleanExit();
-
-            // Mark as handled and close
             _closingHandled = true;
-            Close();
-        }
 
-        private void OnWindowClosed(object sender, WindowEventArgs args)
-        {
             // Stop and dispose auto-save service
             _autoSave.Dispose();
 
@@ -487,22 +463,65 @@ namespace PixlPunkt.UI
         // ─────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Configures extended title bar and adjusts padding to avoid overlap with caption buttons.
+        /// Configures the title bar based on platform capabilities.
+        /// On Windows: Extends content into title bar for a seamless menu bar.
+        /// On Linux/macOS: Uses standard window chrome with the menu bar below the native title bar.
         /// </summary>
         private void SetupMergedTitleBar()
         {
+#if WINDOWS
+            // On Windows, extend content into title bar for seamless menu bar
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(TitleBarRoot);
-
-            if (AppWindowTitleBar.IsCustomizationSupported())
+            
+            // Configure title bar colors to match theme
+            try
             {
-                var tb = _appWindow.TitleBar;
-                tb.ExtendsContentIntoTitleBar = true;
-                tb.ButtonBackgroundColor = Colors.Transparent;
-                tb.ButtonInactiveBackgroundColor = Colors.Transparent;
-                tb.ButtonForegroundColor = Colors.White;
-                TitleBarRoot.Padding = new Thickness(0, 0, tb.RightInset, 0);
+                var appWindow = this.AppWindow;
+                if (appWindow?.TitleBar != null)
+                {
+                    var titleBar = appWindow.TitleBar;
+                    
+                    // Get theme-appropriate colors
+                    var isDark = Root.ActualTheme == ElementTheme.Dark;
+                    var bgColor = isDark 
+                        ? Windows.UI.Color.FromArgb(255, 32, 32, 32)
+                        : Windows.UI.Color.FromArgb(255, 243, 243, 243);
+                    var fgColor = isDark
+                        ? Windows.UI.Color.FromArgb(255, 255, 255, 255)
+                        : Windows.UI.Color.FromArgb(255, 0, 0, 0);
+                    var inactiveFgColor = isDark
+                        ? Windows.UI.Color.FromArgb(255, 128, 128, 128)
+                        : Windows.UI.Color.FromArgb(255, 128, 128, 128);
+                    
+                    titleBar.BackgroundColor = bgColor;
+                    titleBar.ForegroundColor = fgColor;
+                    titleBar.InactiveBackgroundColor = bgColor;
+                    titleBar.InactiveForegroundColor = inactiveFgColor;
+                    titleBar.ButtonBackgroundColor = bgColor;
+                    titleBar.ButtonForegroundColor = fgColor;
+                    titleBar.ButtonInactiveBackgroundColor = bgColor;
+                    titleBar.ButtonInactiveForegroundColor = inactiveFgColor;
+                    titleBar.ButtonHoverBackgroundColor = isDark
+                        ? Windows.UI.Color.FromArgb(255, 64, 64, 64)
+                        : Windows.UI.Color.FromArgb(255, 220, 220, 220);
+                    titleBar.ButtonHoverForegroundColor = fgColor;
+                    titleBar.ButtonPressedBackgroundColor = isDark
+                        ? Windows.UI.Color.FromArgb(255, 96, 96, 96)
+                        : Windows.UI.Color.FromArgb(255, 200, 200, 200);
+                    titleBar.ButtonPressedForegroundColor = fgColor;
+                }
             }
+            catch (Exception ex)
+            {
+                Core.Logging.LoggingService.Debug("Failed to configure title bar colors: {Error}", ex.Message);
+            }
+#else
+            // On Linux/macOS (Skia), use standard window chrome
+            // The native window manager provides the title bar
+            // The menu bar (TitleBarRoot) remains visible as a regular menu bar
+            ExtendsContentIntoTitleBar = false;
+#endif
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -518,7 +537,6 @@ namespace PixlPunkt.UI
             return focused switch
             {
                 TextBox => true,
-                PasswordBox => true,
                 RichEditBox => true,
                 AutoSuggestBox => true,
                 NumberBox => true,
@@ -529,7 +547,6 @@ namespace PixlPunkt.UI
 
         /// <summary>
         /// Checks if a control that might intercept keyboard shortcuts has focus.
-        /// This includes text inputs plus list controls that handle keyboard navigation.
         /// </summary>
         private static bool IsKeyboardCapturingControlFocused()
         {
@@ -537,13 +554,10 @@ namespace PixlPunkt.UI
             return focused switch
             {
                 TextBox => true,
-                PasswordBox => true,
                 RichEditBox => true,
                 AutoSuggestBox => true,
                 NumberBox => true,
                 ComboBox cb when cb.IsEditable => true,
-                // ListView and ListViewItem can capture arrow keys and other navigation
-                // but should NOT block Ctrl+Z/Y/C/V/X/A shortcuts
                 _ => false
             };
         }
@@ -694,7 +708,7 @@ namespace PixlPunkt.UI
                     var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
                     var w = (int)decoder.PixelWidth;
                     var h = (int)decoder.PixelHeight;
-                    doc = new CanvasDocument(file.Name, w, h, new SizeInt32(8, 8), new SizeInt32(Math.Max(1, w / 8), Math.Max(1, h / 8)));
+                    doc = new CanvasDocument(file.Name, w, h, CreateSize(8, 8), CreateSize(Math.Max(1, w / 8), Math.Max(1, h / 8)));
                 }
                 else
                 {
@@ -1164,6 +1178,29 @@ namespace PixlPunkt.UI
             SuspendToolAccelerators(false);
         }
 
+        /// <summary>
+        /// Handles pointer press on Root to ensure keyboard focus is restored.
+        /// On Uno Skia platforms, KeyDown events only fire when the element has focus.
+        /// This handler ensures that clicking anywhere in the app restores focus to Root,
+        /// enabling tool shortcuts to work properly on desktop Linux and WSL.
+        /// </summary>
+        private void OnRootPointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            // Don't steal focus if clicking on a text input control
+            if (IsTextInputFocused()) return;
+
+            // Defer focus restoration to allow the click to be processed first
+            // This prevents interfering with button clicks, menu interactions, etc.
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                // Only restore focus if we're not in a text input
+                if (!IsTextInputFocused())
+                {
+                    Root.Focus(FocusState.Programmatic);
+                }
+            });
+        }
+
         private void SuspendToolAccelerators(bool suspend)
         {
             if (_suspendToolAccelerators == suspend) return;
@@ -1431,6 +1468,53 @@ namespace PixlPunkt.UI
             };
 
             await ShowDialogGuardedAsync(dlg);
+        }
+
+        /// <summary>
+        /// Handles Root SizeChanged to force layout refresh on Uno Skia platforms.
+        /// This fixes an issue where pixel-width Grid columns don't properly reposition
+        /// their children when the window is resized.
+        /// Uses throttling to reduce GC pressure and prevent layout thrashing.
+        /// </summary>
+        private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            // Skip if the size change is negligible (less than 1 pixel)
+            if (Math.Abs(e.NewSize.Width - _lastRootWidth) < 1 &&
+                Math.Abs(e.NewSize.Height - _lastRootHeight) < 1)
+            {
+                return;
+            }
+
+            _lastRootWidth = e.NewSize.Width;
+            _lastRootHeight = e.NewSize.Height;
+
+            // Throttle layout updates - only apply after resize stops for 50ms
+            _layoutRefreshTimer?.Stop();
+            _layoutRefreshTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(50)
+            };
+            _layoutRefreshTimer.Tick += (_, __) =>
+            {
+                _layoutRefreshTimer?.Stop();
+                _layoutRefreshTimer = null;
+
+                // Force the workspace grid to update its layout
+                // This ensures the right sidebar column stays properly anchored to the window edge
+                if (Root.FindName("WorkspaceGrid") is Grid workspaceGrid)
+                {
+                    workspaceGrid.InvalidateMeasure();
+                    workspaceGrid.InvalidateArrange();
+                }
+
+                // Also update the right sidebar's internal grid
+                if (Root.FindName("RightSidebar") is Grid rightSidebar)
+                {
+                    rightSidebar.InvalidateMeasure();
+                    rightSidebar.InvalidateArrange();
+                }
+            };
+            _layoutRefreshTimer.Start();
         }
     }
 }

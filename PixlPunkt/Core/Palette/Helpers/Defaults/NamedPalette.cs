@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Palette.Helpers.Defaults
+namespace PixlPunkt.Core.Palette.Helpers.Defaults
 {
     /// <summary>
     /// Immutable record representing a named color palette with a display name and color array.

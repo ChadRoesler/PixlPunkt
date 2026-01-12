@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Logging;
-using Windows.Graphics.Imaging;
-using Windows.Storage;
-using Windows.Storage.Streams;
 
 namespace PixlPunkt.Core.Export
 {
@@ -22,25 +20,21 @@ namespace PixlPunkt.Core.Export
         Jpeg,
 
         /// <summary>BMP (no alpha, white background).</summary>
-        Bmp
+        Bmp,
+
+        /// <summary>WebP (with alpha support).</summary>
+        WebP
     }
 
     /// <summary>
     /// Exports animation frames as an image sequence to a folder.
+    /// Uses SkiaSharp for cross-platform image encoding.
     /// </summary>
     public static class ImageSequenceExporter
     {
         /// <summary>
         /// Exports frames to a folder as individual images.
         /// </summary>
-        /// <param name="frames">Frames to export.</param>
-        /// <param name="outputFolder">Target folder path.</param>
-        /// <param name="baseName">Base name for output files (e.g., "frame").</param>
-        /// <param name="format">Image format to use.</param>
-        /// <param name="backgroundColor">Background color for non-alpha formats (BGRA).</param>
-        /// <param name="progress">Optional progress callback.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of exported file paths.</returns>
         public static async Task<List<string>> ExportAsync(
             IReadOnlyList<AnimationExportService.RenderedFrame> frames,
             string outputFolder,
@@ -53,32 +47,33 @@ namespace PixlPunkt.Core.Export
             if (frames == null || frames.Count == 0)
                 throw new ArgumentException("No frames to export", nameof(frames));
 
-            // Ensure folder exists
             Directory.CreateDirectory(outputFolder);
 
             var exportedFiles = new List<string>();
             string extension = GetExtension(format);
-            Guid encoderId = GetEncoderId(format);
+            var skiaFormat = GetSkiaFormat(format);
+            int quality = format == ImageSequenceFormat.Jpeg ? 95 : 100;
 
             LoggingService.Info("Exporting {FrameCount} frames to {Folder} as {Format}",
                 frames.Count, outputFolder, format);
 
-            for (int i = 0; i < frames.Count; i++)
+            await Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                for (int i = 0; i < frames.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                var frame = frames[i];
-                string fileName = $"{baseName}_{i:D5}{extension}";
-                string filePath = Path.Combine(outputFolder, fileName);
+                    var frame = frames[i];
+                    string fileName = $"{baseName}_{i:D5}{extension}";
+                    string filePath = Path.Combine(outputFolder, fileName);
 
-                // Prepare pixels (apply background if needed)
-                byte[] pixels = PreparePixelsForFormat(frame.Pixels, frame.Width, frame.Height, format, backgroundColor);
+                    byte[] pixels = PreparePixelsForFormat(frame.Pixels, frame.Width, frame.Height, format, backgroundColor);
+                    SkiaImageEncoder.Encode(pixels, frame.Width, frame.Height, filePath, skiaFormat, quality);
 
-                await SaveImageAsync(pixels, frame.Width, frame.Height, filePath, encoderId, format);
-
-                exportedFiles.Add(filePath);
-                progress?.Report((double)(i + 1) / frames.Count);
-            }
+                    exportedFiles.Add(filePath);
+                    progress?.Report((double)(i + 1) / frames.Count);
+                }
+            }, cancellationToken);
 
             LoggingService.Info("Exported {Count} images to {Folder}", exportedFiles.Count, outputFolder);
 
@@ -88,13 +83,6 @@ namespace PixlPunkt.Core.Export
         /// <summary>
         /// Exports frames grouped by layer to subfolders.
         /// </summary>
-        /// <param name="framesByLayer">Dictionary mapping layer names to their frames.</param>
-        /// <param name="outputFolder">Root output folder.</param>
-        /// <param name="format">Image format to use.</param>
-        /// <param name="backgroundColor">Background color for non-alpha formats.</param>
-        /// <param name="progress">Optional progress callback.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Dictionary mapping layer names to their exported file paths.</returns>
         public static async Task<Dictionary<string, List<string>>> ExportByLayerAsync(
             Dictionary<string, List<AnimationExportService.RenderedFrame>> framesByLayer,
             string outputFolder,
@@ -111,78 +99,74 @@ namespace PixlPunkt.Core.Export
             foreach (var kvp in framesByLayer)
                 totalFrames += kvp.Value.Count;
 
-            int processedFrames = 0;
             string extension = GetExtension(format);
-            Guid encoderId = GetEncoderId(format);
+            var skiaFormat = GetSkiaFormat(format);
+            int quality = format == ImageSequenceFormat.Jpeg ? 95 : 100;
 
             LoggingService.Info("Exporting {LayerCount} layers ({TotalFrames} total frames) to {Folder}",
                 framesByLayer.Count, totalFrames, outputFolder);
 
-            foreach (var kvp in framesByLayer)
+            int processedFrames = 0;
+
+            await Task.Run(() =>
             {
-                string layerName = kvp.Key;
-                var frames = kvp.Value;
-
-                // Create subfolder for this layer
-                string layerFolder = Path.Combine(outputFolder, SanitizeFolderName(layerName));
-                Directory.CreateDirectory(layerFolder);
-
-                var layerFiles = new List<string>();
-
-                for (int i = 0; i < frames.Count; i++)
+                foreach (var kvp in framesByLayer)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    string layerName = kvp.Key;
+                    var frames = kvp.Value;
 
-                    var frame = frames[i];
-                    string fileName = $"{layerName}_{i:D5}{extension}";
-                    string filePath = Path.Combine(layerFolder, fileName);
+                    string layerFolder = Path.Combine(outputFolder, SanitizeFolderName(layerName));
+                    Directory.CreateDirectory(layerFolder);
 
-                    byte[] pixels = PreparePixelsForFormat(frame.Pixels, frame.Width, frame.Height, format, backgroundColor);
-                    await SaveImageAsync(pixels, frame.Width, frame.Height, filePath, encoderId, format);
+                    var layerFiles = new List<string>();
 
-                    layerFiles.Add(filePath);
-                    processedFrames++;
-                    progress?.Report((double)processedFrames / totalFrames);
+                    for (int i = 0; i < frames.Count; i++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        var frame = frames[i];
+                        string fileName = $"{layerName}_{i:D5}{extension}";
+                        string filePath = Path.Combine(layerFolder, fileName);
+
+                        byte[] pixels = PreparePixelsForFormat(frame.Pixels, frame.Width, frame.Height, format, backgroundColor);
+                        SkiaImageEncoder.Encode(pixels, frame.Width, frame.Height, filePath, skiaFormat, quality);
+
+                        layerFiles.Add(filePath);
+                        processedFrames++;
+                        progress?.Report((double)processedFrames / totalFrames);
+                    }
+
+                    result[layerName] = layerFiles;
                 }
-
-                result[layerName] = layerFiles;
-            }
+            }, cancellationToken);
 
             LoggingService.Info("Exported {LayerCount} layers to {Folder}", result.Count, outputFolder);
 
             return result;
         }
 
-        //////////////////////////////////////////////////////////////////
-        // PRIVATE HELPERS
-        //////////////////////////////////////////////////////////////////
-
-        private static string GetExtension(ImageSequenceFormat format)
+        private static string GetExtension(ImageSequenceFormat format) => format switch
         {
-            return format switch
-            {
-                ImageSequenceFormat.Png => ".png",
-                ImageSequenceFormat.Jpeg => ".jpg",
-                ImageSequenceFormat.Bmp => ".bmp",
-                _ => ".png"
-            };
-        }
+            ImageSequenceFormat.Png => ".png",
+            ImageSequenceFormat.Jpeg => ".jpg",
+            ImageSequenceFormat.Bmp => ".bmp",
+            ImageSequenceFormat.WebP => ".webp",
+            _ => ".png"
+        };
 
-        private static Guid GetEncoderId(ImageSequenceFormat format)
+        private static SkiaImageEncoder.ImageFormat GetSkiaFormat(ImageSequenceFormat format) => format switch
         {
-            return format switch
-            {
-                ImageSequenceFormat.Png => BitmapEncoder.PngEncoderId,
-                ImageSequenceFormat.Jpeg => BitmapEncoder.JpegEncoderId,
-                ImageSequenceFormat.Bmp => BitmapEncoder.BmpEncoderId,
-                _ => BitmapEncoder.PngEncoderId
-            };
-        }
+            ImageSequenceFormat.Png => SkiaImageEncoder.ImageFormat.Png,
+            ImageSequenceFormat.Jpeg => SkiaImageEncoder.ImageFormat.Jpeg,
+            ImageSequenceFormat.Bmp => SkiaImageEncoder.ImageFormat.Bmp,
+            ImageSequenceFormat.WebP => SkiaImageEncoder.ImageFormat.Webp,
+            _ => SkiaImageEncoder.ImageFormat.Png
+        };
 
         private static byte[] PreparePixelsForFormat(byte[] pixels, int width, int height, ImageSequenceFormat format, uint backgroundColor)
         {
-            // PNG supports alpha, so return as-is
-            if (format == ImageSequenceFormat.Png)
+            // PNG and WebP support alpha
+            if (format == ImageSequenceFormat.Png || format == ImageSequenceFormat.WebP)
                 return pixels;
 
             // JPEG/BMP need alpha composited over background
@@ -215,7 +199,6 @@ namespace PixlPunkt.Core.Export
                 }
                 else
                 {
-                    // Alpha blend over background
                     int invA = 255 - a;
                     result[i + 0] = (byte)((b * a + bgB * invA) / 255);
                     result[i + 1] = (byte)((g * a + bgG * invA) / 255);
@@ -225,34 +208,6 @@ namespace PixlPunkt.Core.Export
             }
 
             return result;
-        }
-
-        private static async Task SaveImageAsync(byte[] pixels, int width, int height, string filePath, Guid encoderId, ImageSequenceFormat format)
-        {
-            using var stream = File.Create(filePath);
-            using var randomAccessStream = stream.AsRandomAccessStream();
-
-            var encoder = await BitmapEncoder.CreateAsync(encoderId, randomAccessStream);
-
-            // Set JPEG quality if applicable
-            if (format == ImageSequenceFormat.Jpeg)
-            {
-                var props = new BitmapPropertySet
-                {
-                    { "ImageQuality", new BitmapTypedValue(0.95f, Windows.Foundation.PropertyType.Single) }
-                };
-                await encoder.BitmapProperties.SetPropertiesAsync(props);
-            }
-
-            encoder.SetPixelData(
-                BitmapPixelFormat.Bgra8,
-                format == ImageSequenceFormat.Png ? BitmapAlphaMode.Premultiplied : BitmapAlphaMode.Ignore,
-                (uint)width,
-                (uint)height,
-                96, 96,
-                pixels);
-
-            await encoder.FlushAsync();
         }
 
         private static string SanitizeFolderName(string name)

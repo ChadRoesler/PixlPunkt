@@ -1,14 +1,11 @@
 using System;
-using System.Numerics;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.Brushes;
-using Microsoft.Graphics.Canvas.UI.Xaml;
-using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Coloring.Helpers;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.Foundation;
 
 namespace PixlPunkt.UI.ColorPick.Controls
@@ -37,7 +34,10 @@ namespace PixlPunkt.UI.ColorPick.Controls
         private bool _drag;
         private uint _pid;
         private bool _invalidateGradient = true;
-        private CanvasRenderTarget? _cache;
+        private SKBitmap? _cache;
+        private int _lastCacheWidth;
+        private int _lastCacheHeight;
+
         private const float HANDLE_W = 12f;
         private const float HANDLE_H = 18f;
         private const float HANDLE_R = 6f;
@@ -73,7 +73,6 @@ namespace PixlPunkt.UI.ColorPick.Controls
             {
                 bool left = e.Key == Windows.System.VirtualKey.Left;
 
-                // Use modern WinUI 3 API for checking modifier keys
                 var shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift);
                 var ctrlState = InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
                 bool shift = shiftState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
@@ -108,48 +107,54 @@ namespace PixlPunkt.UI.ColorPick.Controls
             return h;
         }
 
-        private void Canvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void Canvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
-            float W = (float)sender.ActualWidth;
-            float H = (float)sender.ActualHeight;
-            var paint = new Rect(INSET, 0, Math.Max(1, W - 2 * INSET), H);
+            var canvas = e.Surface.Canvas;
+            float W = (float)PART_Canvas.ActualWidth;
+            float H = (float)PART_Canvas.ActualHeight;
 
+            canvas.Clear(SKColors.Transparent);
+
+            var paintRect = new SKRect(INSET, 0, Math.Max(INSET + 1, W - INSET), H);
+            int paintW = Math.Max(1, (int)paintRect.Width);
+            int paintH = Math.Max(1, (int)H);
+
+            // Build gradient cache
             if (_invalidateGradient || _cache == null ||
-                _cache.Size.Width != paint.Width || _cache.Size.Height != paint.Height)
+                _lastCacheWidth != paintW || _lastCacheHeight != paintH)
             {
                 _cache?.Dispose();
-                _cache = new CanvasRenderTarget(sender, (float)paint.Width, (float)paint.Height);
-                using (var gds = _cache.CreateDrawingSession())
+                _cache = new SKBitmap(paintW, paintH, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+                for (int x = 0; x < paintW; x++)
                 {
-                    int steps = 60;
-                    float seg = (float)paint.Width / steps;
-                    for (int i = 0; i < steps; i++)
-                    {
-                        double h0 = 360.0 * i / steps;
-                        double h1 = 360.0 * (i + 1) / steps;
-                        var c0 = ColorUtil.FromHSL(h0, 1, 0.5, 255);
-                        var c1 = ColorUtil.FromHSL(h1, 1, 0.5, 255);
-                        float x = i * seg;
-                        using var gb = new CanvasLinearGradientBrush(sender, c0, c1)
-                        {
-                            StartPoint = new Vector2(x, 0),
-                            EndPoint = new Vector2(x + seg, 0)
-                        };
-                        gds.FillRectangle(new Rect(x, 0, seg + 1, H), gb);
-                    }
+                    double h = 360.0 * x / (paintW - 1);
+                    var c = ColorUtil.FromHSL(h, 1, 0.5, 255);
+                    var skColor = new SKColor(c.R, c.G, c.B, c.A);
+
+                    for (int y = 0; y < paintH; y++)
+                        _cache.SetPixel(x, y, skColor);
                 }
+
+                _lastCacheWidth = paintW;
+                _lastCacheHeight = paintH;
                 _invalidateGradient = false;
             }
 
-            ds.DrawImage(_cache, new Vector2((float)paint.X, 0));
+            // Draw gradient
+            canvas.DrawBitmap(_cache, paintRect.Left, 0);
 
             // Selection Pill
-            float ix = (float)(paint.X + (Hue / 360.0) * paint.Width);
-            var rect = new Rect(ix - HANDLE_W / 2f, H / 2f - HANDLE_H / 2f, HANDLE_W, HANDLE_H);
-            var inner = new Rect(rect.X + 1.2f, rect.Y + 1.2f, rect.Width - 2.4f, rect.Height - 2.4f);
-            ds.DrawRoundedRectangle(rect, HANDLE_R, HANDLE_R, Colors.Black, 2f);
-            ds.DrawRoundedRectangle(inner, HANDLE_R - 1.2f, HANDLE_R - 1.2f, Colors.White, 1.5f);
+            float ix = paintRect.Left + (float)(Hue / 360.0) * paintRect.Width;
+            var rect = new SKRect(ix - HANDLE_W / 2f, H / 2f - HANDLE_H / 2f,
+                                  ix + HANDLE_W / 2f, H / 2f + HANDLE_H / 2f);
+            var inner = new SKRect(rect.Left + 1.2f, rect.Top + 1.2f, rect.Right - 1.2f, rect.Bottom - 1.2f);
+
+            using var blackPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 2f, IsAntialias = true };
+            using var whitePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.White, StrokeWidth = 1.5f, IsAntialias = true };
+
+            canvas.DrawRoundRect(rect, HANDLE_R, HANDLE_R, blackPaint);
+            canvas.DrawRoundRect(inner, HANDLE_R - 1.2f, HANDLE_R - 1.2f, whitePaint);
         }
 
         private void Canvas_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -179,8 +184,8 @@ namespace PixlPunkt.UI.ColorPick.Controls
         private void UpdateFromPoint(Point p, bool live)
         {
             float W = (float)PART_Canvas.ActualWidth;
-            var paint = new Rect(INSET, 0, Math.Max(1, W - 2 * INSET), 1);
-            double h = Math.Clamp((p.X - paint.X) / paint.Width, 0, 1) * 360.0;
+            var paintRect = new SKRect(INSET, 0, Math.Max(INSET + 1, W - INSET), 1);
+            double h = Math.Clamp((p.X - paintRect.Left) / paintRect.Width, 0, 1) * 360.0;
             Hue = h;
             PART_Canvas.Invalidate();
             if (live) HueChanging?.Invoke(this, Hue);

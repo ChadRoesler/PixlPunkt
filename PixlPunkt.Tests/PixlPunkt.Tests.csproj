@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="GitHubActionsTestLogger">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- 
+    Pass through SkiaOnly/WinAppSdkOnly/DesktopOnly properties to the referenced project.
+    This ensures that when building/testing on CI runners without mobile workloads,
+    we don't try to restore Android/iOS target frameworks.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\PixlPunkt\PixlPunkt.csproj">
+      <AdditionalProperties>SkiaOnly=$(SkiaOnly);WinAppSdkOnly=$(WinAppSdkOnly);DesktopOnly=$(DesktopOnly)</AdditionalProperties>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

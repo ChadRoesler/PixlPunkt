@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Constants
+namespace PixlPunkt.Constants
 {
     /// <summary>
     /// Localized string constants for dialog messages and UI text.

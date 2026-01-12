@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Structs
+namespace PixlPunkt.Core.Structs
 {
     /// <summary>
     /// Accumulation record tracking pixel state during a stroke.

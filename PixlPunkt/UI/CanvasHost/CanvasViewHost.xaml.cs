@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Numerics;
-using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Document.Layer;
@@ -12,6 +12,7 @@ using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Painting;
 using PixlPunkt.Core.Palette;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Structs;
 using PixlPunkt.Core.Symmetry;
@@ -19,13 +20,21 @@ using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Viewport;
 using PixlPunkt.UI.Helpers;
 using PixlPunkt.UI.Rendering;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
+#if HAS_UNO
+using Uno.WinUI.Graphics2DSK;
+#endif
 using Windows.Graphics;
 using Windows.UI;
+using PixlPunkt.Core.Platform;
+using Microsoft.UI.Dispatching;
 
 namespace PixlPunkt.UI.CanvasHost
 {
     /// <summary>
-    /// Hosts a Win2D CanvasControl for rendering and interacting with a pixel-art document.
+    /// Hosts an SKCanvasElement for rendering and interacting with a pixel-art document.
+    /// Uses Uno's direct Skia integration for hardware-accelerated rendering.
     /// 
     /// This is the core partial class containing:
     /// - Fields and properties
@@ -100,6 +109,72 @@ namespace PixlPunkt.UI.CanvasHost
         public uint ForegroundColor => _fg;
 
         // ════════════════════════════════════════════════════════════════════
+        // FIELDS - SKCANVASELEMENT INSTANCES (Uno platforms)
+        // ════════════════════════════════════════════════════════════════════
+
+#if HAS_UNO
+        /// <summary>Main canvas element using SKCanvasElement for hardware-accelerated rendering.</summary>
+        private MainCanvasElement? _mainCanvasElement;
+
+        /// <summary>Horizontal ruler element.</summary>
+        private HorizontalRulerElement? _horizontalRulerElement;
+
+        /// <summary>Vertical ruler element.</summary>
+        private VerticalRulerElement? _verticalRulerElement;
+#endif
+
+        // ════════════════════════════════════════════════════════════════════
+        // FIELDS - SKXAMLCANVAS INSTANCES (WinAppSdk fallback)
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>Main canvas using SKXamlCanvas (WinAppSdk fallback).</summary>
+        private SKXamlCanvas? _mainCanvasXaml;
+
+        /// <summary>Horizontal ruler using SKXamlCanvas (WinAppSdk fallback).</summary>
+        private SKXamlCanvas? _horizontalRulerXaml;
+
+        /// <summary>Vertical ruler using SKXamlCanvas (WinAppSdk fallback).</summary>
+        private SKXamlCanvas? _verticalRulerXaml;
+
+        // ════════════════════════════════════════════════════════════════════
+        // CANVAS ABSTRACTION HELPERS
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Helper to get the main canvas as a FrameworkElement for shared operations.
+        /// </summary>
+        private FrameworkElement _mainCanvas =>
+#if HAS_UNO
+            _mainCanvasElement ?? (FrameworkElement?)_mainCanvasXaml ?? throw new InvalidOperationException("Canvas not initialized");
+#else
+            _mainCanvasXaml ?? throw new InvalidOperationException("Canvas not initialized");
+#endif
+
+        /// <summary>
+        /// Invalidates the main canvas.
+        /// </summary>
+        private void InvalidateMainCanvas()
+        {
+#if HAS_UNO
+            _mainCanvasElement?.Invalidate();
+#endif
+            _mainCanvasXaml?.Invalidate();
+        }
+
+        /// <summary>
+        /// Invalidates the rulers.
+        /// </summary>
+        private void InvalidateRulers()
+        {
+#if HAS_UNO
+            _horizontalRulerElement?.Invalidate();
+            _verticalRulerElement?.Invalidate();
+#endif
+            _horizontalRulerXaml?.Invalidate();
+            _verticalRulerXaml?.Invalidate();
+        }
+
+        // ════════════════════════════════════════════════════════════════════
         // FIELDS - CORE SYSTEMS
         // ════════════════════════════════════════════════════════════════════
 
@@ -121,10 +196,15 @@ namespace PixlPunkt.UI.CanvasHost
         private PaletteService? _palette;
 
         // ════════════════════════════════════════════════════════════════════
-        // FIELDS - RENDERING
+        // FIELDS - RENDERING (SKIASHARP)
         // ════════════════════════════════════════════════════════════════════
 
-        private CanvasImageBrush? _stripeBrush;
+        /// <summary>Cached checkerboard pattern shader for transparency background.</summary>
+        private SKShader? _checkerboardShader;
+
+        /// <summary>Cached checkerboard pattern bitmap.</summary>
+        private SKBitmap? _checkerboardBitmap;
+
         private bool _showPixelGrid = false;
         private bool _showTileGrid = true;
         private bool _showTileAnimationMappings = false;
@@ -168,16 +248,7 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - EXTERNAL DROPPER MODE (for color picker windows)
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// When true, all canvas pointer input is routed to the external dropper callback.
-        /// This allows color picker windows to sample colors from the canvas.
-        /// </summary>
         private bool _externalDropperActive = false;
-
-        /// <summary>
-        /// Callback invoked when a color is sampled during external dropper mode.
-        /// The parameter is the sampled BGRA color.
-        /// </summary>
         private Action<uint>? _externalDropperCallback;
 
         // ════════════════════════════════════════════════════════════════════
@@ -198,7 +269,7 @@ namespace PixlPunkt.UI.CanvasHost
         private int _fillTolerance = 0;
 
         // ════════════════════════════════════════════════════════════════════
-        // FIELDS - SELECTION STATE (bridges to selection subsystem)
+        // FIELDS - SELECTION STATE
         // ════════════════════════════════════════════════════════════════════
 
         private SelectionRegion _selRegion = new();
@@ -211,89 +282,39 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - STAGE (CAMERA) INTERACTION
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>Whether the stage is currently selected (from AnimationPanel).</summary>
         private bool _stageSelected;
-
-        /// <summary>Whether we're currently dragging the stage.</summary>
         private bool _stageDragging;
-
-        /// <summary>Whether we're currently resizing the stage.</summary>
         private bool _stageResizing;
-
-        /// <summary>Which corner is being dragged for resize (0=TL, 1=TR, 2=BR, 3=BL).</summary>
         private int _stageResizeCorner;
-
-        /// <summary>The stage position when drag started.</summary>
         private int _stageDragStartX, _stageDragStartY;
-
-        /// <summary>The stage size when resize started.</summary>
         private int _stageDragStartW, _stageDragStartH;
-
-        /// <summary>The pointer position when drag started.</summary>
         private int _stageDragPointerStartX, _stageDragPointerStartY;
-
-        /// <summary>Current animation mode - stage is only shown in Canvas mode.</summary>
         private Animation.AnimationMode _animationMode = Animation.AnimationMode.Tile;
-
-        /// <summary>
-        /// Tracks whether the user has pending (unsaved) edits to the stage position.
-        /// Set to true when user drags/resizes the stage, cleared when keyframe is added or frame changes.
-        /// </summary>
         private bool _stagePendingEdits;
-
-        /// <summary>
-        /// The frame index where pending edits were made. Used to clear pending state when navigating away.
-        /// </summary>
         private int _stagePendingEditsFrame;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - REFERENCE LAYER INTERACTION
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>The currently selected reference layer for interaction.</summary>
         private ReferenceLayer? _selectedReferenceLayer;
-
-        /// <summary>Whether we're currently dragging a reference layer.</summary>
         private bool _refLayerDragging;
-
-        /// <summary>Whether we're currently resizing a reference layer.</summary>
         private bool _refLayerResizing;
-
-        /// <summary>Which corner is being dragged for resize (0=TL, 1=TR, 2=BR, 3=BL).</summary>
         private int _refLayerResizeCorner;
-
-        /// <summary>The reference layer position when drag started.</summary>
         private float _refLayerDragStartX, _refLayerDragStartY;
-
-        /// <summary>The reference layer scale when resize started.</summary>
         private float _refLayerDragStartScale;
-
-        /// <summary>The pointer document position when drag started.</summary>
         private float _refLayerDragPointerStartX, _refLayerDragPointerStartY;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - SUB-ROUTINE INTERACTION
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>The currently selected sub-routine for interaction.</summary>
         private AnimationSubRoutine? _selectedSubRoutine;
-
-        /// <summary>Whether we're currently dragging a sub-routine.</summary>
         private bool _subRoutineDragging;
-
-        /// <summary>The sub-routine position when drag started (X).</summary>
         private double _subRoutineDragStartX;
-
-        /// <summary>The sub-routine position when drag started (Y).</summary>
         private double _subRoutineDragStartY;
-
-        /// <summary>The pointer document position when drag started (X).</summary>
         private int _subRoutineDragPointerStartX;
-
-        /// <summary>The pointer document position when drag started (Y).</summary>
         private int _subRoutineDragPointerStartY;
-
-        /// <summary>The normalized progress at which we're editing the sub-routine position.</summary>
         private float _subRoutineEditProgress;
 
         // ════════════════════════════════════════════════════════════════════
@@ -307,19 +328,12 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - INPUT CURSOR
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// The default cursor used for canvas painting operations.
-        /// Uses the built-in Cross cursor for precise pixel targeting.
-        /// </summary>
         private readonly InputCursor? _targetCursor;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - EXTERNAL MODIFICATION TRACKING
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Flag to prevent refresh loops when we're the source of document changes.
-        /// </summary>
         private bool _isCommittingChanges;
 
         // ════════════════════════════════════════════════════════════════════
@@ -327,6 +341,21 @@ namespace PixlPunkt.UI.CanvasHost
         // ════════════════════════════════════════════════════════════════════
 
         private DispatcherTimer? _lockedLayerWarningTimer;
+
+        // ════════════════════════════════════════════════════════════════════
+        // FIELDS - SKIA RENDERING OPTIMIZATION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Whether we're actively painting (mouse down + moving).
+        /// Used to trigger more aggressive invalidation on Skia platforms.
+        /// </summary>
+        private bool _isActivePainting;
+
+        /// <summary>
+        /// Cached reference to DispatcherQueue for high-priority invalidation.
+        /// </summary>
+        private DispatcherQueue? _dispatcherQueue;
 
         // ════════════════════════════════════════════════════════════════════
         // CONSTRUCTION
@@ -339,10 +368,16 @@ namespace PixlPunkt.UI.CanvasHost
         {
             InitializeComponent();
 
+            // Cache dispatcher queue for forced invalidation
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
             Document = doc;
 
             // Use built-in Cross cursor for precise pixel targeting
             _targetCursor = InputSystemCursor.Create(InputSystemCursorShape.Cross);
+
+            // Create and add SKCanvasElement instances
+            InitializeCanvasElements();
 
             // Initialize view and selection bounds
             _zoom.SetDocSize(doc.PixelWidth, doc.PixelHeight);
@@ -354,7 +389,9 @@ namespace PixlPunkt.UI.CanvasHost
             _stroke.SetForeground(_fg);
 
             // Selection engine
-            _selectionEngine = new SelectionEngine(activeLayerProvider: () => Document.ActiveLayer, docSizeProvider: () => (Document.PixelWidth, Document.PixelHeight),
+            _selectionEngine = new SelectionEngine(
+                activeLayerProvider: () => Document.ActiveLayer,
+                docSizeProvider: () => (Document.PixelWidth, Document.PixelHeight),
                 liftCallback: () => LiftSelectionWithHistory(),
                 commitCallback: () => CommitFloatingWithHistory()
             );
@@ -363,7 +400,7 @@ namespace PixlPunkt.UI.CanvasHost
             Document.ActiveLayerChanged += () =>
             {
                 ResetStrokeForActive();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke(); // allow UI to refresh CanUndo/CanRedo
             };
             Document.BeforeStructureChanged += CaptureForCrossfade;
@@ -378,6 +415,132 @@ namespace PixlPunkt.UI.CanvasHost
             InitSelection();
             InitRulers();
             RaiseFrame();
+
+            // Cleanup when control is unloaded
+            Unloaded += OnControlUnloaded;
+        }
+
+        /// <summary>
+        /// Handles control unload to clean up resources like the render hook and timers.
+        /// </summary>
+        private void OnControlUnloaded(object sender, RoutedEventArgs e)
+        {
+            // Stop the continuous rendering hook and fallback timer to prevent memory leaks
+            StopContinuousRendering();
+            
+            // Dispose checkerboard resources
+            _checkerboardShader?.Dispose();
+            _checkerboardShader = null;
+            _checkerboardBitmap?.Dispose();
+            _checkerboardBitmap = null;
+            _checkerboardPaint?.Dispose();
+            _checkerboardPaint = null;
+        }
+
+        /// <summary>
+        /// Creates and initializes the SKCanvasElement instances.
+        /// SKCanvasElement provides hardware-accelerated rendering via direct Skia integration.
+        /// On WinAppSDK, falls back to SKXamlCanvas.
+        /// </summary>
+        private void InitializeCanvasElements()
+        {
+#if HAS_UNO
+            // On Uno platforms, verify SKCanvasElement support
+            if (!SKCanvasElement.IsSupportedOnCurrentPlatform())
+            {
+                throw new PlatformNotSupportedException(
+                    "SKCanvasElement is not supported on this platform. " +
+                    "Ensure you are running on a Skia-rendered target (desktop, android with SkiaRenderer, etc.).");
+            }
+
+            // Create main canvas element using SKCanvasElement for hardware-accelerated rendering
+            _mainCanvasElement = new MainCanvasElement();
+            _mainCanvasElement.DrawCallback = RenderMainCanvas;
+            CanvasContainer.Children.Add(_mainCanvasElement);
+
+            // Create horizontal ruler element
+            _horizontalRulerElement = new HorizontalRulerElement
+            {
+                DrawCallback = RenderHorizontalRuler
+            };
+            HorizontalRulerContainer.Children.Add(_horizontalRulerElement);
+
+            // Create vertical ruler element
+            _verticalRulerElement = new VerticalRulerElement
+            {
+                DrawCallback = RenderVerticalRuler
+            };
+            VerticalRulerContainer.Children.Add(_verticalRulerElement);
+#else
+            // On WinAppSDK, use SKXamlCanvas as fallback
+            _mainCanvasXaml = new SKXamlCanvas();
+            _mainCanvasXaml.PaintSurface += MainCanvasXaml_PaintSurface;
+            CanvasContainer.Children.Add(_mainCanvasXaml);
+
+            // Create horizontal ruler using SKXamlCanvas
+            _horizontalRulerXaml = new SKXamlCanvas();
+            _horizontalRulerXaml.PaintSurface += HorizontalRulerXaml_PaintSurface;
+            HorizontalRulerContainer.Children.Add(_horizontalRulerXaml);
+
+            // Create vertical ruler using SKXamlCanvas
+            _verticalRulerXaml = new SKXamlCanvas();
+            _verticalRulerXaml.PaintSurface += VerticalRulerXaml_PaintSurface;
+            VerticalRulerContainer.Children.Add(_verticalRulerXaml);
+#endif
+        }
+
+#if !HAS_UNO
+        /// <summary>
+        /// Paint surface handler for main canvas (WinAppSDK fallback).
+        /// </summary>
+        private void MainCanvasXaml_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            using var renderer = new SkiaCanvasRenderer(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+            RenderMainCanvas(renderer);
+        }
+
+        /// <summary>
+        /// Paint surface handler for horizontal ruler (WinAppSDK fallback).
+        /// </summary>
+        private void HorizontalRulerXaml_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            RenderHorizontalRuler(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+        }
+
+        /// <summary>
+        /// Paint surface handler for vertical ruler (WinAppSDK fallback).
+        /// </summary>
+        private void VerticalRulerXaml_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            RenderVerticalRuler(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+        }
+#endif
+
+        /// <summary>
+        /// Main canvas render callback - receives ICanvasRenderer from MainCanvasElement.
+        /// Delegates to CanvasView_Draw in the Rendering partial class.
+        /// </summary>
+        private void RenderMainCanvas(ICanvasRenderer renderer)
+        {
+            CanvasView_Draw(renderer);
+        }
+
+        /// <summary>
+        /// Horizontal ruler render callback.
+        /// </summary>
+        private void RenderHorizontalRuler(SKCanvas canvas, float width, float height)
+        {
+            using var renderer = new SkiaCanvasRenderer(canvas, width, height);
+            HorizontalRuler_Draw(renderer);
+        }
+
+        /// <summary>
+        /// Vertical ruler render callback.
+        /// </summary>
+        private void RenderVerticalRuler(SKCanvas canvas, float width, float height)
+        {
+            using var renderer = new SkiaCanvasRenderer(canvas, width, height);
+            VerticalRuler_Draw(renderer);
         }
 
         public void UpdateTransparencyPatternForTheme(ElementTheme theme)
@@ -385,7 +548,14 @@ namespace PixlPunkt.UI.CanvasHost
             try
             {
                 _patternService.ApplyTheme(theme);
-                CanvasView?.Invalidate();
+                // Invalidate checkerboard cache
+                _checkerboardShader?.Dispose();
+                _checkerboardShader = null;
+                _checkerboardBitmap?.Dispose();
+                _checkerboardBitmap = null;
+                _checkerboardPaint?.Dispose();
+                _checkerboardPaint = null;
+                InvalidateMainCanvas();
             }
             catch (Exception ex)
             {
@@ -394,24 +564,18 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ════════════════════════════════════════════════════════════════════
-        // SHARED UTILITY METHODS (used by multiple partials)
+        // SHARED UTILITY METHODS
         // ════════════════════════════════════════════════════════════════════
 
         private bool IsActiveLayerLocked
             => Document.ActiveLayer is RasterLayer rl && CanvasDocument.IsEffectivelyLocked(rl);
 
-        /// <summary>
-        /// Shows a warning that the active layer is locked and cannot be edited.
-        /// The warning auto-dismisses after a few seconds.
-        /// </summary>
         private void ShowLockedLayerWarning()
         {
-            // Don't spam warnings - only show if not already visible
             if (LockedLayerWarning.IsOpen) return;
 
             LockedLayerWarning.IsOpen = true;
 
-            // Auto-dismiss after 3 seconds
             _lockedLayerWarningTimer?.Stop();
             _lockedLayerWarningTimer = new DispatcherTimer
             {
@@ -452,7 +616,7 @@ namespace PixlPunkt.UI.CanvasHost
         {
             _fg = bgra;
             _stroke.SetForeground(_fg);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void ApplyBrush(BrushSettings s, uint fg)
@@ -466,7 +630,7 @@ namespace PixlPunkt.UI.CanvasHost
             _brushDensity = s.Density;
             uint merged = (fg & 0x00FFFFFFu) | ((uint)_brushOpacity << 24);
             SetForeground(merged);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void AdjustBrushSize(int delta)
@@ -479,7 +643,7 @@ namespace PixlPunkt.UI.CanvasHost
         {
             _brushSize = Math.Clamp(s, MinBrushSize, MaxBrushSize);
             _stroke.SetBrushSize(_brushSize);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void SetBrushOpacity(int a)
@@ -488,13 +652,13 @@ namespace PixlPunkt.UI.CanvasHost
             _stroke.SetOpacity(_brushOpacity);
             _fg = (_fg & 0x00FFFFFFu) | ((uint)_brushOpacity << 24);
             _stroke.SetForeground(_fg);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void SetBrushShape(BrushShape shape)
         {
             _stroke.SetBrushShape(shape);
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -507,14 +671,9 @@ namespace PixlPunkt.UI.CanvasHost
             _selRegion.EnsureSize(Document.PixelWidth, Document.PixelHeight);
             UpdateActiveLayerPreview();
             UpdateViewport();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
-        /// <summary>
-        /// Handles external document modifications (e.g., from TileFrameEditorCanvas).
-        /// Refreshes the canvas if we're not currently painting (to avoid loops).
-        /// Also handles mask editing mode changes.
-        /// </summary>
         private void OnExternalDocumentModified()
         {
             // Skip if we're actively painting (we're the source of changes)
@@ -525,7 +684,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             // Refresh to pick up changes from external sources (e.g., TileFrameEditorCanvas)
             // This also handles mask editing mode toggling which fires StructureChanged
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             RaiseFrame();
         }
 
@@ -590,7 +749,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _fg = (_fg & 0x00FFFFFFu) | ((uint)_brushOpacity << 24);
                 _stroke.SetForeground(_fg);
             }
-            CanvasView?.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -730,7 +889,7 @@ namespace PixlPunkt.UI.CanvasHost
             }
 
             // Redraw canvas to update symmetry overlay
-            CanvasView?.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -810,7 +969,7 @@ namespace PixlPunkt.UI.CanvasHost
                 // Redraw if any transform parameters changed
                 if (needsRedraw)
                 {
-                    CanvasView.Invalidate();
+                    InvalidateMainCanvas();
                 }
             }
             finally
@@ -818,7 +977,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _selApplyFromTool = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -877,17 +1036,15 @@ namespace PixlPunkt.UI.CanvasHost
 
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
+
         // --------------------------------------------------------------------
-        // PUBLIC API - PREVIEW (PLACEHOLDERS)
+        // PUBLIC API
         // --------------------------------------------------------------------
 
         public void PreviewPointerMoved(Vector2 worldPos, bool shift) { }
         public void PreviewPointerPressed(Vector2 worldPos, bool shift) { }
         public void PreviewPointerReleased(Vector2 worldPos, bool shift) { }
 
-        /// <summary>
-        /// Forces a redraw of the canvas. Call after external document changes.
-        /// </summary>
         public void InvalidateCanvas()
         {
             // Re-sync zoom controller with potentially changed document size
@@ -901,16 +1058,10 @@ namespace PixlPunkt.UI.CanvasHost
             ResetStrokeForActive();
 
             // Invalidate and re-render
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             RaiseFrame();
         }
 
-        /// <summary>
-        /// Forces a redraw of the canvas after a resize operation, adjusting the viewport
-        /// to keep the original content at the same screen position.
-        /// </summary>
-        /// <param name="contentOffsetX">How many pixels the content was shifted right in the new canvas.</param>
-        /// <param name="contentOffsetY">How many pixels the content was shifted down in the new canvas.</param>
         public void InvalidateCanvasAfterResize(int contentOffsetX, int contentOffsetY)
         {
             // Re-sync zoom controller with the new document size
@@ -934,7 +1085,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             // Update viewport and invalidate
             UpdateViewport();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             RaiseFrame();
         }
 
@@ -969,7 +1120,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _stagePendingEdits = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -992,7 +1143,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _stagePendingEdits = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -1010,7 +1161,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _stageSelected = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // --------------------------------------------------------------------
@@ -1049,7 +1200,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _subRoutineDragging = false;
             }
 
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -1107,6 +1258,115 @@ namespace PixlPunkt.UI.CanvasHost
                 return null;
 
             return ReadCompositeBGRA(docX, docY);
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // SKIA RENDER SYNCHRONIZATION
+        // ════════════════════════════════════════════════════════════════════
+        // 
+        // On Skia platforms, SKXamlCanvas.Invalidate() is asynchronous and posts
+        // to the dispatcher queue. During rapid painting, pointer events can flood
+        // the queue faster than repaints occur, causing visual lag.
+        //
+        // Unlike Win2D (which has GPU-backed composition running in parallel),
+        // Skia rendering competes with input events for dispatcher time.
+        //
+        // Our strategy: Track pending invalidations and ensure they get processed
+        // by using UpdateLayout() to force a synchronous layout pass when needed.
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Whether the paint invalidation system is active.
+        /// </summary>
+        private bool _isRenderingHooked;
+
+        /// <summary>
+        /// Counter to track idle frames for auto-stop.
+        /// </summary>
+        private int _idleFrameCount;
+
+        /// <summary>
+        /// Maximum idle ticks before auto-stopping.
+        /// </summary>
+        private const int MaxIdleFramesBeforeStop = 10;
+
+        /// <summary>
+        /// Counter to throttle forced layout passes (every N invalidations).
+        /// </summary>
+        private int _invalidationCounter;
+
+        /// <summary>
+        /// How often to force a synchronous layout pass (every N invalidations).
+        /// Lower = more responsive but higher CPU. Higher = smoother but more lag.
+        /// </summary>
+        private const int ForceLayoutEveryN = 2;
+
+        /// <summary>
+        /// Starts active painting mode - enables more aggressive invalidation.
+        /// </summary>
+        private void StartContinuousRendering()
+        {
+            if (_isRenderingHooked) return;
+            _isRenderingHooked = true;
+            _idleFrameCount = 0;
+            _invalidationCounter = 0;
+        }
+
+        /// <summary>
+        /// Stops active painting mode.
+        /// </summary>
+        private void StopContinuousRendering()
+        {
+            _isRenderingHooked = false;
+        }
+
+        /// <summary>
+        /// Starts the rapid invalidation for Skia platforms during painting.
+        /// </summary>
+        private void StartPaintInvalidationTimer()
+        {
+            StartContinuousRendering();
+        }
+
+        /// <summary>
+        /// Stops the rapid invalidation when painting ends.
+        /// </summary>
+        private void StopPaintInvalidationTimer()
+        {
+            // Let it auto-stop after stroke commit
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // SKIA INVALIDATION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Forces canvas invalidation during active painting.
+        /// On Skia platforms, we periodically force a synchronous layout pass
+        /// to ensure the repaint actually happens between pointer events.
+        /// </summary>
+        private void ForceInvalidate()
+        {
+            // Always queue the invalidation
+            InvalidateMainCanvas();
+
+            // During active painting, periodically force synchronous processing
+            if (_isActivePainting)
+            {
+                _idleFrameCount = 0;
+                _invalidationCounter++;
+
+                // Every N invalidations, force a synchronous layout pass
+                // This ensures the queued Invalidate() actually gets processed
+                if (_invalidationCounter >= ForceLayoutEveryN)
+                {
+                    _invalidationCounter = 0;
+                    
+                    // UpdateLayout() forces XAML to process pending layout/render requests
+                    // This is the key to getting synchronous-ish rendering on Skia
+                    _mainCanvas.UpdateLayout();
+                }
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════

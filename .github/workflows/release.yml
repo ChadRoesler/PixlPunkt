@@ -1,8 +1,16 @@
 #############################################################################
 # PixlPunkt - Release Workflow
 #############################################################################
-# Creates a GitHub release with signed MSIX packages and SDK.
+# Creates a GitHub release with builds for multiple platforms using Uno.
+# Runs all unit tests before building to ensure release quality.
 # Triggered manually or on version tags (v*).
+#
+# Platforms:
+# - Windows (WinAppSdk MSIX) - x64, arm64
+# - Windows Desktop (Skia) - x64
+# - Linux Desktop (Skia) - x64 (tar.gz + DEB + RPM)
+# - macOS Desktop (Skia) - x64, arm64 (ZIP + DMG)
+# - Plugin SDK (NuGet)
 #
 # Versioning:
 # - Tag push (v1.0.0): MinVer automatically uses 1.0.0
@@ -29,14 +37,56 @@ env:
   DOTNET_VERSION: '10.0.x'
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  UNO_PROJECT_PATH: 'PixlPunkt/PixlPunkt.csproj'
 
 jobs:
+  #############################################################################
+  # Run All Tests First
+  #############################################################################
+  run-tests:
+    name: Run All Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Run SDK Tests
+        run: |
+          echo "=== Running PluginSdk Tests ==="
+          dotnet test PixlPunkt.PluginSdk.Tests/PixlPunkt.PluginSdk.Tests.csproj \
+            --configuration Release \
+            --verbosity normal \
+            --logger "trx;LogFileName=sdk-test-results.trx"
+
+      # Note: Uno Tests are run on Windows in the build-desktop-windows job
+      # because they require the Uno project which has multi-platform targets
+      # that need workloads not available on Linux runners.
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-test-results
+          path: |
+            PixlPunkt.PluginSdk.Tests/TestResults/*.trx
+          retention-days: 30
+          if-no-files-found: ignore
+
   #############################################################################
   # Build SDK
   #############################################################################
   build-sdk:
     name: Build Plugin SDK
     runs-on: ubuntu-latest
+    needs: run-tests
 
     steps:
       - name: Checkout repository
@@ -56,7 +106,6 @@ jobs:
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
             echo "version_args=-p:Version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
-            # Extract version from tag, MinVer will also compute this
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
             echo "version_args=" >> $GITHUB_OUTPUT
           fi
@@ -75,11 +124,12 @@ jobs:
           path: ./artifacts/*.nupkg
 
   #############################################################################
-  # Build Application (MSIX Sideload Packages)
+  # Build WinAppSdk (Windows MSIX)
   #############################################################################
-  build-app:
-    name: Build App (${{ matrix.platform }})
+  build-winappsdk:
+    name: Build WinAppSdk (${{ matrix.platform }})
     runs-on: windows-latest
+    needs: run-tests
     
     strategy:
       fail-fast: false
@@ -95,7 +145,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history needed for MinVer
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -108,10 +158,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            echo "version_args=-p:Version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-            echo "version_args=" >> $GITHUB_OUTPUT
           fi
 
       - name: Decode and import signing certificate
@@ -122,86 +170,46 @@ jobs:
           CERT_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
         run: |
           if (-not $env:CERT_BASE64) {
-            Write-Error "SIGNING_CERTIFICATE_BASE64 secret is not set"
-            exit 1
+            $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=PixlPunkt Dev" -KeyUsage DigitalSignature -FriendlyName "PixlPunkt Dev" -CertStoreLocation "Cert:\CurrentUser\My" -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+            $thumbprint = $cert.Thumbprint
+          } else {
+            $pfxBytes = [Convert]::FromBase64String($env:CERT_BASE64)
+            $pfxPath = Join-Path $env:RUNNER_TEMP "PixlPunkt.pfx"
+            [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+            $securePassword = ConvertTo-SecureString -String $env:CERT_PASSWORD -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+            $thumbprint = $cert.Thumbprint
+            $cerPath = Join-Path $env:RUNNER_TEMP "PixlPunkt.cer"
+            Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT | Out-Null
+            echo "CERT_CER_PATH=$cerPath" >> $env:GITHUB_ENV
           }
-          
-          $pfxBytes = [Convert]::FromBase64String($env:CERT_BASE64)
-          $pfxPath = Join-Path $env:RUNNER_TEMP "PixlPunkt.pfx"
-          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
-          
-          # Import certificate to CurrentUser store for signing
-          $securePassword = ConvertTo-SecureString -String $env:CERT_PASSWORD -AsPlainText -Force
-          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
-          $thumbprint = $cert.Thumbprint
-          
-          # Export the public certificate (.cer) for distribution
-          $cerPath = Join-Path $env:RUNNER_TEMP "PixlPunkt.cer"
-          Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT | Out-Null
-          
           echo "CERT_THUMBPRINT=$thumbprint" >> $env:GITHUB_ENV
-          echo "CERT_CER_PATH=$cerPath" >> $env:GITHUB_ENV
-          Write-Host "Certificate imported with thumbprint: $thumbprint"
-          Write-Host "Public certificate exported to: $cerPath"
 
-      - name: Restore dependencies
-        run: dotnet restore PixlPunkt.sln -r ${{ matrix.rid }}
-
-      - name: Build MSIX Package
+      - name: Build WinAppSdk MSIX
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          $versionArgs = "${{ steps.version.outputs.version_args }}"
           $thumbprint = $env:CERT_THUMBPRINT
-          
           $versionParts = $version -split '\.'
           while ($versionParts.Count -lt 4) { $versionParts += "0" }
           $msixVersion = $versionParts[0..3] -join '.'
           
-          Write-Host "Building PixlPunkt MSIX package..." -ForegroundColor Cyan
-          Write-Host "  Version: $version" -ForegroundColor Gray
-          Write-Host "  MSIX Version: $msixVersion" -ForegroundColor Gray
-          Write-Host "  Platform: ${{ matrix.platform }}" -ForegroundColor Gray
-          Write-Host "  Thumbprint: $thumbprint" -ForegroundColor Gray
-          
-          # Update the Package.appxmanifest with the correct version BEFORE building
-          $manifestPath = "PixlPunkt/Package.appxmanifest"
-          $manifest = [xml](Get-Content $manifestPath)
-          $manifest.Package.Identity.Version = $msixVersion
-          $manifest.Save($manifestPath)
-          Write-Host "  Updated manifest version to: $msixVersion" -ForegroundColor Green
-          
-          $buildArgs = @(
-            "publish", "PixlPunkt/PixlPunkt.csproj",
-            "--configuration", "Release",
-            "--runtime", "${{ matrix.rid }}",
-            "--self-contained", "true",
-            "-p:Platform=${{ matrix.platform }}",
-            "-p:Version=$msixVersion",
-            "-p:ApplicationVersion=$msixVersion",
-            "-p:GenerateAppxPackageOnBuild=true",
-            "-p:AppxPackageSigningEnabled=true",
-            "-p:PackageCertificateThumbprint=$thumbprint",
-            "-p:AppxBundle=Never",
-            "-p:UapAppxPackageBuildMode=SideloadOnly",
-            "-p:AppxPackageDir=../artifacts/${{ matrix.platform }}/",
-            "-p:PublishReadyToRun=true",
-            "-p:GenerateAppInstallerFile=false",
-            "-p:WindowsAppSDKSelfContained=true"
-          )
-          
-          # Add version override if specified (manual dispatch)
-          if ($versionArgs) {
-            $buildArgs += $versionArgs
-          }
-          
-          & dotnet @buildArgs
-          
-          Write-Host ""
-          Write-Host "Build output:" -ForegroundColor Yellow
-          Get-ChildItem -Path "artifacts/${{ matrix.platform }}" -Recurse | ForEach-Object { 
-            Write-Host "  $($_.FullName)" 
-          }
+          # Use WinAppSdkOnly=true to avoid needing Android/iOS workloads
+          dotnet publish $env:UNO_PROJECT_PATH `
+            --configuration Release `
+            --framework net10.0-windows10.0.26100 `
+            --runtime ${{ matrix.rid }} `
+            --self-contained true `
+            -p:WinAppSdkOnly=true `
+            -p:Platform=${{ matrix.platform }} `
+            -p:Version=$msixVersion `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=true `
+            -p:PackageCertificateThumbprint=$thumbprint `
+            -p:AppxBundle=Never `
+            -p:UapAppxPackageBuildMode=SideloadOnly `
+            -p:AppxPackageDir=../../artifacts/winappsdk-${{ matrix.platform }}/ `
+            -p:WindowsAppSDKSelfContained=true
 
       - name: Prepare release package
         id: prepare
@@ -209,174 +217,564 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.version }}"
           $platform = "${{ matrix.platform }}"
-          $outputDir = "release-$platform"
-          
+          $outputDir = "release-winappsdk-$platform"
           New-Item -ItemType Directory -Path $outputDir -Force
           
-          # Find the PixlPunkt MSIX package (not dependencies like WindowsAppRuntime)
-          # The package should be in a folder structure and named with the app identity
-          $msixFiles = Get-ChildItem -Path "artifacts/$platform" -Filter "*.msix" -Recurse | 
-                       Where-Object { $_.Name -like "PixlPunkt*" -and $_.Name -notlike "*Dependencies*" }
-          
-          if ($msixFiles.Count -eq 0) {
-            # Fallback: Look for any msix that's NOT a framework/runtime package
-            Write-Host "No PixlPunkt*.msix found, searching for main package..." -ForegroundColor Yellow
-            $msixFiles = Get-ChildItem -Path "artifacts/$platform" -Filter "*.msix" -Recurse |
-                         Where-Object { 
-                           $_.Name -notlike "*WindowsAppRuntime*" -and 
-                           $_.Name -notlike "*Microsoft.*" -and
-                           $_.Name -notlike "*framework*" -and
-                           $_.DirectoryName -notlike "*Dependencies*"
-                         }
-          }
-          
-          Write-Host "Found MSIX files:" -ForegroundColor Cyan
-          $msixFiles | ForEach-Object { Write-Host "  - $($_.FullName)" }
-          
-          if ($msixFiles.Count -eq 0) {
-            Write-Host "ERROR: No suitable MSIX package found!" -ForegroundColor Red
-            Write-Host "Contents of artifacts/$platform :" -ForegroundColor Yellow
-            Get-ChildItem -Path "artifacts/$platform" -Recurse | ForEach-Object { Write-Host $_.FullName }
-            exit 1
-          }
-          
-          # Use the first matching file (should be the main app package)
+          $msixFiles = Get-ChildItem -Path "artifacts/winappsdk-$platform" -Filter "*.msix" -Recurse |
+                       Where-Object { $_.Name -notlike "*Dependencies*" }
           $msixFile = $msixFiles | Select-Object -First 1
-          $newName = "PixlPunkt-$version-$platform.msix"
-          Copy-Item $msixFile.FullName -Destination "$outputDir/$newName"
-          Write-Host "Using package: $($msixFile.Name) -> $newName" -ForegroundColor Green
-          echo "msix_name=$newName" >> $env:GITHUB_OUTPUT
+          Copy-Item $msixFile.FullName -Destination "$outputDir/PixlPunkt-$version-WinAppSdk-$platform.msix"
           
-          # Copy the exported public certificate from the signing step
           $cerPath = $env:CERT_CER_PATH
           if ($cerPath -and (Test-Path $cerPath)) {
             Copy-Item $cerPath -Destination "$outputDir/PixlPunkt.cer"
-            Write-Host "Certificate bundled: PixlPunkt.cer" -ForegroundColor Green
-          } else {
-            Write-Host "Warning: Certificate not found at $cerPath" -ForegroundColor Yellow
           }
           
-          # Create installation script
           Set-Content -Path "$outputDir/Install-PixlPunkt.ps1" -Value @'
           #Requires -RunAsAdministrator
-          $ErrorActionPreference = "Stop"
-          
-          Write-Host ""
-          Write-Host "========================================" -ForegroundColor Cyan
-          Write-Host "       PixlPunkt Installer" -ForegroundColor Cyan
-          Write-Host "========================================" -ForegroundColor Cyan
-          Write-Host ""
-          
-          # Install certificate
           $certPath = Join-Path $PSScriptRoot "PixlPunkt.cer"
-          if (Test-Path $certPath) {
-              Write-Host "[1/2] Installing certificate..." -ForegroundColor Yellow
-              try {
-                  $cert = Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-                  Write-Host "      Certificate installed successfully." -ForegroundColor Green
-                  Write-Host "      Thumbprint: $($cert.Thumbprint)" -ForegroundColor DarkGray
-              } catch {
-                  if ($_.Exception.Message -like "*already exists*") {
-                      Write-Host "      Certificate already installed." -ForegroundColor Green
-                  } else {
-                      Write-Host "      Warning: $($_.Exception.Message)" -ForegroundColor Yellow
-                  }
-              }
-          } else {
-              Write-Host "[1/2] Certificate not found - skipping..." -ForegroundColor Yellow
-              Write-Host "      You may need to install the certificate manually." -ForegroundColor DarkGray
-          }
-          
-          # Install MSIX package
-          $msixPath = Get-ChildItem -Path $PSScriptRoot -Filter "PixlPunkt*.msix" | Select-Object -First 1
-          if ($msixPath) {
-              Write-Host ""
-              Write-Host "[2/2] Installing PixlPunkt..." -ForegroundColor Yellow
-              try {
-                  Add-AppxPackage -Path $msixPath.FullName
-                  Write-Host "      PixlPunkt installed successfully!" -ForegroundColor Green
-              } catch {
-                  Write-Host "      Error: $($_.Exception.Message)" -ForegroundColor Red
-                  Write-Host ""
-                  Write-Host "If installation failed, try:" -ForegroundColor Yellow
-                  Write-Host "  1. Ensure Windows Developer Mode is enabled, OR" -ForegroundColor DarkGray
-                  Write-Host "  2. Right-click the .msix file and select 'Install'" -ForegroundColor DarkGray
-                  exit 1
-              }
-          } else {
-              Write-Host "[2/2] MSIX package not found!" -ForegroundColor Red
-              exit 1
-          }
-          
-          Write-Host ""
-          Write-Host "========================================" -ForegroundColor Cyan
-          Write-Host "   Installation Complete!" -ForegroundColor Green
-          Write-Host "   Launch PixlPunkt from Start Menu" -ForegroundColor Cyan
-          Write-Host "========================================" -ForegroundColor Cyan
-          Write-Host ""
-          
-          Read-Host "Press Enter to exit"
+          if (Test-Path $certPath) { Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null }
+          $msixPath = Get-ChildItem -Path $PSScriptRoot -Filter "*.msix" | Select-Object -First 1
+          if ($msixPath) { Add-AppxPackage -Path $msixPath.FullName }
           '@
           
-          # Create README
-          Set-Content -Path "$outputDir/README.txt" -Value @"
-          PixlPunkt $version ($platform)
-          ========================================
-          
-          AUTOMATIC INSTALLATION (Recommended):
-          -------------------------------------
-          1. Right-click "Install-PixlPunkt.ps1"
-          2. Select "Run with PowerShell"
-          3. Click "Yes" when prompted for Administrator access
-          4. Wait for installation to complete
-          
-          MANUAL INSTALLATION:
-          -------------------
-          1. Install the certificate:
-             - Right-click "PixlPunkt.cer"
-             - Select "Install Certificate"
-             - Choose "Local Machine"
-             - Select "Place all certificates in the following store"
-             - Click "Browse" and select "Trusted People"
-             - Click "Next" then "Finish"
-          
-          2. Install the application:
-             - Double-click the .msix file
-             - Click "Install" in the App Installer window
-          
-          UNINSTALL:
-          ---------
-          Settings > Apps > Installed apps > PixlPunkt > Uninstall
-          
-          TROUBLESHOOTING:
-          ---------------
-          If installation fails:
-          - Ensure you have Windows 10 version 1809+ or Windows 11
-          - Try enabling Developer Mode in Windows Settings
-          - Make sure the certificate is properly installed
-          
-          "@
-          
-          # Create ZIP archive
-          $zipName = "PixlPunkt-$version-$platform.zip"
+          $zipName = "PixlPunkt-$version-WinAppSdk-$platform.zip"
           Compress-Archive -Path "$outputDir/*" -DestinationPath $zipName
           echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
-          
-          Write-Host "Release package created: $zipName" -ForegroundColor Green
 
-      - name: Upload build artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-${{ matrix.platform }}
+          name: winappsdk-${{ matrix.platform }}
           path: ${{ steps.prepare.outputs.zip_name }}
 
   #############################################################################
-  # Create Release
+  # Build Desktop Windows (Skia) - with Velopack Installer
+  #############################################################################
+  build-desktop-windows:
+    name: Build Desktop Windows (x64)
+    runs-on: windows-latest
+    needs: run-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Run Uno Tests
+        shell: pwsh
+        run: |
+          Write-Host "Running Uno Tests on Windows..." -ForegroundColor Cyan
+          # Use DesktopOnly=true to avoid needing Android/iOS workloads
+          # This limits the referenced PixlPunkt project to desktop targets only
+          dotnet test PixlPunkt.Tests/PixlPunkt.Tests.csproj `
+            --configuration Release `
+            --verbosity normal `
+            --logger "trx;LogFileName=uno-test-results.trx" `
+            -p:DesktopOnly=true
+
+      - name: Upload Uno test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-uno-test-results
+          path: PixlPunkt.Tests/TestResults/*.trx
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Install Velopack
+        shell: pwsh
+        run: dotnet tool install -g vpk
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Desktop Windows
+        shell: pwsh
+        run: |
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} `
+            --configuration Release `
+            --framework net10.0-desktop `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish/desktop-windows-x64 `
+            -p:SkiaOnly=true `
+            -p:Version=${{ steps.version.outputs.version }} `
+            -p:PublishSingleFile=false `
+            -p:PublishReadyToRun=true
+
+      - name: Create Velopack Release
+        id: velopack
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $publishDir = "./publish/desktop-windows-x64"
+          $releaseDir = "./releases"
+          
+          # Create releases directory
+          New-Item -ItemType Directory -Path $releaseDir -Force
+          
+          # Pack with Velopack
+          # Uses GitHub releases as update source
+          $vpkArgs = @(
+            "pack",
+            "--packId", "PixlPunkt",
+            "--packVersion", "$version",
+            "--packDir", "$publishDir",
+            "--mainExe", "PixlPunkt.exe",
+            "--outputDir", "$releaseDir",
+            "--packTitle", "PixlPunkt",
+            "--packAuthors", "PixlPunkt"
+          )
+          
+          if (Test-Path "PixlPunkt/Assets/Icons/PixlPunkt.ico") {
+            $vpkArgs += "--icon"
+            $vpkArgs += "PixlPunkt/Assets/Icons/PixlPunkt.ico"
+          }
+          
+          & vpk @vpkArgs
+          
+          # Find the generated files
+          $setupExe = Get-ChildItem -Path $releaseDir -Filter "*Setup.exe" | Select-Object -First 1
+          
+          # Rename setup for clarity
+          $setupName = "PixlPunkt-$version-Windows-Setup.exe"
+          if ($setupExe) {
+            Copy-Item $setupExe.FullName -Destination "$releaseDir/$setupName"
+            echo "setup_name=$setupName" >> $env:GITHUB_OUTPUT
+            echo "has_setup=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "has_setup=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Warning: Setup.exe not found"
+            Get-ChildItem -Path $releaseDir -Recurse | ForEach-Object { Write-Host $_.FullName }
+          }
+          
+          # Also create portable ZIP
+          $zipName = "PixlPunkt-$version-Desktop-Windows-x64-Portable.zip"
+          Compress-Archive -Path "$publishDir/*" -DestinationPath "$releaseDir/$zipName"
+          echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
+          echo "release_dir=$releaseDir" >> $env:GITHUB_OUTPUT
+
+      - name: Upload Setup installer
+        if: steps.velopack.outputs.has_setup == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-setup
+          path: ${{ steps.velopack.outputs.release_dir }}/${{ steps.velopack.outputs.setup_name }}
+
+      - name: Upload Portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: ${{ steps.velopack.outputs.release_dir }}/${{ steps.velopack.outputs.zip_name }}
+
+      - name: Upload Velopack releases (for auto-update)
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-velopack
+          path: |
+            ${{ steps.velopack.outputs.release_dir }}/*.nupkg
+            ${{ steps.velopack.outputs.release_dir }}/RELEASES
+          if-no-files-found: ignore
+
+  #############################################################################
+  # Build Desktop Linux (Skia) - with DEB and RPM
+  #############################################################################
+  build-desktop-linux:
+    name: Build Desktop Linux (x64)
+    runs-on: ubuntu-latest
+    needs: run-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+          # Install fpm for DEB/RPM packaging
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential rpm
+          sudo gem install --no-document fpm
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Desktop Linux
+        run: |
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} \
+            --configuration Release \
+            --framework net10.0-desktop \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output ./publish/desktop-linux-x64 \
+            -p:SkiaOnly=true \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -p:PublishSingleFile=false \
+            -p:PublishReadyToRun=true
+
+      - name: Prepare package structure
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          chmod +x ./publish/desktop-linux-x64/PixlPunkt
+          
+          mkdir -p ./pkg-root/opt/pixlpunkt
+          mkdir -p ./pkg-root/usr/share/applications
+          mkdir -p ./pkg-root/usr/share/mime/packages
+          mkdir -p ./pkg-root/usr/share/icons/hicolor/256x256/apps
+          
+          cp -r ./publish/desktop-linux-x64/* ./pkg-root/opt/pixlpunkt/
+          
+          cat > ./pkg-root/usr/share/applications/com.pixlpunkt.app.desktop << EOF
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=PixlPunkt
+          Comment=Pixel Art Editor
+          Exec=/opt/pixlpunkt/PixlPunkt %F
+          Icon=pixlpunkt
+          Terminal=false
+          Categories=Graphics;2DGraphics;RasterGraphics;
+          MimeType=application/x-pixlpunkt;application/x-pixlpunkt-reel;application/x-pixlpunkt-tileset;application/x-pixlpunkt-brush;
+          EOF
+          
+          cat > ./pkg-root/usr/share/mime/packages/com.pixlpunkt.app.xml << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+              <mime-type type="application/x-pixlpunkt"><comment>PixlPunkt Document</comment><glob pattern="*.pxp"/></mime-type>
+              <mime-type type="application/x-pixlpunkt-reel"><comment>PixlPunkt Animation Reel</comment><glob pattern="*.pxpr"/></mime-type>
+              <mime-type type="application/x-pixlpunkt-tileset"><comment>PixlPunkt Tileset</comment><glob pattern="*.pxpt"/></mime-type>
+              <mime-type type="application/x-pixlpunkt-brush"><comment>PixlPunkt Brush</comment><glob pattern="*.pbx"/></mime-type>
+          </mime-info>
+          EOF
+          
+          if [ -f "PixlPunkt/Assets/Icons/Icon.png" ]; then
+            cp "PixlPunkt/Assets/Icons/Icon.png" ./pkg-root/usr/share/icons/hicolor/256x256/apps/pixlpunkt.png
+          fi
+
+      - name: Create DEB package
+        id: deb
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DEB_NAME="pixlpunkt_${VERSION}_amd64.deb"
+          
+          cat > /tmp/after-install.sh << 'EOF'
+          update-mime-database /usr/share/mime 2>/dev/null || true
+          update-desktop-database /usr/share/applications 2>/dev/null || true
+          ln -sf /opt/pixlpunkt/PixlPunkt /usr/local/bin/pixlpunkt
+          EOF
+          
+          cat > /tmp/after-remove.sh << 'EOF'
+          rm -f /usr/local/bin/pixlpunkt
+          update-mime-database /usr/share/mime 2>/dev/null || true
+          update-desktop-database /usr/share/applications 2>/dev/null || true
+          EOF
+          
+          fpm -s dir -t deb \
+            --name pixlpunkt \
+            --version "$VERSION" \
+            --architecture amd64 \
+            --description "PixlPunkt - Modern Pixel Art Editor" \
+            --url "https://github.com/ChadRoesler/PixlPunkt" \
+            --license "MIT" \
+            --depends "libx11-6" --depends "libxrandr2" --depends "libxinerama1" --depends "libxcursor1" --depends "libxi6" --depends "libgl1" \
+            --after-install /tmp/after-install.sh \
+            --after-remove /tmp/after-remove.sh \
+            --package "$DEB_NAME" \
+            -C ./pkg-root opt usr
+          
+          echo "deb_name=$DEB_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create RPM package
+        id: rpm
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          RPM_NAME="pixlpunkte-${VERSION}-1.x86_64.rpm"
+          
+          fpm -s dir -t rpm \
+            --name pixlpunkt \
+            --version "$VERSION" \
+            --architecture x86_64 \
+            --description "PixlPunkt - Modern Pixel Art Editor" \
+            --url "https://github.com/ChadRoesler/PixlPunkt" \
+            --license "MIT" \
+            --depends "libX11" --depends "libXrandr" --depends "libXinerama" --depends "libXcursor" --depends "libXi" --depends "mesa-libGL" \
+            --after-install /tmp/after-install.sh \
+            --after-remove /tmp/after-remove.sh \
+            --package "$RPM_NAME" \
+            -C ./pkg-root opt usr
+          
+          echo "rpm_name=$RPM_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create tarball
+        id: tar
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAR_NAME="pixlpunkt-${VERSION}-desktop-linux-x64.tar.gz"
+          tar -czvf $TAR_NAME -C ./pkg-root .
+          echo "tar_name=$TAR_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload DEB package
+        if: steps.deb.outputs.deb_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixlpunkt-deb
+          path: ${{ steps.deb.outputs.deb_name }}
+
+      - name: Upload RPM package
+        if: steps.rpm.outputs.rpm_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixlpunkt-rpm
+          path: ${{ steps.rpm.outputs.rpm_name }}
+
+      - name: Upload tarball
+        if: steps.tar.outputs.tar_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixlpunkt-tarball
+          path: ${{ steps.tar.outputs.tar_name }}
+
+  #############################################################################
+  # Build Desktop macOS (Skia) - with DMG
+  #############################################################################
+  build-desktop-macos:
+    name: Build Desktop macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    needs: run-tests
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+        include:
+          - arch: x64
+            rid: osx-x64
+          - arch: arm64
+            rid: osx-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Desktop macOS
+        run: |
+          echo "Building Desktop macOS (${{ matrix.arch }})..."
+          
+          # Use SkiaOnly=true to avoid needing Android/iOS workloads
+          dotnet publish ${{ env.UNO_PROJECT_PATH }} \
+            --configuration Release \
+            --framework net10.0-desktop \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            --output ./publish/desktop-macos-${{ matrix.arch }} \
+            -p:SkiaOnly=true \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -p:PublishSingleFile=false \
+            -p:PublishReadyToRun=true
+
+      - name: Create macOS App Bundle
+        id: bundle
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          
+          APP_BUNDLE="./PixlPunkt.app"
+          mkdir -p "$APP_BUNDLE/Contents/MacOS"
+          mkdir -p "$APP_BUNDLE/Contents/Resources"
+          
+          # Copy executable and dependencies
+          cp -r ./publish/desktop-macos-$ARCH/* "$APP_BUNDLE/Contents/MacOS/"
+          chmod +x "$APP_BUNDLE/Contents/MacOS/PixlPunkt"
+          
+          # CRITICAL: Create Resources directory for Uno Platform
+          # Uno Platform on macOS expects resources at Contents/MacOS/Resources/
+          mkdir -p "$APP_BUNDLE/Contents/MacOS/Resources"
+          
+          # Move Uno resource folders (fonts, icons) into Resources/ directory
+          for folder in "$APP_BUNDLE/Contents/MacOS/Uno.Fonts."* "$APP_BUNDLE/Contents/MacOS/FluentIcons.Resources."*; do
+            if [ -d "$folder" ]; then
+              folder_name=$(basename "$folder")
+              echo "Moving $folder_name to Resources/"
+              mv "$folder" "$APP_BUNDLE/Contents/MacOS/Resources/"
+            fi
+          done
+          
+          # Copy Assets to Resources if they exist
+          if [ -d "$APP_BUNDLE/Contents/MacOS/Assets" ]; then
+            cp -r "$APP_BUNDLE/Contents/MacOS/Assets" "$APP_BUNDLE/Contents/MacOS/Resources/" 2>/dev/null || true
+          fi
+          
+          # Copy icon if available (for macOS Finder)
+          if [ -f "PixlPunkt/Assets/Icons/Icon.png" ]; then
+            cp "PixlPunkt/Assets/Icons/Icon.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
+          fi
+          
+          # Create Info.plist
+          cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key><string>PixlPunkt</string>
+              <key>CFBundleIdentifier</key><string>com.pixlpunkt.app</string>
+              <key>CFBundleName</key><string>PixlPunkt</string>
+              <key>CFBundleDisplayName</key><string>PixlPunkt</string>
+              <key>CFBundlePackageType</key><string>APPL</string>
+              <key>CFBundleShortVersionString</key><string>$VERSION</string>
+              <key>CFBundleVersion</key><string>$VERSION</string>
+              <key>LSMinimumSystemVersion</key><string>10.15</string>
+              <key>NSHighResolutionCapable</key><true/>
+              <key>CFBundleIconFile</key><string>AppIcon</string>
+              <key>CFBundleDocumentTypes</key>
+              <array>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Document</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pxp</string></array>
+                  </dict>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Reel</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pxpr</string></array>
+                  </dict>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Tileset</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pxpt</string></array>
+                  </dict>
+                  <dict>
+                      <key>CFBundleTypeName</key><string>PixlPunkt Brush</string>
+                      <key>CFBundleTypeRole</key><string>Editor</string>
+                      <key>LSHandlerRank</key><string>Owner</string>
+                      <key>CFBundleTypeExtensions</key>
+                      <array><string>pbx</string></array>
+                  </dict>
+              </array>
+          </dict>
+          </plist>
+          EOF
+          
+          echo "App bundle created at $APP_BUNDLE"
+          echo "Contents of MacOS/Resources:"
+          ls -la "$APP_BUNDLE/Contents/MacOS/Resources/" || echo "Resources folder empty or missing"
+
+      - name: Create DMG
+        id: dmg
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          DMG_NAME="PixlPunkt-$VERSION-macOS-$ARCH.dmg"
+          
+          # Create DMG with Applications folder link
+          create-dmg \
+            --volname "PixlPunkt $VERSION" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "PixlPunkt.app" 150 185 \
+            --hide-extension "PixlPunkt.app" \
+            --app-drop-link 450 185 \
+            "$DMG_NAME" \
+            "./PixlPunkt.app" || true
+          
+          # Check if DMG was created
+          if [ -f "$DMG_NAME" ]; then
+            echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
+            echo "has_dmg=true" >> $GITHUB_OUTPUT
+            echo "Created: $DMG_NAME"
+          else
+            echo "has_dmg=false" >> $GITHUB_OUTPUT
+            echo "Warning: DMG creation failed, creating ZIP instead"
+          fi
+
+      - name: Create ZIP (fallback/additional)
+        id: zip
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          ZIP_NAME="PixlPunkt-$VERSION-macOS-$ARCH.zip"
+          
+          # Create ZIP of the app bundle
+          zip -r "$ZIP_NAME" PixlPunkt.app
+          
+          echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+          echo "Created: $ZIP_NAME"
+
+      - name: Upload DMG
+        if: steps.dmg.outputs.has_dmg == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-dmg-${{ matrix.arch }}
+          path: ${{ steps.dmg.outputs.dmg_name }}
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-zip-${{ matrix.arch }}
+          path: ${{ steps.zip.outputs.zip_name }}
+
+  #############################################################################
+  # Create GitHub Release
   #############################################################################
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-sdk, build-app]
+    needs: [build-sdk, build-winappsdk, build-desktop-windows, build-desktop-linux, build-desktop-macos]
+    if: always() && !cancelled() && needs.run-tests.result != 'failure'
     permissions:
       contents: write
 
@@ -398,43 +796,85 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: ./release-artifacts
+          path: ./artifacts
 
       - name: List artifacts
-        run: ls -R ./release-artifacts
+        run: |
+          echo "=== Downloaded Artifacts ==="
+          find ./artifacts -type f -exec ls -lh {} \;
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: PixlPunkt ${{ steps.version.outputs.version }}
+          name: PixlPunkt v${{ steps.version.outputs.version }}
           draft: false
-          prerelease: ${{ github.event.inputs.prerelease || false }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           generate_release_notes: true
           body: |
-            ## Downloads
+            ## PixlPunkt v${{ steps.version.outputs.version }}
             
-            | Platform | Download |
-            |----------|----------|
-            | Windows x64 | [PixlPunkt-${{ steps.version.outputs.version }}-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt-${{ steps.version.outputs.version }}-x64.zip) |
-            | Windows ARM64 | [PixlPunkt-${{ steps.version.outputs.version }}-arm64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt-${{ steps.version.outputs.version }}-arm64.zip) |
-            | Plugin SDK | [NuGet Package](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/PixlPunkt.PluginSdk.${{ steps.version.outputs.version }}.nupkg) |
+            ### Downloads
             
-            ## Installation
+            #### Windows
+            | Package | Description |
+            |---------|-------------|
+            | `PixlPunkt-${{ steps.version.outputs.version }}-Windows-Setup.exe` | **Recommended** - Installer with auto-updates (Velopack) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-Desktop-Windows-x64-Portable.zip` | Portable version (no install) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-WinAppSdk-x64.zip` | MSIX package (Windows 10/11) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-WinAppSdk-arm64.zip` | MSIX package (Windows ARM) |
             
-            1. Download the ZIP for your platform (x64 for most Windows PCs)
-            2. Extract the ZIP file
-            3. Right-click `Install-PixlPunkt.ps1` and select **Run with PowerShell**
-            4. Allow Administrator access when prompted
+            #### macOS
+            | Package | Description |
+            |---------|-------------|
+            | `PixlPunkt-${{ steps.version.outputs.version }}-macOS-arm64.dmg` | **Recommended** for Apple Silicon (M1/M2/M3) |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-macOS-x64.dmg` | For Intel Macs |
+            | `PixlPunkt-${{ steps.version.outputs.version }}-macOS-*.zip` | ZIP alternatives |
             
-            The installer will automatically install the signing certificate and the application.
+            #### Linux
+            | Package | Description |
+            |---------|-------------|
+            | `pixlpunkt_${{ steps.version.outputs.version }}_amd64.deb` | Debian/Ubuntu package |
+            | `pixlpunkt-${{ steps.version.outputs.version }}-1.x86_64.rpm` | Fedora/RHEL package |
+            | `pixlpunkt-${{ steps.version.outputs.version }}-desktop-linux-x64.tar.gz` | Portable tarball |
             
-            ### Requirements
-            - Windows 10 version 1809+ or Windows 11
-            - Administrator access (for certificate installation)
+            #### Plugin SDK
+            | Package | Description |
+            |---------|-------------|
+            | `PixlPunkt.PluginSdk.*.nupkg` | NuGet package for plugin development |
+            
+            ---
+            
+            ### Installation
+            
+            **Windows:** Download and run the Setup.exe installer. The app will auto-update.
+            
+            **macOS:** Download the DMG, open it, and drag PixlPunkt to Applications. On first run, right-click and select "Open" to bypass Gatekeeper.
+            
+            **Linux (Debian/Ubuntu):**
+            ```bash
+            sudo dpkg -i pixlpunkt_${{ steps.version.outputs.version }}_amd64.deb
+            sudo apt-get install -f  # Install dependencies if needed
+            ```
+            
+            **Linux (Fedora/RHEL):**
+            ```bash
+            sudo dnf install pixlpunkt-${{ steps.version.outputs.version }}-1.x86_64.rpm
+            ```
           files: |
-            ./release-artifacts/app-x64/*.zip
-            ./release-artifacts/app-arm64/*.zip
-            ./release-artifacts/sdk-package/*.nupkg
+            ./artifacts/sdk-package/*.nupkg
+            ./artifacts/winappsdk-x64/*.zip
+            ./artifacts/winappsdk-arm64/*.zip
+            ./artifacts/desktop-windows-setup/*.exe
+            ./artifacts/desktop-windows-x64/*.zip
+            ./artifacts/desktop-windows-velopack/*.nupkg
+            ./artifacts/desktop-windows-velopack/RELEASES
+            ./artifacts/pixlpunkt-deb/*.deb
+            ./artifacts/pixlpunkt-rpm/*.rpm
+            ./artifacts/pixlpunkt-tarball/*.tar.gz
+            ./artifacts/desktop-macos-dmg-x64/*.dmg
+            ./artifacts/desktop-macos-dmg-arm64/*.dmg
+            ./artifacts/desktop-macos-zip-x64/*.zip
+            ./artifacts/desktop-macos-zip-arm64/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

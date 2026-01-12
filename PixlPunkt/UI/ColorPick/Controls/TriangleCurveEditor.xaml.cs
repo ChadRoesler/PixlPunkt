@@ -1,19 +1,16 @@
-﻿using System;
+using System;
 using System.Numerics;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.Geometry;
-using Microsoft.Graphics.Canvas.UI.Xaml;
-using Microsoft.UI;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Enums;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 using Windows.Foundation;
-using Windows.UI;
 
 namespace PixlPunkt.UI.ColorPick.Controls
 {
     /// <summary>
-    /// Interactive Win2D control for editing a piecewise cubic Bézier curve with fixed anchors.
+    /// Interactive SkiaSharp control for editing a piecewise cubic Bézier curve with fixed anchors.
     /// The curve forms a triangle shape with a peak at the center, used for gradient falloff editing.
     /// 
     /// Fixed anchors: Start (-1, 0), Mid (0, 1), End (1, 0)
@@ -86,7 +83,8 @@ namespace PixlPunkt.UI.ColorPick.Controls
         // ════════════════════════════════════════════════════════════════════
 
         private Rect _paintRect;                        // pixel rect where the grid/curve is drawn
-        private Func<Vector2, Vector2>? _toPx, _fromPx; // coordinate space transforms
+        private Func<Vector2, SKPoint>? _toPx;          // normalized to pixel transform
+        private Func<SKPoint, Vector2>? _fromPx;        // pixel to normalized transform
         private Grab _grab = Grab.None;                 // currently grabbed control point
         private uint _pid;                              // pointer ID for tracking
 
@@ -174,19 +172,19 @@ namespace PixlPunkt.UI.ColorPick.Controls
         // ════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Handles canvas draw operations to render the grid, curve, and control points.
+        /// Handles canvas paint operations to render the grid, curve, and control points.
         /// </summary>
-        private void Canvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void Canvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var ds = args.DrawingSession;
-            float W = (float)sender.ActualWidth, H = (float)sender.ActualHeight;
+            var canvas = e.Surface.Canvas;
+            float W = e.Info.Width, H = e.Info.Height;
 
             // Everything draws inside this inset rect (leaves space for rings)
             _paintRect = new Rect(INSET, INSET, Math.Max(1, W - 2 * INSET), Math.Max(1, H - 2 * INSET));
 
             // Setup coordinate space transforms
             // Normalized space: X ∈ [-1, 1], Y ∈ [0, 1] ↔ pixels inside _paintRect
-            _toPx = n => new Vector2(
+            _toPx = n => new SKPoint(
                 (float)(_paintRect.X + (n.X + 1f) * 0.5f * _paintRect.Width),
                 (float)(_paintRect.Y + (1f - n.Y) * _paintRect.Height));
 
@@ -199,7 +197,7 @@ namespace PixlPunkt.UI.ColorPick.Controls
             };
 
             // Draw grid background
-            DrawGrid(ds, (float)_paintRect.Width, (float)_paintRect.Height, _paintRect);
+            DrawGrid(canvas, (float)_paintRect.Width, (float)_paintRect.Height, _paintRect);
 
             // Fixed anchor positions
             var S = new Vector2(-1f, 0f);
@@ -207,91 +205,122 @@ namespace PixlPunkt.UI.ColorPick.Controls
             var E = new Vector2(1f, 0f);
 
             // Draw guide lines from anchors to control points
-            ds.DrawLine(_toPx(S), _toPx(Start_out), Colors.DimGray, 1f);
-            ds.DrawLine(_toPx(M), _toPx(Mid_left), Colors.DimGray, 1f);
-            ds.DrawLine(_toPx(M), _toPx(Mid_right), Colors.DimGray, 1f);
-            ds.DrawLine(_toPx(E), _toPx(End_in), Colors.DimGray, 1f);
-
-            // Draw left curve segment (Start → Mid)
-            using (var pb = new CanvasPathBuilder(sender))
+            using (var linePaint = new SKPaint { Color = SKColors.DimGray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true })
             {
-                pb.BeginFigure(_toPx(S));
-                pb.AddCubicBezier(_toPx(Start_out), _toPx(Mid_left), _toPx(M));
-                pb.EndFigure(CanvasFigureLoop.Open);
-                using var g = CanvasGeometry.CreatePath(pb);
-                ds.DrawGeometry(g, Colors.White, 2f);
+                canvas.DrawLine(_toPx(S), _toPx(Start_out), linePaint);
+                canvas.DrawLine(_toPx(M), _toPx(Mid_left), linePaint);
+                canvas.DrawLine(_toPx(M), _toPx(Mid_right), linePaint);
+                canvas.DrawLine(_toPx(E), _toPx(End_in), linePaint);
             }
 
-            // Draw right curve segment (Mid → End)
-            using (var pb = new CanvasPathBuilder(sender))
+            // Draw curve segments
+            using (var curvePaint = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Stroke, StrokeWidth = 2f, IsAntialias = true })
             {
-                pb.BeginFigure(_toPx(M));
-                pb.AddCubicBezier(_toPx(Mid_right), _toPx(End_in), _toPx(E));
-                pb.EndFigure(CanvasFigureLoop.Open);
-                using var g = CanvasGeometry.CreatePath(pb);
-                ds.DrawGeometry(g, Colors.White, 2f);
+                // Draw left curve segment (Start → Mid)
+                using (var path = new SKPath())
+                {
+                    path.MoveTo(_toPx(S));
+                    path.CubicTo(_toPx(Start_out), _toPx(Mid_left), _toPx(M));
+                    canvas.DrawPath(path, curvePaint);
+                }
+
+                // Draw right curve segment (Mid → End)
+                using (var path = new SKPath())
+                {
+                    path.MoveTo(_toPx(M));
+                    path.CubicTo(_toPx(Mid_right), _toPx(End_in), _toPx(E));
+                    canvas.DrawPath(path, curvePaint);
+                }
             }
 
             // Draw control point handles (draggable)
-            DrawHandle(ds, _toPx(Start_out));
-            DrawHandle(ds, _toPx(Mid_left));
-            DrawHandle(ds, _toPx(Mid_right));
-            DrawHandle(ds, _toPx(End_in));
+            DrawHandle(canvas, _toPx(Start_out));
+            DrawHandle(canvas, _toPx(Mid_left));
+            DrawHandle(canvas, _toPx(Mid_right));
+            DrawHandle(canvas, _toPx(End_in));
 
             // Draw locked anchors (not draggable)
-            DrawAnchor(ds, _toPx(S));
-            DrawAnchor(ds, _toPx(M));
-            DrawAnchor(ds, _toPx(E));
+            DrawAnchor(canvas, _toPx(S));
+            DrawAnchor(canvas, _toPx(M));
+            DrawAnchor(canvas, _toPx(E));
         }
 
         /// <summary>
         /// Draws the background grid with axes and guide lines.
         /// </summary>
-        private static void DrawGrid(CanvasDrawingSession ds, float w, float h, Rect r)
+        private static void DrawGrid(SKCanvas canvas, float w, float h, Rect r)
         {
             // Clear whole control with dark background
-            ds.Clear(Color.FromArgb(255, 26, 26, 26));
+            canvas.Clear(new SKColor(26, 26, 26));
 
             // Outer panel border
-            ds.DrawRectangle(new Rect(0, 0, r.X + w + INSET, r.Y + h + INSET), Color.FromArgb(60, 255, 255, 255), 1f);
+            using (var borderPaint = new SKPaint { Color = new SKColor(255, 255, 255, 60), Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true })
+            {
+                canvas.DrawRect(new SKRect(0, 0, (float)(r.X + w + INSET), (float)(r.Y + h + INSET)), borderPaint);
+            }
 
             // Inner paint rect border
-            ds.DrawRectangle(r, Color.FromArgb(80, 255, 255, 255), 1f);
+            using (var innerBorderPaint = new SKPaint { Color = new SKColor(255, 255, 255, 80), Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true })
+            {
+                canvas.DrawRect(new SKRect((float)r.X, (float)r.Y, (float)(r.X + r.Width), (float)(r.Y + r.Height)), innerBorderPaint);
+            }
 
-            var minor = Color.FromArgb(32, 255, 255, 255);
-            var axis = Color.FromArgb(90, 255, 255, 255);
+            var minor = new SKColor(255, 255, 255, 32);
+            var axis = new SKColor(255, 255, 255, 90);
 
             // Draw 10x10 grid
-            for (int i = 1; i < 10; i++)
+            using (var minorPaint = new SKPaint { Color = minor, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true })
             {
-                float x = (float)r.X + i * (float)r.Width / 10f;
-                float y = (float)r.Y + i * (float)r.Height / 10f;
-                ds.DrawLine(x, (float)r.Y, x, (float)(r.Y + r.Height), minor, 1f);
-                ds.DrawLine((float)r.X, y, (float)(r.X + r.Width), y, minor, 1f);
+                for (int i = 1; i < 10; i++)
+                {
+                    float x = (float)r.X + i * (float)r.Width / 10f;
+                    float y = (float)r.Y + i * (float)r.Height / 10f;
+                    canvas.DrawLine(x, (float)r.Y, x, (float)(r.Y + r.Height), minorPaint);
+                    canvas.DrawLine((float)r.X, y, (float)(r.X + r.Width), y, minorPaint);
+                }
             }
 
             // Draw major axes
-            ds.DrawLine((float)(r.X + r.Width * 0.5), (float)r.Y, (float)(r.X + r.Width * 0.5), (float)(r.Y + r.Height), axis, 1.5f); // X = 0
-            ds.DrawLine((float)r.X, (float)(r.Y + r.Height), (float)(r.X + r.Width), (float)(r.Y + r.Height), axis, 1.0f);           // Y = 0
-            ds.DrawLine((float)r.X, (float)r.Y, (float)(r.X + r.Width), (float)r.Y, axis, 1.0f);                                     // Y = 1
+            using (var axisPaint = new SKPaint { Color = axis, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true })
+            {
+                canvas.DrawLine((float)(r.X + r.Width * 0.5), (float)r.Y, (float)(r.X + r.Width * 0.5), (float)(r.Y + r.Height), axisPaint); // X = 0
+            }
+
+            using (var axisPaint = new SKPaint { Color = axis, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true })
+            {
+                canvas.DrawLine((float)r.X, (float)(r.Y + r.Height), (float)(r.X + r.Width), (float)(r.Y + r.Height), axisPaint); // Y = 0
+                canvas.DrawLine((float)r.X, (float)r.Y, (float)(r.X + r.Width), (float)r.Y, axisPaint);                           // Y = 1
+            }
         }
 
         /// <summary>
         /// Draws a draggable control point handle as a ring.
         /// </summary>
-        private static void DrawHandle(CanvasDrawingSession ds, Vector2 p)
+        private static void DrawHandle(SKCanvas canvas, SKPoint p)
         {
-            ds.DrawCircle(p, HANDLE_OUT, Colors.Black, 2f);
-            ds.DrawCircle(p, HANDLE_IN, Colors.White, 1.6f);
+            using (var outerPaint = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = 2f, IsAntialias = true })
+            {
+                canvas.DrawCircle(p, HANDLE_OUT, outerPaint);
+            }
+            using (var innerPaint = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f, IsAntialias = true })
+            {
+                canvas.DrawCircle(p, HANDLE_IN, innerPaint);
+            }
         }
 
         /// <summary>
         /// Draws a locked anchor point as a filled circle.
         /// </summary>
-        private static void DrawAnchor(CanvasDrawingSession ds, Vector2 p)
+        private static void DrawAnchor(SKCanvas canvas, SKPoint p)
         {
-            ds.FillCircle(p, HANDLE_IN - 3f, Colors.White);
-            ds.DrawCircle(p, HANDLE_OUT - 3f, Colors.Black, 2f);
+            using (var fillPaint = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill, IsAntialias = true })
+            {
+                canvas.DrawCircle(p, HANDLE_IN - 3f, fillPaint);
+            }
+            using (var strokePaint = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = 2f, IsAntialias = true })
+            {
+                canvas.DrawCircle(p, HANDLE_OUT - 3f, strokePaint);
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -305,7 +334,7 @@ namespace PixlPunkt.UI.ColorPick.Controls
         {
             _pid = e.Pointer.PointerId;
             var pt = e.GetCurrentPoint(Canvas).Position;
-            var P = new Vector2((float)pt.X, (float)pt.Y);
+            var P = new SKPoint((float)pt.X, (float)pt.Y);
 
             (Grab g, float d) best = (Grab.None, float.MaxValue);
 
@@ -327,7 +356,7 @@ namespace PixlPunkt.UI.ColorPick.Controls
             {
                 if (_toPx == null) return;
                 var px = _toPx(n);
-                var d = Vector2.Distance(px, P);
+                var d = SKPoint.Distance(px, P);
                 if (d < best.d) best = (g, d);
             }
         }
@@ -340,7 +369,7 @@ namespace PixlPunkt.UI.ColorPick.Controls
             if (_grab == Grab.None || e.Pointer.PointerId != _pid) return;
 
             var pt = e.GetCurrentPoint(Canvas).Position;
-            UpdateDrag(new Vector2((float)pt.X, (float)pt.Y));
+            UpdateDrag(new SKPoint((float)pt.X, (float)pt.Y));
         }
 
         /// <summary>
@@ -358,7 +387,7 @@ namespace PixlPunkt.UI.ColorPick.Controls
         /// Updates the position of the currently dragged control point.
         /// Constrains X to the correct half of the editor space and Y to [0, 1].
         /// </summary>
-        private void UpdateDrag(Vector2 px)
+        private void UpdateDrag(SKPoint px)
         {
             if (_fromPx == null) return;
             var n = _fromPx(px);

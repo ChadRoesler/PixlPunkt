@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Constants
+namespace PixlPunkt.Constants
 {
     /// <summary>
     /// Constants for color picker dialogs and color space conversions.

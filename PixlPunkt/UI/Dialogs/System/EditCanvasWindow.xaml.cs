@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.History;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI.Dialogs
 {
@@ -52,10 +53,10 @@ namespace PixlPunkt.UI.Dialogs
             DocumentNameTextBox.Text = _document.Name ?? "Untitled";
 
             // Document size (read-only display)
-            DocumentSizeText.Text = $"{_document.PixelWidth} × {_document.PixelHeight}";
+            DocumentSizeText.Text = $"{_document.PixelWidth} Ã— {_document.PixelHeight}";
 
             // Tile size (read-only display)
-            TileSizeText.Text = $"{_document.TileSize.Width} × {_document.TileSize.Height}";
+            TileSizeText.Text = $"{_document.TileSize.Width} Ã— {_document.TileSize.Height}";
 
             // Tile counts
             TileWidthBox.Value = _document.TileCounts.Width;
@@ -81,7 +82,7 @@ namespace PixlPunkt.UI.Dialogs
             string deltaWStr = deltaW == 0 ? "" : (deltaW > 0 ? $" (+{deltaW})" : $" ({deltaW})");
             string deltaHStr = deltaH == 0 ? "" : (deltaH > 0 ? $" (+{deltaH})" : $" ({deltaH})");
 
-            NewSizePreviewText.Text = $"New size: {newPixelW} × {newPixelH} px ({newTileW}{deltaWStr} × {newTileH}{deltaHStr} tiles)";
+            NewSizePreviewText.Text = $"New size: {newPixelW} Ã— {newPixelH} px ({newTileW}{deltaWStr} Ã— {newTileH}{deltaHStr} tiles)";
         }
 
         private void TileCount_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
@@ -185,7 +186,7 @@ namespace PixlPunkt.UI.Dialogs
             _document.ResizeCanvas(newPixelW, newPixelH, offsetX, offsetY);
 
             // Update tile counts
-            _document.SetTileCounts(new SizeInt32(newTileW, newTileH));
+            _document.SetTileCounts(CreateSize(newTileW, newTileH));
         }
 
         /// <summary>

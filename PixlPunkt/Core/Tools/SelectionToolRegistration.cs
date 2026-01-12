@@ -25,7 +25,7 @@ namespace PixlPunkt.Core.Tools
     /// Factory function that creates an <see cref="ISelectionTool"/> for this tool.
     /// Receives <see cref="SelectionToolContext"/> for dependency injection.
     /// </param>
-    public sealed record SelectionToolRegistration(
+    public sealed partial record SelectionToolRegistration(
         string Id,
         string DisplayName,
         ToolSettingsBase? Settings,

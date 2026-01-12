@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml.Data;
 
 namespace PixlPunkt.UI.Converters
@@ -25,7 +25,7 @@ namespace PixlPunkt.UI.Converters
     /// <para><strong>XAML Usage:</strong></para>
     /// <code>
     /// &lt;Slider Minimum="0" Maximum="255"
-    ///         Value="{x:Bind LayerOpacity, Converter={StaticResource ByteToDouble}, Mode=TwoWay}" /&gt;
+    ///         Value="{Binding LayerOpacity, Converter={StaticResource ByteToDouble}, Mode=TwoWay}" /&gt;
     /// </code>
     /// </remarks>
     /// <seealso cref="LevelToIndentConverter"/>

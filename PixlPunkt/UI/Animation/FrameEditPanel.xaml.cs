@@ -1,6 +1,4 @@
 using System;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -10,14 +8,13 @@ using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.UI.CanvasHost;
-using Windows.Foundation;
-using Windows.Graphics.DirectX;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
 
 namespace PixlPunkt.UI.Animation
 {
     /// <summary>
     /// Panel for editing animation frames.
-    /// Shows frame strip, transport controls, and an editable frame canvas.
     /// </summary>
     public sealed partial class FrameEditPanel : UserControl
     {
@@ -35,20 +32,8 @@ namespace PixlPunkt.UI.Animation
         // EVENTS
         // ====================================================================
 
-        /// <summary>
-        /// Raised when user wants to add a tile position as a frame.
-        /// </summary>
         public event Action? AddFrameRequested;
-
-        /// <summary>
-        /// Raised when user clicks a frame to edit it.
-        /// Provides the tile position (tileX, tileY) to edit.
-        /// </summary>
         public event Action<int, int>? FrameEditRequested;
-
-        /// <summary>
-        /// Raised when the tile content has been modified via the editor.
-        /// </summary>
         public event Action? TileModified;
 
         // ====================================================================
@@ -58,8 +43,6 @@ namespace PixlPunkt.UI.Animation
         public FrameEditPanel()
         {
             InitializeComponent();
-
-            // Wire up editor canvas events
             FrameEditorCanvas.TileModified += OnTileModified;
         }
 
@@ -67,18 +50,13 @@ namespace PixlPunkt.UI.Animation
         // PUBLIC API
         // ====================================================================
 
-        /// <summary>
-        /// Binds the panel to animation state and document.
-        /// </summary>
         public void Bind(TileAnimationState? state, CanvasDocument? document)
         {
-            // Unbind previous
             if (_state != null)
             {
                 _state.SelectedReelChanged -= OnSelectedReelChanged;
                 _state.CurrentFrameChanged -= OnCurrentFrameChanged;
 
-                // Unbind reel changed event
                 if (_state.SelectedReel != null)
                 {
                     _state.SelectedReel.Changed -= OnReelChanged;
@@ -92,13 +70,11 @@ namespace PixlPunkt.UI.Animation
             _state = state;
             _document = document;
 
-            // Bind new
             if (_state != null)
             {
                 _state.SelectedReelChanged += OnSelectedReelChanged;
                 _state.CurrentFrameChanged += OnCurrentFrameChanged;
 
-                // Bind reel changed event for live updates
                 if (_state.SelectedReel != null)
                 {
                     _state.SelectedReel.Changed += OnReelChanged;
@@ -109,51 +85,32 @@ namespace PixlPunkt.UI.Animation
                 _document.DocumentModified += OnDocumentModified;
             }
 
-            // Bind the editor canvas
             FrameEditorCanvas.Bind(_state, _document);
-
             RefreshDisplay();
         }
 
-        /// <summary>
-        /// Binds the tool state and palette service for tool integration.
-        /// </summary>
         public void BindToolState(ToolState? toolState, PaletteService? palette)
         {
             _toolState = toolState;
             _palette = palette;
-
-            // Pass to the editor canvas for tool integration
             FrameEditorCanvas.BindToolState(_toolState, _palette);
         }
 
-        /// <summary>
-        /// Binds the canvas host for synchronization with the main canvas.
-        /// </summary>
         public void BindCanvasHost(CanvasViewHost? canvasHost)
         {
             FrameEditorCanvas.BindCanvasHost(canvasHost);
         }
 
-        /// <summary>
-        /// Sets the foreground color for the frame editor.
-        /// </summary>
         public void SetForegroundColor(uint bgra)
         {
             FrameEditorCanvas.SetForegroundColor(bgra);
         }
 
-        /// <summary>
-        /// Sets the background color for the frame editor.
-        /// </summary>
         public void SetBackgroundColor(uint bgra)
         {
             FrameEditorCanvas.SetBackgroundColor(bgra);
         }
 
-        /// <summary>
-        /// Refreshes the display to reflect current state.
-        /// </summary>
         public void RefreshDisplay()
         {
             RefreshFrameStrip();
@@ -162,16 +119,11 @@ namespace PixlPunkt.UI.Animation
             FrameEditorCanvas.RefreshDisplay();
         }
 
-        /// <summary>
-        /// Refreshes frame thumbnails after a commit (like layer previews).
-        /// Call this after stroke ends or document saves.
-        /// </summary>
         public void RefreshThumbnailsOnCommit()
         {
-            // Invalidate all thumbnail canvases to re-read pixels
             foreach (var child in FrameStrip.Children)
             {
-                if (child is Button btn && btn.Content is CanvasControl canvas)
+                if (child is Button btn && btn.Content is SKXamlCanvas canvas)
                 {
                     canvas.Invalidate();
                 }
@@ -186,10 +138,9 @@ namespace PixlPunkt.UI.Animation
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                // Bind to new reel's Changed event
                 if (_state?.SelectedReel != null)
                 {
-                    _state.SelectedReel.Changed -= OnReelChanged; // Remove if already bound
+                    _state.SelectedReel.Changed -= OnReelChanged;
                     _state.SelectedReel.Changed += OnReelChanged;
                 }
                 RefreshDisplay();
@@ -212,10 +163,6 @@ namespace PixlPunkt.UI.Animation
             });
         }
 
-        /// <summary>
-        /// Handles document modifications from external sources (main canvas painting).
-        /// Refreshes all frame thumbnails to show updated content.
-        /// </summary>
         private void OnDocumentModified()
         {
             DispatcherQueue.TryEnqueue(RefreshThumbnailsOnCommit);
@@ -223,7 +170,6 @@ namespace PixlPunkt.UI.Animation
 
         private void OnTileModified()
         {
-            // Refresh the frame strip thumbnails on commit (stroke end)
             RefreshThumbnailsOnCommit();
             TileModified?.Invoke();
         }
@@ -324,7 +270,6 @@ namespace PixlPunkt.UI.Animation
             var reel = _state.SelectedReel;
             FrameCountText.Text = $"{reel.FrameCount} frames";
 
-            // Create thumbnail buttons for each frame
             for (int i = 0; i < reel.FrameCount; i++)
             {
                 var frame = reel.Frames[i];
@@ -348,7 +293,6 @@ namespace PixlPunkt.UI.Animation
             ToolTipService.SetToolTip(btn, $"Frame {frameIndex + 1} (Tile {tileX},{tileY})");
             btn.Click += FrameThumbnail_Click;
 
-            // Create thumbnail canvas for crisp pixel rendering
             var canvas = CreateTilePositionCanvas(tileX, tileY, 56, 56);
             if (canvas != null)
             {
@@ -368,78 +312,78 @@ namespace PixlPunkt.UI.Animation
         }
 
         /// <summary>
-        /// Creates a Win2D CanvasControl for crisp pixel-perfect tile rendering at a grid position.
-        /// The canvas re-reads pixels on each draw, so it stays in sync when invalidated on commit.
+        /// Creates a SkiaSharp canvas for crisp pixel-perfect tile rendering.
         /// </summary>
-        private CanvasControl? CreateTilePositionCanvas(int tileX, int tileY, double width, double height)
+        private SKXamlCanvas? CreateTilePositionCanvas(int tileX, int tileY, double width, double height)
         {
             if (_document == null) return null;
 
-            // Get tile dimensions
             int tileW = _document.TileSize.Width;
             int tileH = _document.TileSize.Height;
 
-            var canvas = new CanvasControl
+            var canvas = new SKXamlCanvas
             {
                 Width = width,
                 Height = height
             };
 
-            // Capture the document and tile position for the draw handler
             var doc = _document;
             int capturedTileX = tileX;
             int capturedTileY = tileY;
+            int capturedTileW = tileW;
+            int capturedTileH = tileH;
 
-            canvas.Draw += (sender, args) =>
+            canvas.PaintSurface += (sender, e) =>
             {
-                var ds = args.DrawingSession;
-                ds.Antialiasing = CanvasAntialiasing.Aliased;
+                var skCanvas = e.Surface.Canvas;
+                skCanvas.Clear(SKColors.Transparent);
 
-                float w = (float)sender.ActualWidth;
-                float h = (float)sender.ActualHeight;
+                float w = e.Info.Width;
+                float h = e.Info.Height;
 
-                // Re-read pixels fresh from the document on each draw
                 byte[]? tilePixels = ReadTilePixelsFromCanvas(capturedTileX, capturedTileY, doc);
-                if (tilePixels == null || tilePixels.Length < tileW * tileH * 4)
+                if (tilePixels == null || tilePixels.Length < capturedTileW * capturedTileH * 4)
                     return;
 
-                using var bitmap = CanvasBitmap.CreateFromBytes(
-                    sender.Device,
-                    tilePixels,
-                    tileW,
-                    tileH,
-                    DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                    96.0f);
+                var info = new SKImageInfo(capturedTileW, capturedTileH, SKColorType.Bgra8888, SKAlphaType.Premul);
+                using var bitmap = new SKBitmap(info);
 
-                // Calculate destination rect (centered, uniform scale)
-                float scale = Math.Min(w / tileW, h / tileH);
-                float destW = tileW * scale;
-                float destH = tileH * scale;
-                float destX = (w - destW) / 2;
-                float destY = (h - destH) / 2;
+                var handle = System.Runtime.InteropServices.GCHandle.Alloc(tilePixels, System.Runtime.InteropServices.GCHandleType.Pinned);
+                try
+                {
+                    bitmap.InstallPixels(info, handle.AddrOfPinnedObject(), info.RowBytes);
 
-                ds.DrawImage(
-                    bitmap,
-                    new Rect(destX, destY, destW, destH),
-                    new Rect(0, 0, tileW, tileH),
-                    1.0f,
-                    CanvasImageInterpolation.NearestNeighbor);
+                    float scale = Math.Min(w / capturedTileW, h / capturedTileH);
+                    float destW = capturedTileW * scale;
+                    float destH = capturedTileH * scale;
+                    float destX = (w - destW) / 2;
+                    float destY = (h - destH) / 2;
+
+                    var destRect = new SKRect(destX, destY, destX + destW, destY + destH);
+                    var srcRect = new SKRect(0, 0, capturedTileW, capturedTileH);
+
+                    using var paint = new SKPaint
+                    {
+                        FilterQuality = SKFilterQuality.None,
+                        IsAntialias = false
+                    };
+
+                    skCanvas.DrawBitmap(bitmap, srcRect, destRect, paint);
+                }
+                finally
+                {
+                    handle.Free();
+                }
             };
 
             return canvas;
         }
 
-        /// <summary>
-        /// Reads pixels from the canvas at a tile grid position.
-        /// </summary>
         private byte[]? ReadTilePixelsFromCanvas(int tileX, int tileY)
         {
             return ReadTilePixelsFromCanvas(tileX, tileY, _document);
         }
 
-        /// <summary>
-        /// Reads pixels from a document at a tile grid position.
-        /// </summary>
         private static byte[]? ReadTilePixelsFromCanvas(int tileX, int tileY, CanvasDocument? document)
         {
             if (document == null) return null;
@@ -447,11 +391,9 @@ namespace PixlPunkt.UI.Animation
             int tileW = document.TileSize.Width;
             int tileH = document.TileSize.Height;
 
-            // Calculate pixel coordinates
             int docX = tileX * tileW;
             int docY = tileY * tileH;
 
-            // Ensure we're within bounds
             if (docX < 0 || docY < 0 ||
                 docX + tileW > document.PixelWidth ||
                 docY + tileH > document.PixelHeight)
@@ -459,7 +401,6 @@ namespace PixlPunkt.UI.Animation
                 return null;
             }
 
-            // Read from composite surface
             var surface = document.Surface;
             if (surface == null) return null;
 

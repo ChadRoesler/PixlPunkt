@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Constants
+namespace PixlPunkt.Constants
 {
     /// <summary>
     /// UI sizing and spacing constants for consistent visual appearance.

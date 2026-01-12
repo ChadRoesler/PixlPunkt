@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Constants
+namespace PixlPunkt.Constants
 {
     /// <summary>
     /// Default window sizing constants.

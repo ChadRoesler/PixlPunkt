@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml;
 using Windows.Foundation;
 
@@ -22,21 +22,21 @@ namespace PixlPunkt.UI.CanvasHost
 
         /// <summary>
         /// Recenters the view so that the given document-space point appears near
-        /// the center of the CanvasView.
+        /// the center of the _mainCanvas.
         /// </summary>
         public void CenterOnDocumentPoint(double docX, double docY)
         {
             var screenPt = _zoom.DocToScreen(new Point(docX, docY));
 
-            double centerX = CanvasView.ActualWidth * 0.5;
-            double centerY = CanvasView.ActualHeight * 0.5;
+            double centerX = _mainCanvas.ActualWidth * 0.5;
+            double centerY = _mainCanvas.ActualHeight * 0.5;
 
             double dx = centerX - screenPt.X;
             double dy = centerY - screenPt.Y;
 
             _zoom.PanBy(dx, dy);
             UpdateViewport();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>Resets the zoom to 1:1 (actual size).</summary>
@@ -45,21 +45,21 @@ namespace PixlPunkt.UI.CanvasHost
             _zoom.Actual();
             UpdateViewport();
             ZoomLevel.Text = ZoomLevelText;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>Toggles the pixel grid overlay.</summary>
         public void TogglePixelGrid()
         {
             _showPixelGrid = !_showPixelGrid;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>Toggles the tile grid overlay.</summary>
         public void ToggleTileGrid()
         {
             _showTileGrid = !_showTileGrid;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>Gets or sets whether tile mapping numbers are displayed on the canvas.</summary>
@@ -70,7 +70,7 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 if (_showTileMappings == value) return;
                 _showTileMappings = value;
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
             }
         }
         private bool _showTileMappings = false;
@@ -92,7 +92,7 @@ namespace PixlPunkt.UI.CanvasHost
             _zoom.ZoomAt(_zoom.Offset, ZoomInFactor, MinZoomScale, MaxZoomScale);
             UpdateViewport();
             ZoomLevel.Text = ZoomLevelText;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void ZoomOut()
@@ -100,7 +100,7 @@ namespace PixlPunkt.UI.CanvasHost
             _zoom.ZoomAt(_zoom.Offset, ZoomOutFactor, MinZoomScale, MaxZoomScale);
             UpdateViewport();
             ZoomLevel.Text = ZoomLevelText;
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         public void ZoomActual()
@@ -137,11 +137,11 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void DoFit()
         {
-            _zoom.SetViewportSize(CanvasView.ActualWidth, CanvasView.ActualHeight);
+            _zoom.SetViewportSize(_mainCanvas.ActualWidth, _mainCanvas.ActualHeight);
             _zoom.Fit(24);
             ZoomLevel.Text = ZoomLevelText;
             UpdateViewport();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -163,17 +163,18 @@ namespace PixlPunkt.UI.CanvasHost
 
         /// <summary>
         /// Updates the current visible document rectangle and raises ViewportChanged if it changed.
+        /// Also invalidates rulers to keep them in sync.
         /// </summary>
         private void UpdateViewport()
         {
             if (Document.PixelWidth <= 0 || Document.PixelHeight <= 0 ||
-                CanvasView.ActualWidth <= 0 || CanvasView.ActualHeight <= 0)
+                _mainCanvas.ActualWidth <= 0 || _mainCanvas.ActualHeight <= 0)
                 return;
 
             // Get the document rectangle in screen coordinates
             var docScreen = _zoom.GetDestRect();
             // Get the view rectangle in screen coordinates
-            var viewScreen = new Rect(0, 0, CanvasView.ActualWidth, CanvasView.ActualHeight);
+            var viewScreen = new Rect(0, 0, _mainCanvas.ActualWidth, _mainCanvas.ActualHeight);
             // Find the intersection (visible portion of document in screen space)
             var intersect = RectHelper.Intersect(docScreen, viewScreen);
 
@@ -184,6 +185,8 @@ namespace PixlPunkt.UI.CanvasHost
                 {
                     _currentViewport = empty;
                     ViewportChanged?.Invoke(_currentViewport);
+                    // Invalidate rulers when viewport changes
+                    InvalidateRulers();
                 }
                 return;
             }
@@ -209,6 +212,9 @@ namespace PixlPunkt.UI.CanvasHost
 
             _currentViewport = rect;
             ViewportChanged?.Invoke(rect);
+            
+            // Invalidate rulers when viewport changes (pan/zoom)
+            InvalidateRulers();
         }
     }
 }

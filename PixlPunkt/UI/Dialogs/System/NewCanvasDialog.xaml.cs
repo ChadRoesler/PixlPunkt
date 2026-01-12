@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.Canvas;
 using Windows.Graphics;
 using System.Threading.Tasks;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.UI.Dialogs
 {
@@ -162,8 +163,8 @@ namespace PixlPunkt.UI.Dialogs
 
             return new NewCanvasResult(
                 Name: name,
-                TileSize: new SizeInt32(tw, th),
-                TileCounts: new SizeInt32(cx, cy),
+                TileSize: CreateSize(tw, th),
+                TileCounts: CreateSize(cx, cy),
                 Template: SelectedTemplate
             );
         }

@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using Windows.Storage;
+using System.Runtime.InteropServices;
 
 namespace PixlPunkt.Core.Settings
 {
@@ -10,8 +10,9 @@ namespace PixlPunkt.Core.Settings
     /// <remarks>
     /// <para>
     /// All PixlPunkt data is stored in the application's local data folder.
-    /// For packaged apps, this is the sandboxed LocalCache folder.
-    /// This includes settings, plugins, brushes, palettes, templates, and auto-saves.
+    /// On Windows: %LocalAppData%\PixlPunkt
+    /// On macOS: ~/Library/Application Support/PixlPunkt
+    /// On Linux: ~/.local/share/PixlPunkt
     /// </para>
     /// </remarks>
     public static class AppPaths
@@ -21,59 +22,129 @@ namespace PixlPunkt.Core.Settings
         /// </summary>
         public const string AppName = "PixlPunkt";
 
-        private static string? _rootDirectory;
+        // Cache platform checks once at type initialization
+        private static readonly bool _isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        private static readonly bool _isMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+        private static readonly bool _isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+
+        // Lazy-initialized root directory
+        private static readonly Lazy<string> _rootDirectory = new(GetRootDirectory, isThreadSafe: true);
         private static bool _initialized;
 
         /// <summary>
         /// Gets the root application data directory.
         /// </summary>
-        /// <value>
-        /// For packaged apps: The app's LocalFolder path.
-        /// For unpackaged apps: Falls back to %LocalAppData%\PixlPunkt.
-        /// </value>
-        public static string RootDirectory
-        {
-            get
-            {
-                if (_rootDirectory == null)
-                {
-                    _rootDirectory = GetRootDirectory();
-                }
-                return _rootDirectory;
-            }
-        }
+        public static string RootDirectory => _rootDirectory.Value;
 
         private static string GetRootDirectory()
         {
             try
             {
-                // Use Windows.Storage.ApplicationData for packaged apps
-                // This returns the correct sandboxed path automatically
-                var localFolder = ApplicationData.Current.LocalFolder;
+                if (_isWindows) return GetWindowsPath();
+                if (_isMacOS) return GetMacOSPath();
+                if (_isLinux) return GetLinuxPath();
+                return GetFallbackPath();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Error determining root directory: {ex.Message}");
+                return GetFallbackPath();
+            }
+        }
+
+        private static string GetWindowsPath()
+        {
+#if WINDOWS
+            try
+            {
+                // Try to use Windows.Storage.ApplicationData for packaged apps
+                var localFolder = Windows.Storage.ApplicationData.Current.LocalFolder;
                 System.Diagnostics.Debug.WriteLine($"[AppPaths] Using ApplicationData.LocalFolder: {localFolder.Path}");
                 return localFolder.Path;
             }
             catch (InvalidOperationException)
             {
-                // App is running unpackaged - fall back to traditional path
-                System.Diagnostics.Debug.WriteLine("[AppPaths] Running unpackaged, using Environment path");
-                return GetUnpackagedPath();
+                // App is running unpackaged - fall through to LocalApplicationData
+                System.Diagnostics.Debug.WriteLine("[AppPaths] Running unpackaged on Windows");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[AppPaths] Error accessing ApplicationData: {ex.Message}");
-                return GetUnpackagedPath();
+                // Windows.Storage not available or other error - fall through
             }
+#endif
+
+            // Fall back to traditional Windows path
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrEmpty(localAppData))
+            {
+                var path = Path.Combine(localAppData, AppName);
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using LocalApplicationData: {path}");
+                return path;
+            }
+
+            return GetFallbackPath();
         }
 
-        private static string GetUnpackagedPath()
+        private static string GetMacOSPath()
         {
+            // macOS: ~/Library/Application Support/PixlPunkt
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            
+            // Fallback to HOME environment variable if UserProfile is empty
+            if (string.IsNullOrEmpty(home))
+            {
+                home = Environment.GetEnvironmentVariable("HOME");
+            }
+            
+            if (!string.IsNullOrEmpty(home))
+            {
+                var appSupport = Path.Combine(home, "Library", "Application Support", AppName);
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using macOS Application Support: {appSupport}");
+                return appSupport;
+            }
+
+            return GetFallbackPath();
+        }
+
+        private static string GetLinuxPath()
+        {
+            // Linux: Use XDG Base Directory specification
+            // XDG_DATA_HOME defaults to ~/.local/share
+            var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+            if (!string.IsNullOrEmpty(xdgDataHome))
+            {
+                var path = Path.Combine(xdgDataHome, AppName);
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using XDG_DATA_HOME: {path}");
+                return path;
+            }
+
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (string.IsNullOrEmpty(home))
+            {
+                home = Environment.GetEnvironmentVariable("HOME");
+            }
+
+            if (!string.IsNullOrEmpty(home))
+            {
+                var linuxPath = Path.Combine(home, ".local", "share", AppName);
+                System.Diagnostics.Debug.WriteLine($"[AppPaths] Using Linux path: {linuxPath}");
+                return linuxPath;
+            }
+
+            return GetFallbackPath();
+        }
+
+        private static string GetFallbackPath()
+        {
+            // Ultimate fallback: use LocalApplicationData folder
             try
             {
                 var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 if (!string.IsNullOrEmpty(localAppData))
                 {
-                    return Path.Combine(localAppData, AppName);
+                    var path = Path.Combine(localAppData, AppName);
+                    System.Diagnostics.Debug.WriteLine($"[AppPaths] Using fallback LocalApplicationData: {path}");
+                    return path;
                 }
             }
             catch (Exception ex)
@@ -81,8 +152,10 @@ namespace PixlPunkt.Core.Settings
                 System.Diagnostics.Debug.WriteLine($"[AppPaths] Error getting LocalApplicationData: {ex.Message}");
             }
 
-            // Ultimate fallback
-            return Path.Combine(Path.GetTempPath(), AppName);
+            // Last resort: use temp directory
+            var tempPath = Path.Combine(Path.GetTempPath(), AppName);
+            System.Diagnostics.Debug.WriteLine($"[AppPaths] WARNING: Using temp directory as fallback: {tempPath}");
+            return tempPath;
         }
 
         /// <summary>

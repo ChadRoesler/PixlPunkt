@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -236,7 +236,7 @@ namespace PixlPunkt.UI
                     int effectiveFps = frames.Count > 0 && frames[0].DurationMs > 0
                         ? Math.Max(1, 1000 / frames[0].DurationMs)
                         : 12;
-                    await VideoEncoder.EncodeAsync(animFrames, outputPath, VideoFormat.Mp4, effectiveFps, 80, encodeProgress, progressDialog.CancellationToken);
+                    await VideoEncoder.EncodeAsync(animFrames, outputPath, VideoFormat.Mp4, effectiveFps, 80, scale: 1, encodeProgress, progressDialog.CancellationToken);
                     break;
 
                 case "png":
@@ -323,12 +323,14 @@ namespace PixlPunkt.UI
                     break;
 
                 case "mp4":
-                case "wmv":
+                case "webm":
+                case "mkv":
                 case "avi":
                     var videoFormat = format switch
                     {
                         "mp4" => VideoFormat.Mp4,
-                        "wmv" => VideoFormat.Wmv,
+                        "webm" => VideoFormat.WebM,
+                        "mkv" => VideoFormat.Mkv,
                         "avi" => VideoFormat.Avi,
                         _ => VideoFormat.Mp4
                     };
@@ -485,16 +487,18 @@ namespace PixlPunkt.UI
                     break;
 
                 case "mp4":
-                case "wmv":
+                case "webm":
+                case "mkv":
                 case "avi":
                     var videoFormat = format switch
                     {
                         "mp4" => VideoFormat.Mp4,
-                        "wmv" => VideoFormat.Wmv,
+                        "webm" => VideoFormat.WebM,
+                        "mkv" => VideoFormat.Mkv,
                         "avi" => VideoFormat.Avi,
                         _ => VideoFormat.Mp4
                     };
-                    await VideoEncoder.EncodeAsync(frames, outputPath, videoFormat, fps, videoQuality, encodeProgress, progressDialog.CancellationToken);
+                    await VideoEncoder.EncodeAsync(frames, outputPath, videoFormat, fps, videoQuality, scale: 1, encodeProgress, progressDialog.CancellationToken);
                     break;
 
                 case "png":

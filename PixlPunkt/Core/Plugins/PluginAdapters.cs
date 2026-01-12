@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using FluentIcons.Common;
-using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.History;
 using PixlPunkt.Core.IO;
 using PixlPunkt.Core.Painting;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Tools.Selection;
 using PixlPunkt.Core.Tools.Settings;
@@ -15,7 +15,7 @@ using PixlPunkt.Core.Tools.Utility;
 using PixlPunkt.PluginSdk.Tile;
 using Windows.Foundation;
 using SdkBrushShape = PixlPunkt.PluginSdk.Imaging.BrushShape;
-// SDK types that don't have global aliases
+// SDK types
 using SdkBrushToolRegistration = PixlPunkt.PluginSdk.Tools.BrushToolRegistration;
 using SdkIEffectRegistration = PixlPunkt.PluginSdk.Effects.IEffectRegistration;
 using SdkIExportRegistration = PixlPunkt.PluginSdk.IO.IExportRegistration;
@@ -725,7 +725,7 @@ namespace PixlPunkt.Core.Plugins
 
             if (width <= 0 || height <= 0) return;
 
-            var selRect = new Windows.Graphics.RectInt32(x0, y0, width, height);
+            var selRect = new Windows.Graphics.RectInt32 { X = x0, Y = y0, Width = width, Height = height };
 
             // Check if this is a simple rectangle (4 points forming axis-aligned rect)
             bool isSimpleRect = points.Count == 4 && IsAxisAlignedRectangle(points);
@@ -849,7 +849,7 @@ namespace PixlPunkt.Core.Plugins
 
                     if (x1 >= x0)
                     {
-                        region.AddRect(new Windows.Graphics.RectInt32(x0, y, x1 - x0 + 1, 1));
+                        region.AddRect(new Windows.Graphics.RectInt32 { X = x0, Y = y, Width = x1 - x0 + 1, Height = 1 });
                     }
                 }
             }
@@ -859,33 +859,42 @@ namespace PixlPunkt.Core.Plugins
         public void Cancel() => _sdkTool.Cancel();
         public void Configure(ToolSettingsBase settings) { }
 
-        public void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase)
+        /// <summary>
+        /// Draws the selection preview using the ICanvasRenderer abstraction.
+        /// </summary>
+        public void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase)
         {
             var points = _sdkTool.GetPreviewPoints();
             if (points == null || points.Count < 2) return;
 
-            using var pathBuilder = new Microsoft.Graphics.Canvas.Geometry.CanvasPathBuilder(ds);
-            var firstPoint = points[0];
-            pathBuilder.BeginFigure((float)(destRect.X + firstPoint.x * scale), (float)(destRect.Y + firstPoint.y * scale));
-
-            for (int i = 1; i < points.Count; i++)
+            // Build the polygon path points in screen space
+            var screenPoints = new List<(float x, float y)>();
+            foreach (var pt in points)
             {
-                var pt = points[i];
-                pathBuilder.AddLine((float)(destRect.X + pt.x * scale), (float)(destRect.Y + pt.y * scale));
+                float sx = (float)(destRect.X + pt.x * scale);
+                float sy = (float)(destRect.Y + pt.y * scale);
+                screenPoints.Add((sx, sy));
             }
 
-            pathBuilder.EndFigure(Microsoft.Graphics.Canvas.Geometry.CanvasFigureLoop.Closed);
-            using var geometry = Microsoft.Graphics.Canvas.Geometry.CanvasGeometry.CreatePath(pathBuilder);
+            // Draw the polygon outline with marching ants effect
+            var white = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+            var black = Windows.UI.Color.FromArgb(255, 0, 0, 0);
 
-            var strokeStyle = new Microsoft.Graphics.Canvas.Geometry.CanvasStrokeStyle
+            // Draw white outline
+            for (int i = 0; i < screenPoints.Count; i++)
             {
-                DashStyle = Microsoft.Graphics.Canvas.Geometry.CanvasDashStyle.Dash,
-                DashOffset = -antsPhase,
-                CustomDashStyle = new float[] { 4f, 4f }
-            };
+                var p1 = screenPoints[i];
+                var p2 = screenPoints[(i + 1) % screenPoints.Count];
+                renderer.DrawLine(p1.x, p1.y, p2.x, p2.y, white, 2f);
+            }
 
-            ds.DrawGeometry(geometry, Windows.UI.Color.FromArgb(255, 255, 255, 255), 2f);
-            ds.DrawGeometry(geometry, Windows.UI.Color.FromArgb(255, 0, 0, 0), 1f, strokeStyle);
+            // Draw black dashed outline (marching ants approximation)
+            for (int i = 0; i < screenPoints.Count; i++)
+            {
+                var p1 = screenPoints[i];
+                var p2 = screenPoints[(i + 1) % screenPoints.Count];
+                renderer.DrawLine(p1.x, p1.y, p2.x, p2.y, black, 1f);
+            }
         }
 
         private static (bool shift, bool ctrl, bool alt) GetModifiers()
@@ -1098,7 +1107,7 @@ namespace PixlPunkt.Core.Plugins
         public void Invalidate() => _mainContext.RequestRedraw();
     }
 
-    internal sealed class PluginTileToolRegistration : ITileToolRegistration, IToolBehavior /* + your ITileToolRegistration */
+    internal sealed class PluginTileToolRegistration : ITileToolRegistration, IToolBehavior
     {
         private readonly SdkTileToolRegistration _sdkRegistration;
         private readonly PluginToolSettings? _adaptedSettings;

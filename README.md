@@ -5,7 +5,7 @@
 <h1 align="center">PixlPunkt</h1>
 
 <p align="center">
-  <strong>A modern pixel art editor for Windows</strong>
+  <strong>A modern, cross-platform pixel art editor</strong>
 </p>
 
 <p align="center">
@@ -21,11 +21,35 @@
 
 ## Documentation
 
+### 🚀 Quick Reference
+*For when you're in the zone and just need a reminder*
+
 | Document | Description |
 |----------|-------------|
 | **[Quick Start Guide](docs/QUICK_START.md)** | Get up and running in 5 minutes |
-| **[User Guide](docs/USER_GUIDE.md)** | Complete feature documentation |
-| **[Plugin SDK](PixlPunkt.PluginSdk/DEVELOPER_README.md)** | Create your own plugins |
+| **[Cheat Sheet](docs/CHEAT_SHEET.md)** | One-page keyboard shortcuts & tool reference |
+
+### 📚 The Wiki (Deep Dive)
+*For when you actually want to RTFM*
+
+**[→ PixlPunkt Wiki](https://github.com/ChadRoesler/PixlPunkt/wiki)**
+
+| Topic | What You'll Learn |
+|-------|-------------------|
+| [Tools](https://github.com/ChadRoesler/PixlPunkt/wiki/Tools) | Every brush, eraser, and shape tool |
+| [Gradient Fill](https://github.com/ChadRoesler/PixlPunkt/wiki/Gradient-Fill) | Dithering algorithms explained (yes, even Riemersma) |
+| [Layers & Effects](https://github.com/ChadRoesler/PixlPunkt/wiki/Layers) | Blend modes, masks, effects |
+| [Canvas Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Canvas-Animation) | Frame-by-frame, keyframes, onion skinning |
+| [Tile Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Tile-Animation) | Sprite sheets, reels, game exports |
+| [Stage & Camera](https://github.com/ChadRoesler/PixlPunkt/wiki/Stage) | Pan, zoom, rotate - cinematic camera |
+| [Shortcuts](https://github.com/ChadRoesler/PixlPunkt/wiki/Shortcuts) | Complete keyboard reference |
+
+### 🔌 Plugin Development
+
+| Document | Description |
+|----------|-------------|
+| **[Plugin SDK Guide](PixlPunkt.PluginSdk/DEVELOPER_README.md)** | Create your own tools and effects |
+| **[Example Plugin](PixlPunkt.ExamplePlugin/)** | Working code to steal from |
 
 ---
 
@@ -104,18 +128,55 @@ Full-featured animation with two modes:
 
 ## Installation
 
+### Supported Platforms
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| **Windows** | x64, ARM64 | Setup.exe (auto-updates) or Portable ZIP |
+| **macOS** | Intel (x64), Apple Silicon (ARM64) | DMG or ZIP |
+| **Linux** | x64 | DEB, RPM, or tarball |
+
 ### Requirements
-- Windows 10 version 1809 (build 17763) or later
-- .NET 10 Runtime
+- **Windows**: Windows 10 version 1809 (build 17763) or later
+- **macOS**: macOS 10.15 (Catalina) or later
+- **Linux**: X11-based desktop environment
 
 ### Download
 Download the latest release from the [Releases](https://github.com/ChadRoesler/PixlPunkt/releases) page.
+
+#### Windows
+- **Recommended**: `PixlPunkt-X.X.X-Windows-Setup.exe` - Installer with auto-updates
+- **Portable**: `PixlPunkt-X.X.X-Desktop-Windows-x64-Portable.zip` - No installation required
+
+#### macOS
+- **Apple Silicon**: `PixlPunkt-X.X.X-macOS-arm64.dmg`
+- **Intel**: `PixlPunkt-X.X.X-macOS-x64.dmg`
+
+#### Linux
+- **Debian/Ubuntu**: `pixlpunkt_X.X.X_amd64.deb`
+- **Fedora/RHEL**: `pixlpunkt-X.X.X-1.x86_64.rpm`
+- **Portable**: `pixlpunkt-X.X.X-desktop-linux-x64.tar.gz`
 
 ### Build from Source
 ```bash
 git clone https://github.com/ChadRoesler/PixlPunkt.git
 cd PixlPunkt
 dotnet build
+```
+
+#### Build for Specific Platform
+```bash
+# Windows (Skia Desktop)
+dotnet publish PixlPunkt/PixlPunkt.csproj -c Release -f net10.0-desktop -r win-x64 -p:SkiaOnly=true
+
+# Linux
+dotnet publish PixlPunkt/PixlPunkt.csproj -c Release -f net10.0-desktop -r linux-x64 -p:SkiaOnly=true
+
+# macOS (Apple Silicon)
+dotnet publish PixlPunkt/PixlPunkt.csproj -c Release -f net10.0-desktop -r osx-arm64 -p:SkiaOnly=true
+
+# macOS (Intel)
+dotnet publish PixlPunkt/PixlPunkt.csproj -c Release -f net10.0-desktop -r osx-x64 -p:SkiaOnly=true
 ```
 
 ---
@@ -168,22 +229,32 @@ PixlPunkt supports plugins through the **PixlPunkt.PluginSdk** NuGet package.
 
 ```
 PixlPunkt/
-├── PixlPunkt/                 # Main application
+├── PixlPunkt/                 # Main application (Uno Platform)
 │   ├── Core/                  # Core logic (document, imaging, tools, animation)
 │   │   ├── Animation/         # Canvas & tile animation systems
 │   │   ├── Painting/          # Brush painters, dithering algorithms
 │   │   └── Tools/             # Tool implementations and settings
-│   ├── UI/                    # WinUI 3 user interface
+│   ├── UI/                    # User interface components
 │   │   ├── Animation/         # Timeline and keyframe UI
 │   │   ├── CanvasHost/        # Main canvas rendering
 │   │   └── ColorPick/         # Color picker and gradient editor
+│   ├── Platforms/             # Platform-specific code
+│   │   ├── Desktop/           # Skia Desktop (Windows, Linux, macOS)
+│   │   ├── Windows/           # WinAppSdk specific
+│   │   ├── Android/           # Android specific
+│   │   └── iOS/               # iOS specific
 │   └── Constants/             # Application constants
+├── PixlPunkt.Tests/           # Unit tests for main application
 ├── PixlPunkt.PluginSdk/       # Plugin SDK (NuGet package)
 │   ├── Plugins/               # Plugin interfaces
 │   ├── Tools/                 # Tool abstractions
 │   ├── Effects/               # Effect system
 │   └── IO/                    # Import/export handlers
-└── PixlPunkt.ExamplePlugin/   # Example plugin implementation
+├── PixlPunkt.PluginSdk.Tests/ # Plugin SDK unit tests
+├── PixlPunkt.ExamplePlugin/   # Example plugin implementation
+└── scripts/                   # Build and installer scripts
+    ├── create-installers.ps1  # Windows installer creation
+    └── create-installers.sh   # Linux/macOS installer creation
 ```
 
 ---
@@ -207,9 +278,9 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## Roadmap
 
-- [ ] SkiaSharp rendering backend
-- [ ] Uno platform migration
-- [ ] Symmetry tools
+- [x] SkiaSharp rendering backend
+- [x] Uno Platform migration (cross-platform support!)
+- [x] Symmetry tools
 - [ ] Sprite sheet export improvements
 
 ---

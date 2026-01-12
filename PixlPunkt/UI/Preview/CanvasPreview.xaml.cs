@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Coloring.Helpers;
@@ -11,8 +10,12 @@ using PixlPunkt.Core.Painting;
 using PixlPunkt.Core.Structs;
 using PixlPunkt.UI.CanvasHost;
 using PixlPunkt.UI.Rendering;
+using SkiaSharp;
+using SkiaSharp.Views.Windows;
+#if HAS_UNO
+using Uno.WinUI.Graphics2DSK;
+#endif
 using Windows.Foundation;
-using Windows.Graphics.DirectX;
 using Windows.UI;
 
 namespace PixlPunkt.UI.Preview
@@ -21,11 +24,26 @@ namespace PixlPunkt.UI.Preview
     {
         private CanvasViewHost? _host;
 
+#if HAS_UNO
+        // SKCanvasElement instance for hardware-accelerated rendering (Uno platforms)
+        private CanvasPreviewElement? _previewCanvasElement;
+#endif
+        // SKXamlCanvas fallback for WinAppSdk
+        private SKXamlCanvas? _previewCanvasXaml;
+
         // Latest composited frame
         private byte[]? _pixels;
         private int _docWidth;
         private int _docHeight;
         private readonly PatternBackgroundService _patternService = new();
+
+        // Cached working buffer for compositing (reused to avoid per-frame allocations)
+        private byte[]? _workingBuffer;
+        private int _workingBufferSize;
+
+        // Cached checkerboard pattern
+        private SKShader? _checkerboardShader;
+        private SKBitmap? _checkerboardBitmap;
 
         // Viewport from host (doc space)
         private Rect _viewport;
@@ -42,6 +60,10 @@ namespace PixlPunkt.UI.Preview
         // Empty state (no attached canvas)
         private bool _isEmpty = true;
 
+        // Track last known dimensions for layout calculations
+        private float _lastWidth;
+        private float _lastHeight;
+
         public string ZoomText => $"{_zoom * 100:0}%";
         public bool IsEmpty => _isEmpty;
 
@@ -50,40 +72,108 @@ namespace PixlPunkt.UI.Preview
         /// </summary>
         private Color GetThemeClearColor()
         {
-            // Check the actual theme of the control
             var theme = ActualTheme;
-            return theme == Microsoft.UI.Xaml.ElementTheme.Light
-                ? Color.FromArgb(255, 249, 249, 249)  // Light theme background
-                : Color.FromArgb(255, 24, 24, 24);     // Dark theme background
+            return theme == ElementTheme.Light
+                ? Color.FromArgb(255, 249, 249, 249)
+                : Color.FromArgb(255, 24, 24, 24);
         }
 
         public CanvasPreview()
         {
             InitializeComponent();
 
+            // Initialize canvas element based on platform
+            InitializeCanvasElement();
+
             ZoomInButton.Click += (_, __) => AdjustZoom(1.25f);
             ZoomOutButton.Click += (_, __) => AdjustZoom(1.0f / 1.25f);
             FitButton.Click += (_, __) => ResetZoom();
 
-            SizeChanged += (_, __) => PreviewCanvas.Invalidate();
+            SizeChanged += (_, __) => InvalidatePreviewCanvas();
 
-            PreviewCanvas.PointerPressed += PreviewCanvas_PointerPressed;
-            PreviewCanvas.PointerMoved += PreviewCanvas_PointerMoved;
-            PreviewCanvas.PointerReleased += PreviewCanvas_PointerReleased;
-            PreviewCanvas.PointerExited += PreviewCanvas_PointerExited;
             ResetToEmpty();
 
-            // ── Stripe theme hookup ─────────────────────────────────────
+            // Stripe theme hookup
             ApplyStripeColors();
             TransparencyStripeMixer.ColorsChanged += OnStripeColorsChanged;
-            Unloaded += (_, __) => TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
+            Unloaded += (_, __) => 
+            {
+                TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
+                _checkerboardShader?.Dispose();
+                _checkerboardBitmap?.Dispose();
+            };
+        }
+
+        /// <summary>
+        /// Creates and initializes the appropriate canvas element based on platform.
+        /// </summary>
+        private void InitializeCanvasElement()
+        {
+#if HAS_UNO
+            // Use SKCanvasElement on Uno platforms for better performance
+            if (SKCanvasElement.IsSupportedOnCurrentPlatform())
+            {
+                _previewCanvasElement = new CanvasPreviewElement
+                {
+                    DrawCallback = RenderPreview
+                };
+                PreviewCanvasContainer.Children.Add(_previewCanvasElement);
+                return;
+            }
+#endif
+            // Fall back to SKXamlCanvas on WinAppSdk or unsupported Uno platforms
+            _previewCanvasXaml = new SKXamlCanvas();
+            _previewCanvasXaml.PaintSurface += PreviewCanvas_PaintSurface;
+            PreviewCanvasContainer.Children.Add(_previewCanvasXaml);
+        }
+
+        /// <summary>
+        /// Invalidates the preview canvas to trigger a redraw.
+        /// </summary>
+        private void InvalidatePreviewCanvas()
+        {
+#if HAS_UNO
+            _previewCanvasElement?.Invalidate();
+#endif
+            _previewCanvasXaml?.Invalidate();
+        }
+
+        /// <summary>
+        /// Gets the UI element used for pointer capture.
+        /// </summary>
+        private UIElement GetPointerCaptureElement()
+        {
+#if HAS_UNO
+            if (_previewCanvasElement != null)
+                return _previewCanvasElement;
+#endif
+            return _previewCanvasXaml ?? (UIElement)PreviewCanvasContainer;
+        }
+
+        /// <summary>
+        /// Paint surface handler for SKXamlCanvas (WinAppSdk fallback).
+        /// </summary>
+        private void PreviewCanvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        {
+            _lastWidth = e.Info.Width;
+            _lastHeight = e.Info.Height;
+            RenderPreview(e.Surface.Canvas, e.Info.Width, e.Info.Height);
         }
 
         private void OnStripeColorsChanged()
         {
             ApplyStripeColors();
             _patternService.Invalidate();
-            PreviewCanvas.Invalidate();
+            InvalidateCheckerboardCache();
+            InvalidatePreviewCanvas();
+        }
+
+        private void InvalidateCheckerboardCache()
+        {
+            _checkerboardShader?.Dispose();
+            _checkerboardShader = null;
+            _checkerboardBitmap?.Dispose();
+            _checkerboardBitmap = null;
         }
 
         private void ApplyStripeColors()
@@ -105,6 +195,10 @@ namespace PixlPunkt.UI.Preview
                 _patternService.LightColor = light;
                 _patternService.DarkColor = dark;
             }
+
+            // Disable AutoTheme so the PatternBackgroundService uses the explicit 
+            // colors from TransparencyStripeMixer instead of syncing with ActualTheme
+            _patternService.AutoTheme = false;
         }
 
         /// <summary>
@@ -127,11 +221,10 @@ namespace PixlPunkt.UI.Preview
             _isEmpty = false;
             ResetZoom();
 
-            // Ensure stripes match current theme immediately
             ApplyStripeColors();
             _patternService.Invalidate();
 
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         /// <summary>
@@ -147,7 +240,7 @@ namespace PixlPunkt.UI.Preview
                 _host = null;
             }
             ResetToEmpty();
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void ResetToEmpty()
@@ -160,9 +253,10 @@ namespace PixlPunkt.UI.Preview
             _zoom = 1.0f;
             _dragging = false;
             _isEmpty = true;
+            _workingBuffer = null;
+            _workingBufferSize = 0;
         }
 
-        // Frame from host
         private void OnFrameReady(byte[] pixels, int width, int height)
         {
             if (_host == null) return;
@@ -171,41 +265,55 @@ namespace PixlPunkt.UI.Preview
             _docHeight = height;
             _isEmpty = false;
 
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void OnBrushOverlayChanged(Vector2 center, float radius)
         {
-            // Simply grab the complete snapshot - main canvas is source of truth
             _brushOverlay = _host?.CurrentBrushOverlay ?? BrushOverlaySnapshot.Empty;
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void OnViewportChanged(Rect rect)
         {
             _viewport = rect;
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void AdjustZoom(float factor)
         {
             _zoom = Math.Clamp(_zoom * factor, 0.25f, 8.0f);
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
         private void ResetZoom()
         {
             _zoom = 1.0f;
-            PreviewCanvas.Invalidate();
+            InvalidatePreviewCanvas();
         }
 
-        private bool TryGetLayout(out double offsetX, out double offsetY, out double scale)
+        private float GetLastWidth()
+        {
+#if HAS_UNO
+            if (_previewCanvasElement != null)
+                return _previewCanvasElement.LastWidth;
+#endif
+            return _lastWidth;
+        }
+
+        private float GetLastHeight()
+        {
+#if HAS_UNO
+            if (_previewCanvasElement != null)
+                return _previewCanvasElement.LastHeight;
+#endif
+            return _lastHeight;
+        }
+
+        private bool TryGetLayout(float availW, float availH, out double offsetX, out double offsetY, out double scale)
         {
             offsetX = offsetY = scale = 0;
             if (_docWidth <= 0 || _docHeight <= 0) return false;
-
-            double availW = PreviewCanvas.ActualWidth;
-            double availH = PreviewCanvas.ActualHeight;
             if (availW <= 0 || availH <= 0) return false;
 
             double fitScale = Math.Min(availW / _docWidth, availH / _docHeight);
@@ -223,7 +331,7 @@ namespace PixlPunkt.UI.Preview
         private bool TryScreenToDoc(Point screenPt, out double docX, out double docY)
         {
             docX = docY = 0;
-            if (!TryGetLayout(out double ox, out double oy, out double scale)) return false;
+            if (!TryGetLayout(GetLastWidth(), GetLastHeight(), out double ox, out double oy, out double scale)) return false;
 
             double localX = screenPt.X - ox;
             double localY = screenPt.Y - oy;
@@ -240,12 +348,13 @@ namespace PixlPunkt.UI.Preview
         private void PreviewCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
             if (_isEmpty || _host == null) return;
-            var pt = e.GetCurrentPoint(PreviewCanvas);
+            var captureElement = GetPointerCaptureElement();
+            var pt = e.GetCurrentPoint(captureElement);
             if (!pt.Properties.IsLeftButtonPressed) return;
             if (TryScreenToDoc(pt.Position, out double docX, out double docY))
             {
                 _dragging = true;
-                PreviewCanvas.CapturePointer(e.Pointer);
+                captureElement.CapturePointer(e.Pointer);
                 _host.CenterOnDocumentPoint(docX, docY);
             }
         }
@@ -253,7 +362,8 @@ namespace PixlPunkt.UI.Preview
         private void PreviewCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
             if (_isEmpty || _host == null || !_dragging) return;
-            var pt = e.GetCurrentPoint(PreviewCanvas);
+            var captureElement = GetPointerCaptureElement();
+            var pt = e.GetCurrentPoint(captureElement);
             if (TryScreenToDoc(pt.Position, out double docX, out double docY))
                 _host.CenterOnDocumentPoint(docX, docY);
         }
@@ -263,7 +373,7 @@ namespace PixlPunkt.UI.Preview
             if (_dragging)
             {
                 _dragging = false;
-                PreviewCanvas.ReleasePointerCaptures();
+                GetPointerCaptureElement().ReleasePointerCaptures();
             }
         }
 
@@ -272,90 +382,80 @@ namespace PixlPunkt.UI.Preview
             if (_dragging)
             {
                 _dragging = false;
-                PreviewCanvas.ReleasePointerCaptures();
+                GetPointerCaptureElement().ReleasePointerCaptures();
             }
         }
 
-        private void PreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        /// <summary>
+        /// Main render callback for both SKCanvasElement and SKXamlCanvas.
+        /// </summary>
+        private void RenderPreview(SKCanvas canvas, float width, float height)
         {
-            var ds = args.DrawingSession;
+            _lastWidth = width;
+            _lastHeight = height;
 
             // Use theme-aware clear color
             var clearColor = GetThemeClearColor();
-            ds.Clear(clearColor);
+            canvas.Clear(new SKColor(clearColor.R, clearColor.G, clearColor.B, clearColor.A));
 
             if (_isEmpty) return;
             if (_pixels == null || _docWidth <= 0 || _docHeight <= 0) return;
-            if (!TryGetLayout(out double ox, out double oy, out double scale)) return;
+            if (!TryGetLayout(width, height, out double ox, out double oy, out double scale)) return;
 
             float canvasW = (float)(_docWidth * scale);
             float canvasH = (float)(_docHeight * scale);
             float offsetX = (float)ox;
             float offsetY = (float)oy;
-            var destRect = new Rect(offsetX, offsetY, canvasW, canvasH);
+            var destRect = new SKRect(offsetX, offsetY, offsetX + canvasW, offsetY + canvasH);
 
-            double dpiScale = PreviewCanvas.XamlRoot?.RasterizationScale ?? 1.0;
-            var bg = _patternService.GetSizedImage(sender.Device, dpiScale, (float)destRect.Width, (float)destRect.Height);
+            // Draw checkerboard background
+            DrawCheckerboardBackground(canvas, destRect);
 
-            float tx = (float)Math.Floor(destRect.X);
-            float ty = (float)Math.Floor(destRect.Y);
-            var tgt = new Rect(tx, ty, destRect.Width, destRect.Height);
-            var src = new Rect(0, 0, bg.SizeInPixels.Width, bg.SizeInPixels.Height);
-            ds.DrawImage(bg, tgt, src);
+            // Reuse or reallocate working buffer for compositing overlays
+            int requiredSize = _docWidth * _docHeight * 4;
+            if (_workingBuffer == null || _workingBufferSize < requiredSize)
+            {
+                _workingBuffer = new byte[requiredSize];
+                _workingBufferSize = requiredSize;
+            }
+            System.Buffer.BlockCopy(_pixels, 0, _workingBuffer, 0, _pixels.Length);
 
-            // Create working buffer for compositing overlays
-            byte[] workingBuf = new byte[_docWidth * _docHeight * 4];
-            System.Buffer.BlockCopy(_pixels, 0, workingBuf, 0, _pixels.Length);
-
-            // ═══════════════════════════════════════════════════════════════
-            // BRUSH OVERLAYS - Trust snapshot.Visible completely
-            // ═══════════════════════════════════════════════════════════════
-
-            // 1. Shift-line preview (during shift+drag line drawing)
+            // BRUSH OVERLAYS
             if (_brushOverlay.IsShiftLineDrag && _host != null)
             {
-                CompositeShiftLinePreviewIntoBuffer(workingBuf);
+                CompositeShiftLinePreviewIntoBuffer(_workingBuffer);
             }
-            // 2. Brush cursor ghost (filled preview for brush tool)
             else if (_brushOverlay.Visible && _brushOverlay.FillGhost && _brushOverlay.Mask != null && _brushOverlay.Mask.Count > 0 && _host != null)
             {
-                CompositeBrushGhostIntoBuffer(workingBuf);
+                CompositeBrushGhostIntoBuffer(_workingBuffer);
             }
 
-            // 3. Shape start point hover (when hovering with shape tool before drag starts)
             if (_brushOverlay.ShowShapeStartPoint && _host != null)
             {
-                CompositeShapeStartPointIntoBuffer(workingBuf);
+                CompositeShapeStartPointIntoBuffer(_workingBuffer);
             }
 
-            // 4. Shape preview overlay (during shape drag)
             if (_brushOverlay.IsShapeDrag && _host != null)
             {
-                CompositeShapePreviewIntoBuffer(workingBuf);
+                CompositeShapePreviewIntoBuffer(_workingBuffer);
             }
 
-            // Render the composited image as a single bitmap
-            using var compositeBmp = CanvasBitmap.CreateFromBytes(
-                sender.Device,
-                workingBuf,
-                _docWidth,
-                _docHeight,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f);
+            // Render the composited image
+            using var compositeBmp = new SKBitmap(_docWidth, _docHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+            System.Runtime.InteropServices.Marshal.Copy(_workingBuffer, 0, compositeBmp.GetPixels(), requiredSize);
 
-            ds.DrawImage(
-                compositeBmp,
-                destRect,
-                new Rect(0, 0, _docWidth, _docHeight),
-                1.0f,
-                CanvasImageInterpolation.NearestNeighbor);
+            using var paint = new SKPaint
+            {
+                FilterQuality = SKFilterQuality.None,
+                IsAntialias = false
+            };
+            canvas.DrawBitmap(compositeBmp, new SKRect(0, 0, _docWidth, _docHeight), destRect, paint);
 
-            // 5. Brush outline (for non-brush tools - keep visible even during painting)
-            // Show outline if: (1) normal hover state OR (2) outline mode with valid mask (even if Visible=false during painting)
+            // Brush outline
             bool showOutline = _brushOverlay.Mask != null && _brushOverlay.Mask.Count > 0 && !_brushOverlay.FillGhost && !_brushOverlay.IsShiftLineDrag;
             if (showOutline)
             {
-                DrawBrushOutline(ds, offsetX, offsetY, scale);
+                DrawBrushOutline(canvas, offsetX, offsetY, scale);
             }
 
             // Viewport rectangle
@@ -365,22 +465,80 @@ namespace PixlPunkt.UI.Preview
                 float vy = offsetY + (float)(_viewport.Y * scale);
                 float vw = (float)(_viewport.Width * scale);
                 float vh = (float)(_viewport.Height * scale);
-                ds.DrawRectangle(vx, vy, vw, vh, Colors.DeepSkyBlue, 1.5f);
+
+                using var viewportPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = new SKColor(0, 191, 255),
+                    StrokeWidth = 1.5f,
+                    IsAntialias = true
+                };
+                canvas.DrawRect(vx, vy, vw, vh, viewportPaint);
             }
         }
 
-        /// <summary>
-        /// Composites the shift-line preview into the working buffer.
-        /// Shows the line being drawn from origin to current endpoint.
-        /// Uses smooth stamping (stride of 1) matching PainterBase.StampLine for accurate preview.
-        /// Handles both built-in shapes and custom brushes.
-        /// </summary>
+        private void DrawCheckerboardBackground(SKCanvas canvas, SKRect destRect)
+        {
+            // Don't call SyncWith(ActualTheme) - we use explicit colors from TransparencyStripeMixer
+            var (lightColor, darkColor) = _patternService.CurrentScheme;
+
+            int squareSize = 8;
+            EnsureCheckerboardShader(squareSize, lightColor, darkColor);
+
+            if (_checkerboardShader == null)
+            {
+                using var fallbackPaint = new SKPaint
+                {
+                    Color = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A)
+                };
+                canvas.DrawRect(destRect, fallbackPaint);
+                return;
+            }
+
+            using var paint = new SKPaint
+            {
+                Shader = _checkerboardShader,
+                IsAntialias = false
+            };
+            canvas.DrawRect(destRect, paint);
+        }
+
+        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
+        {
+            if (_checkerboardBitmap != null && _checkerboardShader != null)
+                return;
+
+            _checkerboardShader?.Dispose();
+            _checkerboardBitmap?.Dispose();
+
+            int tileSize = squareSize * 2;
+            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
+            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
+
+            for (int y = 0; y < tileSize; y++)
+            {
+                for (int x = 0; x < tileSize; x++)
+                {
+                    int cx = x / squareSize;
+                    int cy = y / squareSize;
+                    bool isLight = ((cx + cy) & 1) == 0;
+                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
+                }
+            }
+
+            using var image = SKImage.FromBitmap(_checkerboardBitmap);
+            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
+        }
+
+        // ...existing overlay compositing methods...
+
         private void CompositeShiftLinePreviewIntoBuffer(byte[] workingBuf)
         {
             uint fgColor = _host!.ForegroundColor;
             byte brushOpacity = _brushOverlay.BrushOpacity;
 
-            // Check if using a custom brush - use the mask from the snapshot
             bool isCustomBrush = _brushOverlay.IsCustomBrush;
             var mask = _brushOverlay.Mask ?? GetBrushMaskOffsets(_brushOverlay.BrushSize, _brushOverlay.BrushShape);
 
@@ -392,17 +550,14 @@ namespace PixlPunkt.UI.Preview
             int dx = x1 - x0, dy = y1 - y0;
             int steps = Math.Max(Math.Abs(dx), Math.Abs(dy));
 
-            // Track which pixels have been drawn to prevent over-blending (max alpha wins)
             var drawnPixels = new Dictionary<(int x, int y), byte>();
 
             if (steps == 0)
             {
-                // Single stamp at origin
                 AccumulateShiftLineStamp(x0, y0, mask, isCustomBrush, brushOpacity, drawnPixels);
             }
             else
             {
-                // Use stride of 1 for smooth, continuous line drawing (matches PainterBase.StampLine)
                 double sx = dx / (double)steps;
                 double sy = dy / (double)steps;
 
@@ -415,7 +570,6 @@ namespace PixlPunkt.UI.Preview
                 }
             }
 
-            // Apply all accumulated pixels to the working buffer
             foreach (var ((px, py), effA) in drawnPixels)
             {
                 if ((uint)px >= (uint)_docWidth || (uint)py >= (uint)_docHeight)
@@ -435,9 +589,6 @@ namespace PixlPunkt.UI.Preview
             }
         }
 
-        /// <summary>
-        /// Accumulates a brush stamp at the given point for shift-line preview.
-        /// </summary>
         private void AccumulateShiftLineStamp(int cx, int cy, IReadOnlyList<(int dx, int dy)> mask, bool isCustomBrush, byte brushOpacity, Dictionary<(int x, int y), byte> drawnPixels)
         {
             byte brushDensity = _brushOverlay.BrushDensity;
@@ -447,11 +598,9 @@ namespace PixlPunkt.UI.Preview
                 int px = cx + bx;
                 int py = cy + by;
 
-                // Compute alpha
                 byte effA;
                 if (isCustomBrush)
                 {
-                    // Custom brushes use radial density-based falloff (matches DefaultToolContextProvider)
                     effA = ComputeCustomBrushAlphaWithOpacity(bx, by, _brushOverlay.BrushSize, brushOpacity, brushDensity);
                 }
                 else
@@ -469,40 +618,29 @@ namespace PixlPunkt.UI.Preview
             }
         }
 
-        /// <summary>
-        /// Composites the brush ghost (filled cursor preview for brush tool) into working buffer.
-        /// Uses snapshot's brush settings for accurate alpha computation.
-        /// Handles both built-in shapes and custom brushes.
-        /// </summary>
         private void CompositeBrushGhostIntoBuffer(byte[] workingBuf)
         {
             uint fgColor = _host!.ForegroundColor;
-            // Use snapshot's opacity instead of extracting from fgColor
             byte brushOpacity = _brushOverlay.BrushOpacity;
             byte brushDensity = _brushOverlay.BrushDensity;
 
-            // Check if using a custom brush
             bool isCustomBrush = _brushOverlay.IsCustomBrush;
 
             foreach (var (dx, dy) in _brushOverlay.Mask!)
             {
-                // Use exact integer hover coordinates to match main canvas perfectly
                 int docX = _brushOverlay.HoverX + dx;
                 int docY = _brushOverlay.HoverY + dy;
 
                 if ((uint)docX >= (uint)_docWidth || (uint)docY >= (uint)_docHeight)
                     continue;
 
-                // Compute per-pixel alpha
                 byte effA;
                 if (isCustomBrush)
                 {
-                    // Custom brushes use radial density-based falloff (matches DefaultToolContextProvider)
                     effA = ComputeCustomBrushAlphaWithOpacity(dx, dy, _brushOverlay.BrushSize, brushOpacity, brushDensity);
                 }
                 else
                 {
-                    // Built-in shapes use density-based alpha computation
                     effA = ComputeBrushAlphaWithOpacity(dx, dy, _brushOverlay.BrushSize, _brushOverlay.BrushShape, brushOpacity, brushDensity);
                 }
 
@@ -510,7 +648,6 @@ namespace PixlPunkt.UI.Preview
 
                 int idx = (docY * _docWidth + docX) * 4;
 
-                // Blend foreground color with computed alpha over existing pixel
                 uint before = (uint)(workingBuf[idx] | (workingBuf[idx + 1] << 8) |
                                     (workingBuf[idx + 2] << 16) | (workingBuf[idx + 3] << 24));
                 uint srcWithAlpha = (fgColor & 0x00FFFFFFu) | ((uint)effA << 24);
@@ -523,10 +660,6 @@ namespace PixlPunkt.UI.Preview
             }
         }
 
-        /// <summary>
-        /// Composites the shape tool start point preview into working buffer.
-        /// Shows where the brush will stamp when the shape drag begins.
-        /// </summary>
         private void CompositeShapeStartPointIntoBuffer(byte[] workingBuf)
         {
             uint fgColor = _host!.ForegroundColor;
@@ -541,7 +674,6 @@ namespace PixlPunkt.UI.Preview
                 if ((uint)px >= (uint)_docWidth || (uint)py >= (uint)_docHeight)
                     continue;
 
-                // Use shape tool's opacity instead of fgColor alpha
                 byte effA = ComputeBrushAlphaWithOpacity(dx, dy, _brushOverlay.ShapeStrokeWidth, _brushOverlay.ShapeBrushShape, shapeOpacity, _brushOverlay.ShapeBrushDensity);
                 if (effA == 0) continue;
 
@@ -558,15 +690,19 @@ namespace PixlPunkt.UI.Preview
             }
         }
 
-        /// <summary>
-        /// Draws the brush outline overlay for non-brush tools.
-        /// Renders edge pixels of the mask in high-contrast orange.
-        /// </summary>
-        private void DrawBrushOutline(CanvasDrawingSession ds, float offsetX, float offsetY, double scale)
+        private void DrawBrushOutline(SKCanvas canvas, float offsetX, float offsetY, double scale)
         {
             var set = new HashSet<(int dx, int dy)>(_brushOverlay.Mask!);
             float s = (float)scale;
-            var outlineColor = Color.FromArgb(255, 255, 136, 0);
+            var outlineColor = new SKColor(255, 136, 0);
+
+            using var paint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = outlineColor,
+                StrokeWidth = 1.0f,
+                IsAntialias = false
+            };
 
             foreach (var (dx, dy) in _brushOverlay.Mask!)
             {
@@ -577,19 +713,14 @@ namespace PixlPunkt.UI.Preview
                     !set.Contains((dx, dy - 1));
                 if (!edge) continue;
 
-                // Use integer hover coordinates for pixel-perfect alignment
                 int docX = _brushOverlay.HoverX + dx;
                 int docY = _brushOverlay.HoverY + dy;
                 float sx = offsetX + (docX * s);
                 float sy = offsetY + (docY * s);
-                ds.DrawRectangle(sx, sy, s, s, outlineColor, 1.0f);
+                canvas.DrawRect(sx, sy, s, s, paint);
             }
         }
 
-        /// <summary>
-        /// Composites the shape preview directly into the working buffer.
-        /// Renders the shape being dragged with proper brush stamping and alpha blending.
-        /// </summary>
         private void CompositeShapePreviewIntoBuffer(byte[] workingBuf)
         {
             int lx = Math.Min(_brushOverlay.ShapeX0, _brushOverlay.ShapeX1);
@@ -608,7 +739,6 @@ namespace PixlPunkt.UI.Preview
             {
                 if (_brushOverlay.IsFilled)
                 {
-                    // Filled rectangle: stamp brush at every interior point
                     var outline = new HashSet<(int x, int y)>();
                     for (int y = ty; y <= by; y++)
                         for (int x = lx; x <= rx; x++)
@@ -622,7 +752,6 @@ namespace PixlPunkt.UI.Preview
                 }
             }
 
-            // Apply shape preview pixels with alpha blending directly into working buffer
             foreach (var (pos, alpha) in pixelAlphas)
             {
                 if ((uint)pos.x >= (uint)_docWidth || (uint)pos.y >= (uint)_docHeight)
@@ -666,7 +795,6 @@ namespace PixlPunkt.UI.Preview
 
             if (filled)
             {
-                // Filled: collect all points for brush stamping
                 do
                 {
                     for (int x = x0; x <= x1; x++)
@@ -696,7 +824,6 @@ namespace PixlPunkt.UI.Preview
             }
             else
             {
-                // Outline only
                 do
                 {
                     outline.Add((x1, y0)); outline.Add((x0, y0));
@@ -716,7 +843,6 @@ namespace PixlPunkt.UI.Preview
                 }
             }
 
-            // Apply brush stroke to all collected points
             AccumulateBrushStrokeOnPoints(outline, pixelAlphas);
         }
 
@@ -740,7 +866,6 @@ namespace PixlPunkt.UI.Preview
 
         private void AccumulateBrushStrokeOnPoints(HashSet<(int x, int y)> points, Dictionary<(int x, int y), byte> pixelAlphas)
         {
-            // Use shape-specific brush settings from snapshot
             var mask = GetBrushMaskOffsets(_brushOverlay.ShapeStrokeWidth, _brushOverlay.ShapeBrushShape);
             byte shapeOpacity = _brushOverlay.ShapeBrushOpacity;
 
@@ -751,12 +876,10 @@ namespace PixlPunkt.UI.Preview
                     int px = ox + dx;
                     int py = oy + dy;
 
-                    // Use shape tool's opacity instead of fgColor alpha
                     byte effA = ComputeBrushAlphaWithOpacity(dx, dy, _brushOverlay.ShapeStrokeWidth, _brushOverlay.ShapeBrushShape, shapeOpacity, _brushOverlay.ShapeBrushDensity);
                     if (effA > 0)
                     {
                         var key = (px, py);
-                        // Use max alpha (matching StrokeEngine behavior)
                         if (!pixelAlphas.TryGetValue(key, out byte currentAlpha) || effA > currentAlpha)
                         {
                             pixelAlphas[key] = effA;
@@ -768,25 +891,9 @@ namespace PixlPunkt.UI.Preview
 
         private IReadOnlyList<(int dx, int dy)> GetBrushMaskOffsets(int size, BrushShape shape)
         {
-            // Use the shared BrushMaskCache singleton to ensure preview masks match main canvas exactly
             return BrushMaskCache.Shared.GetOffsets(shape, size);
         }
 
-        /// <summary>
-        /// Computes per-pixel brush alpha matching StrokeEngine.ComputePerPixelAlpha logic exactly.
-        /// This MUST remain 100% synchronized with StrokeEngine's implementation.
-        /// </summary>
-        private byte ComputeBrushAlpha(int dx, int dy, int size, BrushShape shape, uint fgColor, byte density)
-        {
-            // Extract opacity from fgColor for shape tools
-            byte opacity = (byte)(fgColor >> 24);
-            return ComputeBrushAlphaWithOpacity(dx, dy, size, shape, opacity, density);
-        }
-
-        /// <summary>
-        /// Computes per-pixel brush alpha with explicit opacity parameter.
-        /// Used when opacity comes from snapshot instead of fgColor.
-        /// </summary>
         private static byte ComputeBrushAlphaWithOpacity(int dx, int dy, int size, BrushShape shape, byte opacity, byte density)
         {
             if (opacity == 0) return 0;
@@ -795,31 +902,24 @@ namespace PixlPunkt.UI.Preview
             int sz = Math.Max(1, size);
             double r = sz / 2.0;
 
-            // Compute distance based on shape - offsets are already relative to brush center
             double d = shape == BrushShape.Circle
                 ? Math.Sqrt((double)dx * dx + (double)dy * dy)
                 : Math.Max(Math.Abs(dx), Math.Abs(dy));
 
             if (d > r) return 0;
 
-            // Apply density falloff (matches StrokeEngine)
             double D = density / 255.0;
             double Rhard = r * D;
 
             if (d <= Rhard)
                 return (byte)Math.Round(255.0 * Aop);
 
-            // Soft falloff region (smoothstep)
             double span = Math.Max(1e-6, (r - Rhard));
             double t = (d - Rhard) / span;
             double mask = 1.0 - (t * t) * (3 - 2 * t);
             return (byte)Math.Round(255.0 * Math.Clamp(Aop * mask, 0.0, 1.0));
         }
 
-        /// <summary>
-        /// Computes per-pixel alpha for custom brushes using radial density-based falloff.
-        /// Matches DefaultToolContextProvider.ComputeCustomBrushAlpha exactly.
-        /// </summary>
         private static byte ComputeCustomBrushAlphaWithOpacity(int dx, int dy, int size, byte opacity, byte density)
         {
             if (opacity == 0) return 0;
@@ -828,22 +928,17 @@ namespace PixlPunkt.UI.Preview
             double Aop = opacity / 255.0;
 
             double r = sz / 2.0;
-
-            // Use circular distance - offsets are already relative to brush center
             double d = Math.Sqrt((double)dx * dx + (double)dy * dy);
 
-            // Apply density falloff based on distance
             double D = density / 255.0;
             double Rhard = r * D;
 
-            // Full opacity within the hard radius
             if (d <= Rhard)
                 return (byte)Math.Round(255.0 * Aop);
 
-            // Falloff region beyond hard radius
             double span = Math.Max(1e-6, r - Rhard);
-            double t = Math.Min(1.0, (d - Rhard) / span); // Clamp t to [0, 1]
-            double mask = 1.0 - (t * t) * (3 - 2 * t); // Smoothstep falloff
+            double t = Math.Min(1.0, (d - Rhard) / span);
+            double mask = 1.0 - (t * t) * (3 - 2 * t);
             return (byte)Math.Round(255.0 * Math.Clamp(Aop * mask, 0.0, 1.0));
         }
     }

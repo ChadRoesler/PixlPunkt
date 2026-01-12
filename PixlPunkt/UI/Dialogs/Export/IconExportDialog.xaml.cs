@@ -74,10 +74,10 @@ namespace PixlPunkt.UI.Dialogs.Export
             PreviewStack.Children.Clear();
             _previewImageSets.Clear();
 
-            // Only show sizes in PreviewSizes (excludes 256×256 and 128×128)
+            // Only show sizes in PreviewSizes (excludes 256Ã—256 and 128Ã—128)
             foreach (var size in IconExportConstants.PreviewSizes)
             {
-                // Show all preview sizes at their actual size (don't cap 64×64)
+                // Show all preview sizes at their actual size (don't cap 64Ã—64)
                 int displaySize = size;
 
                 // Create vertical stack for this size
@@ -91,7 +91,7 @@ namespace PixlPunkt.UI.Dialogs.Export
                 // Size label
                 var sizeLabel = new TextBlock
                 {
-                    Text = $"{size}×{size}",
+                    Text = $"{size}Ã—{size}",
                     FontSize = IconExportConstants.PreviewLabelFontSize,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                     HorizontalAlignment = HorizontalAlignment.Center

@@ -1,12 +1,12 @@
-<!--
+﻿<!--
 ═══════════════════════════════════════════════════════════════════════════════
   COLOR PICKER WINDOW - HSL Color Selection & Ladder Management
 ═══════════════════════════════════════════════════════════════════════════════
   Comprehensive color picker featuring HSL color space manipulation with
-  interactive Win2D canvases and color variation ladders.
+  interactive SkiaSharp canvases and color variation ladders.
   
   Layout Structure:
-    Left Column:  HSL saturation/lightness square + hue bar (Win2D canvases)
+    Left Column:  HSL saturation/lightness square + hue bar (SkiaSharp canvases)
     Right Column: Value inputs (HSL/RGB/Hex/Alpha) + Color ladders
   
   Features:
@@ -25,14 +25,13 @@
     x:Class="PixlPunkt.UI.ColorPick.ColorPickerWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:conv="using:PixlPunkt.UI.Converters"
     xmlns:cp="using:PixlPunkt.UI.ColorPick.Controls"
     xmlns:ic="using:FluentIcons.WinUI">
 
     <Grid 
         Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" 
-        Padding="16">
+        Padding="16,16,24,16">
 
         <!-- ═══════════════════════════════════════════════════════════════ -->
         <!-- RESOURCES -->
@@ -97,8 +96,8 @@
         </Grid.ColumnDefinitions>
 
         <!-- ═══════════════════════════════════════════════════════════════ -->
-        <!-- LEFT COLUMN: WIN2D CANVAS CONTROLS -->
-        <!-- Interactive color selection via Win2D canvases -->
+        <!-- LEFT COLUMN: SKIA CANVAS CONTROLS -->
+        <!-- Interactive color selection via SkiaSharp canvases -->
         <!-- ═══════════════════════════════════════════════════════════════ -->
         <StackPanel 
             Grid.Row="0" 
@@ -106,7 +105,7 @@
             Spacing="8">
 
             <!-- HSL Saturation/Lightness Canvas (240x240) -->
-            <!-- Win2D canvas with custom gradient rendering and pointer interaction -->
+            <!-- SkiaSharp canvas with custom gradient rendering and pointer interaction -->
             <cp:HslSquare x:Name="HslSquare"
               Width="240"
               Height="240"
@@ -156,7 +155,7 @@
                         Width="44" 
                         Height="24" 
                         CornerRadius="6"              
-                        Background="{x:Bind OldBrush}"/>
+                        Background="{Binding OldBrush}"/>
 
                     <TextBlock 
                         Text="New" 
@@ -169,7 +168,7 @@
                         CornerRadius="6" 
                         BorderBrush="White" 
                         BorderThickness="2"
-                        Background="{x:Bind NewBrush}"/>
+                        Background="{Binding NewBrush}"/>
 
                     <!-- Global Color Dropper Button -->
                     <ToggleButton 

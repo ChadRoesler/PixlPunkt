@@ -23,25 +23,171 @@ namespace PixlPunkt.UI
         /// </summary>
         private void InitializePanelDocking()
         {
+            // Create the docking manager with the sidebar grid
             _dockingManager = new DockingManager(RightSidebar, OnPanelLayoutChanged);
 
-            // Register panels with the docking manager
-            RegisterPanel(PreviewCard, 0, Icon.PreviewLink);
-            RegisterPanel(PaletteCard, 2, Icon.Color);
-            RegisterPanel(TilesCard, 4, Icon.Grid);
-            RegisterPanel(LayersCard, 6, Icon.LayerDiagonal);
-            RegisterPanel(HistoryCard, 8, Icon.Clock);
+            // Register all panels with the docking manager
+            // Row indices match the XAML Grid.Row values for each SectionCard
+            _dockingManager.RegisterPanel(new PanelInfo
+            {
+                Id = "Preview",
+                Title = "Preview",
+                Icon = Icon.PreviewLink,
+                DockedContainer = PreviewCard,
+                DockedRowIndex = 0
+            });
 
-            // Wire up undock events
+            _dockingManager.RegisterPanel(new PanelInfo
+            {
+                Id = "Palette",
+                Title = "Palette",
+                Icon = Icon.Color,
+                DockedContainer = PaletteCard,
+                DockedRowIndex = 2
+            });
+
+            _dockingManager.RegisterPanel(new PanelInfo
+            {
+                Id = "Tiles",
+                Title = "Tiles",
+                Icon = Icon.Grid,
+                DockedContainer = TilesCard,
+                DockedRowIndex = 4
+            });
+
+            _dockingManager.RegisterPanel(new PanelInfo
+            {
+                Id = "Layers",
+                Title = "Layers",
+                Icon = Icon.LayerDiagonal,
+                DockedContainer = LayersCard,
+                DockedRowIndex = 6
+            });
+
+            _dockingManager.RegisterPanel(new PanelInfo
+            {
+                Id = "History",
+                Title = "History",
+                Icon = Icon.Clock,
+                DockedContainer = HistoryCard,
+                DockedRowIndex = 8
+            });
+
+            // Wire up undock events to use the docking manager
             PreviewCard.UndockRequested += OnPanelUndockRequested;
             PaletteCard.UndockRequested += OnPanelUndockRequested;
             TilesCard.UndockRequested += OnPanelUndockRequested;
             LayersCard.UndockRequested += OnPanelUndockRequested;
             HistoryCard.UndockRequested += OnPanelUndockRequested;
 
+            // Wire up minimized changed events for dynamic row height adjustment
+            PreviewCard.MinimizedChanged += OnPanelMinimizedChanged;
+            PaletteCard.MinimizedChanged += OnPanelMinimizedChanged;
+            TilesCard.MinimizedChanged += OnPanelMinimizedChanged;
+            LayersCard.MinimizedChanged += OnPanelMinimizedChanged;
+            HistoryCard.MinimizedChanged += OnPanelMinimizedChanged;
+
             // Wire up animation preview undock events
             AnimationPanel.AnimationPreviewUndockRequested += OnAnimationPreviewUndockRequested;
             AnimationPanel.AnimationPreviewDockRequested += OnAnimationPreviewDockRequested;
+
+            // Initialize row heights based on initial minimized states
+            UpdateSidebarRowHeights();
+        }
+
+        // ====================================================================
+        // PANEL COLLAPSE/EXPAND HANDLING
+        // ====================================================================
+
+        /// <summary>
+        /// Called when a panel's minimized state changes.
+        /// Updates the sidebar row heights to redistribute space.
+        /// </summary>
+        private void OnPanelMinimizedChanged(SectionCard card, bool isMinimized)
+        {
+            UpdateSidebarRowHeights();
+        }
+
+        /// <summary>
+        /// Helper to check if a panel is currently docked.
+        /// </summary>
+        private bool IsPanelDocked(string panelId)
+        {
+            if (_dockingManager == null) return true;
+            if (_dockingManager.Panels.TryGetValue(panelId, out var panel))
+            {
+                return panel.IsDocked;
+            }
+            return true; // Default to docked if not found
+        }
+
+        /// <summary>
+        /// Updates the sidebar row heights based on each panel's docked and minimized state.
+        /// Undocked panels get 0 height, minimized panels get Auto height, 
+        /// expanded panels share the remaining space with star sizing.
+        /// </summary>
+        private void UpdateSidebarRowHeights()
+        {
+            // Preview panel (row 0) and spacer (row 1)
+            bool previewDocked = IsPanelDocked("Preview");
+            if (PreviewRow != null)
+            {
+                if (!previewDocked)
+                    PreviewRow.Height = new GridLength(0);
+                else if (PreviewCard.IsMinimized)
+                    PreviewRow.Height = GridLength.Auto;
+                else
+                    PreviewRow.Height = new GridLength(1, GridUnitType.Star);
+            }
+            if (PreviewSpacerRow != null)
+                PreviewSpacerRow.Height = previewDocked ? new GridLength(4) : new GridLength(0);
+
+            // Palette panel (row 2) and spacer (row 3)
+            bool paletteDocked = IsPanelDocked("Palette");
+            if (PaletteRow != null)
+            {
+                if (!paletteDocked)
+                    PaletteRow.Height = new GridLength(0);
+                else if (PaletteCard.IsMinimized)
+                    PaletteRow.Height = GridLength.Auto;
+                else
+                    PaletteRow.Height = new GridLength(1, GridUnitType.Star);
+            }
+            if (PaletteSpacerRow != null)
+                PaletteSpacerRow.Height = paletteDocked ? new GridLength(4) : new GridLength(0);
+
+            // Tiles panel (row 4) and spacer (row 5)
+            bool tilesDocked = IsPanelDocked("Tiles");
+            if (TilesRow != null)
+            {
+                if (!tilesDocked)
+                    TilesRow.Height = new GridLength(0);
+                else if (TilesCard.IsMinimized)
+                    TilesRow.Height = GridLength.Auto;
+                else
+                    TilesRow.Height = new GridLength(1, GridUnitType.Star);
+            }
+            if (TilesSpacerRow != null)
+                TilesSpacerRow.Height = tilesDocked ? new GridLength(4) : new GridLength(0);
+
+            // Layers panel (row 6) and spacer (row 7)
+            bool layersDocked = IsPanelDocked("Layers");
+            if (LayersRow != null)
+            {
+                if (!layersDocked)
+                    LayersRow.Height = new GridLength(0);
+                else if (LayersCard.IsMinimized)
+                    LayersRow.Height = GridLength.Auto;
+                else
+                    LayersRow.Height = new GridLength(1, GridUnitType.Star);
+            }
+            if (LayersSpacerRow != null)
+                LayersSpacerRow.Height = layersDocked ? new GridLength(4) : new GridLength(0);
+
+            // History panel (row 8) - always Auto height when docked, 0 when undocked
+            bool historyDocked = IsPanelDocked("History");
+            if (HistoryRow != null)
+                HistoryRow.Height = historyDocked ? GridLength.Auto : new GridLength(0);
         }
 
         // ====================================================================
@@ -160,156 +306,34 @@ namespace PixlPunkt.UI
             }
         }
 
-        private void RegisterPanel(SectionCard card, int rowIndex, Icon icon)
-        {
-            var panelInfo = new PanelInfo
-            {
-                Id = card.PanelId,
-                Title = card.Title,
-                Icon = icon,
-                DockedContainer = card,
-                DockedRowIndex = rowIndex,
-                IsDocked = true
-            };
-
-            _dockingManager?.RegisterPanel(panelInfo);
-        }
+        // ====================================================================
+        // SIDEBAR PANEL DOCKING
+        // ====================================================================
 
         private void OnPanelUndockRequested(SectionCard card)
         {
-            if (_dockingManager == null || string.IsNullOrEmpty(card.PanelId))
+            if (_dockingManager == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Undock requested but DockingManager is null for panel: {card.PanelId}");
                 return;
+            }
 
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Undocking panel: {card.PanelId}");
             _dockingManager.UndockPanel(card.PanelId);
         }
 
         /// <summary>
         /// Called when the panel layout changes (dock/undock events).
-        /// Updates sidebar visibility based on docked panel count.
+        /// Updates sidebar row heights to redistribute space when panels are docked/undocked.
         /// </summary>
         private void OnPanelLayoutChanged()
         {
             if (_dockingManager == null) return;
 
-            bool hasDockedPanels = !_dockingManager.AllUndocked;
+            // Update row heights - this will collapse undocked panels and redistribute space
+            UpdateSidebarRowHeights();
 
-            // Update visibility of sidebar and splitter
-            RightSidebar.Visibility = hasDockedPanels ? Visibility.Visible : Visibility.Collapsed;
-            RightSplitter.Visibility = hasDockedPanels ? Visibility.Visible : Visibility.Collapsed;
-
-            // Update column widths
-            if (hasDockedPanels)
-            {
-                RightSplitterColumn.Width = new GridLength(6);
-                RightSidebarColumn.Width = new GridLength(360);
-            }
-            else
-            {
-                RightSplitterColumn.Width = new GridLength(0);
-                RightSidebarColumn.Width = new GridLength(0);
-            }
-
-            // Update splitter visibility based on adjacent docked panels
-            UpdateSplitterVisibility();
-        }
-
-        /// <summary>
-        /// Updates the visibility of splitters between panels based on which panels are docked.
-        /// </summary>
-        private void UpdateSplitterVisibility()
-        {
-            if (_dockingManager == null) return;
-
-            var panels = _dockingManager.Panels;
-
-            // Get docked state for each panel
-            bool previewDocked = panels.TryGetValue("Preview", out var p1) && p1.IsDocked;
-            bool paletteDocked = panels.TryGetValue("Palette", out var p2) && p2.IsDocked;
-            bool tilesDocked = panels.TryGetValue("Tiles", out var p3) && p3.IsDocked;
-            bool layersDocked = panels.TryGetValue("Layers", out var p4) && p4.IsDocked;
-            bool historyDocked = panels.TryGetValue("History", out var p5) && p5.IsDocked;
-
-            // Splitter between Preview and Palette - visible if both are docked
-            PreviewSplitter.Visibility = (previewDocked && paletteDocked) ? Visibility.Visible : Visibility.Collapsed;
-
-            // Splitter between Palette and Tiles - visible if both are docked
-            PaletteSplitter.Visibility = (paletteDocked && tilesDocked) ? Visibility.Visible : Visibility.Collapsed;
-
-            // Splitter between Tiles and Layers - visible if both are docked
-            TilesSplitter.Visibility = (tilesDocked && layersDocked) ? Visibility.Visible : Visibility.Collapsed;
-
-            // Splitter between Layers and History - visible if both are docked
-            HistorySplitter.Visibility = (layersDocked && historyDocked) ? Visibility.Visible : Visibility.Collapsed;
-
-            // Update row sizing for hidden elements
-            UpdateSidebarRowSizing();
-        }
-
-        /// <summary>
-        /// Updates the row sizing in the sidebar grid based on which panels are visible.
-        /// </summary>
-        private void UpdateSidebarRowSizing()
-        {
-            if (_dockingManager == null) return;
-
-            var panels = _dockingManager.Panels;
-
-            // Count docked panels to determine star sizing
-            int dockedCount = 0;
-            foreach (var kvp in panels)
-            {
-                if (kvp.Value.IsDocked) dockedCount++;
-            }
-
-            if (dockedCount == 0) return;
-
-            // Set row heights based on docked state
-            // Panel rows get Star(*) if docked, Auto if not
-            // Splitter rows get fixed height if adjacent panels are docked, 0 otherwise
-
-            var rowDefs = RightSidebar.RowDefinitions;
-
-            // Row 0: Preview
-            SetPanelRowHeight(rowDefs, 0, panels.TryGetValue("Preview", out var preview) && preview.IsDocked);
-
-            // Row 1: Preview-Palette splitter (6px or 0)
-            bool previewDocked = panels.TryGetValue("Preview", out var p1) && p1.IsDocked;
-            bool paletteDocked = panels.TryGetValue("Palette", out var p2) && p2.IsDocked;
-            rowDefs[1].Height = (previewDocked && paletteDocked) ? new GridLength(6) : new GridLength(0);
-
-            // Row 2: Palette
-            SetPanelRowHeight(rowDefs, 2, paletteDocked);
-
-            // Row 3: Palette-Tiles splitter
-            bool tilesDocked = panels.TryGetValue("Tiles", out var p3) && p3.IsDocked;
-            rowDefs[3].Height = (paletteDocked && tilesDocked) ? new GridLength(6) : new GridLength(0);
-
-            // Row 4: Tiles
-            SetPanelRowHeight(rowDefs, 4, tilesDocked);
-
-            // Row 5: Tiles-Layers splitter
-            bool layersDocked = panels.TryGetValue("Layers", out var p4) && p4.IsDocked;
-            rowDefs[5].Height = (tilesDocked && layersDocked) ? new GridLength(6) : new GridLength(0);
-
-            // Row 6: Layers
-            SetPanelRowHeight(rowDefs, 6, layersDocked);
-
-            // Row 7: Layers-History splitter
-            bool historyDocked = panels.TryGetValue("History", out var p5) && p5.IsDocked;
-            rowDefs[7].Height = (layersDocked && historyDocked) ? new GridLength(6) : new GridLength(0);
-
-            // Row 8: History
-            SetPanelRowHeight(rowDefs, 8, historyDocked);
-        }
-
-        private static void SetPanelRowHeight(RowDefinitionCollection rowDefs, int index, bool isDocked)
-        {
-            if (index < rowDefs.Count)
-            {
-                rowDefs[index].Height = isDocked
-                    ? new GridLength(1, GridUnitType.Star)
-                    : new GridLength(0);
-            }
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Panel layout changed. Docked count: {_dockingManager.DockedCount}");
         }
 
         /// <summary>

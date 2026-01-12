@@ -1,14 +1,14 @@
-<UserControl
+﻿<UserControl
     x:Class="PixlPunkt.UI.Layers.Controls.LayerPreviewHost"
+    x:Name="root"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid>
-        <!-- Background pattern (DPI aware, zoom independent) -->
-        <win2d:CanvasControl x:Name="BgCanvas" Draw="BgCanvas_Draw"/>
+        <!-- Background pattern container (DPI aware, zoom independent) - element created in code-behind -->
+        <Grid x:Name="BgCanvasContainer"/>
         <!-- Foreground preview with preserved alpha -->
         <Image x:Name="PreviewImage"
-               Source="{x:Bind Source, Mode=OneWay}"
+               Source="{Binding Source, ElementName=root, Mode=OneWay}"
                Stretch="Uniform"
                HorizontalAlignment="Center"
                VerticalAlignment="Center"

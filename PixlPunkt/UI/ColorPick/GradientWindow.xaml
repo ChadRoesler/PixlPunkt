@@ -27,14 +27,14 @@
     x:Class="PixlPunkt.UI.ColorPick.GradientWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:conv="using:PixlPunkt.UI.Converters"
     xmlns:curv="using:PixlPunkt.UI.ColorPick.Controls"
+    xmlns:ctrl="using:PixlPunkt.UI.Controls"
     xmlns:ic="using:FluentIcons.WinUI">
 
     <Grid 
         Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" 
-        Padding="12,6,12,12" 
+        Padding="12,6,20,12" 
         RowSpacing="8">
 
         <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -49,6 +49,9 @@
 
             <!-- Converts BGRA uint to WinUI Brush for swatch display -->
             <conv:BgraToBrushConverter x:Key="BgraToBrush"/>
+
+            <!-- Converts bool to Visibility -->
+            <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
 
             <!-- ─────────────────────────────────────────────────────────── -->
             <!-- SWATCH PREVIEW TEMPLATE -->
@@ -176,7 +179,7 @@
                             Width="44" 
                             Height="24" 
                             CornerRadius="6"
-                            Background="{x:Bind StartBrush}"/>
+                            Background="{Binding StartBrush}"/>
 
                         <!-- Selection Ring (visible when editing start) -->
                         <Border 
@@ -185,7 +188,7 @@
                             CornerRadius="6"
                             BorderThickness="2"
                             BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
-                            Visibility="{x:Bind IsEditingStart, Mode=OneWay}"/>
+                            Visibility="{Binding IsEditingStart, Converter={StaticResource BoolToVis}}"/>
                     </Grid>
 
                     <!-- End Color Section -->
@@ -203,7 +206,7 @@
                             Width="44" 
                             Height="24" 
                             CornerRadius="6"
-                            Background="{x:Bind EndBrush}"/>
+                            Background="{Binding EndBrush}"/>
 
                         <!-- Selection Ring (visible when editing end) -->
                         <Border 
@@ -212,7 +215,7 @@
                             CornerRadius="6"
                             BorderThickness="2"
                             BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
-                            Visibility="{x:Bind IsEditingEnd, Mode=OneWay}"/>
+                            Visibility="{Binding IsEditingEnd, Converter={StaticResource BoolToVis}}"/>
                     </Grid>
 
                     <!-- Swap Start ↔ End Button -->
@@ -416,16 +419,13 @@
                     MinHeight="127">
 
                     <ItemsControl 
-                        ItemsSource="{x:Bind PreviewItems}"
+                        ItemsSource="{Binding PreviewItems}"
                         ItemTemplate="{StaticResource SwatchTemplate}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <!-- Wrap swatches after 8 columns -->
-                                <ItemsWrapGrid 
-                                    Orientation="Horizontal"
-                                    ItemWidth="34" 
-                                    ItemHeight="28"
-                                    MaximumRowsOrColumns="8"/>
+                                <!-- Use custom WrapPanel for Uno Platform compatibility -->
+                                <!-- WrapGrid and ItemsWrapGrid are not supported in Uno Platform Skia -->
+                                <ctrl:WrapPanel Orientation="Horizontal"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -560,6 +560,186 @@ namespace PixlPunkt.UI.Settings
         }
 
         // ─────────────────────────────────────────────────────────────
+        // ANIMATION PANEL
+        // ─────────────────────────────────────────────────────────────
+
+        private bool _animationSettingsLoaded;
+
+        private void LoadAnimationSettings()
+        {
+            if (_animationSettingsLoaded) return;
+            _animationSettingsLoaded = true;
+
+            var anim = AppSettings.Instance.Animation;
+
+            // Canvas animation defaults
+            AnimDefaultFrameCount.Value = anim.DefaultFrameCount;
+            AnimDefaultFps.Value = anim.DefaultFps;
+            AnimDefaultAutoKeyframe.IsOn = anim.DefaultAutoKeyframe;
+            AnimDefaultLoop.IsOn = anim.DefaultLoop;
+            AnimDefaultPingPong.IsOn = anim.DefaultPingPong;
+
+            // Onion skin defaults
+            AnimDefaultOnionSkin.IsOn = anim.DefaultOnionSkinEnabled;
+            AnimDefaultOnionBefore.Value = anim.DefaultOnionSkinFramesBefore;
+            AnimDefaultOnionAfter.Value = anim.DefaultOnionSkinFramesAfter;
+            AnimDefaultOnionOpacity.Value = anim.DefaultOnionSkinOpacity * 100;
+            UpdateOnionOpacityText();
+
+            // Hook up opacity slider change
+            AnimDefaultOnionOpacity.ValueChanged += (s, e) => UpdateOnionOpacityText();
+
+            // Tile animation defaults
+            AnimDefaultTileFrameTime.Value = anim.DefaultTileFrameTimeMs;
+            AnimDefaultTileLoop.IsOn = anim.DefaultTileLoop;
+            AnimDefaultTilePingPong.IsOn = anim.DefaultTilePingPong;
+            AnimDefaultTileOnionSkin.IsOn = anim.DefaultTileOnionSkinEnabled;
+
+            // Timeline
+            AnimAutoScrollPlayhead.IsOn = anim.AutoScrollPlayhead;
+        }
+
+        private void UpdateOnionOpacityText()
+        {
+            AnimOnionOpacityText.Text = $"{(int)AnimDefaultOnionOpacity.Value}%";
+        }
+
+        private void SaveAnimationSettings()
+        {
+            if (!_animationSettingsLoaded) return;
+
+            var anim = AppSettings.Instance.Animation;
+
+            // Canvas animation defaults
+            if (!double.IsNaN(AnimDefaultFrameCount.Value))
+                anim.DefaultFrameCount = (int)AnimDefaultFrameCount.Value;
+            if (!double.IsNaN(AnimDefaultFps.Value))
+                anim.DefaultFps = (int)AnimDefaultFps.Value;
+            anim.DefaultAutoKeyframe = AnimDefaultAutoKeyframe.IsOn;
+            anim.DefaultLoop = AnimDefaultLoop.IsOn;
+            anim.DefaultPingPong = AnimDefaultPingPong.IsOn;
+
+            // Onion skin defaults
+            anim.DefaultOnionSkinEnabled = AnimDefaultOnionSkin.IsOn;
+            if (!double.IsNaN(AnimDefaultOnionBefore.Value))
+                anim.DefaultOnionSkinFramesBefore = (int)AnimDefaultOnionBefore.Value;
+            if (!double.IsNaN(AnimDefaultOnionAfter.Value))
+                anim.DefaultOnionSkinFramesAfter = (int)AnimDefaultOnionAfter.Value;
+            anim.DefaultOnionSkinOpacity = (float)(AnimDefaultOnionOpacity.Value / 100.0);
+
+            // Tile animation defaults
+            if (!double.IsNaN(AnimDefaultTileFrameTime.Value))
+                anim.DefaultTileFrameTimeMs = (int)AnimDefaultTileFrameTime.Value;
+            anim.DefaultTileLoop = AnimDefaultTileLoop.IsOn;
+            anim.DefaultTilePingPong = AnimDefaultTilePingPong.IsOn;
+            anim.DefaultTileOnionSkinEnabled = AnimDefaultTileOnionSkin.IsOn;
+
+            // Timeline
+            anim.AutoScrollPlayhead = AnimAutoScrollPlayhead.IsOn;
+
+            // Validate settings
+            anim.Validate();
+
+            LoggingService.Debug("Animation settings saved");
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // EXPORT PANEL
+        // ─────────────────────────────────────────────────────────────
+
+        private bool _exportSettingsLoaded;
+
+        private void LoadExportSettings()
+        {
+            if (_exportSettingsLoaded) return;
+            _exportSettingsLoaded = true;
+
+            var export = AppSettings.Instance.Export;
+
+            // Image export defaults
+            ExportDefaultFormat.SelectedIndex = (int)export.DefaultImageFormat;
+            ExportDefaultScale.SelectedIndex = export.DefaultImageScale switch
+            {
+                1 => 0,
+                2 => 1,
+                4 => 2,
+                8 => 3,
+                16 => 4,
+                _ => 0
+            };
+            ExportIncludeBackground.IsOn = export.IncludeBackground;
+
+            // Animation export defaults
+            ExportAnimDefaultFormat.SelectedIndex = (int)export.DefaultAnimationFormat;
+            ExportAnimDefaultScale.SelectedIndex = export.DefaultAnimationScale switch
+            {
+                1 => 0,
+                2 => 1,
+                4 => 2,
+                8 => 3,
+                _ => 0
+            };
+            ExportAnimLoop.IsOn = export.LoopAnimation;
+
+            // Sprite sheet options
+            ExportSheetDirection.SelectedIndex = (int)export.SpriteSheetDirection;
+            ExportSheetColumns.Value = export.SpriteSheetColumns;
+            ExportSheetPadding.Value = export.SpriteSheetPadding;
+
+            // File naming
+            ExportSequenceNumbering.SelectedIndex = (int)export.SequenceNumbering;
+            ExportRememberFolder.IsOn = export.RememberLastFolder;
+        }
+
+        private void SaveExportSettings()
+        {
+            if (!_exportSettingsLoaded) return;
+
+            var export = AppSettings.Instance.Export;
+
+            // Image export defaults
+            export.DefaultImageFormat = (ExportImageFormat)ExportDefaultFormat.SelectedIndex;
+            export.DefaultImageScale = ExportDefaultScale.SelectedIndex switch
+            {
+                0 => 1,
+                1 => 2,
+                2 => 4,
+                3 => 8,
+                4 => 16,
+                _ => 1
+            };
+            export.IncludeBackground = ExportIncludeBackground.IsOn;
+
+            // Animation export defaults
+            export.DefaultAnimationFormat = (ExportAnimationFormat)ExportAnimDefaultFormat.SelectedIndex;
+            export.DefaultAnimationScale = ExportAnimDefaultScale.SelectedIndex switch
+            {
+                0 => 1,
+                1 => 2,
+                2 => 4,
+                3 => 8,
+                _ => 1
+            };
+            export.LoopAnimation = ExportAnimLoop.IsOn;
+
+            // Sprite sheet options
+            export.SpriteSheetDirection = (SpriteSheetDirection)ExportSheetDirection.SelectedIndex;
+            if (!double.IsNaN(ExportSheetColumns.Value))
+                export.SpriteSheetColumns = (int)ExportSheetColumns.Value;
+            if (!double.IsNaN(ExportSheetPadding.Value))
+                export.SpriteSheetPadding = (int)ExportSheetPadding.Value;
+
+            // File naming
+            export.SequenceNumbering = (SequenceNumberingStyle)ExportSequenceNumbering.SelectedIndex;
+            export.RememberLastFolder = ExportRememberFolder.IsOn;
+
+            // Validate settings
+            export.Validate();
+
+            LoggingService.Debug("Export settings saved");
+        }
+
+        // ─────────────────────────────────────────────────────────────
         // LOGGING
         // ─────────────────────────────────────────────────────────────
 
@@ -619,7 +799,9 @@ namespace PixlPunkt.UI.Settings
             TilesPanel.Visibility = idx == 3 ? Visibility.Visible : Visibility.Collapsed;
             BrushesPanel.Visibility = idx == 4 ? Visibility.Visible : Visibility.Collapsed;
             TemplatePanel.Visibility = idx == 5 ? Visibility.Visible : Visibility.Collapsed;
-            PluginsPanel.Visibility = idx == 6 ? Visibility.Visible : Visibility.Collapsed;
+            AnimationPanel.Visibility = idx == 6 ? Visibility.Visible : Visibility.Collapsed;
+            ExportPanel.Visibility = idx == 7 ? Visibility.Visible : Visibility.Collapsed;
+            PluginsPanel.Visibility = idx == 8 ? Visibility.Visible : Visibility.Collapsed;
 
             // Refresh data when switching tabs
             switch (idx)
@@ -632,7 +814,9 @@ namespace PixlPunkt.UI.Settings
                 case 3: UpdateTilesPanelInfo(); break;
                 case 4: UpdateBrushPanelInfo(); break;
                 case 5: UpdateTemplatePanelInfo(); break;
-                case 6: UpdatePluginPanelInfo(); break;
+                case 6: LoadAnimationSettings(); break;
+                case 7: LoadExportSettings(); break;
+                case 8: UpdatePluginPanelInfo(); break;
             }
         }
 
@@ -669,6 +853,12 @@ namespace PixlPunkt.UI.Settings
                         LoggingService.SetMinimumLevel(lvl);
                     }
                 }
+
+                // Apply animation settings
+                SaveAnimationSettings();
+
+                // Apply export settings
+                SaveExportSettings();
 
                 // Save settings to disk
                 s.Save();

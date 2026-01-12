@@ -41,7 +41,7 @@ namespace PixlPunkt.UI.Palette.Controls
 
             flyout.Items.Add(new MenuFlyoutSeparator());
 
-            var miClear = new MenuFlyoutItem { Text = "Clear palette…" };
+            var miClear = new MenuFlyoutItem { Text = "Clear paletteâ€¦" };
             miClear.Click += (s, e) => ClearPalette?.Invoke(this, EventArgs.Empty);
             flyout.Items.Add(miClear);
 

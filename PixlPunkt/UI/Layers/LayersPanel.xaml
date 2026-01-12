@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="PixlPunkt.UI.Layers.LayersPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -62,12 +62,12 @@
                         Grid.Column="0"
                         Width="4"
                         CornerRadius="2"
-                        Background="{ThemeResource SystemAccentColor}"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
                         Margin="0,4,-4,4"
                         Visibility="Collapsed"/>
 
                 <!-- Indentation spacer based on depth -->
-                <Border Grid.Column="1" Width="{x:Bind Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
+                <Border Grid.Column="1" Width="{Binding Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
 
                 <!-- Preview thumbnails container (layer + mask) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
@@ -80,7 +80,7 @@
                                 BorderBrush="#FF00D4FF"
                                 BorderThickness="3"
                                 CornerRadius="6"
-                                Visibility="{x:Bind IsEditingMask, Mode=OneWay, Converter={StaticResource NotBoolToVis}}">
+                                Visibility="{Binding IsEditingMask, Mode=OneWay, Converter={StaticResource NotBoolToVis}}">
                             <Border.Background>
                                 <SolidColorBrush Color="#3000D4FF"/>
                             </Border.Background>
@@ -95,12 +95,12 @@
                                 Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                                 PointerPressed="LayerPreview_PointerPressed"
                                 ToolTipService.ToolTip="Click to edit layer pixels">
-                            <lctl:LayerPreviewHost Source="{x:Bind Preview}" />
+                            <lctl:LayerPreviewHost Source="{Binding Preview}" />
                         </Border>
                     </Grid>
 
                     <!-- Mask preview thumbnail with selection border (only visible when mask exists) -->
-                    <Grid Visibility="{x:Bind HasMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                    <Grid Visibility="{Binding HasMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
                         <!-- Selection border (outside, behind the preview) - EDITING MASK -->
                         <Border x:Name="MaskEditIndicator"
                                 Width="38"
@@ -108,7 +108,7 @@
                                 BorderBrush="#FFFF6B00"
                                 BorderThickness="3"
                                 CornerRadius="6"
-                                Visibility="{x:Bind IsEditingMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                                Visibility="{Binding IsEditingMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
                             <Border.Background>
                                 <SolidColorBrush Color="#30FF6B00"/>
                             </Border.Background>
@@ -124,11 +124,11 @@
                                 PointerPressed="MaskPreview_PointerPressed"
                                 ToolTipService.ToolTip="Click to edit layer mask">
                             <Grid>
-                                <Image Source="{x:Bind MaskPreview, Mode=OneWay}" Stretch="Uniform"/>
+                                <Image Source="{Binding MaskPreview, Mode=OneWay}" Stretch="Uniform"/>
                                 <!-- Disabled indicator overlay (when mask is disabled) -->
                                 <Border Background="#AA000000"
                                         CornerRadius="4"
-                                        Visibility="{x:Bind Mask.IsEnabled, Mode=OneWay, Converter={StaticResource NotBoolToVis}}">
+                                        Visibility="{Binding Mask.IsEnabled, Mode=OneWay, Converter={StaticResource NotBoolToVis}}">
                                     <ic:FluentIcon Icon="Dismiss" 
                                                    FontSize="16" 
                                                    Foreground="#FFFF4444"
@@ -143,10 +143,10 @@
                     <StackPanel Orientation="Vertical" 
                                 Spacing="2"
                                 VerticalAlignment="Center"
-                                Visibility="{x:Bind HasMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                                Visibility="{Binding HasMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
                         <!-- Toggle mask enabled -->
                         <ToggleButton x:Name="MaskEnabledBtn"
-                                      IsChecked="{x:Bind Mask.IsEnabled, Mode=TwoWay}"
+                                      IsChecked="{Binding Mask.IsEnabled, Mode=TwoWay}"
                                       Click="MaskEnabled_Click"
                                       Padding="2"
                                       MinWidth="24"
@@ -161,7 +161,7 @@
                         </ToggleButton>
                         <!-- Toggle mask inverted -->
                         <ToggleButton x:Name="MaskInvertBtn"
-                                      IsChecked="{x:Bind Mask.IsInverted, Mode=TwoWay}"
+                                      IsChecked="{Binding Mask.IsInverted, Mode=TwoWay}"
                                       Click="MaskInvert_Click"
                                       Padding="2"
                                       MinWidth="24"
@@ -177,7 +177,7 @@
                 <!-- visibility -->
                 <ToggleButton x:Name="VisBtn"
                               Grid.Column="4"
-                              IsChecked="{x:Bind Visible, Mode=TwoWay}"
+                              IsChecked="{Binding Visible, Mode=TwoWay}"
                               Click="Vis_Click"
                               Padding="1"
                               ToolTipService.ToolTip="Toggle visibility">
@@ -192,7 +192,7 @@
                 <!-- lock -->
                 <ToggleButton x:Name="LockBtn"
                               Grid.Column="5"
-                              IsChecked="{x:Bind Locked, Mode=TwoWay}"
+                              IsChecked="{Binding Locked, Mode=TwoWay}"
                               Click="Lock_Click"
                               Padding="1"
                               ToolTipService.ToolTip="Toggle lock">
@@ -207,12 +207,12 @@
                 <!-- name -->
                 <Grid Grid.Column="6">
                     <TextBlock x:Name="NameView"
-                               Text="{x:Bind Name}"
+                               Text="{Binding Name}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                DoubleTapped="LayerName_DoubleTapped"/>
                     <TextBox x:Name="NameEdit"
-                             Text="{x:Bind Name, Mode=TwoWay}"
+                             Text="{Binding Name, Mode=TwoWay}"
                              Visibility="Collapsed"
                              BorderThickness="0"
                              Background="Transparent"
@@ -263,12 +263,12 @@
                 <Border Grid.Column="0" Width="4"/>
 
                 <!-- Indentation spacer -->
-                <Border Grid.Column="1" Width="{x:Bind Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
+                <Border Grid.Column="1" Width="{Binding Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
 
                 <!-- Folder icon (clickable to expand/collapse) with badge for child count -->
                 <Grid Grid.Column="2">
                     <ToggleButton x:Name="FolderIconButton"
-                                  IsChecked="{x:Bind IsExpanded, Mode=TwoWay}"
+                                  IsChecked="{Binding IsExpanded, Mode=TwoWay}"
                                   Click="FolderChevron_Click"
                                   Padding="4"
                                   MinWidth="0"
@@ -293,8 +293,8 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Bottom"
                             Margin="0,0,-4,-4"
-                            Visibility="{x:Bind Children.Count, Mode=OneWay, Converter={StaticResource CountToVisibilityConverter}}">
-                        <TextBlock Text="{x:Bind Children.Count, Mode=OneWay}"
+                            Visibility="{Binding Children.Count, Mode=OneWay, Converter={StaticResource CountToVisibilityConverter}}">
+                        <TextBlock Text="{Binding Children.Count, Mode=OneWay}"
                                    FontSize="10"
                                    Foreground="White"
                                    FontWeight="SemiBold"/>
@@ -304,7 +304,7 @@
                 <!-- visibility -->
                 <ToggleButton x:Name="FolderVisBtn"
                               Grid.Column="3"
-                              IsChecked="{x:Bind Visible, Mode=TwoWay}"
+                              IsChecked="{Binding Visible, Mode=TwoWay}"
                               Click="Vis_Click"
                               Padding="1"
                               ToolTipService.ToolTip="Toggle visibility">
@@ -319,7 +319,7 @@
                 <!-- lock -->
                 <ToggleButton x:Name="FolderLockBtn"
                               Grid.Column="4"
-                              IsChecked="{x:Bind Locked, Mode=TwoWay}"
+                              IsChecked="{Binding Locked, Mode=TwoWay}"
                               Click="Lock_Click"
                               Padding="1"
                               ToolTipService.ToolTip="Toggle lock">
@@ -334,13 +334,13 @@
                 <!-- name -->
                 <Grid Grid.Column="5">
                     <TextBlock x:Name="NameView"
-                               Text="{x:Bind Name}"
+                               Text="{Binding Name}"
                                VerticalAlignment="Center"
                                FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis"
                                DoubleTapped="LayerName_DoubleTapped"/>
                     <TextBox x:Name="NameEdit"
-                             Text="{x:Bind Name, Mode=TwoWay}"
+                             Text="{Binding Name, Mode=TwoWay}"
                              Visibility="Collapsed"
                              BorderThickness="0"
                              Background="Transparent"
@@ -371,7 +371,7 @@
                 <Border Grid.Column="0" Width="4"/>
 
                 <!-- Indentation spacer based on depth -->
-                <Border Grid.Column="1" Width="{x:Bind Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
+                <Border Grid.Column="1" Width="{Binding Depth, Mode=OneWay, Converter={StaticResource LevelToIndent}}"/>
 
                 <!-- Preview thumbnail -->
                 <Border x:Name="RefPreviewBorder"
@@ -383,7 +383,7 @@
                         CornerRadius="4"
                         Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                         ToolTipService.ToolTip="Reference image preview">
-                    <lctl:LayerPreviewHost Source="{x:Bind Preview, Mode=OneWay}" />
+                    <lctl:LayerPreviewHost Source="{Binding Preview, Mode=OneWay}" />
                 </Border>
 
                 <!-- Reference icon (ImageSparkle) - no special foreground, matches other layer icons -->
@@ -395,7 +395,7 @@
                 <!-- visibility -->
                 <ToggleButton x:Name="RefVisBtn"
                               Grid.Column="4"
-                              IsChecked="{x:Bind Visible, Mode=TwoWay}"
+                              IsChecked="{Binding Visible, Mode=TwoWay}"
                               Click="Vis_Click"
                               Padding="1"
                               ToolTipService.ToolTip="Toggle visibility">
@@ -410,7 +410,7 @@
                 <!-- lock -->
                 <ToggleButton x:Name="RefLockBtn"
                               Grid.Column="5"
-                              IsChecked="{x:Bind Locked, Mode=TwoWay}"
+                              IsChecked="{Binding Locked, Mode=TwoWay}"
                               Click="Lock_Click"
                               Padding="1"
                               ToolTipService.ToolTip="Toggle lock">
@@ -425,12 +425,12 @@
                 <!-- name -->
                 <Grid Grid.Column="6">
                     <TextBlock x:Name="NameView"
-                               Text="{x:Bind Name, Mode=OneWay}"
+                               Text="{Binding Name, Mode=OneWay}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                DoubleTapped="LayerName_DoubleTapped"/>
                     <TextBox x:Name="NameEdit"
-                             Text="{x:Bind Name, Mode=TwoWay}"
+                             Text="{Binding Name, Mode=TwoWay}"
                              Visibility="Collapsed"
                              BorderThickness="0"
                              Background="Transparent"
@@ -444,7 +444,7 @@
                             Width="50"
                             Minimum="0"
                             Maximum="100"
-                            Value="{x:Bind OpacityPercent, Mode=TwoWay}"
+                            Value="{Binding OpacityPercent, Mode=TwoWay}"
                             VerticalAlignment="Center"
                             ToolTipService.ToolTip="Opacity"/>
                 </StackPanel>

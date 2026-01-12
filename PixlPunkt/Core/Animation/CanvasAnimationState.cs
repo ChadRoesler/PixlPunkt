@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
+using PixlPunkt.Core.Settings;
 
 namespace PixlPunkt.Core.Animation
 {
@@ -84,6 +85,13 @@ namespace PixlPunkt.Core.Animation
         /// Gets or sets whether the animation uses ping-pong (reverse at end) playback.
         /// </summary>
         public bool PingPong { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets whether keyframes are automatically created when editing a layer
+        /// that doesn't have a keyframe at the current frame.
+        /// When enabled, painting on a layer will automatically capture a keyframe.
+        /// </summary>
+        public bool AutoKeyframe { get; set; } = true;
 
         // ====================================================================
         // AUDIO TRACKS
@@ -1155,6 +1163,25 @@ namespace PixlPunkt.Core.Animation
 
             // Dispose all audio tracks
             AudioTracks.Dispose();
+        }
+
+        /// <summary>
+        /// Applies default settings from AppSettings.Animation.
+        /// Called when creating a new document.
+        /// </summary>
+        public void ApplyDefaults()
+        {
+            var defaults = AppSettings.Instance.Animation;
+            
+            FrameCount = defaults.DefaultFrameCount;
+            FramesPerSecond = defaults.DefaultFps;
+            AutoKeyframe = defaults.DefaultAutoKeyframe;
+            Loop = defaults.DefaultLoop;
+            PingPong = defaults.DefaultPingPong;
+            OnionSkinEnabled = defaults.DefaultOnionSkinEnabled;
+            OnionSkinFramesBefore = defaults.DefaultOnionSkinFramesBefore;
+            OnionSkinFramesAfter = defaults.DefaultOnionSkinFramesAfter;
+            OnionSkinOpacity = defaults.DefaultOnionSkinOpacity;
         }
     }
 }

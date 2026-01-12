@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using PixlPunkt.Constants;
 
 namespace PixlPunkt.Core.Compositing.Effects

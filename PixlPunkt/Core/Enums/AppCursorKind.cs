@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Enums
+namespace PixlPunkt.Core.Enums
 {
     /// <summary>
     /// Defines the types of custom cursors used in the application.

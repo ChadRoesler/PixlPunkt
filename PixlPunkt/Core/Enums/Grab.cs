@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Enums
+namespace PixlPunkt.Core.Enums
 {
     /// <summary>
     /// Defines the grab handle positions for bezier curve or gradient control points.

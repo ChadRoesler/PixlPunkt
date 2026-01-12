@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using PixlPunkt.Core.Document.Layer;
@@ -6,6 +6,7 @@ using PixlPunkt.Core.History;
 using PixlPunkt.Core.Logging;
 using Windows.Foundation;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Selection
 {
@@ -24,7 +25,7 @@ namespace PixlPunkt.Core.Selection
     /// </para>
     /// <para>
     /// **Architecture**: This class is UI-framework-agnostic. It receives pointer events and coordinate
-    /// transformations from the canvas host but contains no WinUI or Win2D dependencies. All rendering
+    /// transformations from the canvas host but contains no UI framework dependencies. All rendering
     /// is delegated via callbacks.
     /// </para>
     /// <para>
@@ -601,7 +602,7 @@ namespace PixlPunkt.Core.Selection
                     // A non-transparent run?
                     if (end > start)
                     {
-                        region.AddRect(new RectInt32(start, y, end - start, 1));
+                        region.AddRect(CreateRect(start, y, end - start, 1));
                     }
 
                     // Move forward to next candidate

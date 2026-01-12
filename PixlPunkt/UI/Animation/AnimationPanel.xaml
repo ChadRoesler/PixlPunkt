@@ -4,7 +4,6 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ic="using:FluentIcons.WinUI"
-    xmlns:ctk="using:CommunityToolkit.WinUI.Controls"
     xmlns:local="using:PixlPunkt.UI.Animation">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
@@ -53,6 +52,22 @@
                         <StackPanel Spacing="12" Width="280">
                             <TextBlock Text="Animation Settings" FontWeight="SemiBold" FontSize="14"/>
                             
+                            <!-- Keyframe Settings -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Keyframes" FontSize="12" Opacity="0.7"/>
+                                
+                                <ToggleSwitch x:Name="AutoKeyframeToggle" 
+                                              Header="Auto-create Keyframes" 
+                                              Toggled="AutoKeyframe_Toggled"/>
+                                <TextBlock Text="When enabled, painting on an animated layer automatically creates a keyframe at the current frame." 
+                                           FontSize="10" 
+                                           Opacity="0.5" 
+                                           TextWrapping="Wrap" 
+                                           Margin="0,-4,0,0"/>
+                            </StackPanel>
+                            
+                            <MenuFlyoutSeparator/>
+                            
                             <!-- Playback Settings -->
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Playback" FontSize="12" Opacity="0.7"/>
@@ -77,6 +92,10 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
                                     <NumberBox x:Name="OnionSkinBeforeBox" 
                                                Header="Frames Before" 
                                                Minimum="0" Maximum="10" 
@@ -92,6 +111,7 @@
                                                ValueChanged="OnionSkinAfter_ValueChanged"/>
                                 </Grid>
                                 
+
                                 <Slider x:Name="OnionSkinOpacitySlider"
                                         Header="Opacity"
                                         Minimum="0" Maximum="100" Value="30"
@@ -129,17 +149,17 @@
 
             <local:ReelListPanel x:Name="ReelList" Grid.Column="0"/>
 
-            <ctk:GridSplitter Grid.Column="1" 
-                          Width="6"
-                          HorizontalAlignment="Stretch"
-                          Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"/>
+            <Border Grid.Column="1" 
+                    Width="6"
+                    HorizontalAlignment="Stretch"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"/>
 
             <local:FrameEditPanel x:Name="FrameEditor" Grid.Column="2"/>
 
-            <ctk:GridSplitter Grid.Column="3" 
-                          Width="6"
-                          HorizontalAlignment="Stretch"
-                          Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"/>
+            <Border Grid.Column="3" 
+                    Width="6"
+                    HorizontalAlignment="Stretch"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"/>
 
             <local:PlaybackPanel x:Name="Playback" Grid.Column="4"/>
         </Grid>
@@ -453,11 +473,11 @@
             </Grid>
 
             <!-- Splitter between Timeline and Stage Preview -->
-            <ctk:GridSplitter x:Name="StagePreviewSplitter" 
-                              Grid.Row="1" Grid.Column="1" 
-                              Width="6"
-                              HorizontalAlignment="Stretch"
-                              Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"/>
+            <Border x:Name="StagePreviewSplitter" 
+                    Grid.Row="1" Grid.Column="1" 
+                    Width="6"
+                    HorizontalAlignment="Stretch"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"/>
 
             <!-- Stage Preview Panel (wrapped in a card-style container with undock button) -->
             <Grid x:Name="StagePreviewContainer" Grid.Row="1" Grid.Column="2">

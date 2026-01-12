@@ -1,4 +1,4 @@
-<ContentDialog
+ï»¿<ContentDialog
     x:Class="PixlPunkt.UI.Dialogs.Export.IconExportDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -32,7 +32,7 @@
             <TextBlock Text="Each size shown on: Transparency, White, Grey, Black backgrounds" 
                            Opacity="0.7" 
                            FontSize="11" />
-            <TextBlock Text="(256×256 and 128×128 will be included in export but not shown in preview)" 
+            <TextBlock Text="(256Ã—256 and 128Ã—128 will be included in export but not shown in preview)" 
                            Opacity="0.6" 
                            FontSize="10"
                            FontStyle="Italic" />

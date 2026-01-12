@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Constants
+namespace PixlPunkt.Constants
 {
     /// <summary>
     /// Constants for canvas dimensions, tiles, and export settings.

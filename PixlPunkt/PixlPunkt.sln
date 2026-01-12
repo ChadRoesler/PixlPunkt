@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixlPunkt", "PixlPunkt.csproj", "{56D97F05-B8A7-BD5B-FED0-2418D34910BA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{56D97F05-B8A7-BD5B-FED0-2418D34910BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56D97F05-B8A7-BD5B-FED0-2418D34910BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56D97F05-B8A7-BD5B-FED0-2418D34910BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56D97F05-B8A7-BD5B-FED0-2418D34910BA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6F897A78-1FC6-4AEE-A543-6FFEFD7CE388}
+	EndGlobalSection
+EndGlobal

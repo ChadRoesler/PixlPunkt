@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using PixlPunkt.Core.Imaging;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Selection
 {
@@ -230,7 +231,7 @@ namespace PixlPunkt.Core.Selection
             IsFloating = false;
             _backup = null;
             FloatPixels = null;
-            Rect = new RectInt32(FloatX, FloatY, FloatW, FloatH);
+            Rect = CreateRect(FloatX, FloatY, FloatW, FloatH);
         }
 
         /// <summary>
@@ -298,7 +299,7 @@ namespace PixlPunkt.Core.Selection
             int y = r.Height >= 0 ? r.Y : r.Y + r.Height;
             int w = Math.Abs(r.Width);
             int h = Math.Abs(r.Height);
-            return new RectInt32(x, y, w, h);
+            return CreateRect(x, y, w, h);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Numerics;
 using PixlPunkt.Constants;
 using PixlPunkt.Core.Ascii;

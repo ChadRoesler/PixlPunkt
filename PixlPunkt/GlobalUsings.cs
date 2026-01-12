@@ -1,5 +1,16 @@
+global using System.Collections.Immutable;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.Extensions.Localization;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.Extensions.Options;
+global using Uno.Extensions.Http.Kiota;
+global using ApplicationExecutionState = Windows.ApplicationModel.Activation.ApplicationExecutionState;
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Global using aliases to redirect Core types to SDK types for dogfooding
 // This allows Core code to continue using Core namespace paths while actually using SDK types
+// ═══════════════════════════════════════════════════════════════════════════
 
 // Enums shared between SDK and Core
 global using BrushShape = PixlPunkt.PluginSdk.Imaging.BrushShape;
@@ -19,35 +30,23 @@ global using IconButtonOption = PixlPunkt.PluginSdk.Settings.Options.IconButtonO
 global using IconOption = PixlPunkt.PluginSdk.Settings.Options.IconOption;
 global using IconToggleOption = PixlPunkt.PluginSdk.Settings.Options.IconToggleOption;
 global using IDensitySettings = PixlPunkt.PluginSdk.Settings.IDensitySettings;
-// Effect registration - Core uses SDK interface
 global using IEffectRegistration = PixlPunkt.PluginSdk.Effects.IEffectRegistration;
 global using IExportContext = PixlPunkt.PluginSdk.IO.IExportContext;
 global using IExportRegistration = PixlPunkt.PluginSdk.IO.IExportRegistration;
 global using IImageExportData = PixlPunkt.PluginSdk.IO.IImageExportData;
 global using IImportContext = PixlPunkt.PluginSdk.IO.IImportContext;
-// Plugin window descriptor for SDK windows
-
-// Import/Export types - Core uses SDK types for dogfooding
 global using IImportRegistration = PixlPunkt.PluginSdk.IO.IImportRegistration;
 global using ImageImportResult = PixlPunkt.PluginSdk.IO.ImageImportResult;
-// Import/Export builders - Core uses SDK fluent builders
 global using ImportBuilders = PixlPunkt.PluginSdk.IO.Builders.ImportBuilders;
 global using ImportCategory = PixlPunkt.PluginSdk.IO.ImportCategory;
 global using IOpacitySettings = PixlPunkt.PluginSdk.Settings.IOpacitySettings;
 global using IPaletteExportData = PixlPunkt.PluginSdk.IO.IPaletteExportData;
-// Shape builder interface - Core uses SDK type
 global using IShapeBuilder = PixlPunkt.PluginSdk.Shapes.IShapeBuilder;
-// Settings interfaces - Core uses SDK interface types
 global using IStrokeSettings = PixlPunkt.PluginSdk.Settings.IStrokeSettings;
-// Custom brush settings interface - Core uses SDK type
 global using ICustomBrushSettings = PixlPunkt.PluginSdk.Settings.ICustomBrushSettings;
-// Tool options - Core uses SDK option types
 global using IToolOption = PixlPunkt.PluginSdk.Settings.IToolOption;
-// Key binding for tool shortcuts - uses SDK type but VirtualKey remains Windows.System.VirtualKey
-// because UI code extensively uses Windows.System.VirtualKey for keyboard handling
 global using KeyBinding = PixlPunkt.PluginSdk.Settings.KeyBinding;
 global using LabelOption = PixlPunkt.PluginSdk.Settings.Options.LabelOption;
-// Base classes - Core uses SDK implementations
 global using LayerEffectBase = PixlPunkt.PluginSdk.Compositing.LayerEffectBase;
 global using NumberBoxOption = PixlPunkt.PluginSdk.Settings.Options.NumberBoxOption;
 global using PaletteImportResult = PixlPunkt.PluginSdk.IO.PaletteImportResult;
@@ -66,3 +65,9 @@ global using ToolLimits = PixlPunkt.PluginSdk.Constants.ToolLimits;
 global using EffectLimits = PixlPunkt.PluginSdk.Constants.EffectLimits;
 global using ColorConstants = PixlPunkt.PluginSdk.Constants.ColorConstants;
 global using MathConstants = PixlPunkt.PluginSdk.Constants.MathConstants;
+
+// Graphics struct helpers for Uno Platform (uses object initializers instead of constructors)
+global using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
+
+// Assembly attributes must come after all global usings
+[assembly: Uno.Extensions.Reactive.Config.BindableGenerationTool(3)]

@@ -97,7 +97,7 @@ namespace PixlPunkt.Core.Canvas
         /// Gets a display string for the template dimensions.
         /// </summary>
         [JsonIgnore]
-        public string DimensionsDisplay => $"{PixelWidth}×{PixelHeight}";
+        public string DimensionsDisplay => $"{PixelWidth} Ã— {PixelHeight}";
 
         /// <summary>
         /// Gets a summary string for the template.
@@ -113,7 +113,7 @@ namespace PixlPunkt.Core.Canvas
                     parts.Add($"{LayerCount} layer{(LayerCount != 1 ? "s" : "")}");
                 if (TileCount > 0)
                     parts.Add($"{TileCount} tile{(TileCount != 1 ? "s" : "")}");
-                return string.Join(" • ", parts);
+                return string.Join(" : ", parts);
             }
         }
 

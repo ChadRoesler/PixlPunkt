@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.UI.Input;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.History;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 using SelectionState = PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelectionState;
 
 namespace PixlPunkt.UI.CanvasHost
@@ -212,7 +213,7 @@ namespace PixlPunkt.UI.CanvasHost
             _selAngleDeg = 0.0;
 
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
 
             _toolState?.SetSelectionPresence(active: true, floating: true);
             _toolState?.SetSelectionScale(100.0, 100.0, false);
@@ -271,7 +272,7 @@ namespace PixlPunkt.UI.CanvasHost
             _selFX = newFX; _selFY = newFY;
 
             var surf = rl.Surface;
-            var dstRect = new RectInt32(_selFX, _selFY, workW, workH);
+            var dstRect = CreateRect(_selFX, _selFY, workW, workH);
             var dstClamp = ClampToSurface(dstRect, surf.Width, surf.Height);
 
             // If nothing lands on canvas, push lift history to undo the clearing and clear state
@@ -297,13 +298,13 @@ namespace PixlPunkt.UI.CanvasHost
 
                 _selRegion.EnsureSize(Document.PixelWidth, Document.PixelHeight);
                 _selRegion.Clear();
-                _selRect = new RectInt32(0, 0, 0, 0);
+                _selRect = CreateRect(0, 0, 0, 0);
                 _selActive = false;
                 _selFloating = false;
                 _selBuf = null;
 
                 Document.RaiseStructureChanged();
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 return;
             }
@@ -370,7 +371,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             HistoryStateChanged?.Invoke();
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             SetCursor(InputSystemCursorShape.Arrow);
 
             _toolState?.SetSelectionPresence(_selActive, _selFloating);
@@ -381,6 +382,9 @@ namespace PixlPunkt.UI.CanvasHost
             _selCumulativeAngleDeg = 0.0;
             _toolState?.SetRotationAngle(0.0);
             UpdateActiveLayerPreview();
+
+            // Capture keyframe if in canvas animation mode and layer has animation
+            AutoCaptureKeyframeIfNeeded();
         }
 
         /// <summary>
@@ -425,7 +429,7 @@ namespace PixlPunkt.UI.CanvasHost
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -454,7 +458,7 @@ namespace PixlPunkt.UI.CanvasHost
             _selRegion.Clear();
             _selState.Active = false;
             _selState.State = SelectionState.None;
-            _selState.Rect = new RectInt32(0, 0, 0, 0);
+            _selState.Rect = CreateRect(0, 0, 0, 0);
 
             // Notify tool state
             _toolState?.SetSelectionPresence(false, false);
@@ -465,7 +469,7 @@ namespace PixlPunkt.UI.CanvasHost
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
             Document.RaiseStructureChanged();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
         }
 
         /// <summary>
@@ -580,7 +584,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (baseW <= 0 || baseH <= 0 || dstClamp.Width <= 0 || dstClamp.Height <= 0)
             {
-                _selRect = new RectInt32(0, 0, 0, 0);
+                _selRect = CreateRect(0, 0, 0, 0);
                 _selActive = false;
                 return;
             }
@@ -617,13 +621,13 @@ namespace PixlPunkt.UI.CanvasHost
                     }
                     else if (runStart >= 0)
                     {
-                        _selRegion.AddRect(new RectInt32(runStart, y, x - runStart, 1));
+                        _selRegion.AddRect(CreateRect(runStart, y, x - runStart, 1));
                         runStart = -1;
                     }
                 }
 
                 if (runStart >= 0)
-                    _selRegion.AddRect(new RectInt32(runStart, y, x1 - runStart, 1));
+                    _selRegion.AddRect(CreateRect(runStart, y, x1 - runStart, 1));
             }
 
             _selRect = _selRegion.Bounds;
@@ -646,7 +650,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (r.Width <= 0 || r.Height <= 0)
             {
                 _selRegion.Clear();
-                _selRect = new RectInt32(0, 0, 0, 0);
+                _selRect = CreateRect(0, 0, 0, 0);
                 _selActive = false;
                 return;
             }
@@ -670,7 +674,7 @@ namespace PixlPunkt.UI.CanvasHost
                     {
                         if (runStart >= 0)
                         {
-                            _selRegion.AddRect(new RectInt32(runStart, y, x - runStart, 1));
+                            _selRegion.AddRect(CreateRect(runStart, y, x - runStart, 1));
                             runStart = -1;
                         }
                         continue;
@@ -685,13 +689,13 @@ namespace PixlPunkt.UI.CanvasHost
                     }
                     else if (runStart >= 0)
                     {
-                        _selRegion.AddRect(new RectInt32(runStart, y, x - runStart, 1));
+                        _selRegion.AddRect(CreateRect(runStart, y, x - runStart, 1));
                         runStart = -1;
                     }
                 }
 
                 if (runStart >= 0)
-                    _selRegion.AddRect(new RectInt32(runStart, y, x1 - runStart, 1));
+                    _selRegion.AddRect(CreateRect(runStart, y, x1 - runStart, 1));
             }
 
             _selRect = _selRegion.Bounds;
@@ -735,7 +739,10 @@ namespace PixlPunkt.UI.CanvasHost
             HistoryStateChanged?.Invoke();
             Document.RaiseStructureChanged();
             Document.RaiseDocumentModified(); // Notify animation panels of pixel changes
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
+
+            // Capture keyframe if in canvas animation mode and layer has animation
+            AutoCaptureKeyframeIfNeeded();
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -769,7 +776,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Selection transform/commit undo needs UI refresh
             if (isSelectionTransform || isSelectionCommit)
             {
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 Document.RaiseDocumentModified(); // Notify animation panels
                 return;
@@ -778,7 +785,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Always recomposite after pixel-changing undo
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             Document.RaiseDocumentModified(); // Notify animation panels
             RaiseFrame();
@@ -811,7 +818,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Selection transform/commit redo needs UI refresh
             if (isSelectionTransform || isSelectionCommit)
             {
-                CanvasView.Invalidate();
+                InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 Document.RaiseDocumentModified(); // Notify animation panels
                 return;
@@ -820,7 +827,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Always recomposite after pixel-changing redo
             Document.CompositeTo(Document.Surface);
             UpdateActiveLayerPreview();
-            CanvasView.Invalidate();
+            InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             Document.RaiseDocumentModified(); // Notify animation panels
             RaiseFrame();

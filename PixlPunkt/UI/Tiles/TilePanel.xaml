@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
 ═══════════════════════════════════════════════════════════════════════════════
   TILE PANEL - Tile Set Management
@@ -22,7 +22,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ic="using:FluentIcons.WinUI"
-    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:skia="using:SkiaSharp.Views.Windows"
+    xmlns:ctrl="using:PixlPunkt.UI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
@@ -145,13 +146,11 @@
                 VerticalAlignment="Stretch">
 
                 <ItemsControl x:Name="TileGrid" MinHeight="48">
-                    <!-- Grid Panel: Square cells based on tile size + zoom -->
+                    <!-- Grid Panel: Use custom WrapPanel for Uno Platform compatibility -->
+                    <!-- WrapGrid is not supported in Uno Platform Skia -->
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapGrid 
-                                Orientation="Horizontal"
-                                ItemWidth="{Binding TileCellSize, ElementName=Self}" 
-                                ItemHeight="{Binding TileCellSize, ElementName=Self}"/>
+                            <ctrl:WrapPanel Orientation="Horizontal"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
 
@@ -159,14 +158,16 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Grid 
+                                Width="{Binding TileCellSize, ElementName=Self}"
+                                Height="{Binding TileCellSize, ElementName=Self}"
                                 Margin="2"
                                 Loaded="TileCell_Loaded" 
                                 Unloaded="TileCell_Unloaded">
 
-                                <!-- Win2D Canvas for pixel-perfect tile rendering with transparency pattern -->
-                                <win2d:CanvasControl 
+                                <!-- SkiaSharp Canvas for pixel-perfect tile rendering with transparency pattern -->
+                                <skia:SKXamlCanvas 
                                     x:Name="TileCanvas"
-                                    Draw="TileCanvas_Draw"/>
+                                    PaintSurface="TileCanvas_PaintSurface"/>
 
                                 <!-- Selection Ring (accent color for visibility) -->
                                 <Border 

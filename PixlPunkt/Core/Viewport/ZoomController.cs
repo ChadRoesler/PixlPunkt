@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Windows.Foundation;
 
 namespace PixlPunkt.Core.Viewport

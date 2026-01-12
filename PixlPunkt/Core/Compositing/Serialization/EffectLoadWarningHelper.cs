@@ -44,7 +44,7 @@ namespace PixlPunkt.Core.Compositing.Serialization
                 var byPlugin = pluginWarnings.GroupBy(w => w.PluginId);
                 foreach (var group in byPlugin)
                 {
-                    sb.AppendLine($"• Plugin '{group.Key}':");
+                    sb.AppendLine($"â€¢ Plugin '{group.Key}':");
                     foreach (var warning in group)
                     {
                         sb.AppendLine($"    - {warning.DisplayName}");
@@ -66,7 +66,7 @@ namespace PixlPunkt.Core.Compositing.Serialization
 
                 foreach (var warning in otherWarnings)
                 {
-                    sb.AppendLine($"• {warning.DisplayName}: {warning.Message}");
+                    sb.AppendLine($"â€¢ {warning.DisplayName}: {warning.Message}");
                 }
             }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using PixlPunkt.Constants;
 using PixlPunkt.Core.Coloring.Helpers;
 

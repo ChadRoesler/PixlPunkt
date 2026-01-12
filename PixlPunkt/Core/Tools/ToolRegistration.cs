@@ -31,7 +31,7 @@ namespace PixlPunkt.Core.Tools
     /// Factory function that creates an <see cref="IStrokePainter"/> for this tool.
     /// Null for non-painting tools (e.g., Pan, Magnifier, Dropper).
     /// </param>
-    public sealed record ToolRegistration(
+    public sealed partial record ToolRegistration(
         string Id,
         ToolCategory Category,
         string DisplayName,

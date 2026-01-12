@@ -1,9 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <ContentDialog
     x:Class="PixlPunkt.UI.Dialogs.ImportTilesDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ic="using:FluentIcons.WinUI"
+    xmlns:ctrl="using:PixlPunkt.UI.Controls"
     Title="Import Tiles from Document"
     PrimaryButtonText="Import"
     CloseButtonText="Cancel"
@@ -70,14 +71,14 @@
                 <ItemsControl x:Name="TileGrid" ItemsSource="{Binding TileItems}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapGrid Orientation="Horizontal"
-                                      ItemWidth="64"
-                                      ItemHeight="80"/>
+                            <!-- Use custom WrapPanel for Uno Platform compatibility -->
+                            <!-- WrapGrid is not supported in Uno Platform Skia -->
+                            <ctrl:WrapPanel Orientation="Horizontal"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Margin="4">
+                            <StackPanel Margin="4" Width="64">
                                 <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                           Checked="TileCheckBox_Changed"
                                           Unchecked="TileCheckBox_Changed"

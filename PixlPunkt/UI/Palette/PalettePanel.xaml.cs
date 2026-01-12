@@ -120,15 +120,9 @@ namespace PixlPunkt.UI.Palette
         {
             if (d is PalettePanel self)
             {
-                // Update items panel item size (WrapGrid expects ItemWidth/ItemHeight on the panel instance)
-                // We need to walk the visual tree to find the WrapGrid and set its ItemWidth/ItemHeight.
+                // Update items panel layout when swatch size changes
                 self.DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (self.SwatchList.ItemsPanelRoot is WrapGrid wg)
-                    {
-                        wg.ItemWidth = (double)self.SwatchSize;
-                        wg.ItemHeight = (double)self.SwatchSize;
-                    }
                     self.SwatchList.InvalidateMeasure();
                 });
             }
@@ -215,69 +209,6 @@ namespace PixlPunkt.UI.Palette
             _swatchMenuFlyout.SetAsForeground += Swatch_SetFg_Click;
             _swatchMenuFlyout.SetAsBackground += Swatch_SetBg_Click;
         }
-        /// <summary>
-        /// Ensures the panel-level context flyout is created and attached.
-        /// Shown when right-clicking empty space in the palette.
-        /// </summary>
-        //private void EnsurePanelFlyout()
-        //{
-        //    if (PaletteScroll.ContextFlyout is not null) return;
-
-        //    var fly = new MenuFlyout();
-
-        //    var miAddFg = new MenuFlyoutItem { Text = "Add FG to palette" };
-        //    miAddFg.Click += (_, __) => { if (Service is not null) Service.AddColor(Service.Foreground); };
-        //    fly.Items.Add(miAddFg);
-
-        //    var miAddBg = new MenuFlyoutItem { Text = "Add BG to palette" };
-        //    miAddBg.Click += (_, __) => { if (Service is not null) Service.AddColor(Service.Background); };
-        //    fly.Items.Add(miAddBg);
-
-        //    fly.Items.Add(new MenuFlyoutSeparator());
-
-        //    var miClear = new MenuFlyoutItem { Text = "Clear palette…" };
-        //    miClear.Click += Panel_Clear_Click;
-        //    fly.Items.Add(miClear);
-
-        //    // Bind to both surfaces so empty areas reliably show it
-        //    PaletteScroll.ContextFlyout = fly;
-        //    SwatchList.ContextFlyout = fly;
-        //}
-
-        /// <summary>
-        /// Attaches a context menu to an individual color swatch.
-        /// Provides Edit, Remove, Set FG, and Set BG options.
-        /// </summary>
-        //private void AttachSwatchFlyout(Border swatch)
-        //{
-        //    if (swatch.ContextFlyout is not null) return;
-
-        //    // Get the color from Tag (bound to {Binding} in XAML)
-        //    if (!ColorUtil.TryGetBGRA(swatch.Tag, out var value))
-        //        return;
-
-        //    var fly = new MenuFlyout();
-
-        //    var miEdit = new MenuFlyoutItem { Text = "Edit", Tag = value };
-        //    miEdit.Click += Swatch_Edit_Click;
-        //    fly.Items.Add(miEdit);
-
-        //    var miRemove = new MenuFlyoutItem { Text = "Remove", Tag = value };
-        //    miRemove.Click += Swatch_Remove_Click;
-        //    fly.Items.Add(miRemove);
-
-        //    fly.Items.Add(new MenuFlyoutSeparator());
-
-        //    var miFg = new MenuFlyoutItem { Text = "Set as FG", Tag = value };
-        //    miFg.Click += Swatch_SetFg_Click;
-        //    fly.Items.Add(miFg);
-
-        //    var miBg = new MenuFlyoutItem { Text = "Set as BG", Tag = value };
-        //    miBg.Click += Swatch_SetBg_Click;
-        //    fly.Items.Add(miBg);
-
-        //    swatch.ContextFlyout = fly;
-        //}
 
         // ════════════════════════════════════════════════════════════════════
         // EVENT HANDLERS - TOOLBAR BUTTONS

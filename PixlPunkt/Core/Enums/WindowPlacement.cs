@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Enums
+namespace PixlPunkt.Core.Enums
 {
     /// <summary>
     /// Defines the placement strategies for positioning child windows relative to their parent window.

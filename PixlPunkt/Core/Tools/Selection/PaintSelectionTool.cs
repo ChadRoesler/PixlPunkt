@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml.Input;
+using PixlPunkt.Core.Rendering;
 using PixlPunkt.Core.Selection;
 using PixlPunkt.Core.Tools.Settings;
 using Windows.Foundation;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Tools.Selection
 {
@@ -73,7 +74,7 @@ namespace PixlPunkt.Core.Tools.Selection
         }
 
         /// <inheritdoc/>
-        public override void DrawPreview(CanvasDrawingSession ds, Rect destRect, double scale, float antsPhase)
+        public override void DrawPreview(ICanvasRenderer renderer, Rect destRect, double scale, float antsPhase)
         {
             // Brush cursor preview is handled by the main brush overlay system in CanvasViewHost.BrushOverlay.cs
             // This method is intentionally empty - PaintSelect participates in the standard brush overlay
@@ -177,7 +178,7 @@ namespace PixlPunkt.Core.Tools.Selection
             };
 
             // **OPTIMIZATION**: For subtract mode, batch all pixel operations before triggering
-            // expensive bounds recomputation. This reduces O(pixels × W×H) to O(W×H) per stamp.
+            // expensive bounds recomputation. This reduces O(pixels â†’ WÃ—H) to O(WÃ—H) per stamp.
             if (!adding)
             {
                 // Batch subtract: modify mask directly without bounds recalculation
@@ -207,7 +208,7 @@ namespace PixlPunkt.Core.Tools.Selection
                     if (px < 0 || py < 0 || px >= w || py >= h)
                         continue;
 
-                    region.AddRect(new Windows.Graphics.RectInt32(px, py, 1, 1));
+                    region.AddRect(CreateRect(px, py, 1, 1));
                 }
             }
 

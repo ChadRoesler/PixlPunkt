@@ -22,7 +22,7 @@ namespace PixlPunkt.Core.Tools
     /// <param name="DisplayName">Human-readable name for UI display.</param>
     /// <param name="Settings">Tool-specific settings object.</param>
     /// <param name="PainterFactory">Factory to create stroke painter, or null for non-stroke tools like Fill.</param>
-    public sealed record BrushToolRegistration(
+    public sealed partial record BrushToolRegistration(
         string Id,
         string DisplayName,
         ToolSettingsBase? Settings,

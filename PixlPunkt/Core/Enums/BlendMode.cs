@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Enums
+namespace PixlPunkt.Core.Enums
 {
     /// <summary>
     /// Defines the blending modes used for layer compositing and painting operations.

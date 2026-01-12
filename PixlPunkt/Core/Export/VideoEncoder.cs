@@ -1,16 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using FFMpegCore;
+using FFMpegCore.Enums;
+using FFMpegCore.Pipes;
+using PixlPunkt.Core.Audio;
 using PixlPunkt.Core.Logging;
-using Windows.Foundation;
-using Windows.Media.Core;
-using Windows.Media.MediaProperties;
-using Windows.Media.Transcoding;
-using Windows.Storage;
-using Windows.Storage.Streams;
 
 namespace PixlPunkt.Core.Export
 {
@@ -28,183 +25,151 @@ namespace PixlPunkt.Core.Export
         /// <summary>AVI container.</summary>
         Avi,
 
-        /// <summary>WMV (Windows Media Video).</summary>
-        Wmv
+        /// <summary>GIF (animated).</summary>
+        Gif,
+
+        /// <summary>MKV with H.265 codec.</summary>
+        Mkv
     }
 
     /// <summary>
-    /// Encodes animation frames to video formats using Windows Media Foundation.
+    /// Encodes animation frames to video formats using FFmpeg.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// FFmpeg binaries are automatically downloaded on first use if not found.
+    /// For pixel art, uses nearest-neighbor scaling and high bitrate to preserve crisp edges.
+    /// </para>
+    /// </remarks>
     public static class VideoEncoder
     {
         /// <summary>
-        /// Encodes frames to a video file.
+        /// Gets whether video encoding is supported (FFmpeg is available or can be downloaded).
         /// </summary>
-        /// <param name="frames">List of rendered frames.</param>
-        /// <param name="outputPath">Output video file path.</param>
-        /// <param name="format">Video format to use.</param>
-        /// <param name="fps">Frames per second (if 0, uses frame durations).</param>
-        /// <param name="quality">Video quality (0-100).</param>
-        /// <param name="progress">Optional progress callback.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
+        public static bool IsSupported => true; // Always true since we auto-download
+
+        /// <summary>
+        /// Gets whether FFmpeg is currently ready (no download needed).
+        /// </summary>
+        public static bool IsReady => FFmpegService.IsAvailable;
+
+        /// <summary>
+        /// Encodes frames to a video file using FFmpeg.
+        /// </summary>
         public static async Task EncodeAsync(
             IReadOnlyList<AnimationExportService.RenderedFrame> frames,
             string outputPath,
             VideoFormat format = VideoFormat.Mp4,
             int fps = 0,
             int quality = 80,
+            int scale = 1,
             IProgress<double>? progress = null,
             CancellationToken cancellationToken = default)
         {
             if (frames == null || frames.Count == 0)
                 throw new ArgumentException("No frames to encode", nameof(frames));
 
-            var firstFrame = frames[0];
-            int width = firstFrame.Width;
-            int height = firstFrame.Height;
+            // Ensure FFmpeg is available (auto-download if needed)
+            if (!FFmpegService.IsAvailable)
+            {
+                progress?.Report(0.05);
+                var downloadProgress = new Progress<(float p, string s)>(x => progress?.Report(x.p * 0.2));
+                bool downloaded = await FFmpegService.EnsureDownloadedAsync(downloadProgress);
+                
+                if (!downloaded)
+                {
+                    throw new InvalidOperationException(
+                        "FFmpeg is required for video export. Download failed. " +
+                        "Please check your internet connection and try again.");
+                }
+            }
 
-            // Calculate effective FPS
+            var firstFrame = frames[0];
+            int width = firstFrame.Width * scale;
+            int height = firstFrame.Height * scale;
+
             if (fps <= 0)
             {
-                // Use average frame duration
                 int totalMs = 0;
                 foreach (var f in frames)
                     totalMs += f.DurationMs;
                 fps = Math.Max(1, (int)Math.Round(frames.Count * 1000.0 / totalMs));
             }
 
-            LoggingService.Info("Encoding video: {FrameCount} frames, {Width}x{Height}, {FPS} fps, format={Format}",
-                frames.Count, width, height, fps, format);
+            LoggingService.Info("Encoding video with FFmpeg: {FrameCount} frames, {Width}x{Height}, {FPS} fps, format={Format}, scale={Scale}x",
+                frames.Count, width, height, fps, format, scale);
 
-            // Ensure output directory exists
             var dir = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             {
                 Directory.CreateDirectory(dir);
             }
 
-            // Use Windows.Media.Editing (MediaComposition)
-            await EncodeWithMediaCompositionAsync(frames, outputPath, format, fps, quality, progress, cancellationToken);
-        }
-
-        /// <summary>
-        /// Encodes using Windows.Media.Editing API (MediaComposition).
-        /// </summary>
-        private static async Task EncodeWithMediaCompositionAsync(
-            IReadOnlyList<AnimationExportService.RenderedFrame> frames,
-            string outputPath,
-            VideoFormat format,
-            int fps,
-            int quality,
-            IProgress<double>? progress,
-            CancellationToken cancellationToken)
-        {
-            var firstFrame = frames[0];
-            int width = firstFrame.Width;
-            int height = firstFrame.Height;
-
-            // Create a MediaComposition
-            var composition = new Windows.Media.Editing.MediaComposition();
-
-            // We need to create temporary image files for each frame
-            var tempFolder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync(
-                $"VideoExport_{Guid.NewGuid():N}",
-                CreationCollisionOption.ReplaceExisting);
-
-            var tempFiles = new List<StorageFile>();
+            var tempDir = Path.Combine(Path.GetTempPath(), $"PixlPunkt_VideoExport_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
 
             try
             {
-                // Save each frame as a PNG
+                // Save frames as PNG files (20-60% progress)
+                progress?.Report(0.2);
                 for (int i = 0; i < frames.Count; i++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var frame = frames[i];
-                    var pngFile = await tempFolder.CreateFileAsync($"frame_{i:D5}.png", CreationCollisionOption.ReplaceExisting);
-                    tempFiles.Add(pngFile);
+                    var framePath = Path.Combine(tempDir, $"frame_{i:D5}.png");
+                    await SaveFrameAsPngAsync(frame, framePath);
 
-                    await SaveFrameAsPngAsync(frame, pngFile);
-
-                    progress?.Report((double)(i + 1) / (frames.Count * 2)); // First half is frame creation
+                    progress?.Report(0.2 + (0.4 * (i + 1) / frames.Count));
                 }
 
-                // Add each frame as a clip
-                double frameDurationTicks = 10_000_000.0 / fps; // Duration in 100-nanosecond units
+                var inputPattern = Path.Combine(tempDir, "frame_%05d.png");
+                
+                progress?.Report(0.6);
 
-                for (int i = 0; i < tempFiles.Count; i++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
+                var (codec, extraArgs) = GetEncodingSettings(format, quality, scale, width, height);
 
-                    var imageFile = tempFiles[i];
-                    var frame = frames[i];
-
-                    // Calculate duration for this frame
-                    double durationTicks = fps > 0
-                        ? frameDurationTicks
-                        : frame.DurationMs * 10_000.0; // ms to 100-ns
-
-                    var clip = await Windows.Media.Editing.MediaClip.CreateFromImageFileAsync(
-                        imageFile,
-                        TimeSpan.FromTicks((long)durationTicks));
-
-                    composition.Clips.Add(clip);
-                }
-
-                // Create output file using direct file creation (more reliable than StorageFile APIs for arbitrary paths)
-                StorageFile outputFile;
-                try
-                {
-                    // First, ensure the file exists by creating it with System.IO
-                    // This handles paths that aren't in known folders
-                    if (File.Exists(outputPath))
+                // Run FFmpeg (60-100% progress)
+                await FFMpegArguments
+                    .FromFileInput(inputPattern, verifyExists: false, options => options
+                        .WithFramerate(fps))
+                    .OutputToFile(outputPath, overwrite: true, options =>
                     {
-                        File.Delete(outputPath);
-                    }
-                    
-                    // Create empty file
-                    await using (File.Create(outputPath)) { }
-                    
-                    // Now get the StorageFile reference
-                    outputFile = await StorageFile.GetFileFromPathAsync(outputPath);
-                }
-                catch (Exception ex)
-                {
-                    LoggingService.Error("Failed to create output file at {Path}: {Error}", outputPath, ex.Message);
-                    throw new IOException($"Cannot create output file at '{outputPath}'. Please ensure the path is valid and you have write permissions.", ex);
-                }
+                        options.WithFramerate(fps);
 
-                // Configure encoding profile
-                // IMPORTANT: Set output dimensions to match frame dimensions exactly
-                // This prevents MediaComposition from scaling (which uses bilinear interpolation)
-                // and preserves crisp pixel art edges
-                var profile = GetEncodingProfile(format, width, height, fps, quality);
+                        if (!string.IsNullOrEmpty(codec))
+                        {
+                            options.WithVideoCodec(codec);
+                        }
 
-                // Render the composition
-                var renderOp = composition.RenderToFileAsync(outputFile,
-                    Windows.Media.Editing.MediaTrimmingPreference.Precise,
-                    profile);
+                        if (scale > 1)
+                        {
+                            options.WithCustomArgument($"-vf \"scale={width}:{height}:flags=neighbor\"");
+                        }
 
-                renderOp.Progress = (info, progressValue) =>
-                {
-                    progress?.Report(0.5 + progressValue / 200.0); // Second half is rendering
-                };
+                        if (!string.IsNullOrEmpty(extraArgs))
+                        {
+                            options.WithCustomArgument(extraArgs);
+                        }
 
-                var result = await renderOp;
+                        if (format != VideoFormat.Gif)
+                        {
+                            options.WithCustomArgument("-pix_fmt yuv420p");
+                        }
+                    })
+                    .ProcessAsynchronously();
 
-                if (result != Windows.Media.Transcoding.TranscodeFailureReason.None)
-                {
-                    throw new Exception($"Video encoding failed: {result}");
-                }
-
+                progress?.Report(1.0);
                 LoggingService.Info("Video encoding complete: {Path}", outputPath);
             }
             finally
             {
-                // Clean up temp files
                 try
                 {
-                    await tempFolder.DeleteAsync(StorageDeleteOption.PermanentDelete);
+                    if (Directory.Exists(tempDir))
+                    {
+                        Directory.Delete(tempDir, recursive: true);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -213,99 +178,162 @@ namespace PixlPunkt.Core.Export
             }
         }
 
-        private static async Task SaveFrameAsPngAsync(AnimationExportService.RenderedFrame frame, StorageFile file)
+        private static (string? codec, string? extraArgs) GetEncodingSettings(
+            VideoFormat format, int quality, int scale, int width, int height)
         {
-            using var stream = await file.OpenAsync(FileAccessMode.ReadWrite);
-            var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
-                Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, stream);
+            int crf = Math.Max(0, Math.Min(51, 51 - (quality * 51 / 100)));
 
-            encoder.SetPixelData(
-                Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
-                (uint)frame.Width,
-                (uint)frame.Height,
-                96, 96,
-                frame.Pixels);
-
-            await encoder.FlushAsync();
+            return format switch
+            {
+                VideoFormat.Mp4 => ("libx264", $"-crf {crf} -preset slow -tune animation"),
+                VideoFormat.WebM => ("libvpx-vp9", $"-crf {crf} -b:v 0 -deadline good"),
+                VideoFormat.Mkv => ("libx265", $"-crf {crf} -preset slow"),
+                VideoFormat.Avi => ("mpeg4", $"-q:v {Math.Max(1, 31 - (quality * 30 / 100))}"),
+                VideoFormat.Gif => (null, $"-vf \"fps={30},split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5\""),
+                _ => ("libx264", $"-crf {crf}")
+            };
         }
 
-        private static MediaEncodingProfile GetEncodingProfile(VideoFormat format, int width, int height, int fps, int quality)
+        private static async Task SaveFrameAsPngAsync(AnimationExportService.RenderedFrame frame, string path)
         {
-            MediaEncodingProfile profile;
+            using var fileStream = File.Create(path);
+            await WritePngAsync(fileStream, frame.Pixels, frame.Width, frame.Height);
+        }
 
-            // Map quality (0-100) to video bitrate
-            // For pixel art, use higher bitrate to preserve sharp edges
-            uint baseBitrate = (uint)(width * height * fps / 5); // Higher base for crisp output
-            uint bitrate = (uint)(baseBitrate * (0.5 + quality / 100.0)); // Scale by quality
-            bitrate = Math.Max(1_000_000u, Math.Min(bitrate, 100_000_000u)); // Higher minimum for quality
+        private static async Task WritePngAsync(Stream stream, byte[] pixels, int width, int height)
+        {
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
 
-            switch (format)
+            writer.Write(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+
+            WriteChunk(writer, "IHDR", w =>
             {
-                case VideoFormat.Mp4:
-                    profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Auto);
-                    break;
+                w.Write(ToBigEndian(width));
+                w.Write(ToBigEndian(height));
+                w.Write((byte)8);
+                w.Write((byte)6);
+                w.Write((byte)0);
+                w.Write((byte)0);
+                w.Write((byte)0);
+            });
 
-                case VideoFormat.Wmv:
-                    profile = MediaEncodingProfile.CreateWmv(VideoEncodingQuality.Auto);
-                    break;
-
-                case VideoFormat.Avi:
-                    profile = MediaEncodingProfile.CreateAvi(VideoEncodingQuality.Auto);
-                    break;
-
-                case VideoFormat.WebM:
-                    // WebM isn't directly supported, use MP4 as fallback
-                    profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Auto);
-                    break;
-
-                default:
-                    profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Auto);
-                    break;
+            using var compressedStream = new MemoryStream();
+            using (var deflate = new System.IO.Compression.DeflateStream(compressedStream, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    deflate.WriteByte(0);
+                    for (int x = 0; x < width; x++)
+                    {
+                        int idx = (y * width + x) * 4;
+                        deflate.WriteByte(pixels[idx + 2]);
+                        deflate.WriteByte(pixels[idx + 1]);
+                        deflate.WriteByte(pixels[idx + 0]);
+                        deflate.WriteByte(pixels[idx + 3]);
+                    }
+                }
             }
 
-            // Override video properties - MUST match frame dimensions exactly for crisp pixel art
-            if (profile.Video != null)
+            var compressedData = compressedStream.ToArray();
+            var zlibData = new byte[compressedData.Length + 6];
+            zlibData[0] = 0x78;
+            zlibData[1] = 0x9C;
+            Array.Copy(compressedData, 0, zlibData, 2, compressedData.Length);
+            
+            uint adler = ComputeAdler32(pixels, width, height);
+            zlibData[^4] = (byte)(adler >> 24);
+            zlibData[^3] = (byte)(adler >> 16);
+            zlibData[^2] = (byte)(adler >> 8);
+            zlibData[^1] = (byte)adler;
+
+            WriteChunk(writer, "IDAT", w => w.Write(zlibData));
+            WriteChunk(writer, "IEND", _ => { });
+
+            ms.Position = 0;
+            await ms.CopyToAsync(stream);
+        }
+
+        private static void WriteChunk(BinaryWriter writer, string type, Action<BinaryWriter> writeData)
+        {
+            using var dataStream = new MemoryStream();
+            using var dataWriter = new BinaryWriter(dataStream);
+            writeData(dataWriter);
+            var data = dataStream.ToArray();
+
+            writer.Write(ToBigEndian(data.Length));
+            writer.Write(System.Text.Encoding.ASCII.GetBytes(type));
+            writer.Write(data);
+            writer.Write(ToBigEndian((int)ComputeCrc32(type, data)));
+        }
+
+        private static int ToBigEndian(int value) => System.Net.IPAddress.HostToNetworkOrder(value);
+
+        private static uint ComputeCrc32(string type, byte[] data)
+        {
+            uint crc = 0xFFFFFFFF;
+            foreach (var b in System.Text.Encoding.ASCII.GetBytes(type))
+                crc = UpdateCrc32(crc, b);
+            foreach (var b in data)
+                crc = UpdateCrc32(crc, b);
+            return crc ^ 0xFFFFFFFF;
+        }
+
+        private static uint UpdateCrc32(uint crc, byte b)
+        {
+            crc ^= b;
+            for (int i = 0; i < 8; i++)
+                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
+            return crc;
+        }
+
+        private static uint ComputeAdler32(byte[] pixels, int width, int height)
+        {
+            uint a = 1, b = 0;
+            for (int y = 0; y < height; y++)
             {
-                profile.Video.Width = (uint)width;
-                profile.Video.Height = (uint)height;
-                profile.Video.Bitrate = bitrate;
-                profile.Video.FrameRate.Numerator = (uint)fps;
-                profile.Video.FrameRate.Denominator = 1;
+                a = (a + 0) % 65521; b = (b + a) % 65521;
+                for (int x = 0; x < width; x++)
+                {
+                    int idx = (y * width + x) * 4;
+                    a = (a + pixels[idx + 2]) % 65521; b = (b + a) % 65521;
+                    a = (a + pixels[idx + 1]) % 65521; b = (b + a) % 65521;
+                    a = (a + pixels[idx + 0]) % 65521; b = (b + a) % 65521;
+                    a = (a + pixels[idx + 3]) % 65521; b = (b + a) % 65521;
+                }
             }
-
-            // Remove audio (we're exporting animation, not video with audio)
-            profile.Audio = null;
-
-            return profile;
+            return (b << 16) | a;
         }
 
         /// <summary>
         /// Gets the file extension for a video format.
         /// </summary>
-        public static string GetExtension(VideoFormat format)
+        public static string GetExtension(VideoFormat format) => format switch
         {
-            return format switch
-            {
-                VideoFormat.Mp4 => ".mp4",
-                VideoFormat.WebM => ".webm",
-                VideoFormat.Avi => ".avi",
-                VideoFormat.Wmv => ".wmv",
-                _ => ".mp4"
-            };
-        }
+            VideoFormat.Mp4 => ".mp4",
+            VideoFormat.WebM => ".webm",
+            VideoFormat.Avi => ".avi",
+            VideoFormat.Gif => ".gif",
+            VideoFormat.Mkv => ".mkv",
+            _ => ".mp4"
+        };
 
         /// <summary>
-        /// Gets supported video formats for the current system.
+        /// Gets supported video formats.
         /// </summary>
-        public static IReadOnlyList<(VideoFormat format, string displayName)> GetSupportedFormats()
-        {
-            return new List<(VideoFormat, string)>
+        public static IReadOnlyList<(VideoFormat format, string displayName)> GetSupportedFormats() =>
+            new List<(VideoFormat, string)>
             {
-                (VideoFormat.Mp4, "MP4 (H.264)"),
-                (VideoFormat.Wmv, "Windows Media Video"),
-                (VideoFormat.Avi, "AVI")
+                (VideoFormat.Mp4, "MP4 (H.264) - Most Compatible"),
+                (VideoFormat.WebM, "WebM (VP9) - Web Optimized"),
+                (VideoFormat.Gif, "GIF - Animated"),
+                (VideoFormat.Mkv, "MKV (H.265) - High Quality"),
+                (VideoFormat.Avi, "AVI (MPEG4)")
             };
-        }
+
+        /// <summary>
+        /// Gets the FFmpeg status message for UI display.
+        /// </summary>
+        public static string GetStatusMessage() => FFmpegService.GetStatusMessage();
     }
 }

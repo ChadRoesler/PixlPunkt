@@ -12,7 +12,7 @@ namespace PixlPunkt.Core.Effects.Settings
     /// Generates UI options for configuring color adjustment parameters in HSV color space:
     /// </para>
     /// <list type="bullet">
-    /// <item><strong>Hue Shift</strong> - Rotates colors around the color wheel (0° to 360°)</item>
+    /// <item><strong>Hue Shift</strong> - Rotates colors around the color wheel (0Â° to 360Â°)</item>
     /// <item><strong>Saturation</strong> - Color intensity multiplier (0 = grayscale, 1 = normal, 2 = oversaturated)</item>
     /// <item><strong>Brightness</strong> - Value/brightness multiplier (0 = black, 1 = normal, 2 = overbright)</item>
     /// </list>

@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 using Microsoft.UI.Xaml;
 using PixlPunkt.Core.Document;
+using PixlPunkt.Core.Settings;
 
 namespace PixlPunkt.Core.Animation
 {
@@ -552,6 +553,20 @@ namespace PixlPunkt.Core.Animation
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Applies default settings from AppSettings.Animation.
+        /// Called when creating a new document.
+        /// </summary>
+        public void ApplyDefaults()
+        {
+            var defaults = AppSettings.Instance.Animation;
+            
+            OnionSkinEnabled = defaults.DefaultTileOnionSkinEnabled;
+            OnionSkinFramesBefore = defaults.DefaultOnionSkinFramesBefore;
+            OnionSkinFramesAfter = defaults.DefaultOnionSkinFramesAfter;
+            OnionSkinOpacity = defaults.DefaultOnionSkinOpacity;
         }
 
         // ====================================================================

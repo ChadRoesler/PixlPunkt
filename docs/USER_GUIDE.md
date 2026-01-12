@@ -1464,7 +1464,7 @@ This lets you paint different tile types on separate layers while keeping everyt
 3. **Hue Shifting** - Shift hue when shading (cool shadows, warm highlights)
 4. **Limited Palette** - Fewer colors = more cohesive art
 
-### Gradient Fill Pro Tips
+### Gradient Fill Quick Tips
 
 1. **Start simple** - Begin with 2-color gradients
 2. **Match your palette** - Use colors already in your artwork
@@ -1473,14 +1473,14 @@ This lets you paint different tile types on separate layers while keeping everyt
 5. **Scale matters** - Larger Scale = chunkier, more retro
 6. **Layer gradients** - Build complex effects with multiple gradient layers
 
-### Mask Pro Tips
+### Mask Quick Tips
 
 1. **Non-destructive first** - Always try a mask before erasing
 2. **Soft brushes** - Use low-density brushes for smooth mask edges
 3. **Invert to start** - Sometimes it's easier to reveal than conceal
 4. **Apply when done** - Reduce file size by applying final masks
 
-### Animation Pro Tips
+### Animation Quick Tips
 
 1. **Key poses first** - Block major moments before details
 2. **Use onion skin** - Essential for smooth motion

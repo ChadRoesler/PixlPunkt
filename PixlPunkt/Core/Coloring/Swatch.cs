@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Palette.Helpers.Defaults;

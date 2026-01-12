@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <UserControl
     x:Class="PixlPunkt.UI.Animation.StagePreviewPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -54,7 +54,7 @@
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="4">
-            <!-- Win2D CanvasControl will be inserted here programmatically -->
+            <!-- SkiaSharp SKXamlCanvas will be inserted here programmatically -->
         </Border>
 
         <!-- Info bar -->

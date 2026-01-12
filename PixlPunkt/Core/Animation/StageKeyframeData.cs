@@ -181,7 +181,7 @@ namespace PixlPunkt.Core.Animation
 
         /// <summary>
         /// Interpolates between two angles, taking the shortest path.
-        /// Handles the wraparound at ±180 degrees correctly.
+        /// Handles the wraparound at â‰¥ 180 degrees correctly.
         /// </summary>
         private static float LerpAngle(float from, float to, float t)
         {

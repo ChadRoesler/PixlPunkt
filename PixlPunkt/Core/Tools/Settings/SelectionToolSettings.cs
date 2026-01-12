@@ -143,7 +143,7 @@ namespace PixlPunkt.Core.Tools.Settings
             yield return new SeparatorOption(Order: baseOrder + 8);
 
             // Rotation angle and mode
-            yield return new NumberBoxOption("rotation", "Rotation:", -180, 180, _rotationAngleDeg, SetRotationAngle, Order: baseOrder + 9, Suffix: "°", Width: 70);
+            yield return new NumberBoxOption("rotation", "Rotation:", -180, 180, _rotationAngleDeg, SetRotationAngle, Order: baseOrder + 9, Suffix: "Â°", Width: 70);
             yield return new DropdownOption("rotationMode", "", RotationModeNames, (int)_rotationMode, i => SetRotationMode((RotationMode)i), Order: baseOrder + 10, ShowLabel: false);
 
             yield return new SeparatorOption(Order: baseOrder + 11);

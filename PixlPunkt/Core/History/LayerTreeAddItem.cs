@@ -1,4 +1,4 @@
-﻿using FluentIcons.Common;
+using FluentIcons.Common;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Document.Layer;
 

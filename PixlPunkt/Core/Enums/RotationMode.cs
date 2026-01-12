@@ -1,4 +1,4 @@
-﻿namespace PixlPunkt.Core.Enums
+namespace PixlPunkt.Core.Enums
 {
     /// <summary>
     /// Defines the interpolation algorithms used for rotating pixel art.

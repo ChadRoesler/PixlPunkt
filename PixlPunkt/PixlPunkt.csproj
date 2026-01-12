@@ -1,448 +1,210 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Uno.Sdk">
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       TARGET FRAMEWORKS
+       
+       For CI builds that don't have mobile workloads installed, pass:
+         -p:DesktopOnly=true     (builds desktop + windows + wasm)
+         -p:SkiaOnly=true        (builds only net10.0-desktop)
+         -p:WinAppSdkOnly=true   (builds only net10.0-windows10.0.26100)
+         -p:WithAndroid=true     (includes Android - requires UnoIcon SVGs)
+  ═══════════════════════════════════════════════════════════════════════ -->
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <RootNamespace>PixlPunkt</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x86;x64;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
-    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
-    <UseWinUI>true</UseWinUI>
-    <EnableMsixTooling>true</EnableMsixTooling>
-    <Nullable>enable</Nullable>
-    <!-- Generate XML documentation for public APIs -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <DocumentationFile>$(OutputPath)PixlPunkt.xml</DocumentationFile>
-    <!-- Suppress warnings:
-         CS1591 - Missing XML comments for public types (internal UI code)
-         CS0169 - Field never used (scaffolded fields for future use)
-         CS0414 - Field assigned but never read (UI state placeholders)
-         CS0649 - Field never assigned (intentional default value fields)
-         CS0067 - Event never used (extensibility points for plugins)
-         CS0618 - Obsolete usage (internal compatibility, handled via other checks)
-         CS0253 - Possible reference comparison (intentional TabViewItem comparison)
-         CS8601 - Possible null reference assignment (internal null-safe code)
-         CS8604 - Possible null reference argument (controlled null handling)
-         CS8629 - Nullable value type may be null (handled at runtime)
-         WMC1506 - OneWay binding notification (known XAML binding limitation)
-    -->
-    <NoWarn>$(NoWarn);CS1591;CS0169;CS0414;CS0649;CS0067;CS0618;CS0253;CS8601;CS8604;CS8629</NoWarn>
+    <!-- Default: Windows + iOS/macOS (no Android - it requires UnoIcon SVGs) -->
+    <TargetFrameworks Condition="'$(DesktopOnly)' != 'true' and '$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true' and '$(WithAndroid)' != 'true'">net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    
+    <!-- WithAndroid: includes Android (requires UnoIcon with proper SVG files) -->
+    <TargetFrameworks Condition="'$(WithAndroid)' == 'true'">net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    
+    <!-- DesktopOnly: excludes Android and iOS -->
+    <TargetFrameworks Condition="'$(DesktopOnly)' == 'true'">net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    
+    <!-- SkiaOnly: only Skia Desktop (for Linux/macOS CI) -->
+    <TargetFrameworks Condition="'$(SkiaOnly)' == 'true'">net10.0-desktop</TargetFrameworks>
+    
+    <!-- WinAppSdkOnly: only WinAppSdk (for Windows native builds) -->
+    <TargetFrameworks Condition="'$(WinAppSdkOnly)' == 'true'">net10.0-windows10.0.26100</TargetFrameworks>
   </PropertyGroup>
 
-  <!-- MinVer for automatic versioning from git tags -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <RootNamespace>PixlPunkt</RootNamespace>
+
+    <!-- Display name -->
+    <ApplicationTitle>PixlPunkt</ApplicationTitle>
+    <!-- App Identifier -->
+    <ApplicationId>com.pixlpunkt.app</ApplicationId>
+    <!-- Versions -->
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <!-- Package Publisher -->
+    <ApplicationPublisher>Caesar</ApplicationPublisher>
+    <!-- Package Description -->
+    <Description>PixlPunkt - Cross-platform pixel art editor powered by Uno Platform.</Description>
+    
+    <!-- Application Icon for Desktop - embed icon into exe for taskbar -->
+    <ApplicationIcon Condition="$(TargetFramework.Contains('desktop')) or $(TargetFramework.Contains('windows'))">Assets\Icons\PixlPunkt.ico</ApplicationIcon>
+    <!-- Win32Icon is the direct compiler property that embeds the icon -->
+    <Win32Icon Condition="$(TargetFramework.Contains('desktop')) or $(TargetFramework.Contains('windows'))">Assets\Icons\PixlPunkt.ico</Win32Icon>
+
+    <!--
+      UnoFeatures are used to quickly add and manage features enabled for your app.
+      https://aka.platform.uno/singleproject-features
+    -->
+    <UnoFeatures>
+      Lottie;
+      Hosting;
+      Toolkit;
+      Logging;
+      LoggingSerilog;
+      MVUX;
+      Configuration;
+      HttpKiota;
+      Serialization;
+      Localization;
+      Navigation;
+      ThemeService;
+      SkiaRenderer;
+    </UnoFeatures>
+  </PropertyGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       BUILD CONFIGURATION
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>$(OutputPath)PixlPunkt.xml</DocumentationFile>
+    
+    <!-- Suppress warnings -->
+    <NoWarn>$(NoWarn);CS1591;CS0169;CS0414;CS0649;CS0067;CS0618;CS0253;CS8601;CS8604;CS8629;WMC1506</NoWarn>
+    
+    <!-- Publishing - disabled by default, enable per-platform where supported -->
+    <PublishReadyToRun>False</PublishReadyToRun>
+    <PublishTrimmed>False</PublishTrimmed>
+  </PropertyGroup>
+
+  <!-- Enable ReadyToRun only for Release builds with a valid RuntimeIdentifier on supported platforms -->
+  <!-- R2R requires a RuntimeIdentifier to resolve the appropriate runtime package -->
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug' and '$(RuntimeIdentifier)' != '' and ($(RuntimeIdentifier.StartsWith('win')))">
+    <PublishReadyToRun>True</PublishReadyToRun>
+  </PropertyGroup>
+
+  <!-- Android: Disable AOT compilation since trimming is not enabled -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('android'))">
+    <RunAOTCompilation>False</RunAOTCompilation>
+  </PropertyGroup>
+
+  <!-- iOS: Disable ReadyToRun (not supported) -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('ios'))">
+    <PublishReadyToRun>False</PublishReadyToRun>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug' or '$(IsUiAutomationMappingEnabled)'=='True'">
+    <IsUiAutomationMappingEnabled>True</IsUiAutomationMappingEnabled>
+    <DefineConstants>$(DefineConstants);USE_UITESTS</DefineConstants>
+  </PropertyGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       DESKTOP (SKIA) CONFIGURATION
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('desktop'))">
+    <UnoSingleProjectAllowIncrementalBuilds>true</UnoSingleProjectAllowIncrementalBuilds>
+    <!-- Define HAS_UNO_SKIA for Skia desktop builds -->
+    <DefineConstants>$(DefineConstants);HAS_UNO_SKIA</DefineConstants>
+    <!-- 
+      For desktop builds, we run on Windows, Linux, or macOS.
+      The WINDOWS symbol is used for conditional compilation of Windows-specific code.
+      Since we can't know at compile time which OS we'll run on, we define WINDOWS_DESKTOP
+      to indicate this is a desktop build that MAY run on Windows.
+      Runtime code should use RuntimeInformation.IsOSPlatform() for actual OS detection.
+    -->
+    <DefineConstants>$(DefineConstants);WINDOWS_DESKTOP</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Define WINDOWS for Windows runtime on Skia desktop builds when RuntimeIdentifier is known -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('desktop')) and '$(RuntimeIdentifier)' != '' and $(RuntimeIdentifier.StartsWith('win'))">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+  
+  <!-- Define WINDOWS for WinAppSdk builds -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('windows10'))">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       ICON AND CONTENT FILES
+  ═══════════════════════════════════════════════════════════════════════ -->
+  
+  <!-- 
+    Disable Uno Resizetizer icon/splash generation - we use our own PixlPunkt.ico.
+    The original icon.svg and icon_foreground.svg files have been renamed to .disabled
+    because they contained the default Uno logo placeholder.
+  -->
+  <PropertyGroup>
+    <UnoIconGenerate>false</UnoIconGenerate>
+    <UnoSplashGenerate>false</UnoSplashGenerate>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="Markdig" Version="0.44.0" />
-    <PackageReference Include="MinVer" Version="6.1.0">
+    <!-- Copy PixlPunkt.ico to output root as icon.ico for runtime window icon -->
+    <None Include="Assets\Icons\PixlPunkt.ico" CopyToOutputDirectory="PreserveNewest" Link="icon.ico" />
+    <!-- Also keep in Assets folder for fallback access -->
+    <Content Include="Assets\Icons\PixlPunkt.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Icons\Icon.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- File type icons for Windows file associations -->
+    <Content Include="Assets\Icons\FileTypes\*.ico" CopyToOutputDirectory="PreserveNewest" Link="Assets\Icons\FileTypes\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- 
+    Fix empty ShowNameOnTiles element that Uno Resizetizer adds to the manifest.
+    This target runs after Uno Resizetizer and replaces the empty element with a valid one.
+  -->
+  <Target Name="FixShowNameOnTiles" AfterTargets="UnoResizetizerProcessAppManifest" Condition="$(TargetFramework.Contains('windows10'))">
+    <PropertyGroup>
+      <_ManifestPath>$(IntermediateOutputPath)unoresizetizer\m\Package.appxmanifest</_ManifestPath>
+    </PropertyGroup>
+    <WriteLinesToFile
+      File="$(_ManifestPath)"
+      Lines="$([System.IO.File]::ReadAllText('$(_ManifestPath)').Replace('&lt;uap:ShowNameOnTiles /&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=&quot;square150x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;square310x310Logo&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;'))"
+      Overwrite="true"
+      Condition="Exists('$(_ManifestPath)')" />
+  </Target>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SHARED DEPENDENCIES (CPM - no versions here)
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <ItemGroup>
+    <PackageReference Include="Markdig" />
+    <PackageReference Include="MinVer">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="FluentIcons.Common" />
+    <PackageReference Include="FluentIcons.WinUI" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="System.Drawing.Common" />
+    <PackageReference Include="FFMpegCore" />
+    <PackageReference Include="Xabe.FFmpeg.Downloader" />
+    <PackageReference Include="NetCoreAudio" />
+  </ItemGroup>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       WINDOWS DESKTOP-SPECIFIC DEPENDENCIES (Velopack is Windows-only at runtime)
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Include Velopack for all desktop builds - it will only be used at runtime on Windows -->
+  <ItemGroup Condition="$(TargetFramework.Contains('desktop'))">
+    <PackageReference Include="Velopack" />
   </ItemGroup>
   
-  <ItemGroup>
-    <Compile Remove="UI\CanvasViewHost\**" />
-    <Compile Remove="UI\Windows\**" />
-    <Compile Remove="XamlForChecks\**" />
-    <EmbeddedResource Remove="UI\CanvasViewHost\**" />
-    <EmbeddedResource Remove="UI\Windows\**" />
-    <EmbeddedResource Remove="XamlForChecks\**" />
-    <None Remove="UI\CanvasViewHost\**" />
-    <None Remove="UI\Windows\**" />
-    <None Remove="XamlForChecks\**" />
-    <Page Remove="UI\CanvasViewHost\**" />
-    <Page Remove="UI\Windows\**" />
-    <Page Remove="XamlForChecks\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="Core\Document\DocumentWindow.xaml" />
-    <None Remove="SectionCard.xaml" />
-    <None Remove="UI\ColorPick\ColorPickerWindow.xaml" />
-    <None Remove="UI\ColorPick\ColorSwatchButton.xaml" />
-    <None Remove="UI\ColorPick\Controls\HslSquare.xaml" />
-    <None Remove="UI\ColorPick\Controls\HueSlider.xaml" />
-    <None Remove="UI\ColorPick\Controls\LadderRow.xaml" />
-    <None Remove="UI\ColorPick\GradientWindow.xaml" />
-    <None Remove="UI\Controls\LayersPanel.xaml" />
-    <None Remove="UI\Controls\PalettePanel.xaml" />
-    <None Remove="UI\Controls\SelectionOverlay.xaml" />
-    <None Remove="UI\Dialogs\Export\BrushExportDialog.xaml" />
-    <None Remove="UI\Dialogs\Export\CursorExportDialog.xaml" />
-    <None Remove="UI\Dialogs\Export\IconExportDialog.xaml" />
-    <None Remove="UI\Dialogs\Export\ImageExportDialog.xaml" />
-    <None Remove="UI\Dialogs\System\NewCanvasDialog.xaml" />
-    <None Remove="UI\Dialogs\System\EditCanvasWindow.xaml" />
-    <None Remove="UI\History\HistoryPanel.xaml" />
-    <None Remove="UI\Layers\Controls\LayerFolderMenuFlyout.xaml" />
-    <None Remove="UI\Layers\Controls\LayerPreviewHost.xaml" />
-    <None Remove="UI\Layers\Controls\LayersPanelMenuFlyout.xaml" />
-    <None Remove="UI\Layers\Controls\ReferenceLayerMenuFlyout.xaml" />
-    <None Remove="UI\Layers\LayerSettingsWindow.xaml" />
-    <None Remove="UI\Palette\Controls\SwatchMenuFlyout.xaml" />
-    <None Remove="UI\Palette\QuickSwatches.xaml" />
-    <None Remove="UI\Preview\CanvasPreview.xaml" />
-    <None Remove="UI\Tiles\TilePanel.xaml" />
-    <None Remove="UI\Tiles\TileTessellationWindow.xaml" />
-    <None Remove="UI\Tools\ToolOptionsBar.xaml" />
-    <None Remove="UI\Tools\ToolRail.xaml" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Assets\SplashScreen.scale-200.png" />
-    <Content Include="Assets\LockScreenLogo.scale-200.png" />
-    <Content Include="Assets\Square150x150Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
-    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+  <!-- Also include Velopack for WinAppSdk builds -->
+  <ItemGroup Condition="$(TargetFramework.Contains('windows10'))">
+    <PackageReference Include="Velopack" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Manifest Include="$(ApplicationManifest)" />
-  </ItemGroup>
-
-  <!--
-    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
-    Tools extension to be activated for this project even if the Windows App SDK Nuget
-    package has not yet been restored.
-  -->
-  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-    <ProjectCapability Include="Msix" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="CommunityToolkit.WinUI.Animations" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Behaviors" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Collections" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.ColorPicker" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.HeaderedControls" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.LayoutTransformControl" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.Primitives" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.RangeSelector" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.Sizers" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.TokenizingTextBox" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Converters" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Extensions" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Helpers" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Media" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Triggers" Version="8.2.251219" />
-    <PackageReference Include="FluentIcons.Common" Version="2.0.316" />
-    <PackageReference Include="FluentIcons.WinUI" Version="2.0.316" />
-    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7175" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.251106002" />
-    <PackageReference Include="Serilog" Version="4.3.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-    <PackageReference Include="System.Drawing.Common" Version="10.0.1" />
-    <!-- Add StyleCop analyzers for documentation & formatting guidance -->
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="Core\Document\DocumentWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Palette\QuickSwatches.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Controls\PalettePanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="SectionCard.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Controls\ContentDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Controls\CanvasViewHost.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-
-  <!--
-    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
-    Explorer "Package and Publish" context menu entry to be enabled for this project even if
-    the Windows App SDK Nuget package has not yet been restored.
-  -->
-  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
-  </PropertyGroup>
-
-  <!-- Publish Properties -->
-  <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <!-- CRITICAL: Disable trimming for Release builds - WinUI/XAML data binding requires reflection -->
-    <!-- Trimming breaks: LayersPanel data templates, Environment.GetFolderPath, visual tree operations -->
-    <PublishTrimmed>False</PublishTrimmed>
-    <Title>Pixl Punkt</Title>
-    <PackageIcon>PixlPunkt.ico</PackageIcon>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PackageCertificateThumbprint>44E123CB1E768E62BF0EE111FF7A7587BD13EF6F</PackageCertificateThumbprint>
-    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-    <!-- Use en-US to match Windows resource system expectations (avoids PRI257 warning) -->
-    <DefaultLanguage>en-US</DefaultLanguage>
-    <!-- Disable app installer file generation for sideload packages -->
-    <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
-    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
-    <GenerateTestArtifacts>True</GenerateTestArtifacts>
-    <AppxBundle>Auto</AppxBundle>
-    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-    <!-- Ensure the package is named correctly -->
-    <AppxPackageName>PixlPunkt</AppxPackageName>
-    <AppxBundlePlatforms>x86|x64</AppxBundlePlatforms>
-  </PropertyGroup>
-  <ItemGroup>
-    <PRIResource Remove="UI\Windows\**" />
-  </ItemGroup>
-  <ItemGroup>
-	  <Content Update="Assets\Cursors\PixlPunktCursor.cur">
-		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </Content>
-  </ItemGroup>
-  <ItemGroup>
-    <None Update="Assets\Icons\PixlPunkt.ico">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-    <None Update="UI\Animation\AnimationPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Animation\FrameEditPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Animation\PlaybackPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Animation\ReelListPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Animation\TileFrameEditorCanvas.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Ascii\GlyphSetEditorWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Controls\CollapsibleSplitter.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Controls\CollapsibleSplitterHorizontal.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Dialogs\Export\BrushExportDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\Dialogs\System\UpdateAvailableDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <Page Update="UI\Palette\Controls\PalettePanelMenuFlyout.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Palette\Controls\SwatchMenuFlyout.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Layers\Controls\ReferenceLayerMenuFlyout.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Layers\Controls\LayersPanelMenuFlyout.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Layers\Controls\LayerFolderMenuFlyout.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Layers\Controls\RasterLayerMenuFlyout.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <None Update="UI\Layers\ReferenceLayerSettingsWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <Page Update="UI\Dialogs\Export\BatchTileAnimationExportDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Dialogs\Export\ExportProgressDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\History\HistoryPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Settings\ShortcutSettingsPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Tiles\TileTessellationWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Tiles\TilePanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Controls\PaletteSwatchRow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Dialogs\System\NewCanvasDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Dialogs\NewCanvasDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Dialogs\Export\ImageExportDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Dialogs\Export\IconExportDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Dialogs\Export\CursorExportDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Layers\Controls\LayerPreviewHost.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\ColorPick\Controls\HslSquare.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\ColorPick\Controls\HueSlider.qml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Preview\CanvasPreview.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\ColorPick\ColorSwatchButton.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\ColorPickerButton.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Controls\SelectionOverlay.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Layers\LayerSettingsWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Controls\LayerSettingsWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UI\Controls\LayersPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\ColorPick\Controls\LadderRow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Tools\ToolRail.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Tools\ToolOptionsBar.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\ColorPick\TriangleCurveEditor.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\ColorPick\GradientWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\ColorPick\ColorPickerWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <PRIResource Remove="UI\CanvasViewHost\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Panels\PanelWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Dialogs\Import\ImageImportDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Dialogs\Tiles\ImportTilesDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Dialogs\System\EditCanvasWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Dialogs\Export\BrushExportDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <PRIResource Remove="XamlForChecks\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <Page Remove="UI\Animation\AnimationPanel.xaml" />
-    <Page Remove="UI\Animation\FrameEditPanel.xaml" />
-    <Page Remove="UI\Animation\PlaybackPanel.xaml" />
-    <Page Remove="UI\Animation\ReelListPanel.xaml" />
-    <Page Remove="UI\Animation\TileFrameEditorCanvas.xaml" />
-    <Page Remove="UI\Ascii\GlyphSetEditorWindow.xaml" />
-    <Page Remove="UI\Controls\CollapsibleSplitter.xaml" />
-    <Page Remove="UI\Controls\CollapsibleSplitterHorizontal.xaml" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="UI\Resources\SharedStyles.xaml" />
-    <None Remove="UI\Animation\AnimationPanel.xaml" />
-    <None Remove="UI\Animation\FrameEditPanel.xaml" />
-    <None Remove="UI\Animation\PlaybackPanel.xaml" />
-    <None Remove="UI\Animation\ReelListPanel.xaml" />
-    <None Remove="UI\Animation\TileFrameEditorCanvas.xaml" />
-    <None Remove="UI\Ascii\GlyphSetEditorWindow.xaml" />
-    <None Remove="UI\Dialogs\Export\BatchTileAnimationExportDialog.xaml" />
-    <None Remove="UI\Dialogs\Export\ExportProgressDialog.xaml" />
-    <None Remove="UI\Dialogs\System\UpdateAvailableDialog.xaml" />
-    <Page Include="UI\Controls\CollapsibleSplitter.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UI\Controls\CollapsibleSplitterHorizontal.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UI\Animation\AnimationPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UI\Animation\FrameEditPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UI\Animation\PlaybackPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UI\Animation\ReelListPanel.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UI\Animation\TileFrameEditorCanvas.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="UI\Ascii\GlyphSetEditorWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Page Update="UI\Dialogs\System\UpdateAvailableDialog.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
+
 </Project>

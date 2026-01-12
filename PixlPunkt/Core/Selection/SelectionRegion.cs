@@ -1,8 +1,9 @@
-﻿using System;
-using Microsoft.Graphics.Canvas;
+using System;
 using Microsoft.UI;
+using PixlPunkt.Core.Rendering;
 using Windows.Foundation;
 using Windows.Graphics;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
 namespace PixlPunkt.Core.Selection
 {
@@ -89,7 +90,7 @@ namespace PixlPunkt.Core.Selection
             {
                 if (IsEmpty) return _bounds;
                 // Apply offset to bounds
-                return new RectInt32(
+                return CreateRect(
                     _bounds.X + _offsetX,
                     _bounds.Y + _offsetY,
                     _bounds.Width,
@@ -128,22 +129,18 @@ namespace PixlPunkt.Core.Selection
             {
                 _w = _h = 0;
                 _m = Array.Empty<byte>();
-                _bounds = new RectInt32(0, 0, 0, 0);
-                // DON'T reset offset here - it should persist
+                _bounds = CreateRect(0, 0, 0, 0);
                 return;
             }
 
             w = Math.Max(1, w);
             h = Math.Max(1, h);
 
-            // If the size didn't change, do nothing (preserve the selection AND offset!)
             if (w == _w && h == _h && _m.Length == _w * _h) return;
 
-            // Size changed → reallocate and reset mask/bounds, but KEEP offset
             _w = w; _h = h;
             _m = new byte[_w * _h];
-            _bounds = new RectInt32(0, 0, 0, 0);
-            // Offset is preserved through buffer reallocation
+            _bounds = CreateRect(0, 0, 0, 0);
         }
 
         /// <summary>
@@ -155,10 +152,7 @@ namespace PixlPunkt.Core.Selection
         public void Clear()
         {
             if (_m.Length > 0) Array.Clear(_m, 0, _m.Length);
-            _bounds = new RectInt32(0, 0, 0, 0);
-
-            // CRITICAL FIX: Reset world-space offset when clearing selection
-            // Without this, new selections inherit the offset from previous selections
+            _bounds = CreateRect(0, 0, 0, 0);
             _offsetX = 0;
             _offsetY = 0;
         }
@@ -215,7 +209,7 @@ namespace PixlPunkt.Core.Selection
         /// <summary>
         /// Renders animated marching-ants outline along the outer boundary of the selection.
         /// </summary>
-        /// <param name="ds">Canvas drawing session for rendering.</param>
+        /// <param name="renderer">Canvas renderer for rendering.</param>
         /// <param name="dest">Destination rectangle in view space.</param>
         /// <param name="scale">Zoom scale factor (document pixels → view pixels).</param>
         /// <param name="phase">Animation phase offset in pixels. Increment over time to animate.</param>
@@ -240,7 +234,7 @@ namespace PixlPunkt.Core.Selection
         /// coalescing minimizes draw calls for continuous edges.
         /// </para>
         /// </remarks>
-        public void DrawAnts(CanvasDrawingSession ds, Rect dest, double scale, float phase,
+        public void DrawAnts(ICanvasRenderer renderer, Rect dest, double scale, float phase,
                              float antsOn, float antsOff, float antsThickness)
         {
             if (IsEmpty) return;
@@ -264,7 +258,7 @@ namespace PixlPunkt.Core.Selection
                         float ex = ox + runX0 * s;
                         float ey = oy + y * s;
                         float len = (x - runX0) * s;
-                        DrawAntsH(ds, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: false);
+                        DrawAntsH(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: false);
                         runX0 = -1;
                     }
                 }
@@ -283,7 +277,7 @@ namespace PixlPunkt.Core.Selection
                         float ex = ox + runX0 * s;
                         float ey = oy + (y + 1) * s;
                         float len = (x - runX0) * s;
-                        DrawAntsH(ds, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: true);
+                        DrawAntsH(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: true);
                         runX0 = -1;
                     }
                 }
@@ -302,7 +296,7 @@ namespace PixlPunkt.Core.Selection
                         float ex = ox + x * s;
                         float ey = oy + runY0 * s;
                         float len = (y - runY0) * s;
-                        DrawAntsV(ds, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: false);
+                        DrawAntsV(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: false);
                         runY0 = -1;
                     }
                 }
@@ -321,57 +315,57 @@ namespace PixlPunkt.Core.Selection
                         float ex = ox + (x + 1) * s;
                         float ey = oy + runY0 * s;
                         float len = (y - runY0) * s;
-                        DrawAntsV(ds, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: true);
+                        DrawAntsV(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: true);
                         runY0 = -1;
                     }
                 }
             }
+        }
 
-            // local helpers using your white/black segment technique
-            static void DrawAntsH(CanvasDrawingSession ds, float ex, float ey, float length,
-                                  float phase, float on, float off, float thick, bool invert)
+        // local helpers using white/black segment technique
+        private static void DrawAntsH(ICanvasRenderer renderer, float ex, float ey, float length,
+                              float phase, float on, float off, float thick, bool invert)
+        {
+            float period = on + off;
+            float start = -phase + (invert ? on : 0f);
+            while (start < length)
             {
-                float period = on + off;
-                float start = -phase + (invert ? on : 0f);
-                while (start < length)
+                float on0 = Math.Max(0, start);
+                float on1 = Math.Min(length, start + on);
+                if (on1 > on0)
                 {
-                    float on0 = Math.Max(0, start);
-                    float on1 = Math.Min(length, start + on);
-                    if (on1 > on0)
+                    renderer.FillRectangle(ex + on0, ey - thick * 0.5f, on1 - on0, thick, Colors.White);
+                    float bs0 = on0 + period * 0.5f, bs1 = on1 + period * 0.5f;
+                    if (bs0 < length)
                     {
-                        ds.FillRectangle(ex + on0, ey - thick * 0.5f, on1 - on0, thick, Colors.White);
-                        float bs0 = on0 + period * 0.5f, bs1 = on1 + period * 0.5f;
-                        if (bs0 < length)
-                        {
-                            bs0 = Math.Max(0, bs0); bs1 = Math.Min(length, bs1);
-                            if (bs1 > bs0) ds.FillRectangle(ex + bs0, ey - thick * 0.5f, bs1 - bs0, thick, Colors.Black);
-                        }
+                        bs0 = Math.Max(0, bs0); bs1 = Math.Min(length, bs1);
+                        if (bs1 > bs0) renderer.FillRectangle(ex + bs0, ey - thick * 0.5f, bs1 - bs0, thick, Colors.Black);
                     }
-                    start += period;
                 }
+                start += period;
             }
+        }
 
-            static void DrawAntsV(CanvasDrawingSession ds, float ex, float ey, float length,
-                                  float phase, float on, float off, float thick, bool invert)
+        private static void DrawAntsV(ICanvasRenderer renderer, float ex, float ey, float length,
+                              float phase, float on, float off, float thick, bool invert)
+        {
+            float period = on + off;
+            float start = -phase + (invert ? on : 0f);
+            while (start < length)
             {
-                float period = on + off;
-                float start = -phase + (invert ? on : 0f);
-                while (start < length)
+                float on0 = Math.Max(0, start);
+                float on1 = Math.Min(length, start + on);
+                if (on1 > on0)
                 {
-                    float on0 = Math.Max(0, start);
-                    float on1 = Math.Min(length, start + on);
-                    if (on1 > on0)
+                    renderer.FillRectangle(ex - thick * 0.5f, ey + on0, thick, on1 - on0, Colors.White);
+                    float bs0 = on0 + period * 0.5f, bs1 = on1 + period * 0.5f;
+                    if (bs0 < length)
                     {
-                        ds.FillRectangle(ex - thick * 0.5f, ey + on0, thick, on1 - on0, Colors.White);
-                        float bs0 = on0 + period * 0.5f, bs1 = on1 + period * 0.5f;
-                        if (bs0 < length)
-                        {
-                            bs0 = Math.Max(0, bs0); bs1 = Math.Min(length, bs1);
-                            if (bs1 > bs0) ds.FillRectangle(ex - thick * 0.5f, ey + bs0, thick, bs1 - bs0, Colors.Black);
-                        }
+                        bs0 = Math.Max(0, bs0); bs1 = Math.Min(length, bs1);
+                        if (bs1 > bs0) renderer.FillRectangle(ex - thick * 0.5f, ey + bs0, thick, bs1 - bs0, Colors.Black);
                     }
-                    start += period;
                 }
+                start += period;
             }
         }
 
@@ -403,14 +397,14 @@ namespace PixlPunkt.Core.Selection
             if (modeAdd)
             {
                 // expand bounds cheaply
-                if (IsEmpty) _bounds = new RectInt32(x0, y0, x1 - x0, y1 - y0);
+                if (IsEmpty) _bounds = CreateRect(x0, y0, x1 - x0, y1 - y0);
                 else
                 {
                     int bx0 = Math.Min(_bounds.X, x0);
                     int by0 = Math.Min(_bounds.Y, y0);
                     int bx1 = Math.Max(_bounds.X + _bounds.Width, x1);
                     int by1 = Math.Max(_bounds.Y + _bounds.Height, y1);
-                    _bounds = new RectInt32(bx0, by0, bx1 - bx0, by1 - by0);
+                    _bounds = CreateRect(bx0, by0, bx1 - bx0, by1 - by0);
                 }
             }
             else
@@ -482,7 +476,7 @@ namespace PixlPunkt.Core.Selection
                 int y0 = Math.Min(_bounds.Y, other._bounds.Y);
                 int x1 = Math.Max(_bounds.X + _bounds.Width, other._bounds.X + other._bounds.Width);
                 int y1 = Math.Max(_bounds.Y + _bounds.Height, other._bounds.Y + other._bounds.Height);
-                _bounds = new RectInt32(x0, y0, x1 - x0, y1 - y0);
+                _bounds = CreateRect(x0, y0, x1 - x0, y1 - y0);
             }
         }
 
@@ -538,7 +532,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         private void RecomputeBounds()
         {
-            if (_w == 0 || _h == 0) { _bounds = new RectInt32(0, 0, 0, 0); return; }
+            if (_w == 0 || _h == 0) { _bounds = CreateRect(0, 0, 0, 0); return; }
 
             int minX = _w, minY = _h, maxX = -1, maxY = -1;
             for (int y = 0; y < _h; y++)
@@ -555,8 +549,8 @@ namespace PixlPunkt.Core.Selection
             }
 
             _bounds = (maxX < 0)
-                ? new RectInt32(0, 0, 0, 0)
-                : new RectInt32(minX, minY, maxX - minX + 1, maxY - minY + 1);
+                ? CreateRect(0, 0, 0, 0)
+                : CreateRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
         }
 
         /// <summary>

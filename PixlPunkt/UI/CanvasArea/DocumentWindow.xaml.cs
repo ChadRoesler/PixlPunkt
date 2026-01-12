@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Palette;

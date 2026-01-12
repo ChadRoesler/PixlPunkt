@@ -26,7 +26,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Gets a human-readable description of the operation (for UI display).
         /// </summary>
-        /// <example>"Brush Stroke", "Resize Canvas (128×128 ? 256×256)", "Fill"</example>
+        /// <example>"Brush Stroke", "Resize Canvas (128Ã—128 â†’ 256Ã—256)", "Fill"</example>
         string Description { get; }
 
         /// <summary>

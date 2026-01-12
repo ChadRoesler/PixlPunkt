@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
 
@@ -27,7 +27,7 @@ namespace PixlPunkt.UI.Converters
     /// </para>
     /// <para><strong>XAML Usage:</strong></para>
     /// <code>
-    /// &lt;Rectangle Fill="{x:Bind CurrentColor, Converter={StaticResource UIntToBrush}}" /&gt;
+    /// &lt;Rectangle Fill="{Binding CurrentColor, Converter={StaticResource UIntToBrush}}" /&gt;
     /// </code>
     /// <para><strong>Debug Logging:</strong></para>
     /// <para>

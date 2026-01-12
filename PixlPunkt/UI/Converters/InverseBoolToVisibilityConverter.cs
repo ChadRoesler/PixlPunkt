@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 
@@ -22,7 +22,7 @@ namespace PixlPunkt.UI.Converters
     /// <para><strong>XAML Usage:</strong></para>
     /// <code>
     /// &lt;TextBlock Text="No layers"
-    ///            Visibility="{x:Bind HasLayers, Converter={StaticResource InverseBoolToVisibility}}" /&gt;
+    ///            Visibility="{Binding HasLayers, Converter={StaticResource InverseBoolToVisibility}}" /&gt;
     /// </code>
     /// </remarks>
     /// <seealso cref="BoolToVisibilityConverter"/>

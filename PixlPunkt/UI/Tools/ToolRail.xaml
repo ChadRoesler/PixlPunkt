@@ -79,7 +79,7 @@
                     Padding="8">
                     <pal:QuickSwatches 
                         x:Name="Quick"
-                        Service="{x:Bind Service, Mode=OneWay}"
+                        Service="{Binding Service, Mode=OneWay}"
                         HorizontalAlignment="Stretch"/>
                 </Border>
 

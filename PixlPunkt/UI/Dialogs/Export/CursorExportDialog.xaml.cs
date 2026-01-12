@@ -55,8 +55,8 @@ namespace PixlPunkt.UI.Dialogs.Export
 
         private void SetupPreviewSizes()
         {
-            ActualSizeLabel.Text = $"Actual {CursorExportConstants.PreviewActualSize}×{CursorExportConstants.PreviewActualSize}";
-            EnlargedSizeLabel.Text = $"Hotspot Preview (×{CursorExportConstants.PreviewEnlargementFactor} = {CursorExportConstants.PreviewEnlargedSize}×{CursorExportConstants.PreviewEnlargedSize})";
+            ActualSizeLabel.Text = $"Actual {CursorExportConstants.PreviewActualSize}Ã—{CursorExportConstants.PreviewActualSize}";
+            EnlargedSizeLabel.Text = $"Hotspot Preview (â€¢{CursorExportConstants.PreviewEnlargementFactor} = {CursorExportConstants.PreviewEnlargedSize}Ã—{CursorExportConstants.PreviewEnlargedSize})";
 
             // Set sizes
             ActualImageStriped.Width = ActualImageStriped.Height = CursorExportConstants.PreviewActualSize;
