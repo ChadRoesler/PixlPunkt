@@ -36,6 +36,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 		.github\workflows\build-uno-desktop.yml = .github\workflows\build-uno-desktop.yml
 		.github\workflows\nuget-publish.yml = .github\workflows\nuget-publish.yml
 		.github\workflows\release.yml = .github\workflows\release.yml
+		.github\workflows\sync-wiki.yml = .github\workflows\sync-wiki.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ISSUE_TEMPLATE", "ISSUE_TEMPLATE", "{9E16D6DE-0101-470D-990D-5DFBB21DE4A4}"
@@ -46,16 +47,34 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ISSUE_TEMPLATE", "ISSUE_TEM
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "wiki", "wiki", "{7E1AC4C6-3F95-4B5A-88CD-2EBA019D6621}"
 	ProjectSection(SolutionItems) = preProject
+		wiki\Animation-Workflow.md = wiki\Animation-Workflow.md
+		wiki\Audio.md = wiki\Audio.md
+		wiki\Brushes.md = wiki\Brushes.md
 		wiki\Canvas-Animation.md = wiki\Canvas-Animation.md
+		wiki\Color-Picker.md = wiki\Color-Picker.md
+		wiki\Dithering.md = wiki\Dithering.md
 		wiki\Effects.md = wiki\Effects.md
+		wiki\Formats.md = wiki\Formats.md
+		wiki\Game-Art.md = wiki\Game-Art.md
 		wiki\Gradient-Fill.md = wiki\Gradient-Fill.md
 		wiki\Home.md = wiki\Home.md
+		wiki\Installation.md = wiki\Installation.md
+		wiki\Interface.md = wiki\Interface.md
 		wiki\Layers.md = wiki\Layers.md
+		wiki\Masks.md = wiki\Masks.md
+		wiki\Palette.md = wiki\Palette.md
+		wiki\Plugins.md = wiki\Plugins.md
+		wiki\Quick-Start.md = wiki\Quick-Start.md
 		wiki\README.md = wiki\README.md
+		wiki\SDK-Reference.md = wiki\SDK-Reference.md
+		wiki\Settings.md = wiki\Settings.md
 		wiki\Shortcuts.md = wiki\Shortcuts.md
 		wiki\Stage.md = wiki\Stage.md
+		wiki\Sub-Routines.md = wiki\Sub-Routines.md
 		wiki\Tile-Animation.md = wiki\Tile-Animation.md
+		wiki\Tiles.md = wiki\Tiles.md
 		wiki\Tools.md = wiki\Tools.md
+		wiki\Troubleshooting.md = wiki\Troubleshooting.md
 		wiki\_Sidebar.md = wiki\_Sidebar.md
 	EndProjectSection
 EndProject
