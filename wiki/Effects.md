@@ -7,10 +7,10 @@ Layer effects <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/
 Effects are applied per-layer and render in real-time. The original pixel data is never modified - effects are computed on top.
 
 **Key benefits:**
-- ? Non-destructive (always reversible)
-- ? Animatable (change settings over time)
-- ? Stackable (multiple effects per layer)
-- ? Reorderable (drag to change effect order)
+- ✅ Non-destructive (always reversible)
+- ✅ Animatable (change settings over time)
+- ✅ Stackable (multiple effects per layer)
+- ✅ Reorderable (drag to change effect order)
 
 ---
 
@@ -22,7 +22,7 @@ Effects are applied per-layer and render in real-time. The original pixel data i
 4. Expand the effect to configure parameters
 
 Or:
-- **Right-click layer ? Effects**
+- **Right-click layer → Effects**
 - Click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> **gear icon** on the layer
 
 ---
@@ -47,12 +47,11 @@ Adds a shadow behind the layer content.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
+| **Offset X** | -64 to 64 | Horizontal displacement |
+| **Offset Y** | -64 to 64 | Vertical displacement |
+| **Opacity** | 0-1 | Shadow transparency |
+| **Blur** | 0-64 | Shadow softness |
 | **Color** | Any | Shadow color (default: black) |
-| **Offset X** | -100 to 100 | Horizontal displacement |
-| **Offset Y** | -100 to 100 | Vertical displacement |
-| **Blur** | 0-50 | Shadow softness |
-| **Spread** | 0-50 | Shadow expansion before blur |
-| **Opacity** | 0-100% | Shadow transparency |
 
 **Tips:**
 - Offset in the direction opposite your light source
@@ -67,14 +66,12 @@ Adds a stroke around non-transparent pixels.
 | Parameter | Range | Description |
 |-----------|-------|-------------|
 | **Color** | Any | Outline color |
-| **Thickness** | 1-10 | Stroke width in pixels |
-| **Position** | Inside/Center/Outside | Where the outline draws |
-| **Opacity** | 0-100% | Outline transparency |
+| **Thickness** | 1-32 | Stroke width in pixels |
+| **Outside Only** | On/Off | Draw outline only outside the shape |
 
 **Tips:**
-- 1px outside outline is classic pixel art style
+- 1px thickness is classic pixel art style
 - Use contrasting colors for readability
-- Inside position preserves sprite size
 
 ---
 
@@ -83,11 +80,9 @@ Creates a soft light emission effect.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Color** | Any | Glow color (or use source colors) |
-| **Radius** | 1-50 | How far glow extends |
-| **Intensity** | 0-200% | Glow brightness |
-| **Threshold** | 0-255 | Brightness level to start glowing |
-| **Use Source Color** | On/Off | Glow matches pixel colors |
+| **Intensity** | 0-2 | Glow brightness |
+| **Radius** | 0-64 | How far glow extends |
+| **Threshold** | 0-1 | Brightness level to start glowing |
 
 **Tips:**
 - Low threshold = more pixels glow
@@ -101,10 +96,8 @@ Separates RGB channels for a glitch/retro look.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Offset X** | -20 to 20 | Horizontal channel separation |
-| **Offset Y** | -20 to 20 | Vertical channel separation |
-| **Red Offset** | -10 to 10 | Red channel specific offset |
-| **Blue Offset** | -10 to 10 | Blue channel specific offset |
+| **Offset** | 0-64 | Radial channel separation in pixels |
+| **Strength** | 0-1 | Blend strength between original and shifted |
 
 **Tips:**
 - Small values (1-3) for subtle retro CRT feel
@@ -120,11 +113,11 @@ Adds horizontal CRT-style lines.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Spacing** | 1-10 | Pixels between lines |
-| **Thickness** | 1-5 | Line thickness |
-| **Opacity** | 0-100% | Line darkness |
+| **Intensity** | 0-1 | Line darkness |
+| **Thickness** | 1-64 | Line height in pixels |
+| **Spacing** | 0-64 | Gap between lines |
 | **Color** | Any | Line color (default: black) |
-| **Offset** | 0-10 | Vertical position offset |
+| **Apply on Transparent** | On/Off | Draw lines over transparent pixels |
 
 **Tips:**
 - Spacing 2, Thickness 1 for classic CRT
@@ -138,13 +131,12 @@ Adds film-like noise texture.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Amount** | 0-100% | Noise intensity |
-| **Size** | 1-5 | Grain particle size |
-| **Monochrome** | On/Off | Color or grayscale grain |
+| **Amount** | 0-1 | Noise intensity |
+| **Monochrome** | On/Off | Grayscale vs. color grain |
 | **Animated** | On/Off | Grain changes each frame |
 
 **Tips:**
-- 10-20% amount for subtle texture
+- 0.1-0.2 amount for subtle texture
 - Enable Animated for film look in animations
 - Combine with Color Adjust for vintage feel
 
@@ -155,11 +147,9 @@ Darkens edges of the frame.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Intensity** | 0-100% | How dark the edges get |
-| **Radius** | 0-100% | Size of the clear center |
-| **Softness** | 0-100% | Edge falloff smoothness |
-| **Shape** | Circle/Square | Vignette shape |
-| **Color** | Any | Vignette color (default: black) |
+| **Intensity** | 0-1 | How dark the edges get |
+| **Radius** | 0-2 | Size of the clear center |
+| **Softness** | 0-1 | Edge falloff smoothness |
 
 **Tips:**
 - Creates focus on center content
@@ -173,11 +163,9 @@ Simulates old CRT monitor effects.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Curvature** | 0-50% | Screen bend amount |
-| **Scanline Intensity** | 0-100% | Built-in scanlines |
-| **RGB Mask** | On/Off | Subpixel pattern |
-| **Bloom** | 0-50% | Glow around bright areas |
-| **Flicker** | 0-20% | Brightness variation |
+| **Curvature** | 0-1 | Screen bend amount |
+| **Scanline Intensity** | 0-1 | Built-in scanlines |
+| **Bloom** | 0-1 | Glow around bright areas |
 
 **Tips:**
 - Full retro look in one effect
@@ -191,8 +179,7 @@ Reduces apparent resolution.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Block Size** | 2-32 | Pixel cluster size |
-| **Preserve Edges** | On/Off | Keeps hard edges sharper |
+| **Block Size** | 1-64 | Pixel cluster size |
 
 **Tips:**
 - Creates chunky pixel look within pixel art (meta!)
@@ -208,11 +195,10 @@ Modifies hue, saturation, brightness, and contrast.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Hue Shift** | -180� to 180� | Rotate all colors |
-| **Saturation** | -100% to 100% | Color intensity |
-| **Brightness** | -100% to 100% | Lighten/darken |
-| **Contrast** | -100% to 100% | Tonal range |
-| **Gamma** | 0.1-3.0 | Midtone adjustment |
+| **Hue Shift** | -180° to 180° | Rotate all colors |
+| **Saturation** | -100 to 100 | Color intensity |
+| **Brightness** | -100 to 100 | Lighten/darken |
+| **Contrast** | -100 to 100 | Tonal range |
 
 **Tips:**
 - Hue shift for palette swaps (different team colors)
@@ -242,15 +228,15 @@ Converts layer to character-based representation.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Character Set** | Various | Which characters to use |
-| **Cell Size** | 4-16 | Size of each character |
-| **Color Mode** | Mono/Color | Preserve colors or not |
-| **Background** | On/Off | Fill background |
+| **Glyph Set** | Various | Which character set to use |
+| **Foreground Color** | Any | Character color |
+| **Background Color** | Any | Background fill color |
+| **Show Background** | On/Off | Fill background |
 
 **Tips:**
 - Fun stylistic effect
 - Works best on high-contrast images
-- Animate character set for glitch effect
+- Use different glyph sets for unique looks
 
 ---
 
@@ -260,16 +246,16 @@ Effects apply in order from top to bottom:
 
 ```
 Layer "Character"
-?? Effect: Outline (applies first)
-?? Effect: Drop Shadow (applies second)
-?? Effect: Glow (applies last)
+├─ Effect: Outline (applies first)
+├─ Effect: Drop Shadow (applies second)
+└─ Effect: Glow (applies last)
 ```
 
 **Reordering:** Drag effects up/down in the effects list.
 
 **Order matters!** For example:
-- Glow ? Outline = Glow around outline
-- Outline ? Glow = Outline around glow
+- Glow → Outline = Glow around outline
+- Outline → Glow = Outline around glow
 
 ---
 
@@ -293,10 +279,8 @@ All effect parameters are animatable in Canvas Animation mode!
 | Effect | Animation | Use Case |
 |--------|-----------|----------|
 | **Glow** | Intensity pulses | Power-ups, magic |
-| **Glow** | Color cycles | Energy effects |
 | **Drop Shadow** | Offset animates | Moving light source |
 | **Outline** | Thickness pulses | Selection highlight |
-| **Scanlines** | Offset scrolls | Retro TV effect |
 | **Chromatic Aberration** | Offset spikes | Damage, glitch |
 | **Vignette** | Intensity increases | Danger, focus |
 | **Brightness** | Flash to white | Impacts, explosions |
@@ -327,30 +311,8 @@ Lightest:
 
 ---
 
-## Effect Presets
-
-Save and load effect combinations:
-
-### Saving a Preset
-1. Configure effects the way you want
-2. Right-click effects header ? **Save Preset**
-3. Name your preset
-
-### Loading a Preset
-1. Right-click effects header ? **Load Preset**
-2. Select from your saved presets
-3. Effects are applied to current layer
-
-### Built-in Presets
-- "Classic Sprite" - 1px outline
-- "Retro CRT" - Scanlines + CRT
-- "Neon Glow" - Bright glow effect
-- "Cinematic" - Vignette + Color Adjust
-
----
-
 ## See Also
 
-- [[Layers]] - Layer management basics
-- [[Canvas Animation|Canvas-Animation]] - Animating layers and effects
-- [[Masks]] - Layer masking
+- [[Layers]] - Layer management
+- [[Canvas Animation|Canvas-Animation]] - Animation system
+- [[Palette]] - Color palettes for Palette Quantize

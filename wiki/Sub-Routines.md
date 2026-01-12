@@ -22,15 +22,15 @@ Think of them as "animation instances" - define once, use many times.
 ### From Tile Animation
 
 1. Create a [[Tile Animation|Tile-Animation]] reel
-2. In the Timeline, click **Add Sub-Routine** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16">
-3. Select your tile animation reel
+2. Export as Sub-Routine (.pxpr) via **File → Export → Animation**
+3. Import the .pxpr file into your canvas animation
 4. Position it on the canvas
 
-### From Selection
+### Importing a Sub-Routine
 
-1. Select frames in the timeline
-2. Right-click → **Create Sub-Routine from Selection**
-3. Frames become a reusable sub-routine
+1. In Canvas Animation mode, use **File → Import → Sub-Routine**
+2. Select a .pxpr file
+3. Sub-routine appears on canvas at the import position
 
 ---
 
@@ -41,12 +41,7 @@ Each sub-routine instance has:
 | Property | Description |
 |----------|-------------|
 | **Position** | X, Y coordinates on canvas |
-| **Scale** | Size multiplier (0.1 - 10.0) |
-| **Rotation** | Angle in degrees |
-| **Opacity** | Transparency (0-255) |
-| **Z-Order** | Layer ordering (front/back) |
-| **Start Frame** | When sub-routine begins playing |
-| **Loop** | Whether it repeats |
+| **Progress** | Playback position (0.0 - 1.0) |
 
 ---
 
@@ -55,102 +50,36 @@ Each sub-routine instance has:
 ### Select a Sub-Routine
 
 - Click on a sub-routine in the canvas
-- Or click in the Timeline's sub-routine track
-- Selected sub-routine shows transform handles
+- Selected sub-routine shows selection handles
 
-### Transform Handles
+### Moving Sub-Routines
 
 ```
-    ○─────────○
-    │         │
-    │    ●    │   ○ = Scale/Rotate handles
-    │         │   ● = Center (move)
-    ○─────────○
+┌─────────────┐
+│             │
+│      ●      │   ● = Center (drag to move)
+│             │
+└─────────────┘
 ```
 
-- **Corner handles** - Scale proportionally
-- **Edge handles** - Scale in one direction
-- **Outside corners** - Rotate
-- **Center** - Move position
-
-### Property Panel
-
-With sub-routine selected:
-- Adjust numeric values precisely
-- Set exact position, scale, rotation
-- Configure animation timing
+- **Drag** to reposition the sub-routine on the canvas
 
 ---
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> Sub-Routine Timing
 
-### Start Frame
+### Playback
 
-When the sub-routine begins playing relative to the main animation:
-- **Frame 0** = Starts immediately
-- **Frame 30** = Starts at frame 30 of main animation
+Sub-routines contain their own frame timing from the original tile animation:
+- Each frame has its duration in milliseconds
+- Loop and Ping-Pong settings are preserved from the source reel
 
-### Duration
+### Progress
 
-How long the sub-routine is visible:
-- **Auto** = Matches source animation length
-- **Custom** = Set specific frame count
-
-### Looping
-
-| Mode | Behavior |
-|------|----------|
-| **No Loop** | Plays once, then holds last frame |
-| **Loop** | Repeats continuously |
-| **Ping-Pong** | Plays forward, then backward |
-
----
-
-## Z-Order (Layering)
-
-Sub-routines have a Z-order relative to your layers:
-
-```
-Layer Stack:
-─────────────
-Foreground     ← Z: 3
-Sub-Routine B  ← Z: 2.5 (between layers!)
-Character      ← Z: 2
-Sub-Routine A  ← Z: 1.5
-Background     ← Z: 1
-```
-
-### Adjusting Z-Order
-
-- Right-click sub-routine → **Move Forward** / **Move Backward**
-- Or set exact Z value in properties
-- Decimal values allow placement between layers
-
----
-
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/camera_16.png" width="16"> Animating Sub-Routines
-
-Sub-routine properties can be **keyframed**:
-
-### Adding Keyframes
-
-1. Move playhead to desired frame
-2. Adjust sub-routine property (position, scale, etc.)
-3. Keyframe is automatically created
-
-### Keyframeable Properties
-
-- Position (X, Y)
-- Scale
-- Rotation
-- Opacity
-
-### Interpolation
-
-Between keyframes, values are interpolated:
-- **Linear** - Constant speed
-- **Ease In/Out** - Smooth acceleration/deceleration
-- **Hold** - Jump to next value (no interpolation)
+The progress value (0.0 - 1.0) controls where in the animation the sub-routine is:
+- **0.0** = Start of animation
+- **0.5** = Middle of animation
+- **1.0** = End of animation
 
 ---
 
@@ -169,45 +98,36 @@ Main Animation: Character Body
 
 ```
 Main Animation: Explosion
-├── Sub-Routine: Spark 1 (offset start, random position)
+├── Sub-Routine: Spark 1 (offset position)
 ├── Sub-Routine: Spark 2 (different timing)
-├── Sub-Routine: Smoke (delayed start, slower)
-└── Sub-Routine: Flash (frame 0-5 only)
+├── Sub-Routine: Smoke (delayed start)
+└── Sub-Routine: Flash (quick burst)
 ```
 
 ### UI Elements
 
 ```
 Main Animation: Game HUD
-├── Sub-Routine: Health Bar Pulse (when low)
+├── Sub-Routine: Health Bar Pulse
 ├── Sub-Routine: Coin Spin (looping icon)
-└── Sub-Routine: Alert Flash (triggered)
+└── Sub-Routine: Alert Flash
 ```
 
 ---
 
-## Managing Sub-Routines
+## Sub-Routine File Format (.pxpr)
 
-### Timeline View
+Sub-routines are saved as `.pxpr` files containing:
 
-Sub-routines appear as colored bars in the timeline:
-- Bar position = Start frame
-- Bar length = Duration
-- Bar color = Sub-routine identity
+| Data | Description |
+|------|-------------|
+| **Frame Dimensions** | Width and height of each frame |
+| **Embedded Pixels** | BGRA pixel data for each frame |
+| **Frame Timing** | Duration in milliseconds per frame |
+| **Loop Settings** | Loop and Ping-Pong flags |
+| **Reel Name** | Original animation name |
 
-### Sub-Routine List
-
-In the Timeline panel:
-- View all sub-routines
-- Click to select
-- Double-click to edit source
-- Drag to reorder
-
-### Editing Source
-
-Double-click a sub-routine to edit its source animation:
-- Opens the tile animation editor
-- Changes affect ALL instances of this sub-routine
+This format makes sub-routines **portable** - they can be used in any document without needing the original source file.
 
 ---
 
@@ -216,39 +136,26 @@ Double-click a sub-routine to edit its source animation:
 ### Reuse Sub-Routines
 
 Creating multiple instances of the same sub-routine is efficient:
-- Only one source animation in memory
-- Instances just store transform data
-
-### Limit Active Sub-Routines
-
-Too many simultaneous sub-routines can slow playback:
-- Use `Start Frame` to stagger
-- Remove when off-screen
-- Consider baking to frames for export
+- Source animation is loaded once
+- Instances share the pixel data
 
 ### Resolution Matters
 
-Sub-routine source should match your art scale:
-- Don't use 256×256 sub-routine at 16×16 size
+Sub-routine frame size should match your intended display size:
+- Don't import large sub-routines if displaying small
 - Create appropriate resolution sources
 
 ---
 
 ## Exporting with Sub-Routines
 
-When exporting animation:
+When exporting canvas animation:
 
 ### Baked Export (Default)
 
 - Sub-routines are composited into final frames
 - Output is flat frame sequence
-- Compatible with all formats
-
-### Sprite Sheet Export
-
-- Each sub-routine can export separately
-- Main animation + individual sub-routine sheets
-- Combine in game engine for dynamic composition
+- Compatible with all export formats (GIF, video, image sequence)
 
 ---
 
@@ -257,4 +164,3 @@ When exporting animation:
 - [[Tile Animation|Tile-Animation]] - Creating source animations
 - [[Canvas Animation|Canvas-Animation]] - Main animation system
 - [[Stage]] - Camera and composition
-- [[Animation Workflow|Animation-Workflow]] - Best practices

@@ -44,6 +44,12 @@ namespace PixlPunkt.UI.ColorPick
         {
             InitializeComponent();
 
+            // Set DataContext for XAML bindings (OldBrush, NewBrush)
+            if (Content is FrameworkElement root)
+            {
+                root.DataContext = this;
+            }
+
             ShadeRow.SwatchClicked += LadderRow_SwatchClicked;
             TintRow.SwatchClicked += LadderRow_SwatchClicked;
             HueRow.SwatchClicked += LadderRow_SwatchClicked;
@@ -180,7 +186,8 @@ namespace PixlPunkt.UI.ColorPick
             _suppress = false;
 
             _newBrush.Color = ColorUtil.MakeOpaque(c);
-            SetLive?.Invoke(c);
+            // Skip SetLive during fast drag - updates are expensive and cause sluggishness
+            // SetLive will be called on Push() (mouse release)
         }
 
         // HSL square events

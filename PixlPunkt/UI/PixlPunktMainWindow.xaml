@@ -359,13 +359,14 @@
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                     <Grid.RowDefinitions>
                         <!-- Use explicit proportional heights for better Skia compatibility -->
-                        <RowDefinition x:Name="PreviewRow" Height="1*" MinHeight="60"/>
+                        <!-- MinHeight only applies when docked - we'll manage this in code -->
+                        <RowDefinition x:Name="PreviewRow" Height="1*"/>
                         <RowDefinition x:Name="PreviewSpacerRow" Height="4"/>
-                        <RowDefinition x:Name="PaletteRow" Height="1*" MinHeight="60"/>
+                        <RowDefinition x:Name="PaletteRow" Height="1*"/>
                         <RowDefinition x:Name="PaletteSpacerRow" Height="4"/>
-                        <RowDefinition x:Name="TilesRow" Height="1*" MinHeight="60"/>
+                        <RowDefinition x:Name="TilesRow" Height="1*"/>
                         <RowDefinition x:Name="TilesSpacerRow" Height="4"/>
-                        <RowDefinition x:Name="LayersRow" Height="1*" MinHeight="60"/>
+                        <RowDefinition x:Name="LayersRow" Height="1*"/>
                         <RowDefinition x:Name="LayersSpacerRow" Height="4"/>
                         <RowDefinition x:Name="HistoryRow" Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -382,7 +383,7 @@
                             </Border>
                         </ctrl:SectionCard.CustomControl>
                     </ctrl:SectionCard>
-                    <Border Grid.Row="1" Height="4"/>
+                    <Border x:Name="PreviewSpacer" Grid.Row="1" Height="4"/>
 
                     <ctrl:SectionCard x:Name="PaletteCard" Grid.Row="2" Title="Palette" DisplayIcon="Color" 
                                       PanelId="Palette" CanUndock="True"
@@ -395,7 +396,7 @@
                             </Border>
                         </ctrl:SectionCard.CustomControl>
                     </ctrl:SectionCard>
-                    <Border Grid.Row="3" Height="4"/>
+                    <Border x:Name="PaletteSpacer" Grid.Row="3" Height="4"/>
                     
                     <ctrl:SectionCard x:Name="TilesCard" Grid.Row="4" Title="Tiles" DisplayIcon="Grid" 
                                       PanelId="Tiles" CanUndock="True"
@@ -408,7 +409,7 @@
                             </Border>
                         </ctrl:SectionCard.CustomControl>
                     </ctrl:SectionCard>
-                    <Border Grid.Row="5" Height="4"/>
+                    <Border x:Name="TilesSpacer" Grid.Row="5" Height="4"/>
                     
                     <ctrl:SectionCard x:Name="LayersCard" Grid.Row="6" Title="Layers" DisplayIcon="LayerDiagonal" 
                                       PanelId="Layers" CanUndock="True"
@@ -422,7 +423,7 @@
                         </ctrl:SectionCard.CustomControl>
                     </ctrl:SectionCard>
 
-                    <Border Grid.Row="7" Height="4"/>
+                    <Border x:Name="LayersSpacer" Grid.Row="7" Height="4"/>
                     <ctrl:SectionCard x:Name="HistoryCard" Grid.Row="8" Title="History" DisplayIcon="Clock" 
                                       PanelId="History" CanUndock="True" IsMinimized="True"
                                       HorizontalAlignment="Stretch" VerticalAlignment="Top">

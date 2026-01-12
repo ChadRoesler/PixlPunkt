@@ -19,16 +19,16 @@ Organize multiple layers into collapsible groups. Great for:
 ## Layer Panel
 
 ```
-???????????????????????????????????????????????
+?????????????????????????????????????????
 ? Layers                          + ?? ??    ?
-???????????????????????????????????????????????
+?????????????????????????????????????????
 ? ?? ?? ? [preview] ? Foreground        ?   ?
 ? ?? ?? ? [preview] ? Character         ?   ?
 ? ?? ?? ? [preview] ? ?? Effects            ?
 ?       ?           ?   ? Glow layer        ?
 ?       ?           ?   ? Shadow layer      ?
 ? ?? ?? ? [preview] ? Background        ?   ?
-???????????????????????????????????????????????
+?????????????????????????????????????????
 ```
 
 ### Panel Toolbar Buttons
@@ -109,57 +109,21 @@ Double-click a layer or click the <img src="https://raw.githubusercontent.com/Ch
 
 Blend modes control how a layer's pixels combine with the layers beneath it.
 
-### Normal Modes
-
-| Mode | Effect |
-|------|--------|
-| **Normal** | Standard layering, opacity controls transparency |
-| **Dissolve** | Random pixels based on opacity (noisy transparency) |
-
-### Darken Modes
+### Available Blend Modes
 
 | Mode | Effect | Use Case |
 |------|--------|----------|
-| **Darken** | Keeps darker pixels | Shadows |
+| **Normal** | Standard layering, opacity controls transparency | Default |
 | **Multiply** | Multiplies colors (always darker) | Shadows, shading |
-| **Color Burn** | Intense darkening | Deep shadows |
-| **Linear Burn** | Additive darkening | Harsh shadows |
-
-### Lighten Modes
-
-| Mode | Effect | Use Case |
-|------|--------|----------|
-| **Lighten** | Keeps lighter pixels | Highlights |
 | **Screen** | Inverse multiply (always lighter) | Glow, light |
-| **Color Dodge** | Intense brightening | Specular highlights |
 | **Add** | Adds values directly | Glow effects, fire |
-
-### Contrast Modes
-
-| Mode | Effect | Use Case |
-|------|--------|----------|
+| **Subtract** | Subtracts colors (always darker) | Effects |
+| **Darken** | Keeps darker pixels | Shadows |
+| **Lighten** | Keeps lighter pixels | Highlights |
 | **Overlay** | Multiply darks, Screen lights | General contrast |
-| **Soft Light** | Gentle contrast | Subtle lighting |
-| **Hard Light** | Strong contrast | Dramatic lighting |
-| **Vivid Light** | Intense contrast | Extreme effects |
-
-### Inversion Modes
-
-| Mode | Effect | Use Case |
-|------|--------|----------|
+| **HardLight** | Strong contrast | Dramatic lighting |
 | **Difference** | Subtracts colors | Psychedelic effects |
-| **Exclusion** | Softer difference | Artistic effects |
-| **Subtract** | Direct subtraction | Masking, effects |
 | **Invert** | Inverts where opaque | X-ray effects |
-
-### Component Modes
-
-| Mode | Effect | Use Case |
-|------|--------|----------|
-| **Hue** | Applies layer's hue | Color grading |
-| **Saturation** | Applies layer's saturation | Desaturation |
-| **Color** | Applies hue + saturation | Colorizing |
-| **Luminosity** | Applies layer's brightness | Tone mapping |
 
 ---
 
@@ -177,11 +141,11 @@ Blend modes control how a layer's pixels combine with the layers beneath it.
 3. Paint with light colors
 4. Result: Bright glow effect that intensifies
 
-### Color Overlay
+### Contrast with Overlay
 1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> to create new layer, fill with a color
-2. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Color**
+2. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Overlay**
 3. Adjust opacity slider
-4. Result: Everything tinted that color while preserving values
+4. Result: Enhanced contrast while preserving midtones
 
 ---
 
@@ -193,45 +157,42 @@ Blend modes control how a layer's pixels combine with the layers beneath it.
 
 ### Folder Behavior
 - Folders can be collapsed/expanded (click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/chevron_right_16.png" width="16"> arrow)
-- Opacity applies to entire folder
-- Blend mode applies to folder composite
+- Hiding a folder hides all children
+- Locking a folder locks all children
 - Effects can be applied to folders
 
 ### Nested Folders
-Folders can contain other folders (up to 8 levels deep).
+Folders can contain other folders.
 
 ```
 ?? Character
-??? ?? Head
-?   ??? Face
-?   ??? Hair
-?   ??? Accessories
-??? ?? Body
-?   ??? Torso
-?   ??? Arms
-??? ?? Legs
-    ??? Upper
-    ??? Lower
+?? ?? Head
+?   ?? Face
+?   ?? Hair
+?   ?? Accessories
+?? ?? Body
+?   ?? Torso
+?   ?? Arms
+?? ?? Legs
+    ?? Upper
+    ?? Lower
 ```
 
 ---
 
 ## Layer Locking
 
-### Lock Types
+Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16"> to lock a layer:
 
-| Lock | Icon | Effect |
-|------|:----:|--------|
-| **Full Lock** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16"> | Can't edit anything |
-| **Transparency Lock** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16">? | Can only paint on existing pixels |
-| **Position Lock** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16">? | Can't move layer contents |
+| State | Effect |
+|-------|--------|
+| **Unlocked** | Can edit normally |
+| **Locked** | Can't edit anything |
 
-### Using Transparency Lock
-Perfect for shading:
-1. Draw your base shape
-2. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16"> and enable **Transparency Lock**
-3. Paint freely - colors only apply where pixels exist
-4. No accidentally painting outside the lines!
+When locked:
+- Can't paint on the layer
+- Can't move layer contents
+- Layer still renders normally
 
 ---
 
@@ -240,7 +201,6 @@ Perfect for shading:
 ### Organization
 - Name your layers! "Layer 1" is useless
 - Use folders <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/folder_16.png" width="16"> to group related elements
-- Color-code layers with the label feature
 
 ### Performance
 - Flatten finished areas to reduce layer count

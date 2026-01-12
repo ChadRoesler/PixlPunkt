@@ -73,8 +73,8 @@ Complete keyboard shortcut reference for PixlPunkt.
 | `B` | Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/edit_16.png" width="16"> |
 | `E` | Eraser | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eraser_16.png" width="16"> |
 | `G` | Fill (Bucket) | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/paint_bucket_16.png" width="16"> |
-| `D` | Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> |
-| `Shift+G` | **Gradient Fill** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> |
+| `O` | Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> |
+| `Shift+G` | Gradient Fill | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> |
 | `R` | Color Replacer | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/pen_sync_16.png" width="16"> |
 
 ### Selection Tools
@@ -84,7 +84,7 @@ Complete keyboard shortcut reference for PixlPunkt.
 | `M` | Rectangle Select | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/select_object_16.png" width="16"> |
 | `W` | Magic Wand | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/wand_16.png" width="16"> |
 | `L` | Lasso | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lasso_16.png" width="16"> |
-| `Shift+P` | Paint Selection | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_16.png" width="16"> |
+| `Q` | Paint Selection | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_16.png" width="16"> |
 
 ### Effect Tools
 
@@ -98,21 +98,21 @@ Complete keyboard shortcut reference for PixlPunkt.
 
 | Shortcut | Tool | Icon |
 |----------|------|:----:|
-| `Ctrl+U` | Rectangle | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> |
-| `O` | Ellipse | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> |
+| `I` | Rectangle | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> |
+| `P` | Ellipse | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> |
 
 ### Tile Tools
 
 | Shortcut | Tool | Icon |
 |----------|------|:----:|
-| `Shift+A` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> |
+| `Shift+T` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> |
 | `Ctrl+T` | Tile Modifier | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_16.png" width="16"> |
 
 ### Utility Tools
 
 | Shortcut | Tool | Icon |
 |----------|------|:----:|
-| `I` | Dropper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> |
+| `D` | Dropper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> |
 | `H` | Pan (Hand) | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/hand_left_16.png" width="16"> |
 | `Z` | Zoom | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/zoom_in_16.png" width="16"> |
 
@@ -155,8 +155,6 @@ Complete keyboard shortcut reference for PixlPunkt.
 |----------|--------|:----:|
 | `X` | Swap FG/BG Colors | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_swap_16.png" width="16"> |
 | `Right-Click` | Pick Color (from any tool) | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> |
-| `Shift+Right-Click` | Pick Background Color | |
-| `Alt+Click` | Pick Color to Palette | |
 
 ---
 
@@ -217,7 +215,6 @@ Complete keyboard shortcut reference for PixlPunkt.
 | `Shift+Arrow Keys` | Nudge 10px | |
 | `Enter` | Apply Transform | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/checkmark_16.png" width="16"> |
 | `Escape` | Cancel Transform | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/dismiss_16.png" width="16"> |
-| `Ctrl+T` | Free Transform | |
 | `Ctrl+Shift+H` | Flip Horizontal | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/flip_horizontal_16.png" width="16"> |
 | `Ctrl+Shift+V` | Flip Vertical | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/flip_vertical_16.png" width="16"> |
 

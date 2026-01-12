@@ -19,7 +19,7 @@ Creates pixel-perfect square strokes.
 
 ### Custom
 Use any image as a brush tip.
-- Import from `.pbx` files
+- Import from `.mrk` files
 - Create your own patterns
 - Supports transparency
 
@@ -28,7 +28,7 @@ Use any image as a brush tip.
 ## Brush Settings
 
 ### Size
-**Range:** 1-256 pixels
+**Range:** 1-128 pixels
 
 | Shortcut | Action |
 |----------|--------|
@@ -53,36 +53,29 @@ Controls the brush falloff/hardness.
 - **128** = Soft edge with gradual falloff
 - **0** = Maximum softness
 
-### Spacing
-**Range:** 0.1-10.0
-
-Distance between brush stamps during a stroke.
-- **1.0** = Continuous stroke
-- **2.0** = Stamps every 2× brush size
-- Lower values = smoother strokes
-
 ---
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/star_16.png" width="16"> Custom Brushes
 
 ### Creating a Custom Brush
 
-1. Draw your brush pattern on the canvas
-2. Select the area you want as a brush
-3. Go to **Edit → Define Brush** or press `Ctrl+B`
-4. Name your brush
-5. It appears in the brush selector!
+1. Create a new 16×16 canvas (**File → New**)
+2. Draw your brush pattern
+3. Go to **File → Export → Brush**
+4. Enter brush name and author
+5. Set the pivot point (brush center)
+6. Save the `.mrk` file
 
-### Brush File Format (.pbx)
+### Brush File Format (.mrk)
 
-Custom brushes are saved as `.pbx` files:
+Custom brushes are saved as `.mrk` (PixlPunkt Mark) files:
 - Location: `%LocalAppData%\PixlPunkt\Brushes\`
-- Format: PNG with metadata
-- Includes: Pattern, default size, name
+- Format: Binary with 16×16 1-bit mask
+- Includes: Author, name, pivot point, icon preview
 
 ### Installing Custom Brushes
 
-1. Download or create a `.pbx` file
+1. Download or create a `.mrk` file
 2. Copy to your Brushes folder:
    - Windows: `%LocalAppData%\PixlPunkt\Brushes\`
    - macOS: `~/Library/Application Support/PixlPunkt/Brushes/`
@@ -91,10 +84,11 @@ Custom brushes are saved as `.pbx` files:
 
 ### Exporting Brushes
 
-1. Select a custom brush
+1. Create a 16×16 canvas with your brush pattern
 2. Go to **File → Export → Brush**
-3. Choose location and filename
-4. Share your `.pbx` file!
+3. Configure name, author, and pivot point
+4. Save the `.mrk` file
+5. Share your brush!
 
 ---
 
@@ -126,16 +120,16 @@ Enable for clean single-pixel lines:
 The eraser uses the same brush system:
 - Same shapes (Circle, Square, Custom)
 - Same size controls
-- Same opacity (for partial erasing)
+- Same density settings
 
 **Shortcut:** `E`
 
-### Eraser Modes
+### Eraser Options
 
-| Mode | Description |
-|------|-------------|
-| Normal | Erases to transparency |
-| Background | Erases to background color |
+| Option | Description |
+|--------|-------------|
+| Erase to transparent | When enabled, erases to full transparency |
+| Erase to background | When disabled, erases to background color |
 
 ---
 
@@ -146,7 +140,7 @@ The eraser uses the same brush system:
 | Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/edit_16.png" width="16"> | `B` | Standard drawing brush |
 | Eraser | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eraser_16.png" width="16"> | `E` | Erase pixels |
 | Color Replacer | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/pen_sync_16.png" width="16"> | `R` | Replace one color with another |
-| Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> | `D` | Paint with gradient |
+| Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> | `O` | Paint with gradient |
 
 ---
 
@@ -174,22 +168,17 @@ The eraser uses the same brush system:
 
 ## Organizing Brushes
 
-### Brush Folders
-Organize custom brushes in subfolders:
+### Brush Files
+Brushes are stored as individual `.mrk` files:
 ```
 Brushes/
-├── Textures/
-│   ├── grass.pbx
-│   └── stone.pbx
-├── Stamps/
-│   ├── star.pbx
-│   └── heart.pbx
-└── my-brush.pbx
+├── PixlPunkt.Star.mrk
+├── PixlPunkt.Heart.mrk
+├── Custom.MyBrush.mrk
+└── Artist.SpecialBrush.mrk
 ```
 
-### Favorites
-- Right-click a brush → **Add to Favorites**
-- Favorites appear at the top of the brush list
+Brush files follow the naming convention: `Author.BrushName.mrk`
 
 ---
 

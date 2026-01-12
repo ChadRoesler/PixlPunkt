@@ -9,126 +9,96 @@ Tile Animation <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt
 | **Best for** | Game sprites, repeated animations, sprite sheets |
 | **How it works** | References tile positions, not full pixel data |
 | **Memory** | Very efficient - reuses tile graphics |
-| **Export** | Sprite sheets for game engines |
+| **Export** | GIF, video, sprite strips, image sequences |
 
 ---
 
 ## Key Concepts
 
 ### Tiles
-Individual sprite frames arranged in a grid (your tileset).
+Individual sprite frames arranged in a grid on your canvas. Each tile occupies a grid position (tileX, tileY).
 
 ### Reels
-Named animation sequences. One tileset can have many reels:
-- "Idle" reel: tiles 0, 1, 2, 1 (looping)
-- "Walk" reel: tiles 3, 4, 5, 6, 7, 8
-- "Jump" reel: tiles 9, 10, 11, 12
-- "Attack" reel: tiles 13, 14, 15, 16, 17
+Named animation sequences. One document can have many reels:
+- "Idle" reel: references tiles at positions (0,0), (1,0), (2,0), (1,0) (looping)
+- "Walk" reel: references tiles at positions (0,1), (1,1), (2,1), (3,1)
+- "Attack" reel: references tiles at positions (0,2), (1,2), (2,2)
 
 ### Frames
-References to specific tiles with timing information.
+References to specific tile positions with optional custom timing.
 
 ---
 
 ## Creating a Tileset for Animation
 
-### Method 1: Draw in PixlPunkt
-1. **File ? New Canvas**
-2. Set tile size (e.g., 32�32)
-3. Set canvas to hold all frames (e.g., 8�4 tiles for 32 frames)
-4. Draw each animation frame in a separate tile
-
-### Method 2: Import Existing
-1. **File ? Import Tileset**
-2. Select your sprite sheet image
-3. Set the tile size to match your frames
-4. PixlPunkt slices it automatically
+### Draw in PixlPunkt
+1. **File → New Canvas**
+2. Set tile size (e.g., 32×32)
+3. Set canvas to hold all frames (e.g., 8×4 tiles for 32 frames)
+4. Draw each animation frame in a separate tile position
 
 ### Recommended Layout
 
 ```
-?????????????????????????????????????????
-?Idle?Idle?Idle?Idle?Walk?Walk?Walk?Walk?  Row 1
-?????????????????????????????????????????
-?Walk?Walk?Walk?Walk?Run ?Run ?Run ?Run ?  Row 2
-?????????????????????????????????????????
-?Run ?Run ?Jump?Jump?Jump?Fall?Fall?Land?  Row 3
-?????????????????????????????????????????
-?Atk1?Atk2?Atk3?Atk4?Atk5?Hurt?Die1?Die2?  Row 4
-?????????????????????????????????????????
+┌────┬────┬────┬────┬────┬────┬────┬────┐
+│Idle│Idle│Idle│Idle│Walk│Walk│Walk│Walk│  Row 0
+├────┼────┼────┼────┼────┼────┼────┼────┤
+│Walk│Walk│Walk│Walk│Run │Run │Run │Run │  Row 1
+├────┼────┼────┼────┼────┼────┼────┼────┤
+│Run │Run │Jump│Jump│Jump│Fall│Fall│Land│  Row 2
+├────┼────┼────┼────┼────┼────┼────┼────┤
+│Atk1│Atk2│Atk3│Atk4│Atk5│Hurt│Die1│Die2│  Row 3
+└────┴────┴────┴────┴────┴────┴────┴────┘
 ```
 
 ---
 
-## The Tile Animation Panel
+## The Tile Animation Tool
 
-### Opening
-- **View ? Tile Animation** or use the Tiles panel toggle
+Use the **Tile Animation Tool** to select tile positions for your reel:
 
-### Interface
+**Shortcut:** Available in the Tiles tool group
 
-```
-???????????????????????????????????????????????????????????????????
-? Reel: [Walk ?] ? + New ? ? Rename ? ?? Delete ? ? Preview      ?
-???????????????????????????????????????????????????????????????????
-? Frame 1 ? Frame 2 ? Frame 3 ? Frame 4 ? Frame 5 ? Frame 6 ? + ?
-? [tile]  ? [tile]  ? [tile]  ? [tile]  ? [tile]  ? [tile]  ?   ?
-?  100ms  ?  100ms  ?  100ms  ?  100ms  ?  100ms  ?  100ms  ?   ?
-???????????????????????????????????????????????????????????????????
-? Tileset Preview (click to add frames)                          ?
-? ?????????????????????????                                      ?
-? ?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?                                      ?
-? ?????????????????????????                                      ?
-? ?8 ?9 ?10?11?12?13?14?15?                                      ?
-? ?????????????????????????                                      ?
-???????????????????????????????????????????????????????????????????
-```
+### Using the Tile Animation Tool
 
----
-
-## Creating a Reel
-
-1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **+ New** to create a new reel
-2. Name it (e.g., "Walk_Right")
-3. Click tiles in the tileset preview to add frames
-4. Adjust timing for each frame
-5. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> **Preview** to test
-
----
-
-## Frame Operations
+1. Select the Tile Animation tool
+2. **Click and drag** on the canvas to select a range of tiles
+3. Tiles are added in **row-major order** (left-to-right, top-to-bottom)
+4. Hold `Shift` while dragging to **add to existing** frames instead of replacing
 
 ### Adding Frames
-- **Click a tile** in the tileset preview to add it to the reel
-- Frames are added at the end by default
-- Hold `Shift` to insert at current position
+- **Drag to select** tile positions on the canvas
+- Selected tiles become frames in the current reel
+- Frames reference the tile grid position (tileX, tileY)
 
-### Removing Frames
-- **Right-click a frame** ? Delete
-- Or select and press `Delete`
+---
 
-### Reordering Frames
-- **Drag frames** left/right to reorder
+## Creating and Managing Reels
 
-### Duplicating Frames
-- **Right-click** ? Duplicate
-- Useful for holds (same tile, different timing)
+### Creating a Reel
+
+1. If no reel exists, one is created automatically when you select tiles
+2. New reels can be created from the Tile Animation panel
+3. Name your reel (e.g., "Walk_Right")
+
+### Reel Operations
+
+- **Add Reel** - Create a new empty reel
+- **Rename** - Change the reel name
+- **Delete** - Remove a reel
+- **Duplicate** - Copy a reel with all its frames
 
 ---
 
 ## Frame Timing
 
-Each frame has an independent duration:
+Each frame has a duration in milliseconds:
 
-| Timing Type | Description |
-|-------------|-------------|
-| **Milliseconds** | Exact time (e.g., 100ms) |
-| **Frames** | At target FPS (e.g., 2 frames at 12fps = 167ms) |
+### Default Frame Time
+Each reel has a **DefaultFrameTimeMs** (default: 100ms) that applies to all frames unless overridden.
 
-### Setting Timing
-1. Click the timing field under a frame
-2. Enter duration in ms
-3. Or right-click ? Set Duration
+### Per-Frame Duration
+Individual frames can have custom durations that override the default.
 
 ### Common Timings
 
@@ -143,18 +113,42 @@ Each frame has an independent duration:
 
 ## Reel Properties
 
-### Loop Mode
+### Loop
+When enabled (default), the animation repeats forever: 1→2→3→1→2→3...
 
-| Mode | Behavior |
-|------|----------|
-| **Loop** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_repeat_all_16.png" width="16"> | Repeats forever (1?2?3?1?2?3...) |
-| **Ping-Pong** | Bounces back and forth (1?2?3?2?1?2?3...) |
-| **Once** | Plays once and stops |
+### Ping-Pong
+When enabled, the animation bounces back and forth: 1→2→3→2→1→2→3...
 
-### Playback Direction
-- **Forward** - Normal order
-- **Reverse** - Backwards
-- **Random** - Random frame each cycle (for variety)
+---
+
+## Playback Controls
+
+### Playback States
+- **Stopped** - Animation is at frame 0
+- **Playing** - Animation is running
+- **Paused** - Animation is paused at current frame
+
+### Controls
+- **Play** - Start or resume animation
+- **Pause** - Pause at current frame
+- **Stop** - Stop and return to frame 0
+- **Next Frame** - Advance one frame
+- **Previous Frame** - Go back one frame
+- **First Frame** - Jump to frame 0
+- **Last Frame** - Jump to final frame
+
+---
+
+## Onion Skinning
+
+View previous and next frames as ghost overlays:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| **Enabled** | Toggle onion skin display | Off |
+| **Frames Before** | Number of previous frames to show | 2 |
+| **Frames After** | Number of next frames to show | 1 |
+| **Opacity** | Ghost frame transparency | 30% |
 
 ---
 
@@ -163,133 +157,69 @@ Each frame has an independent duration:
 One of Tile Animation's biggest advantages: **tile reuse**.
 
 ### Same Tile, Multiple Reels
-The "idle" standing frame can appear in:
+The "idle" standing tile can appear in:
 - Idle reel (repeated)
 - Walk reel (start/end)
 - Jump reel (ground frame)
 - Any transition
 
-Changes to the tile update ALL reels automatically.
-
-### Mirrored Animations
-Instead of drawing Walk_Left separately:
-1. Draw Walk_Right
-2. Create Walk_Left reel with same tiles
-3. Set <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/flip_horizontal_16.png" width="16"> **Flip Horizontal** on the reel
-4. Half the work, same result
-
----
-
-## Previewing Animations
-
-### In-Panel Preview
-Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> **Preview** to loop the current reel in the panel.
-
-### On-Canvas Preview
-1. Use the Tile Stamper tool <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> (`Shift+A`)
-2. Select your reel
-3. Stamp on canvas
-4. Animation plays live on the canvas
-
-### Preview Options
-- **Speed multiplier** - 0.5x, 1x, 2x playback
-- **Loop** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_repeat_all_16.png" width="16"> - Toggle looping
-- **Show frame number** - Overlay current frame
+Changes to the tile pixels update ALL reels automatically.
 
 ---
 
 ## Exporting Tile Animations
 
-### As Sprite Sheet
+### Single Animation Export
 
-1. **File ? Export Sprite Sheet**
-2. Configure layout:
-   - **Columns** - Frames per row
-   - **Padding** - Space between frames
-   - **Include all reels** - Or select specific ones
-3. Choose format (PNG recommended)
-4. Export
+**File → Export → Animation**
 
-### Sprite Sheet Layouts
+Select "Tile Animation" mode to export the currently selected reel:
 
-**Horizontal Strip:**
-```
-???????????????????????????????
-? F1 ? F2 ? F3 ? F4 ? F5 ? F6 ?
-???????????????????????????????
-```
+| Format | Description |
+|--------|-------------|
+| **GIF** | Animated GIF with loop option |
+| **MP4/WebM/MKV/AVI** | Video formats |
+| **PNG/JPG Sequence** | Individual frame files |
+| **Sub-routine (.pxpr)** | Reusable animation file with embedded pixels |
 
-**Grid:**
-```
-?????????????????????
-? F1 ? F2 ? F3 ? F4 ?
-?????????????????????
-? F5 ? F6 ? F7 ? F8 ?
-?????????????????????
-```
+### Batch Export
 
-### As Animation File
+**File → Export → Batch Tile Animation**
 
-1. **File ? Export Animation**
+Export multiple reels at once:
+
+1. Select which reels to export
 2. Choose format:
-   - **GIF** - Simple, widely supported
-   - **APNG** - PNG with animation, better quality
-   - **WebP** - Modern, good compression
+   - **GIF** - Animated GIF per reel
+   - **MP4** - Video per reel
+   - **PNG Sequence** - Subfolder per reel with frame files
+   - **Sprite Strip** - Horizontal PNG strip per reel
+   - **Sub-routine (.pxpr)** - Portable animation file per reel
 
-### As Individual Frames
+3. Configure options:
+   - **Scale** - Output pixel scale (1x, 2x, etc.)
+   - **Loop** - For GIF format
+   - **Quality** - For video formats
+   - **Override FPS** - Custom framerate
 
-1. **File ? Export Frames**
-2. Files named: `reel_name_001.png`, `reel_name_002.png`, etc.
+4. Select output folder
+5. Files are named after reel names
 
-### Reel Data Export
+### Sprite Strip Layout
 
-Export timing data for game engines:
-
-```json
-{
-  "walk": {
-    "frames": [3, 4, 5, 6, 7, 8],
-    "durations": [100, 100, 100, 100, 100, 100],
-    "loop": true
-  }
-}
+Frames are arranged horizontally in a single PNG:
+```
+┌────┬────┬────┬────┬────┬────┐
+│ F1 │ F2 │ F3 │ F4 │ F5 │ F6 │
+└────┴────┴────┴────┴────┴────┘
 ```
 
-Supported formats:
-- JSON (Unity, Godot, custom engines)
-- XML (various engines)
-- Aseprite (.ase)
+### Sub-Routine Export (.pxpr)
 
----
-
-## Game Engine Integration
-
-### Unity
-
-1. Export as sprite sheet + JSON
-2. Import sprite sheet, set to Multiple
-3. Use Sprite Editor to slice
-4. Create Animation Clips from the JSON timing
-
-### Godot
-
-1. Export as sprite sheet
-2. Create AnimatedSprite node
-3. Add SpriteFrames resource
-4. Import frames with timing
-
-### GameMaker
-
-1. Export as horizontal sprite strip
-2. Create Sprite, set frames
-3. Set frame timing in sprite properties
-
-### Pygame / Custom
-
-1. Export as sprite sheet + JSON
-2. Load sprite sheet as single image
-3. Parse JSON for frame rects and timing
-4. Blit appropriate region each frame
+Sub-routines contain embedded pixel data and can be:
+- Imported into canvas animations
+- Shared between projects
+- Used without the original document
 
 ---
 
@@ -298,7 +228,7 @@ Supported formats:
 ### Plan Your Tileset
 - Group related animations together
 - Leave room for expansion
-- Consider mirroring needs upfront
+- Use consistent tile grid positions
 
 ### Consistent Frame Counts
 Standard frame counts make looping easier:
@@ -314,9 +244,9 @@ Instead of adding frames for slow motion:
 - Saves memory and work
 
 ### Test Early and Often
-- Preview animations constantly with <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16">
+- Preview animations with Play
 - Check loops for jarring transitions
-- Verify timing feels right at game speed
+- Verify timing feels right
 
 ### Reuse Everything
 - Same idle frame for multiple states
@@ -330,22 +260,21 @@ Instead of adding frames for slow motion:
 | Feature | Tile Animation | Canvas Animation |
 |---------|----------------|------------------|
 | Memory usage | Low (reuses tiles) | High (full frames) |
-| Frame independence | Each frame is a tile | Each frame can be unique |
-| Layer effects | No | Yes, fully animatable |
-| Camera/Stage | No | Yes |
+| Frame independence | Each frame is a tile position | Each frame can be unique |
+| Layer effects | Applied to whole canvas | Yes, per-keyframe |
+| Stage/Camera | No | Yes |
 | Best for | Game sprites | Cutscenes, complex animation |
-| Export | Sprite sheets | Video, GIF, sequences |
+| Export | Sprite sheets, GIF, video | Video, GIF, sequences |
 
 **Use both together!** 
 - Tile Animation <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_16.png" width="16"> for character sprites
 - Canvas Animation <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> for cinematics
-- Sub-Routines to embed tile animations in canvas animations
+- Sub-routines to embed tile animations in canvas animations
 
 ---
 
 ## See Also
 
 - [[Canvas Animation|Canvas-Animation]] - Frame-by-frame animation
-- [[Sub-Routines]] - Embedding tile animations in canvas animations
 - [[Tiles]] - Tileset management
-- [[Game Art|Game-Art]] - Creating game-ready assets
+- [[Tools]] - Tool documentation

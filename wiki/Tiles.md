@@ -38,7 +38,7 @@ Tiles are fixed-size squares that can be:
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> Tile Stamper Tool
 
-**Shortcut:** `Shift+A`
+**Shortcut:** `Shift+T`
 
 ### Using Tile Stamper
 
@@ -245,7 +245,7 @@ Automatic tile selection based on neighbors:
 
 | Shortcut | Action |
 |----------|--------|
-| `Shift+A` | Tile Stamper tool |
+| `Shift+T` | Tile Stamper tool |
 | `Ctrl+T` | Tile Modifier tool |
 | `Ctrl+Shift+'` | Toggle tile grid |
 | `F7` | Toggle Tiles Panel |

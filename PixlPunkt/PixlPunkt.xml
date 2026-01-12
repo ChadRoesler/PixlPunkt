@@ -34441,6 +34441,16 @@
             <param name="title">The title to display in the window title bar.</param>
             <param name="content">The UI content to host (typically a SectionCard).</param>
         </member>
+        <member name="M:PixlPunkt.UI.Panels.PanelWindow.#ctor(System.String,System.String,Microsoft.UI.Xaml.FrameworkElement,System.Double,System.Double)">
+            <summary>
+            Creates a new floating panel window with specified initial size.
+            </summary>
+            <param name="panelId">Unique identifier for the panel (e.g., "Preview", "Palette", "Tiles", "Layers").</param>
+            <param name="title">The title to display in the window title bar.</param>
+            <param name="content">The UI content to host (typically a SectionCard).</param>
+            <param name="dockedWidth">The width the panel had when docked (0 to use default).</param>
+            <param name="dockedHeight">The height the panel had when docked (0 to use default).</param>
+        </member>
         <member name="M:PixlPunkt.UI.Panels.PanelWindow.DetachContent">
             <summary>
             Removes the content from this window so it can be returned to the main window.

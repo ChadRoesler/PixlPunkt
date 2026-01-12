@@ -31,20 +31,13 @@ namespace PixlPunkt.UI.ColorPick
         private bool _suppress;
         private bool _toggling;
 
-        private SolidColorBrush _startBrush;
-        private SolidColorBrush _endBrush;
+        // Initialize brushes at declaration to ensure they exist before binding evaluation
+        private readonly SolidColorBrush _startBrush = new(Colors.Black);
+        private readonly SolidColorBrush _endBrush = new(Colors.White);
 
-        public SolidColorBrush StartBrush
-        {
-            get => _startBrush;
-            set { _startBrush = value; OnPropertyChanged(); }
-        }
+        public SolidColorBrush StartBrush => _startBrush;
 
-        public SolidColorBrush EndBrush
-        {
-            get => _endBrush;
-            set { _endBrush = value; OnPropertyChanged(); }
-        }
+        public SolidColorBrush EndBrush => _endBrush;
 
         public bool IsEditingStart => _editingStart;
         public bool IsEditingEnd => !_editingStart;
@@ -76,12 +69,6 @@ namespace PixlPunkt.UI.ColorPick
             {
                 root.DataContext = this;
             }
-
-            // Don't seed colors here - the delegates aren't set yet
-            // We'll initialize in the deferred queue once delegates are wired
-
-            _startBrush = new SolidColorBrush(Colors.Black);
-            _endBrush = new SolidColorBrush(Colors.White);
 
             TriFalloff.Start_out = new(-0.60f, 0.00f);
             TriFalloff.Mid_left = new(-0.20f, 0.85f);
@@ -261,7 +248,8 @@ namespace PixlPunkt.UI.ColorPick
             HexBox.Text = ColorUtil.ToHex(c);
             _suppress = false;
 
-            BuildPreview();
+            // Skip BuildPreview during drag - it's expensive and causes sluggishness
+            // Preview will update on SVChanged (mouse release)
         }
 
         private void HslSquare_SVChanged(object? sender, (double S, double L) e)
@@ -290,7 +278,8 @@ namespace PixlPunkt.UI.ColorPick
             // Keep square hue aligned during drag
             HslSquare.Hue = newHue;
 
-            BuildPreview();
+            // Skip BuildPreview during drag - it's expensive and causes sluggishness
+            // Preview will update on HueChanged (mouse release)
         }
 
         private void HueSlider_HueChanged(object? sender, double newHue)

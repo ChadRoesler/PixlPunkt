@@ -9,8 +9,8 @@ PixlPunkt includes a comprehensive set of drawing, selection, and editing tools.
 | `B` | Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/edit_16.png" width="16"> | Painting |
 | `E` | Eraser | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eraser_16.png" width="16"> | Painting |
 | `G` | Fill (Bucket) | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/paint_bucket_16.png" width="16"> | Painting |
-| `D` | Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> | Painting |
-| `Shift+G` | **Gradient Fill** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> | Painting |
+| `O` | Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> | Painting |
+| `Shift+G` | Gradient Fill | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> | Painting |
 | `R` | Color Replacer | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/pen_sync_16.png" width="16"> | Painting |
 | `U` | Blur | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/drop_16.png" width="16"> | Effects |
 | `J` | Jumble | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/tap_double_16.png" width="16"> | Effects |
@@ -18,13 +18,13 @@ PixlPunkt includes a comprehensive set of drawing, selection, and editing tools.
 | `M` | Rectangle Select | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/select_object_16.png" width="16"> | Selection |
 | `W` | Magic Wand | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/wand_16.png" width="16"> | Selection |
 | `L` | Lasso | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lasso_16.png" width="16"> | Selection |
-| `Shift+P` | Paint Selection | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_16.png" width="16"> | Selection |
-| `I` | Dropper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> | Utility |
+| `Q` | Paint Selection | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_16.png" width="16"> | Selection |
+| `D` | Dropper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> | Utility |
 | `H` | Pan | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/hand_left_16.png" width="16"> | Utility |
 | `Z` | Zoom | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/zoom_in_16.png" width="16"> | Utility |
-| `Ctrl+U` | Rectangle | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> | Shapes |
-| `O` | Ellipse | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> | Shapes |
-| `Shift+A` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> | Tiles |
+| `I` | Rectangle | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> | Shapes |
+| `P` | Ellipse | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> | Shapes |
+| `Shift+T` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> | Tiles |
 | `Ctrl+T` | Tile Modifier | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_16.png" width="16"> | Tiles |
 
 ---
@@ -39,16 +39,16 @@ Standard painting brush for applying the foreground color.
 | Option | Description |
 |--------|-------------|
 | **Brush** | Select brush shape (<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> Circle, <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> Square) or custom brush |
-| **Size** | Brush diameter (use `[` and `]` to adjust) |
+| **Size** | Brush diameter 1-128 (use `[` and `]` to adjust) |
 | **Opacity** | Transparency of brush strokes (0-255) |
 | **Density** | How filled the brush stroke is (0-255) |
 | **Pixel Perfect** | Eliminates diagonal stair-stepping for 1px brushes |
 
 **Modifiers:**
 - `Shift + Drag` - Draw straight lines
-- `Ctrl + Shift + Drag` - Constrain to isometric angles (0�, 22.5�, 45�, 67.5�, 90�)
+- `Ctrl + Shift + Drag` - Constrain to 15° angle increments
 
-**Custom Brushes:** Supports custom `.pbx` brush files loaded from your brushes folder.
+**Custom Brushes:** Supports custom `.mrk` brush files loaded from your brushes folder.
 
 ---
 
@@ -60,8 +60,7 @@ Removes pixels by making them transparent.
 | Option | Description |
 |--------|-------------|
 | **Brush** | Select eraser shape (<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> Circle, <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> Square) or custom brush |
-| **Size** | Eraser diameter |
-| **Opacity** | Eraser transparency (0-255) |
+| **Size** | Eraser diameter (1-128) |
 | **Density** | Eraser hardness (0-255) |
 | **Erase to transparent** | When enabled, erases to full transparency; when disabled, erases to background color |
 
@@ -81,7 +80,7 @@ Flood fills a contiguous area with the foreground color.
 
 ---
 
-### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_20.png" width="20"> Gradient Brush (D)
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_20.png" width="20"> Gradient Brush (O)
 
 Cycles through loaded gradient colors based on the pixel color under the brush.
 
@@ -94,7 +93,7 @@ Cycles through loaded gradient colors based on the pixel color under the brush.
 | Option | Description |
 |--------|-------------|
 | **Shape** | Round or Square brush tip |
-| **Size** | Brush diameter |
+| **Size** | Brush diameter (1-128) |
 | **Density** | Brush hardness (0-255) |
 | **Ignore Alpha** | Skip transparent pixels |
 | **Loop** | Cycle back to the start after reaching the end |
@@ -109,8 +108,7 @@ Replaces the background color with the foreground color wherever you paint.
 | Option | Description |
 |--------|-------------|
 | **Brush** | Select replacer shape (<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> Circle, <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> Square) or custom brush |
-| **Size** | Brush diameter |
-| **Opacity** | Transparency of replaced pixels (0-255) |
+| **Size** | Brush diameter (1-128) |
 | **Density** | Brush hardness (0-255) |
 | **Ignore Alpha** | Replace regardless of transparency |
 
@@ -163,7 +161,7 @@ Click points to create a polygon selection. The shape closes automatically when 
 
 ---
 
-### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_20.png" width="20"> Paint Selection (Shift+P)
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_20.png" width="20"> Paint Selection (Q)
 
 Brush-based selection mode - paint to add, right-click to subtract.
 
@@ -247,7 +245,7 @@ Pushes and blends colors in the direction you paint.
 
 ## Shape Tools
 
-### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_20.png" width="20"> Rectangle (Ctrl+U)
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_20.png" width="20"> Rectangle (I)
 
 Draw filled or outlined rectangles.
 
@@ -268,7 +266,7 @@ Draw filled or outlined rectangles.
 
 ---
 
-### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_20.png" width="20"> Ellipse (O)
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_20.png" width="20"> Ellipse (P)
 
 Draw filled or outlined ellipses/circles.
 
@@ -282,7 +280,7 @@ Draw filled or outlined ellipses/circles.
 
 ## Tile Tools
 
-### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_20.png" width="20"> Tile Stamper (Shift+A)
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_20.png" width="20"> Tile Stamper (Shift+T)
 
 Places tiles from your tileset onto the canvas.
 
@@ -313,7 +311,7 @@ Offsets and transforms tile content within boundaries.
 
 ## Utility Tools
 
-### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_20.png" width="20"> Dropper (I) / Right-Click
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_20.png" width="20"> Dropper (D) / Right-Click
 
 Sample colors from the canvas.
 

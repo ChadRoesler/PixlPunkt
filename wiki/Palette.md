@@ -1,4 +1,4 @@
-# Palette
+﻿# Palette
 
 Color palette management in PixlPunkt.
 
@@ -8,21 +8,7 @@ Color palette management in PixlPunkt.
 
 The Palette Panel is your color management hub:
 
-```
-???????????????????????????????
-?  [FG] [BG]  [? Swap (X)]   ?
-???????????????????????????????
-? ?????????????????????????  ?
-? ?   ?   ?   ?   ?   ?   ?  ?
-? ?????????????????????????  ?
-? ?   ?   ?   ?   ?   ?   ?  ?  Palette
-? ?????????????????????????  ?  Swatches
-? ?   ?   ?   ?   ?   ?   ?  ?
-? ?????????????????????????  ?
-???????????????????????????????
-? [+] Add  [?] Menu          ?
-???????????????????????????????
-```
+<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/screenshots/PalettePanel.png" width="16">
 
 ---
 
@@ -36,7 +22,7 @@ The Palette Panel is your color management hub:
 ### Background (BG)
 - Secondary color
 - Used by Eraser (to background mode)
-- Shift+Click to sample to BG
+- Used as gradient endpoint
 
 ### Swap Colors
 - Press `X` to swap FG and BG
@@ -52,16 +38,11 @@ The Palette Panel is your color management hub:
 
 ### Add Color to Palette
 1. Set your foreground color
-2. Click **[+] Add** or press `Ctrl+Shift+A`
+2. Click **[+] Add** button
 3. Color is added to palette
 
 ### Remove Color
-- Right-click swatch ? **Remove**
-- Or drag swatch out of palette
-
-### Rearrange Colors
-- Drag swatches to reorder
-- Group similar colors together
+- Right-click swatch → **Remove**
 
 ### Edit Color
 - Double-click swatch to edit in Color Picker
@@ -71,30 +52,58 @@ The Palette Panel is your color management hub:
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/folder_16.png" width="16"> Preset Palettes
 
-PixlPunkt includes classic palettes:
+PixlPunkt includes 24 curated preset palettes across four categories:
 
-| Palette | Colors | Era |
-|---------|--------|-----|
-| **NES** | 54 | 8-bit Nintendo |
-| **GameBoy** | 4 | Original GB green |
-| **GameBoy Pocket** | 4 | GB Pocket gray |
-| **CGA** | 16 | IBM PC CGA |
-| **EGA** | 64 | IBM PC EGA |
-| **PICO-8** | 16 | Fantasy console |
-| **Commodore 64** | 16 | C64 |
-| **Amstrad CPC** | 27 | Amstrad |
-| **MSX** | 15 | MSX computers |
-| **Sega Master System** | 64 | SMS |
-| **DB16** | 16 | DawnBringer 16 |
-| **DB32** | 32 | DawnBringer 32 |
-| **AAP-64** | 64 | Adigun A. Polack |
-| **Lospec500** | 500 | Lospec community |
+### Retro Hardware (7 palettes)
+
+| Palette | Colors | Description |
+|---------|--------|-------------|
+| **Game Boy (DMG)** | 4 | Classic green-tinted LCD |
+| **NES (Compact 16)** | 16 | Nintendo Entertainment System |
+| **Commodore 64 (16)** | 16 | C64 Pepto colors |
+| **CGA Mode 4 (Merged 16)** | 16 | IBM PC CGA graphics |
+| **PICO-8 (16)** | 16 | Fantasy console palette |
+| **EGA / VGA (16)** | 16 | Standard PC graphics |
+| **ZX Spectrum (16)** | 16 | Sinclair home computer |
+
+### Artistic Themes (11 palettes)
+
+| Palette | Colors | Description |
+|---------|--------|-------------|
+| **Pastelly (16)** | 16 | Soft pastel tones |
+| **Dystopian (16)** | 16 | Dark, muted atmosphere |
+| **Brutal(ist) (16)** | 16 | High-contrast with accents |
+| **Steampunk (16)** | 16 | Bronze and teal Victorian |
+| **Dieselpunk (16)** | 16 | Industrial grays and earth |
+| **Cyberpunk Neon (16)** | 16 | Fluorescent high-tech |
+| **Vaporwave (16)** | 16 | Pastel and neon retro-future |
+| **Earthy Naturals (16)** | 16 | Natural browns and greens |
+| **WaterWorld (16)** | 16 | Aquatic blues and aqua |
+| **Kingdom Death Monster (16)** | 16 | Muted horror/dark fantasy |
+| **Cosmic (16)** | 16 | Deep space and nebula |
+
+### Community Standards (3 palettes)
+
+| Palette | Colors | Description |
+|---------|--------|-------------|
+| **DawnBringer (DB16)** | 16 | Popular pixel art palette |
+| **Seren-12 (Midnight Orchard)** | 12 | Rich dramatic colors |
+| **Solarized (16)** | 16 | Eye-friendly coding palette |
+
+### Utility (3 palettes)
+
+| Palette | Colors | Description |
+|---------|--------|-------------|
+| **PixlPunkt Default** | 100 | Comprehensive general-purpose |
+| **Grayscale (16)** | 16 | Smooth black to white |
+| **Skin Tones (16)** | 16 | Diverse human skin tones |
 
 ### Loading a Preset
 
-1. Click **[?] Menu** in Palette Panel
-2. Select **Load Preset**
+1. Click **[≡] Menu** in Palette Panel
+2. Select **Presets** submenu
 3. Choose from the list
+4. Select **Add** (append) or **Replace** (clear and load)
 
 ---
 
@@ -102,8 +111,8 @@ PixlPunkt includes classic palettes:
 
 ### Save Current Palette
 
-1. **[?] Menu** ? **Save Palette**
-2. Enter a name
+1. **[≡] Menu** → **Export** → **Save Custom Palette**
+2. Enter a name and optional description
 3. Saved to your Palettes folder
 
 ### Palette File Location
@@ -112,26 +121,27 @@ PixlPunkt includes classic palettes:
 - macOS: `~/Library/Application Support/PixlPunkt/Palettes/`
 - Linux: `~/.local/share/PixlPunkt/Palettes/`
 
-### Palette Formats
+### Import/Export Formats
 
-| Format | Extension | Notes |
-|--------|-----------|-------|
-| PixlPunkt | `.pxpp` | Native, includes name |
-| GIMP | `.gpl` | Compatible with GIMP |
-| Adobe ASE | `.ase` | Adobe Swatch Exchange |
-| Hex List | `.hex` | One hex color per line |
-| PAL | `.pal` | JASC/PSP format |
-| PNG | `.png` | Extract colors from image |
+PixlPunkt supports these palette file formats:
 
-### Import Palette
+| Format | Extension | Import | Export | Notes |
+|--------|-----------|:------:|:------:|-------|
+| Hex List | `.hex` | ✓ | ✓ | One `#RRGGBB` per line |
+| GIMP Palette | `.gpl` | ✓ | ✓ | GIMP/Inkscape compatible |
+| Microsoft PAL | `.pal` | ✓ | — | RIFF palette format |
+| Adobe Color | `.aco` | ✓ | — | Photoshop swatches (RGB only) |
+| PixlPunkt JSON | `.json` | — | ✓ | Native format with metadata |
 
-1. **[?] Menu** ? **Import Palette**
+### Import Palette from File
+
+1. **[≡] Menu** → **Import** → **From File**
 2. Select file in any supported format
-3. Colors are loaded
+3. Colors are loaded with Add/Replace option
 
-### Export Palette
+### Export Palette to File
 
-1. **[?] Menu** ? **Export Palette**
+1. **[≡] Menu** → **Export** → **To File**
 2. Choose format
 3. Select destination
 
@@ -139,44 +149,32 @@ PixlPunkt includes classic palettes:
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> Extract Palette from Image
 
-Pull colors from any image:
+Pull unique colors from any image:
 
-1. **[?] Menu** ? **Extract from Image**
-2. Select an image file
-3. Options:
-   - **Max Colors:** Limit extracted colors
-   - **Quantization:** How colors are selected
-4. Extracted palette is loaded
+1. **[≡] Menu** → **Import** → **From Image**
+2. Select an image file (PNG, BMP, JPG, GIF)
+3. Preview shows extracted colors
+4. Use **Merge near colors** slider to reduce similar colors
+5. Choose **Add** or **Replace**
 
-### Quantization Methods
-
-| Method | Best For |
-|--------|----------|
-| **Median Cut** | General purpose |
-| **Octree** | Photographic images |
-| **K-Means** | Precise color matching |
+You can also extract from:
+- **Current Layer** → Import → From Layer
+- **Entire Document** → Import → From Document
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> Palette Ramps
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> Gradient Swatches
 
-Create color ramps (gradients) within your palette:
+Create intermediate colors between two palette colors:
 
-### Generate Ramp
+### Generate Gradient Swatches
 
-1. Select start color (click swatch, hold Ctrl)
-2. Select end color (Ctrl+click second swatch)
-3. **[?] Menu** ? **Generate Ramp**
-4. Choose number of steps
-5. Intermediate colors are created
-
-### Hue Shifting
-
-For more interesting ramps:
-- Enable **Hue Shift** option
-- Warm colors shift toward orange
-- Cool colors shift toward blue
-- Creates more natural-looking gradients
+1. Click the **Gradient** button <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> in the palette toolbar
+2. Start color defaults to your foreground
+3. End color defaults to your background
+4. Adjust the number of steps
+5. Preview shows the gradient
+6. Click **Add** to add colors to palette
 
 ---
 
@@ -186,54 +184,40 @@ Organize your palette:
 
 ### Sort Options
 
-**[?] Menu** ? **Sort Palette**
+**[≡] Menu** → **Sort By**
 
 | Sort By | Description |
 |---------|-------------|
-| **Hue** | Group by color family |
-| **Saturation** | Gray ? Vibrant |
-| **Luminosity** | Dark ? Light |
-| **Red/Green/Blue** | By channel value |
-
-### Manual Sorting
-
-Drag swatches to create your own organization:
-- Group skin tones together
-- Separate shadows from highlights
-- Organize by usage (character, environment, etc.)
+| **Hue** | Group by color family (rainbow order) |
+| **Saturation** | Gray → Vibrant |
+| **Lightness** | By HSL lightness value |
+| **Luminance** | By perceived brightness |
+| **Red** | By red channel value |
+| **Green** | By green channel value |
+| **Blue** | By blue channel value |
+| **Reverse** | Flip current order |
 
 ---
 
 ## Palette Operations
 
 ### Clear Palette
-- **[?] Menu** ? **Clear Palette**
+- **[≡] Menu** → **Clear Palette**
+- Shows confirmation dialog
 - Removes all colors
-- Keeps FG/BG colors
 
 ### Reset to Default
-- **[?] Menu** ? **Reset to Default**
-- Loads the default starter palette
-
-### Duplicate Palette
-- **[?] Menu** ? **Duplicate**
-- Creates a copy for experimentation
+- **[≡] Menu** → **Reset**
+- Loads the configured default palette
 
 ---
 
 ## Per-Document Palettes
 
 Each document stores its own palette:
-- Save with the `.pxp` file
+- Saved with the `.pxp` file
 - Different projects can have different palettes
 - Palette travels with the document
-
-### Default Palette
-
-Set a palette as default for new documents:
-1. Load or create your preferred palette
-2. **[?] Menu** ? **Set as Default**
-3. New documents start with this palette
 
 ---
 
@@ -242,9 +226,7 @@ Set a palette as default for new documents:
 | Shortcut | Action |
 |----------|--------|
 | `X` | Swap FG/BG |
-| `Ctrl+Shift+A` | Add FG to palette |
-| `1-9` | Quick select palette colors |
-| `Right-click` | Pick color from canvas |
+| `Right-click` (canvas) | Pick color as foreground |
 
 ---
 

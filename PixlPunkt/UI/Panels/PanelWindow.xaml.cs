@@ -34,6 +34,19 @@ namespace PixlPunkt.UI.Panels
         /// <param name="title">The title to display in the window title bar.</param>
         /// <param name="content">The UI content to host (typically a SectionCard).</param>
         public PanelWindow(string panelId, string title, FrameworkElement content)
+            : this(panelId, title, content, 0, 0)
+        {
+        }
+
+        /// <summary>
+        /// Creates a new floating panel window with specified initial size.
+        /// </summary>
+        /// <param name="panelId">Unique identifier for the panel (e.g., "Preview", "Palette", "Tiles", "Layers").</param>
+        /// <param name="title">The title to display in the window title bar.</param>
+        /// <param name="content">The UI content to host (typically a SectionCard).</param>
+        /// <param name="dockedWidth">The width the panel had when docked (0 to use default).</param>
+        /// <param name="dockedHeight">The height the panel had when docked (0 to use default).</param>
+        public PanelWindow(string panelId, string title, FrameworkElement content, double dockedWidth, double dockedHeight)
         {
             _panelId = panelId;
             _content = content;
@@ -56,6 +69,36 @@ namespace PixlPunkt.UI.Panels
             if (ContentPlaceholder != null && content != null)
             {
                 ContentPlaceholder.Child = content;
+            }
+
+            // Size window based on docked panel size if available
+            if (dockedWidth > 0 && dockedHeight > 0)
+            {
+                try
+                {
+                    // Add padding for window chrome (title bar ~32px, borders ~2px each side)
+                    int chromeHeight = 32;
+                    int chromeBorder = 8; // Include ContentPlaceholder padding
+                    
+                    int windowWidth = (int)dockedWidth + (chromeBorder * 2);
+                    int windowHeight = (int)dockedHeight + chromeHeight + chromeBorder;
+
+                    // Ensure minimum reasonable size
+                    windowWidth = Math.Max(windowWidth, 200);
+                    windowHeight = Math.Max(windowHeight, 150);
+
+                    var appWindow = this.AppWindow;
+                    if (appWindow != null)
+                    {
+                        var size = new Windows.Graphics.SizeInt32 { Width = windowWidth, Height = windowHeight };
+                        appWindow.Resize(size);
+                        System.Diagnostics.Debug.WriteLine($"[PanelWindow] Sized to {windowWidth}x{windowHeight} (docked was {dockedWidth}x{dockedHeight})");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PanelWindow] ERROR sizing window: {ex.Message}");
+                }
             }
 
             // Handle window close

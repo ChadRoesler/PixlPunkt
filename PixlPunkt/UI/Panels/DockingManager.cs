@@ -130,6 +130,15 @@ namespace PixlPunkt.UI.Panels
 
             try
             {
+                // Capture the docked panel's current size before removing
+                double dockedWidth = 0;
+                double dockedHeight = 0;
+                if (panel.DockedContainer is FrameworkElement fe)
+                {
+                    dockedWidth = fe.ActualWidth;
+                    dockedHeight = fe.ActualHeight;
+                }
+
                 // Remove the SectionCard from the sidebar grid
                 _sidebarGrid.Children.Remove(panel.DockedContainer);
                 // Set floating state on SectionCard
@@ -147,7 +156,7 @@ namespace PixlPunkt.UI.Panels
                     }
                 }
                 // Create floating window with the SectionCard as content
-                var window = new PanelWindow(panelId, panel.Title, panel.DockedContainer);
+                var window = new PanelWindow(panelId, panel.Title, panel.DockedContainer, dockedWidth, dockedHeight);
                 panel.FloatingWindow = window;
                 panel.IsDocked = false;
 

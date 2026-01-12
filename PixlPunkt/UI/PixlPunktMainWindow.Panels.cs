@@ -130,64 +130,120 @@ namespace PixlPunkt.UI
         {
             // Preview panel (row 0) and spacer (row 1)
             bool previewDocked = IsPanelDocked("Preview");
+            bool previewMinimized = PreviewCard?.IsMinimized ?? false;
             if (PreviewRow != null)
             {
                 if (!previewDocked)
+                {
                     PreviewRow.Height = new GridLength(0);
-                else if (PreviewCard.IsMinimized)
+                    PreviewRow.MinHeight = 0;
+                }
+                else if (previewMinimized)
+                {
                     PreviewRow.Height = GridLength.Auto;
+                    PreviewRow.MinHeight = 0;
+                }
                 else
+                {
                     PreviewRow.Height = new GridLength(1, GridUnitType.Star);
+                    PreviewRow.MinHeight = 60;
+                }
             }
             if (PreviewSpacerRow != null)
-                PreviewSpacerRow.Height = previewDocked ? new GridLength(4) : new GridLength(0);
+                PreviewSpacerRow.Height = previewDocked && !previewMinimized ? new GridLength(4) : new GridLength(0);
+            if (PreviewSpacer != null)
+                PreviewSpacer.Visibility = previewDocked && !previewMinimized ? Visibility.Visible : Visibility.Collapsed;
 
             // Palette panel (row 2) and spacer (row 3)
             bool paletteDocked = IsPanelDocked("Palette");
+            bool paletteMinimized = PaletteCard?.IsMinimized ?? false;
             if (PaletteRow != null)
             {
                 if (!paletteDocked)
+                {
                     PaletteRow.Height = new GridLength(0);
-                else if (PaletteCard.IsMinimized)
+                    PaletteRow.MinHeight = 0;
+                }
+                else if (paletteMinimized)
+                {
                     PaletteRow.Height = GridLength.Auto;
+                    PaletteRow.MinHeight = 0;
+                }
                 else
+                {
                     PaletteRow.Height = new GridLength(1, GridUnitType.Star);
+                    PaletteRow.MinHeight = 60;
+                }
             }
             if (PaletteSpacerRow != null)
-                PaletteSpacerRow.Height = paletteDocked ? new GridLength(4) : new GridLength(0);
+                PaletteSpacerRow.Height = paletteDocked && !paletteMinimized ? new GridLength(4) : new GridLength(0);
+            if (PaletteSpacer != null)
+                PaletteSpacer.Visibility = paletteDocked && !paletteMinimized ? Visibility.Visible : Visibility.Collapsed;
 
             // Tiles panel (row 4) and spacer (row 5)
             bool tilesDocked = IsPanelDocked("Tiles");
+            bool tilesMinimized = TilesCard?.IsMinimized ?? false;
             if (TilesRow != null)
             {
                 if (!tilesDocked)
+                {
                     TilesRow.Height = new GridLength(0);
-                else if (TilesCard.IsMinimized)
+                    TilesRow.MinHeight = 0;
+                }
+                else if (tilesMinimized)
+                {
                     TilesRow.Height = GridLength.Auto;
+                    TilesRow.MinHeight = 0;
+                }
                 else
+                {
                     TilesRow.Height = new GridLength(1, GridUnitType.Star);
+                    TilesRow.MinHeight = 60;
+                }
             }
             if (TilesSpacerRow != null)
-                TilesSpacerRow.Height = tilesDocked ? new GridLength(4) : new GridLength(0);
+                TilesSpacerRow.Height = tilesDocked && !tilesMinimized ? new GridLength(4) : new GridLength(0);
+            if (TilesSpacer != null)
+                TilesSpacer.Visibility = tilesDocked && !tilesMinimized ? Visibility.Visible : Visibility.Collapsed;
 
             // Layers panel (row 6) and spacer (row 7)
             bool layersDocked = IsPanelDocked("Layers");
+            bool layersMinimized = LayersCard?.IsMinimized ?? false;
             if (LayersRow != null)
             {
                 if (!layersDocked)
+                {
                     LayersRow.Height = new GridLength(0);
-                else if (LayersCard.IsMinimized)
+                    LayersRow.MinHeight = 0;
+                }
+                else if (layersMinimized)
+                {
                     LayersRow.Height = GridLength.Auto;
+                    LayersRow.MinHeight = 0;
+                }
                 else
+                {
                     LayersRow.Height = new GridLength(1, GridUnitType.Star);
+                    LayersRow.MinHeight = 60;
+                }
             }
             if (LayersSpacerRow != null)
-                LayersSpacerRow.Height = layersDocked ? new GridLength(4) : new GridLength(0);
+                LayersSpacerRow.Height = layersDocked && !layersMinimized ? new GridLength(4) : new GridLength(0);
+            if (LayersSpacer != null)
+                LayersSpacer.Visibility = layersDocked && !layersMinimized ? Visibility.Visible : Visibility.Collapsed;
 
             // History panel (row 8) - always Auto height when docked, 0 when undocked
             bool historyDocked = IsPanelDocked("History");
             if (HistoryRow != null)
                 HistoryRow.Height = historyDocked ? GridLength.Auto : new GridLength(0);
+
+            // Force the sidebar grid to recalculate layout
+            if (RightSidebar != null)
+            {
+                RightSidebar.InvalidateMeasure();
+                RightSidebar.InvalidateArrange();
+                RightSidebar.UpdateLayout();
+            }
         }
 
         // ====================================================================
