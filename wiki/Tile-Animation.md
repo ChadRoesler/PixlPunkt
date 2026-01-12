@@ -1,6 +1,6 @@
 # Tile Animation
 
-Tile Animation <img src="../docs/assets/icons/table_lightning_20.png" width="20"> is PixlPunkt's sprite-sheet-based animation system. Instead of storing full frames of pixel data, it sequences through tile coordinates - making it perfect for game sprites, memory-efficient animations, and sprite sheet workflows.
+Tile Animation <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_20.png" width="20"> is PixlPunkt's sprite-sheet-based animation system. Instead of storing full frames of pixel data, it sequences through tile coordinates - making it perfect for game sprites, memory-efficient animations, and sprite sheet workflows.
 
 ## Overview
 
@@ -34,8 +34,8 @@ References to specific tiles with timing information.
 
 ### Method 1: Draw in PixlPunkt
 1. **File ? New Canvas**
-2. Set tile size (e.g., 32×32)
-3. Set canvas to hold all frames (e.g., 8×4 tiles for 32 frames)
+2. Set tile size (e.g., 32ï¿½32)
+3. Set canvas to hold all frames (e.g., 8ï¿½4 tiles for 32 frames)
 4. Draw each animation frame in a separate tile
 
 ### Method 2: Import Existing
@@ -88,11 +88,11 @@ References to specific tiles with timing information.
 
 ## Creating a Reel
 
-1. Click <img src="../docs/assets/icons/add_16.png" width="16"> **+ New** to create a new reel
+1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **+ New** to create a new reel
 2. Name it (e.g., "Walk_Right")
 3. Click tiles in the tileset preview to add frames
 4. Adjust timing for each frame
-5. Click <img src="../docs/assets/icons/play_16.png" width="16"> **Preview** to test
+5. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> **Preview** to test
 
 ---
 
@@ -147,7 +147,7 @@ Each frame has an independent duration:
 
 | Mode | Behavior |
 |------|----------|
-| **Loop** <img src="../docs/assets/icons/arrow_repeat_all_16.png" width="16"> | Repeats forever (1?2?3?1?2?3...) |
+| **Loop** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_repeat_all_16.png" width="16"> | Repeats forever (1?2?3?1?2?3...) |
 | **Ping-Pong** | Bounces back and forth (1?2?3?2?1?2?3...) |
 | **Once** | Plays once and stops |
 
@@ -175,7 +175,7 @@ Changes to the tile update ALL reels automatically.
 Instead of drawing Walk_Left separately:
 1. Draw Walk_Right
 2. Create Walk_Left reel with same tiles
-3. Set <img src="../docs/assets/icons/flip_horizontal_16.png" width="16"> **Flip Horizontal** on the reel
+3. Set <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/flip_horizontal_16.png" width="16"> **Flip Horizontal** on the reel
 4. Half the work, same result
 
 ---
@@ -183,17 +183,17 @@ Instead of drawing Walk_Left separately:
 ## Previewing Animations
 
 ### In-Panel Preview
-Click <img src="../docs/assets/icons/play_16.png" width="16"> **Preview** to loop the current reel in the panel.
+Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> **Preview** to loop the current reel in the panel.
 
 ### On-Canvas Preview
-1. Use the Tile Stamper tool <img src="../docs/assets/icons/table_edit_16.png" width="16"> (`Shift+A`)
+1. Use the Tile Stamper tool <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> (`Shift+A`)
 2. Select your reel
 3. Stamp on canvas
 4. Animation plays live on the canvas
 
 ### Preview Options
 - **Speed multiplier** - 0.5x, 1x, 2x playback
-- **Loop** <img src="../docs/assets/icons/arrow_repeat_all_16.png" width="16"> - Toggle looping
+- **Loop** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_repeat_all_16.png" width="16"> - Toggle looping
 - **Show frame number** - Overlay current frame
 
 ---
@@ -314,7 +314,7 @@ Instead of adding frames for slow motion:
 - Saves memory and work
 
 ### Test Early and Often
-- Preview animations constantly with <img src="../docs/assets/icons/play_16.png" width="16">
+- Preview animations constantly with <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16">
 - Check loops for jarring transitions
 - Verify timing feels right at game speed
 
@@ -337,8 +337,8 @@ Instead of adding frames for slow motion:
 | Export | Sprite sheets | Video, GIF, sequences |
 
 **Use both together!** 
-- Tile Animation <img src="../docs/assets/icons/table_lightning_16.png" width="16"> for character sprites
-- Canvas Animation <img src="../docs/assets/icons/play_16.png" width="16"> for cinematics
+- Tile Animation <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_16.png" width="16"> for character sprites
+- Canvas Animation <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> for cinematics
 - Sub-Routines to embed tile animations in canvas animations
 
 ---

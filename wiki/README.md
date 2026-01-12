@@ -21,14 +21,11 @@ wiki/
 
 ## Publishing to GitHub Wiki
 
-GitHub Wikis are actually separate git repositories. To publish:
+This wiki is automatically synced using the GitHub Action in `.github/workflows/sync-wiki.yml`.
 
-### Option 1: Manual Copy
-1. Go to your repo's Wiki tab on GitHub
-2. Create pages manually
-3. Copy content from these files
+When you push changes to the `wiki/` folder on the `main` branch, they will be automatically published to the GitHub Wiki.
 
-### Option 2: Git Clone (Recommended)
+### Manual Sync (if needed)
 
 ```bash
 # Clone the wiki repo (it's separate from main repo!)
@@ -44,32 +41,6 @@ git commit -m "Update wiki from main repo"
 git push
 ```
 
-### Option 3: GitHub Action (Automated)
-
-Add this workflow to `.github/workflows/sync-wiki.yml`:
-
-```yaml
-name: Sync Wiki
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'wiki/**'
-
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Sync Wiki
-        uses: Andrew-Chen-Wang/github-wiki-action@v4
-        with:
-          path: wiki
-          token: ${{ secrets.GITHUB_TOKEN }}
-```
-
 ## Page Naming Convention
 
 - Use `Title-Case-With-Dashes.md` for filenames
@@ -80,14 +51,22 @@ jobs:
 
 ```markdown
 # Internal wiki links
-[[Tools]]                    # Links to Tools.md
+[[Tools]]                        # Links to Tools.md
 [[Gradient Fill|Gradient-Fill]]  # Custom display text
 
 # External links
 [GitHub Repo](https://github.com/ChadRoesler/PixlPunkt)
 
-# Links to docs/ folder
-[Cheat Sheet](../docs/CHEAT_SHEET.md)
+# Links to main repo files
+[Cheat Sheet](https://github.com/ChadRoesler/PixlPunkt/blob/main/docs/CHEAT_SHEET.md)
+```
+
+## Images
+
+Images should reference the main repo using raw GitHub URLs:
+
+```markdown
+<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/edit_16.png" width="16">
 ```
 
 ## Adding New Pages
@@ -95,12 +74,12 @@ jobs:
 1. Create `New-Page.md` in this folder
 2. Add to `_Sidebar.md` for navigation
 3. Link from relevant existing pages
-4. Sync to wiki using method above
+4. Push to main - wiki syncs automatically!
 
 ## Updating Existing Pages
 
 1. Edit the `.md` file in this folder
-2. Commit to main branch
-3. Sync to wiki (manual or automated)
+2. Commit and push to main branch
+3. Wiki syncs automatically via GitHub Action
 
 This keeps wiki source in version control with the code!

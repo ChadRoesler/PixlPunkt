@@ -1,6 +1,6 @@
 # Layer Effects
 
-Layer effects <img src="../docs/assets/icons/image_sparkle_20.png" width="20"> are non-destructive filters applied to layers. They can be toggled on/off, adjusted anytime, and fully animated - making them incredibly powerful for both static art and animation.
+Layer effects <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/image_sparkle_20.png" width="20"> are non-destructive filters applied to layers. They can be toggled on/off, adjusted anytime, and fully animated - making them incredibly powerful for both static art and animation.
 
 ## Overview
 
@@ -23,7 +23,7 @@ Effects are applied per-layer and render in real-time. The original pixel data i
 
 Or:
 - **Right-click layer ? Effects**
-- Click the <img src="../docs/assets/icons/settings_16.png" width="16"> **gear icon** on the layer
+- Click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> **gear icon** on the layer
 
 ---
 
@@ -31,10 +31,10 @@ Or:
 
 | Icon | State | Description |
 |:----:|-------|-------------|
-| <img src="../docs/assets/icons/glasses_20.png" width="20"> | Effects On | Layer effects are rendering |
-| <img src="../docs/assets/icons/glasses_off_20.png" width="20"> | Effects Off | Layer effects disabled (faster editing) |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/glasses_20.png" width="20"> | Effects On | Layer effects are rendering |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/glasses_off_20.png" width="20"> | Effects Off | Layer effects disabled (faster editing) |
 
-Click the <img src="../docs/assets/icons/glasses_16.png" width="16"> icon on a layer row to quickly toggle all its effects.
+Click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/glasses_16.png" width="16"> icon on a layer row to quickly toggle all its effects.
 
 ---
 
@@ -42,7 +42,7 @@ Click the <img src="../docs/assets/icons/glasses_16.png" width="16"> icon on a l
 
 ### Stylize Effects
 
-#### <img src="../docs/assets/icons/square_shadow_20.png" width="20"> Drop Shadow
+#### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_shadow_20.png" width="20"> Drop Shadow
 Adds a shadow behind the layer content.
 
 | Parameter | Range | Description |
@@ -78,7 +78,7 @@ Adds a stroke around non-transparent pixels.
 
 ---
 
-#### <img src="../docs/assets/icons/sparkle_20.png" width="20"> Glow / Bloom
+#### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/sparkle_20.png" width="20"> Glow / Bloom
 Creates a soft light emission effect.
 
 | Parameter | Range | Description |
@@ -203,12 +203,12 @@ Reduces apparent resolution.
 
 ### Color Effects
 
-#### <img src="../docs/assets/icons/color_20.png" width="20"> Color Adjust
+#### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_20.png" width="20"> Color Adjust
 Modifies hue, saturation, brightness, and contrast.
 
 | Parameter | Range | Description |
 |-----------|-------|-------------|
-| **Hue Shift** | -180° to 180° | Rotate all colors |
+| **Hue Shift** | -180ï¿½ to 180ï¿½ | Rotate all colors |
 | **Saturation** | -100% to 100% | Color intensity |
 | **Brightness** | -100% to 100% | Lighten/darken |
 | **Contrast** | -100% to 100% | Tonal range |
@@ -281,12 +281,12 @@ All effect parameters are animatable in Canvas Animation mode!
 
 1. Open Timeline (`T`)
 2. Navigate to starting frame
-3. Configure effect settings via <img src="../docs/assets/icons/settings_16.png" width="16">
-4. Click <img src="../docs/assets/icons/add_16.png" width="16"> Add keyframe to the layer
+3. Configure effect settings via <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16">
+4. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> Add keyframe to the layer
 5. Navigate to ending frame
 6. Change effect settings
-7. Click <img src="../docs/assets/icons/add_16.png" width="16"> Add another keyframe
-8. Press <img src="../docs/assets/icons/play_16.png" width="16"> Play to see animated effect!
+7. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> Add another keyframe
+8. Press <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> Play to see animated effect!
 
 ### Animation Ideas
 
@@ -309,7 +309,7 @@ All effect parameters are animatable in Canvas Animation mode!
 Effects are computed in real-time, which can impact performance:
 
 ### Performance Tips
-- Disable effects while drawing (toggle with <img src="../docs/assets/icons/glasses_16.png" width="16"> glasses icon)
+- Disable effects while drawing (toggle with <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/glasses_16.png" width="16"> glasses icon)
 - Fewer effects = faster rendering
 - Large blur radii are expensive
 - Animated grain is CPU-intensive

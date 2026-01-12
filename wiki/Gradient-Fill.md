@@ -1,10 +1,10 @@
-﻿# Gradient Fill
+# Gradient Fill
 
-The **Gradient Fill** tool <img src="../docs/assets/icons/data_sunburst_20.png" width="20"> (`Shift+G`) is one of PixlPunkt's most powerful features. It creates smooth color transitions with pixel-art-friendly dithering - perfect for skies, backgrounds, lighting effects, and stylized shading.
+The **Gradient Fill** tool <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_20.png" width="20"> (`Shift+G`) is one of PixlPunkt's most powerful features. It creates smooth color transitions with pixel-art-friendly dithering - perfect for skies, backgrounds, lighting effects, and stylized shading.
 
 ## Basic Usage
 
-1. Select the **Gradient Fill** tool (`Shift+G`) <img src="../docs/assets/icons/data_sunburst_16.png" width="16">
+1. Select the **Gradient Fill** tool (`Shift+G`) <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16">
 2. Choose your **Gradient Type** (Linear, Radial, Angular, Diamond)
 3. Select your **Color Mode** or click **Custom...** for multi-color gradients
 4. Click and drag on the canvas:
@@ -51,13 +51,13 @@ The tool options bar includes a **live gradient preview strip** that shows exact
 
 Click **Custom...** in the color mode dropdown to open the gradient editor window:
 
-1. **Start Color** - Click to select or use <img src="../docs/assets/icons/eyedropper_16.png" width="16"> dropper
-2. **End Color** - Click to select or use <img src="../docs/assets/icons/eyedropper_16.png" width="16"> dropper
+1. **Start Color** - Click to select or use <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> dropper
+2. **End Color** - Click to select or use <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> dropper
 3. **Steps** - Number of colors in the gradient
 4. **Preview** - Shows all generated colors
-5. <img src="../docs/assets/icons/add_16.png" width="16"> **Add to Palette** - Saves colors to your palette
+5. <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **Add to Palette** - Saves colors to your palette
 
-The editor supports **dropper mode** - click the <img src="../docs/assets/icons/eyedropper_16.png" width="16"> dropper button then click anywhere on your canvas to sample colors.
+The editor supports **dropper mode** - click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> dropper button then click anywhere on your canvas to sample colors.
 
 ---
 
@@ -192,16 +192,16 @@ This creates beautiful, painterly gradients that perfectly match your color pale
 ## Gradient Fill Tips
 
 ### Working with Selections
-Make a selection first (use <img src="../docs/assets/icons/select_object_16.png" width="16"> Rectangle Select or <img src="../docs/assets/icons/wand_16.png" width="16"> Magic Wand), then the gradient only fills that area. Great for:
+Make a selection first (use <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/select_object_16.png" width="16"> Rectangle Select or <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/wand_16.png" width="16"> Magic Wand), then the gradient only fills that area. Great for:
 - Gradient text
 - Shaped backgrounds
 - Masking effects
 
 ### Layering Gradients
 Apply gradients on separate layers for non-destructive editing:
-1. Click <img src="../docs/assets/icons/add_16.png" width="16"> to create new layer
+1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> to create new layer
 2. Apply gradient
-3. Adjust layer opacity/blend mode via <img src="../docs/assets/icons/settings_16.png" width="16">
+3. Adjust layer opacity/blend mode via <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16">
 4. Stack multiple gradients for complex effects
 
 ### Combining Dither Styles
@@ -211,7 +211,7 @@ Use different dithering in different areas:
 - Blue Noise for subtle textures
 
 ### Matching Your Palette
-Custom gradients work best when colors are from your existing palette <img src="../docs/assets/icons/color_16.png" width="16">. This ensures color consistency across your artwork.
+Custom gradients work best when colors are from your existing palette <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_16.png" width="16">. This ensures color consistency across your artwork.
 
 ### Scale for Resolution
 - **Small sprites (16×16, 32×32):** Scale 1x-2x

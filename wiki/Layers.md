@@ -35,25 +35,25 @@ Organize multiple layers into collapsible groups. Great for:
 
 | Icon | Name | Action |
 |:----:|------|--------|
-| <img src="../docs/assets/icons/add_20.png" width="20"> | Add Layer | Create a new raster layer above current |
-| <img src="../docs/assets/icons/folder_add_20.png" width="20"> | Add Folder | Create a new layer folder |
-| <img src="../docs/assets/icons/delete_20.png" width="20"> | Delete | Remove the selected layer or folder |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_20.png" width="20"> | Add Layer | Create a new raster layer above current |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/folder_add_20.png" width="20"> | Add Folder | Create a new layer folder |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/delete_20.png" width="20"> | Delete | Remove the selected layer or folder |
 
 ### Layer Row Icons
 
 | Icon | Name | Action |
 |:----:|------|--------|
-| <img src="../docs/assets/icons/eye_20.png" width="20"> | Visibility | Toggle layer visible/hidden (click to toggle) |
-| <img src="../docs/assets/icons/lock_closed_20.png" width="20"> | Lock | Prevent editing this layer (click to toggle) |
-| <img src="../docs/assets/icons/glasses_20.png" width="20"> | Effects | Toggle layer effects on/off |
-| <img src="../docs/assets/icons/settings_20.png" width="20"> | Settings | Open layer properties dialog |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eye_20.png" width="20"> | Visibility | Toggle layer visible/hidden (click to toggle) |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_20.png" width="20"> | Lock | Prevent editing this layer (click to toggle) |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/glasses_20.png" width="20"> | Effects | Toggle layer effects on/off |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_20.png" width="20"> | Settings | Open layer properties dialog |
 
 ---
 
 ## Layer Operations
 
 ### Creating Layers
-- Click <img src="../docs/assets/icons/add_16.png" width="16"> **Add Layer** button in the panel toolbar
+- Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **Add Layer** button in the panel toolbar
 - **Ctrl+Shift+N** - New layer dialog
 - **Right-click ? New Layer** - Context menu
 
@@ -76,14 +76,14 @@ Organize multiple layers into collapsible groups. Great for:
 
 ### Deleting Layers
 - Select + **Delete** key
-- Click <img src="../docs/assets/icons/delete_16.png" width="16"> **Delete** button
+- Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/delete_16.png" width="16"> **Delete** button
 - **Right-click ? Delete**
 
 ---
 
 ## Layer Settings
 
-Double-click a layer or click the <img src="../docs/assets/icons/settings_16.png" width="16"> **Settings** button to open:
+Double-click a layer or click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> **Settings** button to open:
 
 ### Basic Properties
 
@@ -98,10 +98,10 @@ Double-click a layer or click the <img src="../docs/assets/icons/settings_16.png
 
 | State | Icon | Description |
 |-------|:----:|-------------|
-| Visible | <img src="../docs/assets/icons/eye_16.png" width="16"> | Layer renders normally |
-| Hidden | <img src="../docs/assets/icons/eye_off_16.png" width="16"> | Layer doesn't render |
-| Solo | <img src="../docs/assets/icons/eye_tracking_16.png" width="16"> | Only this layer visible |
-| Locked | <img src="../docs/assets/icons/lock_closed_16.png" width="16"> | Can't edit, but renders |
+| Visible | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eye_16.png" width="16"> | Layer renders normally |
+| Hidden | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eye_off_16.png" width="16"> | Layer doesn't render |
+| Solo | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eye_tracking_16.png" width="16"> | Only this layer visible |
+| Locked | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16"> | Can't edit, but renders |
 
 ---
 
@@ -166,20 +166,20 @@ Blend modes control how a layer's pixels combine with the layers beneath it.
 ## Blend Mode Examples
 
 ### Shadows with Multiply
-1. Click <img src="../docs/assets/icons/add_16.png" width="16"> to create new layer above your art
-2. Click <img src="../docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Multiply**
+1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> to create new layer above your art
+2. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Multiply**
 3. Paint with dark purple/blue
 4. Result: Natural-looking shadows that preserve underlying detail
 
 ### Glow with Add
-1. Click <img src="../docs/assets/icons/add_16.png" width="16"> to create new layer above your art
-2. Click <img src="../docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Add**
+1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> to create new layer above your art
+2. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Add**
 3. Paint with light colors
 4. Result: Bright glow effect that intensifies
 
 ### Color Overlay
-1. Click <img src="../docs/assets/icons/add_16.png" width="16"> to create new layer, fill with a color
-2. Click <img src="../docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Color**
+1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> to create new layer, fill with a color
+2. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> and set blend mode to **Color**
 3. Adjust opacity slider
 4. Result: Everything tinted that color while preserving values
 
@@ -188,11 +188,11 @@ Blend modes control how a layer's pixels combine with the layers beneath it.
 ## Layer Folders
 
 ### Creating Folders
-- Click <img src="../docs/assets/icons/folder_add_16.png" width="16"> **Add Folder** button
+- Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/folder_add_16.png" width="16"> **Add Folder** button
 - **Select multiple layers + Right-click ? Group** - Folder from selection
 
 ### Folder Behavior
-- Folders can be collapsed/expanded (click the <img src="../docs/assets/icons/chevron_right_16.png" width="16"> arrow)
+- Folders can be collapsed/expanded (click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/chevron_right_16.png" width="16"> arrow)
 - Opacity applies to entire folder
 - Blend mode applies to folder composite
 - Effects can be applied to folders
@@ -222,14 +222,14 @@ Folders can contain other folders (up to 8 levels deep).
 
 | Lock | Icon | Effect |
 |------|:----:|--------|
-| **Full Lock** | <img src="../docs/assets/icons/lock_closed_16.png" width="16"> | Can't edit anything |
-| **Transparency Lock** | <img src="../docs/assets/icons/lock_closed_16.png" width="16">? | Can only paint on existing pixels |
-| **Position Lock** | <img src="../docs/assets/icons/lock_closed_16.png" width="16">? | Can't move layer contents |
+| **Full Lock** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16"> | Can't edit anything |
+| **Transparency Lock** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16">? | Can only paint on existing pixels |
+| **Position Lock** | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16">? | Can't move layer contents |
 
 ### Using Transparency Lock
 Perfect for shading:
 1. Draw your base shape
-2. Click <img src="../docs/assets/icons/lock_closed_16.png" width="16"> and enable **Transparency Lock**
+2. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lock_closed_16.png" width="16"> and enable **Transparency Lock**
 3. Paint freely - colors only apply where pixels exist
 4. No accidentally painting outside the lines!
 
@@ -239,13 +239,13 @@ Perfect for shading:
 
 ### Organization
 - Name your layers! "Layer 1" is useless
-- Use folders <img src="../docs/assets/icons/folder_16.png" width="16"> to group related elements
+- Use folders <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/folder_16.png" width="16"> to group related elements
 - Color-code layers with the label feature
 
 ### Performance
 - Flatten finished areas to reduce layer count
 - Large documents with many layers can slow down
-- Click <img src="../docs/assets/icons/eye_16.png" width="16"> to hide complex layers while working
+- Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eye_16.png" width="16"> to hide complex layers while working
 
 ### Workflow
 - Work on separate layers for different elements

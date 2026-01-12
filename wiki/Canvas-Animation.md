@@ -1,4 +1,4 @@
-﻿# Canvas Animation
+# Canvas Animation
 
 Canvas Animation is PixlPunkt's professional, layer-based animation system. Each layer can have independent keyframes that store complete state snapshots - perfect for complex character animation, cutscenes, and any frame-by-frame work.
 
@@ -40,14 +40,14 @@ Open the Timeline with **View → Timeline** or press `T`.
 
 | Icon | Name | Action |
 |:----:|------|--------|
-| <img src="../docs/assets/icons/previous_20.png" width="20"> | **First Frame** | Jump to frame 0 |
-| <img src="../docs/assets/icons/previous_20.png" width="20"> | **Previous Frame** | Go back one frame |
-| <img src="../docs/assets/icons/play_20.png" width="20"> | **Play/Pause** | Toggle animation playback |
-| <img src="../docs/assets/icons/next_20.png" width="20"> | **Next Frame** | Advance one frame |
-| <img src="../docs/assets/icons/next_20.png" width="20"> | **Last Frame** | Jump to the last frame |
-| <img src="../docs/assets/icons/stop_20.png" width="20"> | **Stop** | Stop playback and return to frame 0 |
-| <img src="../docs/assets/icons/add_20.png" width="20"> | **Add Keyframe** | Create a keyframe at the current frame |
-| <img src="../docs/assets/icons/layer_diagonal_20.png" width="20"> | **Onion Skin** | Toggle onion skinning overlay |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/previous_20.png" width="20"> | **First Frame** | Jump to frame 0 |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/previous_20.png" width="20"> | **Previous Frame** | Go back one frame |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_20.png" width="20"> | **Play/Pause** | Toggle animation playback |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/next_20.png" width="20"> | **Next Frame** | Advance one frame |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/next_20.png" width="20"> | **Last Frame** | Jump to the last frame |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/stop_20.png" width="20"> | **Stop** | Stop playback and return to frame 0 |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_20.png" width="20"> | **Add Keyframe** | Create a keyframe at the current frame |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/layer_diagonal_20.png" width="20"> | **Onion Skin** | Toggle onion skinning overlay |
 
 ---
 
@@ -88,7 +88,7 @@ Values stay constant until the next keyframe. There's no automatic tweening - th
 ### Method 1: Toolbar Button
 1. Navigate to desired frame
 2. Make changes to your layer
-3. Click the <img src="../docs/assets/icons/add_16.png" width="16"> **Add Keyframe** button in the timeline toolbar
+3. Click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **Add Keyframe** button in the timeline toolbar
 
 ### Method 2: Context Menu
 1. Navigate to desired frame
@@ -112,12 +112,12 @@ Values stay constant until the next keyframe. There's no automatic tweening - th
 
 | Icon | Button | Action | Shortcut |
 |:----:|--------|--------|----------|
-| <img src="../docs/assets/icons/previous_16.png" width="16"> | First frame | Jump to frame 0 | `Home` |
-| <img src="../docs/assets/icons/previous_16.png" width="16"> | Previous frame | Go back one | `,` |
-| <img src="../docs/assets/icons/play_16.png" width="16"> | Play/Pause | Toggle playback | `Space` |
-| <img src="../docs/assets/icons/next_16.png" width="16"> | Next frame | Go forward one | `.` |
-| <img src="../docs/assets/icons/next_16.png" width="16"> | Last frame | Jump to end | `End` |
-| <img src="../docs/assets/icons/stop_16.png" width="16"> | Stop | Stop and go to frame 0 | |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/previous_16.png" width="16"> | First frame | Jump to frame 0 | `Home` |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/previous_16.png" width="16"> | Previous frame | Go back one | `,` |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> | Play/Pause | Toggle playback | `Space` |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/next_16.png" width="16"> | Next frame | Go forward one | `.` |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/next_16.png" width="16"> | Last frame | Jump to end | `End` |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/stop_16.png" width="16"> | Stop | Stop and go to frame 0 | |
 
 ### Playback Options
 - **FPS** - Frames per second (6, 8, 12, 15, 24, 30, 60)
@@ -131,7 +131,7 @@ Values stay constant until the next keyframe. There's no automatic tweening - th
 Shows ghost images of nearby frames to help with smooth animation.
 
 ### Enabling Onion Skin
-Click the <img src="../docs/assets/icons/layer_diagonal_16.png" width="16"> **Onion Skin** button in the timeline toolbar.
+Click the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/layer_diagonal_16.png" width="16"> **Onion Skin** button in the timeline toolbar.
 
 ### Onion Skin Settings
 
@@ -155,13 +155,13 @@ All layer effects are fully animatable! This opens up tons of possibilities.
 ### How to Animate Effects
 
 1. Navigate to frame 0
-2. Open layer settings (click <img src="../docs/assets/icons/settings_16.png" width="16"> gear icon), enable an effect (e.g., Glow)
+2. Open layer settings (click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> gear icon), enable an effect (e.g., Glow)
 3. Configure the effect settings
-4. Click <img src="../docs/assets/icons/add_16.png" width="16"> **Add Keyframe**
+4. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **Add Keyframe**
 5. Navigate to a later frame (e.g., frame 10)
 6. Change the effect settings (e.g., increase glow intensity)
-7. Click <img src="../docs/assets/icons/add_16.png" width="16"> **Add Keyframe** again
-8. Press <img src="../docs/assets/icons/play_16.png" width="16"> **Play** to see the effect animate!
+7. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **Add Keyframe** again
+8. Press <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> **Play** to see the effect animate!
 
 ### Animation Ideas
 
@@ -202,10 +202,10 @@ Each layer animates independently:
 - Background: single keyframe at 0 (static)
 
 ### Layer Visibility Animation
-Toggle layers on/off over time using the <img src="../docs/assets/icons/eye_16.png" width="16"> **visibility** icon:
+Toggle layers on/off over time using the <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eye_16.png" width="16"> **visibility** icon:
 1. Set visibility ON at frame 0, add keyframe
 2. Navigate to frame where you want it to disappear
-3. Click <img src="../docs/assets/icons/eye_16.png" width="16"> to toggle visibility OFF, add keyframe
+3. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eye_16.png" width="16"> to toggle visibility OFF, add keyframe
 4. Layer appears frames 0-N, disappears after
 
 ### Blend Mode Animation
@@ -220,7 +220,7 @@ Change blend modes over time for effects like:
 
 See [[Audio]] for full details, but the basics:
 
-1. Click <img src="../docs/assets/icons/add_16.png" width="16"> **Add Audio Track** in the timeline
+1. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **Add Audio Track** in the timeline
 2. Import your audio file
 3. Waveform appears in the timeline
 4. Align keyframes to beats and cues
@@ -231,7 +231,7 @@ Audio is **reference only** - helps you sync but isn't exported by default.
 
 ## Working with the Stage
 
-See [[Stage]] for full details. The Stage <img src="../docs/assets/icons/camera_16.png" width="16"> provides:
+See [[Stage]] for full details. The Stage <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/camera_16.png" width="16"> provides:
 
 - Camera pan, zoom, rotation
 - Smooth interpolation between keyframes (◇ diamond for stage, ◆ for layers)
@@ -250,7 +250,7 @@ The Stage is perfect for:
 ### Phase 1: Key Poses
 1. Draw the most important poses first (extremes)
 2. Space them out on the timeline
-3. Test timing by clicking <img src="../docs/assets/icons/play_16.png" width="16"> **Play**
+3. Test timing by clicking <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> **Play**
 
 ### Phase 2: Breakdowns
 1. Add frames between key poses
@@ -264,13 +264,13 @@ The Stage is perfect for:
 
 ### Phase 4: Polish
 1. Add secondary animation (hair, cloth, etc.)
-2. Apply layer effects <img src="../docs/assets/icons/image_sparkle_16.png" width="16">
+2. Apply layer effects <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/image_sparkle_16.png" width="16">
 3. Fine-tune timing
 4. Add Stage camera movement if needed
 
 ### Pro Tips
 
-- **Use <img src="../docs/assets/icons/layer_diagonal_16.png" width="16"> onion skin constantly** - You can't animate well without seeing context
+- **Use <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/layer_diagonal_16.png" width="16"> onion skin constantly** - You can't animate well without seeing context
 - **Work rough first** - Silhouettes and blobs, then refine details
 - **Loop early** - Check your loop point before adding detail
 - **Save versions** - Keep backups of major milestones

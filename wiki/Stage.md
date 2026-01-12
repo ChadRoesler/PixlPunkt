@@ -1,6 +1,6 @@
 # Stage (Camera System)
 
-The Stage <img src="../docs/assets/icons/camera_20.png" width="20"> provides a virtual camera for Canvas Animation, enabling cinematic pan, zoom, and rotation effects without modifying your artwork. Perfect for cutscenes, dramatic reveals, and dynamic presentations.
+The Stage <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/camera_20.png" width="20"> provides a virtual camera for Canvas Animation, enabling cinematic pan, zoom, and rotation effects without modifying your artwork. Perfect for cutscenes, dramatic reveals, and dynamic presentations.
 
 ## Overview
 
@@ -18,7 +18,7 @@ The Stage is essentially a "window" into your canvas that can be animated. While
 
 ## Enabling the Stage
 
-1. Open **Stage Settings** (click <img src="../docs/assets/icons/camera_16.png" width="16"> camera icon in Timeline toolbar)
+1. Open **Stage Settings** (click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/camera_16.png" width="16"> camera icon in Timeline toolbar)
 2. Check **Enable Stage**
 3. Configure dimensions:
    - **Stage Size** - How much of the canvas is visible
@@ -50,21 +50,21 @@ Only content within the Stage viewport is rendered/exported.
 ### Stage Size
 The viewport dimensions on your canvas (in pixels).
 
-Example: A 256×256 canvas with a 128×128 stage means the camera sees half the canvas at a time.
+Example: A 256ï¿½256 canvas with a 128ï¿½128 stage means the camera sees half the canvas at a time.
 
 ### Output Size
 The final rendered dimensions (in pixels).
 
-Example: A 128×128 stage with 512×512 output means 4x upscaling.
+Example: A 128ï¿½128 stage with 512ï¿½512 output means 4x upscaling.
 
 ### Relationship
 
 | Stage Size | Output Size | Result |
 |------------|-------------|--------|
-| 128×128 | 128×128 | 1:1 (no scaling) |
-| 128×128 | 256×256 | 2x upscale |
-| 128×128 | 512×512 | 4x upscale |
-| 256×256 | 128×128 | 0.5x downscale |
+| 128ï¿½128 | 128ï¿½128 | 1:1 (no scaling) |
+| 128ï¿½128 | 256ï¿½256 | 2x upscale |
+| 128ï¿½128 | 512ï¿½512 | 4x upscale |
+| 256ï¿½256 | 128ï¿½128 | 0.5x downscale |
 
 ---
 
@@ -77,11 +77,11 @@ Unlike layer keyframes (which hold values), stage keyframes **interpolate** for 
 1. Enable Stage
 2. Navigate to frame 0
 3. Position the camera (drag viewport or use settings)
-4. Click <img src="../docs/assets/icons/add_16.png" width="16"> **Add Stage Keyframe**
+4. Click <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/add_16.png" width="16"> **Add Stage Keyframe**
 5. Navigate to a later frame
 6. Move/zoom/rotate the camera
 7. Add another keyframe
-8. Press <img src="../docs/assets/icons/play_16.png" width="16"> Play to see smooth motion!
+8. Press <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> Play to see smooth motion!
 
 ### Keyframe Properties
 
@@ -115,13 +115,13 @@ When Stage is enabled:
 | **Scale X** | Horizontal zoom (%) |
 | **Scale Y** | Vertical zoom (%) |
 | **Rotation** | Camera angle (degrees) |
-| **Lock Aspect** <img src="../docs/assets/icons/link_16.png" width="16"> | Keep scale X/Y equal |
+| **Lock Aspect** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/link_16.png" width="16"> | Keep scale X/Y equal |
 
 ### Keyboard Modifiers
 
 | Modifier | Effect |
 |----------|--------|
-| `Shift` | Constrain to axis (pan) or 15° (rotate) |
+| `Shift` | Constrain to axis (pan) or 15ï¿½ (rotate) |
 | `Ctrl` | Scale from center |
 | `Alt` | Duplicate keyframe while dragging |
 
@@ -174,8 +174,8 @@ Result: Smooth horizontal scroll.
 
 ### Zoom In for Drama
 
-1. Frame 0: Wide shot (scale 0.5) <img src="../docs/assets/icons/zoom_out_16.png" width="16">
-2. Frame 30: Close-up (scale 1.5), centered on subject <img src="../docs/assets/icons/zoom_in_16.png" width="16">
+1. Frame 0: Wide shot (scale 0.5) <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/zoom_out_16.png" width="16">
+2. Frame 30: Close-up (scale 1.5), centered on subject <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/zoom_in_16.png" width="16">
 3. Easing: EaseIn
 
 Result: Dramatic zoom-in.
@@ -201,8 +201,8 @@ Result: Quick shake effect.
 
 ### Rotation Spin
 
-1. Frame 0: Rotation 0°
-2. Frame 30: Rotation 360°
+1. Frame 0: Rotation 0ï¿½
+2. Frame 30: Rotation 360ï¿½
 3. Easing: EaseInOut
 
 Result: Smooth full rotation.
@@ -243,7 +243,7 @@ When Stage is enabled, exports render through the camera:
 | Setting | Effect |
 |---------|--------|
 | **Output Size** | Final dimensions |
-| **Maintain Aspect** <img src="../docs/assets/icons/link_16.png" width="16"> | Lock aspect ratio |
+| **Maintain Aspect** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/link_16.png" width="16"> | Lock aspect ratio |
 | **Background Color** | Color for areas outside canvas |
 
 ---
@@ -256,11 +256,11 @@ When Stage is enabled, exports render through the camera:
 - Plan key camera positions before animating
 
 ### Combine with Layer Animation
-Stage <img src="../docs/assets/icons/camera_16.png" width="16"> movement + layer keyframes = complex scenes:
+Stage <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/camera_16.png" width="16"> movement + layer keyframes = complex scenes:
 - Character animates (layer keyframes)
 - Camera follows character (stage keyframes)
 - Background scrolls via camera
-- Effects <img src="../docs/assets/icons/image_sparkle_16.png" width="16"> animate independently
+- Effects <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/image_sparkle_16.png" width="16"> animate independently
 
 ### Use for Composition
 Even without animation, Stage helps framing:
@@ -269,7 +269,7 @@ Even without animation, Stage helps framing:
 - Export at exact size needed
 
 ### Test Early
-- Preview camera motion early in production with <img src="../docs/assets/icons/play_16.png" width="16"> Play
+- Preview camera motion early in production with <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> Play
 - Easier to adjust before all animation is done
 - Check timing against audio if using reference tracks
 
@@ -278,7 +278,7 @@ Even without animation, Stage helps framing:
 ## Troubleshooting
 
 ### Camera Won't Move
-- Is Stage enabled? (Check Stage Settings <img src="../docs/assets/icons/camera_16.png" width="16">)
+- Is Stage enabled? (Check Stage Settings <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/camera_16.png" width="16">)
 - Are you on the Stage track in timeline?
 - Is there a keyframe at this frame?
 
