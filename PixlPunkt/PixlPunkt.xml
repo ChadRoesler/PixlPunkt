@@ -27793,6 +27793,12 @@
             Used for file association handling (opening files by double-click).
             </summary>
         </member>
+        <member name="M:PixlPunkt.Program.InitializeVelopackWindows">
+            <summary>
+            Initializes Velopack for Windows auto-update support.
+            Must be called as early as possible in Main().
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Animation.AnimationMode">
             <summary>
             Defines the animation mode for the animation panel.
@@ -32845,6 +32851,12 @@
             Sets the window icon from the application's icon asset using AppWindow.SetIcon.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIconWin32(Microsoft.UI.Xaml.Window)">
+            <summary>
+            Sets the window icon using Win32 API for better taskbar/title bar support on unpackaged apps.
+            Works on both WinAppSdk and Skia Desktop when running on Windows.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Helpers.WindowHost.FindIconPath">
             <summary>
             Finds the icon file path, checking multiple possible locations.
@@ -32920,6 +32932,28 @@
             <summary>
             Safely sets the default file extension on a FileSavePicker.
             This property is not implemented on all platforms (Android, iOS).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIcon(Microsoft.UI.Xaml.Window)">
+            <summary>
+            Sets the window icon using the Win32 API. Call this after window activation
+            to ensure the window handle is available (especially important for Skia Desktop).
+            </summary>
+            <param name="window">The window to set the icon for.</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIcon(Microsoft.UI.Xaml.Window,System.String)">
+            <summary>
+            Sets the window icon using the Win32 API. Call this after window activation
+            to ensure the window handle is available (especially important for Skia Desktop).
+            Uses the window title to find the handle if GetActiveWindow fails.
+            </summary>
+            <param name="window">The window to set the icon for.</param>
+            <param name="windowTitle">The window title to use for FindWindow fallback.</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIconWin32WithTitle(Microsoft.UI.Xaml.Window,System.String)">
+            <summary>
+            Sets the window icon using Win32 API, with window title fallback for finding the handle.
+            Sets both window icon (WM_SETICON) and class icon (SetClassLongPtr) for taskbar support.
             </summary>
         </member>
         <member name="T:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout">

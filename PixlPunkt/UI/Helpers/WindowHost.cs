@@ -13,13 +13,29 @@ namespace PixlPunkt.UI.Helpers
     /// </summary>
     public static class WindowHost
     {
-#if WINDOWS
+#if WINDOWS || HAS_UNO_SKIA
         // Win32 API for setting window icon directly (more reliable for unpackaged apps)
+        // Available on both WinAppSdk and Skia Desktop when running on Windows
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr LoadImage(IntPtr hInstance, string lpIconName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr GetActiveWindow();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr FindWindowW(string? lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetClassLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr GetClassLongPtr(IntPtr hWnd, int nIndex);
 
         private const uint IMAGE_ICON = 1;
         private const uint LR_LOADFROMFILE = 0x00000010;
@@ -27,6 +43,10 @@ namespace PixlPunkt.UI.Helpers
         private const uint WM_SETICON = 0x0080;
         private const int ICON_SMALL = 0;
         private const int ICON_BIG = 1;
+        
+        // Class icon indices for SetClassLongPtr
+        private const int GCLP_HICON = -14;
+        private const int GCLP_HICONSM = -34;
 #endif
 
         // ════════════════════════════════════════════════════════════════════
@@ -115,19 +135,23 @@ namespace PixlPunkt.UI.Helpers
                         ApplyTitleBarTheme(appWindow, effectiveTheme);
                     }
 
-                    // Set window icon using AppWindow API
+                    // Set window icon using AppWindow API (may not work on all platforms)
                     SetWindowIcon(appWindow);
-                    
-#if WINDOWS
-                    // Also set the icon using Win32 API for better taskbar support
-                    SetWindowIconWin32(window);
-#endif
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"WindowHost.ApplyChrome: Could not configure presenter: {ex.Message}");
             }
+
+            // Set window icon using Win32 API for Windows platforms (both WinAppSdk and Skia Desktop)
+            // This is more reliable for taskbar icons on unpackaged apps
+#if WINDOWS || HAS_UNO_SKIA
+            if (IsWindows)
+            {
+                SetWindowIconWin32(window);
+            }
+#endif
 
             return window;
         }
@@ -157,21 +181,43 @@ namespace PixlPunkt.UI.Helpers
             }
         }
 
-#if WINDOWS
+#if WINDOWS || HAS_UNO_SKIA
         /// <summary>
         /// Sets the window icon using Win32 API for better taskbar/title bar support on unpackaged apps.
+        /// Works on both WinAppSdk and Skia Desktop when running on Windows.
         /// </summary>
         private static void SetWindowIconWin32(Window window)
         {
+            // Only works on Windows
+            if (!IsWindows)
+                return;
+
             try
             {
                 string? iconPath = FindIconPath();
                 if (string.IsNullOrEmpty(iconPath) || !System.IO.File.Exists(iconPath))
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Icon file not found");
                     return;
+                }
 
-                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+                // Get the window handle
+                IntPtr hwnd = IntPtr.Zero;
+                
+#if WINDOWS
+                // WinAppSdk: Use WindowNative
+                hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+#else
+                // Skia Desktop: Try to get the active window handle
+                // Uno Skia doesn't expose window handles directly, so we use GetActiveWindow
+                hwnd = GetActiveWindow();
+#endif
+                
                 if (hwnd == IntPtr.Zero)
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Could not get window handle");
                     return;
+                }
 
                 // Load the icon from file
                 IntPtr hIconBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 32, 32, LR_LOADFROMFILE);
@@ -180,7 +226,11 @@ namespace PixlPunkt.UI.Helpers
                 if (hIconBig != IntPtr.Zero)
                 {
                     SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, hIconBig);
-                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Set big icon");
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Set big icon from {iconPath}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Failed to load big icon");
                 }
 
                 if (hIconSmall != IntPtr.Zero)
@@ -568,5 +618,167 @@ namespace PixlPunkt.UI.Helpers
             }
 #endif
         }
+
+        // ════════════════════════════════════════════════════════════════════
+        // PUBLIC EXTENSION METHOD FOR DEFERRED ICON SETTING
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Sets the window icon using the Win32 API. Call this after window activation
+        /// to ensure the window handle is available (especially important for Skia Desktop).
+        /// </summary>
+        /// <param name="window">The window to set the icon for.</param>
+        public static void SetWindowIcon(this Window window)
+        {
+#if WINDOWS || HAS_UNO_SKIA
+            if (IsWindows)
+            {
+                // For Skia Desktop, we need to defer the icon setting slightly
+                // because the window handle may not be available immediately after Activate()
+#if !WINDOWS
+                // Skia Desktop: Hook into Activated event to retry when window becomes active
+                void TrySetIcon()
+                {
+                    SetWindowIconWin32(window);
+                }
+
+                // Try immediately first
+                TrySetIcon();
+                
+                // Also schedule a deferred attempt using the dispatcher
+                // This handles cases where the window isn't fully ready yet
+                if (window.Content is FrameworkElement fe && fe.DispatcherQueue != null)
+                {
+                    fe.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                    {
+                        TrySetIcon();
+                    });
+                }
+#else
+                // WinAppSdk: Can set immediately since WindowNative is available
+                SetWindowIconWin32(window);
+#endif
+            }
+#endif
+            // No-op on platforms that don't support window icons (WASM, Android, iOS)
+        }
+
+        /// <summary>
+        /// Sets the window icon using the Win32 API. Call this after window activation
+        /// to ensure the window handle is available (especially important for Skia Desktop).
+        /// Uses the window title to find the handle if GetActiveWindow fails.
+        /// </summary>
+        /// <param name="window">The window to set the icon for.</param>
+        /// <param name="windowTitle">The window title to use for FindWindow fallback.</param>
+        public static void SetWindowIcon(this Window window, string windowTitle)
+        {
+#if WINDOWS || HAS_UNO_SKIA
+            if (IsWindows)
+            {
+                SetWindowIconWin32WithTitle(window, windowTitle);
+            }
+#endif
+            // No-op on platforms that don't support window icons (WASM, Android, iOS)
+        }
+
+#if WINDOWS || HAS_UNO_SKIA
+        /// <summary>
+        /// Sets the window icon using Win32 API, with window title fallback for finding the handle.
+        /// Sets both window icon (WM_SETICON) and class icon (SetClassLongPtr) for taskbar support.
+        /// </summary>
+        private static void SetWindowIconWin32WithTitle(Window window, string windowTitle)
+        {
+            // Only works on Windows
+            if (!IsWindows)
+                return;
+
+            try
+            {
+                string? iconPath = FindIconPath();
+                if (string.IsNullOrEmpty(iconPath) || !System.IO.File.Exists(iconPath))
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Icon file not found");
+                    return;
+                }
+
+                // Get the window handle
+                IntPtr hwnd = IntPtr.Zero;
+                
+#if WINDOWS
+                // WinAppSdk: Use WindowNative
+                hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+#else
+                // Skia Desktop: Try multiple methods to get the window handle
+                // 1. Try GetForegroundWindow (most likely to work after Activate)
+                hwnd = GetForegroundWindow();
+                
+                // 2. If that fails, try GetActiveWindow
+                if (hwnd == IntPtr.Zero)
+                {
+                    hwnd = GetActiveWindow();
+                }
+                
+                // 3. If that fails, try FindWindowW with the window title
+                if (hwnd == IntPtr.Zero && !string.IsNullOrEmpty(windowTitle))
+                {
+                    hwnd = FindWindowW(null, windowTitle);
+                }
+#endif
+                
+                if (hwnd == IntPtr.Zero)
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Could not get window handle");
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Got window handle: 0x{hwnd:X}");
+
+                // Load icons from file - use larger sizes for better taskbar quality
+                IntPtr hIconBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 256, 256, LR_LOADFROMFILE);
+                IntPtr hIconSmall = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
+                
+                // If 256x256 fails, try 32x32
+                if (hIconBig == IntPtr.Zero)
+                {
+                    hIconBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 32, 32, LR_LOADFROMFILE);
+                }
+
+                // Set window icons via WM_SETICON (for title bar)
+                if (hIconBig != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, hIconBig);
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Set big window icon from {iconPath}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Failed to load big icon");
+                }
+
+                if (hIconSmall != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, hIconSmall);
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Set small window icon");
+                }
+
+                // Set class icons via SetClassLongPtr (for taskbar)
+                // This is what Windows Explorer uses for the taskbar icon
+                if (hIconBig != IntPtr.Zero)
+                {
+                    SetClassLongPtr(hwnd, GCLP_HICON, hIconBig);
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Set class big icon (GCLP_HICON)");
+                }
+
+                if (hIconSmall != IntPtr.Zero)
+                {
+                    SetClassLongPtr(hwnd, GCLP_HICONSM, hIconSmall);
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Set class small icon (GCLP_HICONSM)");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32WithTitle: Could not set window icon: {ex.Message}");
+            }
+        }
+#endif
     }
 }

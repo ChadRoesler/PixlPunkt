@@ -1,4 +1,5 @@
 using Uno.UI.Hosting;
+using System.Runtime.InteropServices;
 
 namespace PixlPunkt;
 
@@ -16,11 +17,11 @@ public class Program
         // Store args for file association handling
         StartupArgs = args;
 
-#if WINDOWS
-        // Velopack must be initialized as early as possible in app startup.
-        // This handles Squirrel events during install/uninstall/update.
-        InitializeVelopack();
-#endif
+        // On Windows, initialize Velopack for auto-updates
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            InitializeVelopackWindows();
+        }
 
         var host = UnoPlatformHostBuilder.Create()
             .App(() => new App())
@@ -33,12 +34,11 @@ public class Program
         host.Run();
     }
 
-#if WINDOWS
     /// <summary>
     /// Initializes Velopack for Windows auto-update support.
     /// Must be called as early as possible in Main().
     /// </summary>
-    private static void InitializeVelopack()
+    private static void InitializeVelopackWindows()
     {
         try
         {
@@ -76,5 +76,4 @@ public class Program
             System.Diagnostics.Debug.WriteLine($"[Velopack] Initialization failed: {ex.Message}");
         }
     }
-#endif
 }

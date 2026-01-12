@@ -6,6 +6,7 @@ using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Plugins;
 using PixlPunkt.Core.Settings;
 using PixlPunkt.UI;
+using PixlPunkt.UI.Helpers;
 using Uno.Resizetizer;
 #if NET10_0_DESKTOP || NET9_0_DESKTOP || NET8_0_DESKTOP
 using System.IO;
@@ -239,9 +240,12 @@ public partial class App : Application
 #if DEBUG
         MainWindow.UseStudio();
 #endif
-        MainWindow.SetWindowIcon();
         
         PixlPunktMainWindow.Activate();
+
+        // Set window icon AFTER activation to ensure window handle is available
+        // This is especially important for Skia Desktop on Windows
+        MainWindow.SetWindowIcon("Pixl Punkt");
 
         LoggingService.Info("PixlPunkt main window activated");
     }

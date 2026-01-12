@@ -42,8 +42,10 @@
     <!-- Package Description -->
     <Description>PixlPunkt - Cross-platform pixel art editor powered by Uno Platform.</Description>
     
-    <!-- Application Icon for Desktop -->
+    <!-- Application Icon for Desktop - embed icon into exe for taskbar -->
     <ApplicationIcon Condition="$(TargetFramework.Contains('desktop')) or $(TargetFramework.Contains('windows'))">Assets\Icons\PixlPunkt.ico</ApplicationIcon>
+    <!-- Win32Icon is the direct compiler property that embeds the icon -->
+    <Win32Icon Condition="$(TargetFramework.Contains('desktop')) or $(TargetFramework.Contains('windows'))">Assets\Icons\PixlPunkt.ico</Win32Icon>
 
     <!--
       UnoFeatures are used to quickly add and manage features enabled for your app.
@@ -110,11 +112,19 @@
     <UnoSingleProjectAllowIncrementalBuilds>true</UnoSingleProjectAllowIncrementalBuilds>
     <!-- Define HAS_UNO_SKIA for Skia desktop builds -->
     <DefineConstants>$(DefineConstants);HAS_UNO_SKIA</DefineConstants>
+    <!-- 
+      For desktop builds, we run on Windows, Linux, or macOS.
+      The WINDOWS symbol is used for conditional compilation of Windows-specific code.
+      Since we can't know at compile time which OS we'll run on, we define WINDOWS_DESKTOP
+      to indicate this is a desktop build that MAY run on Windows.
+      Runtime code should use RuntimeInformation.IsOSPlatform() for actual OS detection.
+    -->
+    <DefineConstants>$(DefineConstants);WINDOWS_DESKTOP</DefineConstants>
   </PropertyGroup>
 
-  <!-- Define WINDOWS for Windows runtime on Skia desktop builds (used by Velopack and file associations) -->
-  <PropertyGroup Condition="$(TargetFramework.Contains('desktop')) and $(RuntimeIdentifier.StartsWith('win'))">
-    <DefineConstants>$(DefineConstants);WINDOWS_DESKTOP;WINDOWS</DefineConstants>
+  <!-- Define WINDOWS for Windows runtime on Skia desktop builds when RuntimeIdentifier is known -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('desktop')) and '$(RuntimeIdentifier)' != '' and $(RuntimeIdentifier.StartsWith('win'))">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
   </PropertyGroup>
   
   <!-- Define WINDOWS for WinAppSdk builds -->
@@ -148,20 +158,16 @@
 
   <!-- 
     Fix empty ShowNameOnTiles element that Uno Resizetizer adds to the manifest.
-    This target runs after Uno Resizetizer and replaces the empty/malformed element with a valid one.
+    This target runs after Uno Resizetizer and replaces the empty element with a valid one.
   -->
   <Target Name="FixShowNameOnTiles" AfterTargets="UnoResizetizerProcessAppManifest" Condition="$(TargetFramework.Contains('windows10'))">
     <PropertyGroup>
       <_ManifestPath>$(IntermediateOutputPath)unoresizetizer\m\Package.appxmanifest</_ManifestPath>
     </PropertyGroup>
-    <!-- Handle self-closing empty tag -->
     <WriteLinesToFile
       File="$(_ManifestPath)"
       Lines="$([System.IO.File]::ReadAllText('$(_ManifestPath)').Replace('&lt;uap:ShowNameOnTiles /&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=&quot;square150x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;square310x310Logo&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;'))"
       Overwrite="true"
-      Condition="Exists('$(_ManifestPath)')" />
-    <!-- Handle unclosed opening tag (Uno Resizetizer bug) - replace the broken pattern -->
-    <Exec Command="powershell -NoProfile -Command &quot;(Get-Content '$(_ManifestPath)' -Raw) -replace '&lt;uap:ShowNameOnTiles&gt;\s*&lt;/uap:DefaultTile&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=\&quot;square150x150Logo\&quot;/&gt;&lt;uap:ShowOn Tile=\&quot;wide310x150Logo\&quot;/&gt;&lt;uap:ShowOn Tile=\&quot;square310x310Logo\&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;&lt;/uap:DefaultTile&gt;' | Set-Content '$(_ManifestPath)' -NoNewline&quot;"
       Condition="Exists('$(_ManifestPath)')" />
   </Target>
 
@@ -185,10 +191,10 @@
   </ItemGroup>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       WINDOWS DESKTOP-SPECIFIC DEPENDENCIES (Velopack is Windows-only)
+       WINDOWS DESKTOP-SPECIFIC DEPENDENCIES (Velopack is Windows-only at runtime)
   ═══════════════════════════════════════════════════════════════════════ -->
-  <ItemGroup Condition="$(TargetFramework.Contains('desktop')) and $(RuntimeIdentifier.StartsWith('win'))">
-    <!-- Velopack for auto-updates on Windows Desktop (Skia) only -->
+  <!-- Include Velopack for all desktop builds - it will only be used at runtime on Windows -->
+  <ItemGroup Condition="$(TargetFramework.Contains('desktop'))">
     <PackageReference Include="Velopack" />
   </ItemGroup>
   
