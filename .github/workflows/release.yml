@@ -194,6 +194,10 @@ jobs:
           while ($versionParts.Count -lt 4) { $versionParts += "0" }
           $msixVersion = $versionParts[0..3] -join '.'
           
+          # Create output directory first
+          $outputDir = "artifacts/winappsdk-${{ matrix.platform }}"
+          New-Item -ItemType Directory -Path $outputDir -Force
+          
           # Use WinAppSdkOnly=true to avoid needing Android/iOS workloads
           dotnet publish $env:UNO_PROJECT_PATH `
             --configuration Release `
@@ -208,7 +212,7 @@ jobs:
             -p:PackageCertificateThumbprint=$thumbprint `
             -p:AppxBundle=Never `
             -p:UapAppxPackageBuildMode=SideloadOnly `
-            -p:AppxPackageDir=../../artifacts/winappsdk-${{ matrix.platform }}/ `
+            -p:AppxPackageDir=${{ github.workspace }}/artifacts/winappsdk-${{ matrix.platform }}/ `
             -p:WindowsAppSDKSelfContained=true
 
       - name: Prepare release package
@@ -220,9 +224,21 @@ jobs:
           $outputDir = "release-winappsdk-$platform"
           New-Item -ItemType Directory -Path $outputDir -Force
           
-          $msixFiles = Get-ChildItem -Path "artifacts/winappsdk-$platform" -Filter "*.msix" -Recurse |
+          # Debug: Show what's in the artifacts directory
+          Write-Host "=== Searching for MSIX files ==="
+          Write-Host "Looking in: artifacts/winappsdk-$platform"
+          Get-ChildItem -Path "artifacts/winappsdk-$platform" -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          
+          $msixFiles = Get-ChildItem -Path "artifacts/winappsdk-$platform" -Filter "*.msix" -Recurse -ErrorAction Stop |
                        Where-Object { $_.Name -notlike "*Dependencies*" }
+          
+          if (-not $msixFiles) {
+            Write-Error "No MSIX files found in artifacts/winappsdk-$platform"
+            exit 1
+          }
+          
           $msixFile = $msixFiles | Select-Object -First 1
+          Write-Host "Found MSIX: $($msixFile.FullName)"
           Copy-Item $msixFile.FullName -Destination "$outputDir/PixlPunkt-$version-WinAppSdk-$platform.msix"
           
           $cerPath = $env:CERT_CER_PATH
