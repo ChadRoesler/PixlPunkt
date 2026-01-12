@@ -1446,6 +1446,13 @@
             Gets or sets whether the animation uses ping-pong (reverse at end) playback.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Animation.CanvasAnimationState.AutoKeyframe">
+            <summary>
+            Gets or sets whether keyframes are automatically created when editing a layer
+            that doesn't have a keyframe at the current frame.
+            When enabled, painting on a layer will automatically capture a keyframe.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Animation.CanvasAnimationState.AudioTracks">
             <summary>
             Gets the collection of audio tracks for reference audio in the timeline.
@@ -1765,6 +1772,12 @@
         <member name="M:PixlPunkt.Core.Animation.CanvasAnimationState.Dispose">
             <summary>
             Stops playback and releases resources.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.CanvasAnimationState.ApplyDefaults">
+            <summary>
+            Applies default settings from AppSettings.Animation.
+            Called when creating a new document.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Animation.CanvasAnimationTrack">
@@ -3090,6 +3103,12 @@
             Gets the tile positions for onion skin display.
             </summary>
             <returns>List of ((tileX, tileY), opacity) tuples for frames to overlay.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Animation.TileAnimationState.ApplyDefaults">
+            <summary>
+            Applies default settings from AppSettings.Animation.
+            Called when creating a new document.
+            </summary>
         </member>
         <member name="M:PixlPunkt.Core.Animation.TileAnimationState.Dispose">
             <summary>
@@ -19018,7 +19037,17 @@
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.Single">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.PaletteSortMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.AnimationSettings">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
@@ -19029,6 +19058,31 @@
             </summary>
         </member>
         <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.AppThemeChoice">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.ExportAnimationFormat">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.ExportImageFormat">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.ExportSettings">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.SequenceNumberingStyle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Serialization.AppSettingsJsonContext.SpriteSheetDirection">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
@@ -19538,6 +19592,93 @@
             </summary>
             <returns>The new session state.</returns>
         </member>
+        <member name="T:PixlPunkt.Core.Settings.AnimationSettings">
+            <summary>
+            Application-level animation default settings.
+            These are used as defaults when creating new documents or when resetting animation state.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultFrameCount">
+            <summary>
+            Gets or sets the default frame count for new canvas animations.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultFps">
+            <summary>
+            Gets or sets the default frames per second for canvas animations.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultAutoKeyframe">
+            <summary>
+            Gets or sets whether auto-keyframe creation is enabled by default.
+            When enabled, painting on an animated layer automatically creates a keyframe.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultLoop">
+            <summary>
+            Gets or sets whether canvas animations loop by default.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultPingPong">
+            <summary>
+            Gets or sets whether ping-pong playback is enabled by default.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultOnionSkinEnabled">
+            <summary>
+            Gets or sets whether onion skinning is enabled by default for canvas animation.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultOnionSkinFramesBefore">
+            <summary>
+            Gets or sets the default number of onion skin frames to show before the current frame.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultOnionSkinFramesAfter">
+            <summary>
+            Gets or sets the default number of onion skin frames to show after the current frame.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultOnionSkinOpacity">
+            <summary>
+            Gets or sets the default onion skin opacity (0.0 to 1.0).
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultTileFrameTimeMs">
+            <summary>
+            Gets or sets the default frame duration in milliseconds for tile animations.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultTileLoop">
+            <summary>
+            Gets or sets whether tile animations loop by default.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultTilePingPong">
+            <summary>
+            Gets or sets whether tile animations use ping-pong playback by default.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.DefaultTileOnionSkinEnabled">
+            <summary>
+            Gets or sets whether onion skinning is enabled by default for tile animation.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AnimationSettings.AutoScrollPlayhead">
+            <summary>
+            Gets or sets whether the timeline auto-scrolls to follow the playhead during playback.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Settings.AnimationSettings.#ctor">
+            <summary>
+            Creates a new instance with default values.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Settings.AnimationSettings.Validate">
+            <summary>
+            Validates and clamps all settings to valid ranges.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Settings.AppPaths">
             <summary>
             Centralized storage path management for all application data.
@@ -19746,6 +19887,16 @@
             Gets or sets the version that the user chose to skip (won't be prompted again).
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.Animation">
+            <summary>
+            Gets or sets the default animation settings for new documents.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.Export">
+            <summary>
+            Gets or sets the default export settings.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Core.Settings.AppSettings.Load">
             <summary>
             Loads settings from the JSON file, or returns defaults if not found.
@@ -19760,6 +19911,84 @@
         <member name="M:PixlPunkt.Core.Settings.AppSettings.Reload">
             <summary>
             Reloads settings from disk, updating the singleton instance.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Settings.ExportImageFormat">
+            <summary>
+            Image export format options.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Settings.ExportAnimationFormat">
+            <summary>
+            Animation export format options.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Settings.SpriteSheetDirection">
+            <summary>
+            Sprite sheet layout direction options.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Settings.SequenceNumberingStyle">
+            <summary>
+            Sequence numbering style for exported file sequences.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Settings.SequenceNumberingStyle.Simple">
+            <summary>_0, _1, _2...</summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Settings.SequenceNumberingStyle.ThreeDigit">
+            <summary>_001, _002, _003...</summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Settings.SequenceNumberingStyle.FourDigit">
+            <summary>_0001, _0002...</summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Settings.SequenceNumberingStyle.Parentheses">
+            <summary>(1), (2), (3)...</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Settings.ExportSettings">
+            <summary>
+            Settings for export defaults persisted across sessions.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.DefaultImageFormat">
+            <summary>Default image export format (PNG recommended for pixel art).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.DefaultImageScale">
+            <summary>Default image export scale multiplier (1 = original size).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.IncludeBackground">
+            <summary>Whether to include background color in exports by default.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.DefaultAnimationFormat">
+            <summary>Default animation export format.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.DefaultAnimationScale">
+            <summary>Default animation export scale multiplier.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.LoopAnimation">
+            <summary>Whether exported animations should loop by default.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.SpriteSheetDirection">
+            <summary>Default sprite sheet layout direction.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.SpriteSheetColumns">
+            <summary>Number of columns for grid layout sprite sheets.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.SpriteSheetPadding">
+            <summary>Padding between frames in sprite sheets (pixels).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.SequenceNumbering">
+            <summary>Numbering style for sequence exports.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.RememberLastFolder">
+            <summary>Whether to remember the last export folder.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.ExportSettings.LastExportFolder">
+            <summary>Last used export folder path (not shown in UI, just remembered).</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Settings.ExportSettings.Validate">
+            <summary>
+            Validates and clamps settings to valid ranges.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Settings.ShortcutConflictDetector">
@@ -33115,7 +33344,17 @@
         </member>
         <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIcon(Microsoft.UI.Windowing.AppWindow)">
             <summary>
-            Sets the window icon from the application's icon asset.
+            Sets the window icon from the application's icon asset using AppWindow.SetIcon.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIconWin32(Microsoft.UI.Xaml.Window)">
+            <summary>
+            Sets the window icon using Win32 API for better taskbar/title bar support on unpackaged apps.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Helpers.WindowHost.FindIconPath">
+            <summary>
+            Finds the icon file path, checking multiple possible locations.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Helpers.WindowHost.ApplyTitleBarTheme(Microsoft.UI.Windowing.AppWindow,Microsoft.UI.Xaml.ElementTheme)">

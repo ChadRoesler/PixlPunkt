@@ -13,6 +13,22 @@ namespace PixlPunkt.UI.Helpers
     /// </summary>
     public static class WindowHost
     {
+#if WINDOWS
+        // Win32 API for setting window icon directly (more reliable for unpackaged apps)
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr LoadImage(IntPtr hInstance, string lpIconName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        private const uint IMAGE_ICON = 1;
+        private const uint LR_LOADFROMFILE = 0x00000010;
+        private const uint LR_DEFAULTSIZE = 0x00000040;
+        private const uint WM_SETICON = 0x0080;
+        private const int ICON_SMALL = 0;
+        private const int ICON_BIG = 1;
+#endif
+
         // ════════════════════════════════════════════════════════════════════
         // THEME COLORS
         // ════════════════════════════════════════════════════════════════════
@@ -78,8 +94,6 @@ namespace PixlPunkt.UI.Helpers
 
             // Configure window presenter for proper chrome (min/max/close buttons)
             // Only supported on desktop platforms with windowing support
-            // Configure window presenter for proper chrome (min/max/close buttons)
-            // Only supported on desktop platforms with windowing support
             try
             {
                 var appWindow = window.AppWindow;
@@ -101,8 +115,13 @@ namespace PixlPunkt.UI.Helpers
                         ApplyTitleBarTheme(appWindow, effectiveTheme);
                     }
 
-                    // Set window icon
+                    // Set window icon using AppWindow API
                     SetWindowIcon(appWindow);
+                    
+#if WINDOWS
+                    // Also set the icon using Win32 API for better taskbar support
+                    SetWindowIconWin32(window);
+#endif
                 }
             }
             catch (Exception ex)
@@ -114,55 +133,118 @@ namespace PixlPunkt.UI.Helpers
         }
 
         /// <summary>
-        /// Sets the window icon from the application's icon asset.
+        /// Sets the window icon from the application's icon asset using AppWindow.SetIcon.
         /// </summary>
         private static void SetWindowIcon(Microsoft.UI.Windowing.AppWindow appWindow)
         {
             try
             {
-                // Try to get the icon path from the application's assets
-                // On Windows, we use the .ico file
-                // On Linux/macOS, we'd use the .png file
-                
-                string iconPath;
-                
-                if (IsWindows)
-                {
-                    // Get the path to the .ico file in the output directory
-                    var baseDir = AppContext.BaseDirectory;
-                    iconPath = System.IO.Path.Combine(baseDir, "Assets", "Icons", "PixlPunkt.ico");
-                    
-                    if (!System.IO.File.Exists(iconPath))
-                    {
-                        // Try alternate location
-                        iconPath = System.IO.Path.Combine(baseDir, "PixlPunkt.ico");
-                    }
-                }
-                else
-                {
-                    // For Linux/macOS, use PNG
-                    var baseDir = AppContext.BaseDirectory;
-                    iconPath = System.IO.Path.Combine(baseDir, "Assets", "Icons", "Icon.png");
-                    
-                    if (!System.IO.File.Exists(iconPath))
-                    {
-                        iconPath = System.IO.Path.Combine(baseDir, "Icon.png");
-                    }
-                }
+                string? iconPath = FindIconPath();
 
-                if (System.IO.File.Exists(iconPath))
+                if (!string.IsNullOrEmpty(iconPath) && System.IO.File.Exists(iconPath))
                 {
                     appWindow.SetIcon(iconPath);
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIcon: Set icon from {iconPath}");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIcon: Icon file not found at {iconPath}");
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIcon: Icon file not found");
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIcon: Could not set window icon: {ex.Message}");
             }
+        }
+
+#if WINDOWS
+        /// <summary>
+        /// Sets the window icon using Win32 API for better taskbar/title bar support on unpackaged apps.
+        /// </summary>
+        private static void SetWindowIconWin32(Window window)
+        {
+            try
+            {
+                string? iconPath = FindIconPath();
+                if (string.IsNullOrEmpty(iconPath) || !System.IO.File.Exists(iconPath))
+                    return;
+
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+                if (hwnd == IntPtr.Zero)
+                    return;
+
+                // Load the icon from file
+                IntPtr hIconBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 32, 32, LR_LOADFROMFILE);
+                IntPtr hIconSmall = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
+
+                if (hIconBig != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, hIconBig);
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Set big icon");
+                }
+
+                if (hIconSmall != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, hIconSmall);
+                    System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Set small icon");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WindowHost.SetWindowIconWin32: Could not set window icon: {ex.Message}");
+            }
+        }
+#endif
+
+        /// <summary>
+        /// Finds the icon file path, checking multiple possible locations.
+        /// </summary>
+        private static string? FindIconPath()
+        {
+            var baseDir = AppContext.BaseDirectory;
+
+            if (IsWindows)
+            {
+                // Try multiple possible locations for the icon
+                var possiblePaths = new[]
+                {
+                    // Uno Resizetizer generates icon.ico in the output root
+                    System.IO.Path.Combine(baseDir, "icon.ico"),
+                    // Custom app icon in Assets folder
+                    System.IO.Path.Combine(baseDir, "Assets", "Icons", "PixlPunkt.ico"),
+                    // Fallback locations
+                    System.IO.Path.Combine(baseDir, "PixlPunkt.ico"),
+                    System.IO.Path.Combine(baseDir, "Assets", "PixlPunkt.ico")
+                };
+
+                foreach (var path in possiblePaths)
+                {
+                    if (System.IO.File.Exists(path))
+                    {
+                        return path;
+                    }
+                }
+            }
+            else
+            {
+                // For Linux/macOS, use PNG
+                var possiblePaths = new[]
+                {
+                    System.IO.Path.Combine(baseDir, "Assets", "Icons", "Icon.png"),
+                    System.IO.Path.Combine(baseDir, "Icon.png"),
+                    System.IO.Path.Combine(baseDir, "Assets", "Icon.png")
+                };
+
+                foreach (var path in possiblePaths)
+                {
+                    if (System.IO.File.Exists(path))
+                    {
+                        return path;
+                    }
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

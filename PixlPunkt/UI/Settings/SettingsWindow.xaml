@@ -83,6 +83,22 @@
                 <ListBoxItem>
                     <ListBoxItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
+                            <ic:FluentIcon Icon="Play" />
+                            <TextBlock Text="Animation" Margin="8,0,8,0"/>
+                        </StackPanel>
+                    </ListBoxItem.Content>
+                </ListBoxItem>
+                <ListBoxItem>
+                    <ListBoxItem.Content>
+                        <StackPanel Orientation="Horizontal" Padding="4">
+                            <ic:FluentIcon Icon="ArrowExport" />
+                            <TextBlock Text="Export" Margin="8,0,8,0"/>
+                        </StackPanel>
+                    </ListBoxItem.Content>
+                </ListBoxItem>
+                <ListBoxItem>
+                    <ListBoxItem.Content>
+                        <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="PlugDisconnected" />
                             <TextBlock Text="Plugins" Margin="8,0,8,0"/>
                         </StackPanel>
@@ -463,6 +479,386 @@
                                 <TextBlock Text="Templates are stored as JSON files in the folder above." 
                                            Opacity="0.5" FontSize="11"/>
                             </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ═══════════════════════════════════════════════════════════════ -->
+                <!-- ANIMATION PANEL -->
+                <!-- ═══════════════════════════════════════════════════════════════ -->
+                <StackPanel x:Name="AnimationPanel" Visibility="Collapsed" Spacing="16">
+                    <TextBlock Text="Animation Settings" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="Default settings applied when creating new documents." Opacity="0.7" FontSize="12"/>
+                    
+                    <!-- Tab selector for Canvas vs Tile -->
+                    <Pivot x:Name="AnimationPivot" Margin="0,8,0,0">
+                        <!-- Canvas Animation Tab -->
+                        <PivotItem Header="Canvas Animation">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12,0,0">
+                                <StackPanel Spacing="16">
+                                    <!-- Canvas Animation Defaults -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8" Padding="16">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Playback Defaults" FontWeight="SemiBold" FontSize="14"/>
+                                            
+                                            <Grid ColumnSpacing="16" RowSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                
+                                                <TextBlock Text="Default Frame Count" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <NumberBox x:Name="AnimDefaultFrameCount" Grid.Column="1" 
+                                                           Minimum="1" Maximum="9999" Value="24" 
+                                                           SpinButtonPlacementMode="Compact" Width="120" HorizontalAlignment="Left"/>
+                                                
+                                                <TextBlock Text="Default FPS" Grid.Row="1" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <NumberBox x:Name="AnimDefaultFps" Grid.Row="1" Grid.Column="1" 
+                                                           Minimum="1" Maximum="120" Value="12" 
+                                                           SpinButtonPlacementMode="Compact" Width="120" HorizontalAlignment="Left"/>
+                                                
+                                                <TextBlock Text="Loop by Default" Grid.Row="2" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimDefaultLoop" Grid.Row="2" Grid.Column="1" IsOn="True" OnContent="" OffContent=""/>
+                                                
+                                                <TextBlock Text="Ping-Pong by Default" Grid.Row="3" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimDefaultPingPong" Grid.Row="3" Grid.Column="1" IsOn="False" OnContent="" OffContent=""/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- Keyframe Settings -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8" Padding="16">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Keyframes" FontWeight="SemiBold" FontSize="14"/>
+                                            
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                
+                                                <TextBlock Text="Auto-create Keyframes" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimDefaultAutoKeyframe" Grid.Column="1" IsOn="True" OnContent="" OffContent=""/>
+                                            </Grid>
+                                            
+                                            <TextBlock Text="When enabled, painting on an animated layer automatically creates a keyframe at the current frame." 
+                                                       Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- Canvas Onion Skin Defaults -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8" Padding="16">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Onion Skin" FontWeight="SemiBold" FontSize="14"/>
+                                            
+                                            <Grid ColumnSpacing="16" RowSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                
+                                                <TextBlock Text="Enable by Default" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimDefaultOnionSkin" Grid.Column="1" IsOn="False" OnContent="" OffContent=""/>
+                                                
+                                                <TextBlock Text="Frames Before" Grid.Row="1" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <NumberBox x:Name="AnimDefaultOnionBefore" Grid.Row="1" Grid.Column="1" 
+                                                           Minimum="0" Maximum="10" Value="2" 
+                                                           SpinButtonPlacementMode="Compact" Width="100" HorizontalAlignment="Left"/>
+                                                
+                                                <TextBlock Text="Frames After" Grid.Row="2" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <NumberBox x:Name="AnimDefaultOnionAfter" Grid.Row="2" Grid.Column="1" 
+                                                           Minimum="0" Maximum="10" Value="1" 
+                                                           SpinButtonPlacementMode="Compact" Width="100" HorizontalAlignment="Left"/>
+                                                
+                                                <TextBlock Text="Opacity (%)" Grid.Row="3" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                    <Slider x:Name="AnimDefaultOnionOpacity" Minimum="0" Maximum="100" Value="30" Width="180"/>
+                                                    <TextBlock x:Name="AnimOnionOpacityText" Text="30%" VerticalAlignment="Center" Width="40"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </PivotItem>
+                        
+                        <!-- Tile Animation Tab -->
+                        <PivotItem Header="Tile Animation">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12,0,0">
+                                <StackPanel Spacing="16">
+                                    <!-- Tile Animation Defaults -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8" Padding="16">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Playback Defaults" FontWeight="SemiBold" FontSize="14"/>
+                                            
+                                            <Grid ColumnSpacing="16" RowSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                
+                                                <TextBlock Text="Frame Duration (ms)" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <NumberBox x:Name="AnimDefaultTileFrameTime" Grid.Column="1" 
+                                                           Minimum="10" Maximum="10000" Value="100" 
+                                                           SpinButtonPlacementMode="Compact" Width="120" HorizontalAlignment="Left"/>
+                                                
+                                                <TextBlock Text="Loop by Default" Grid.Row="1" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimDefaultTileLoop" Grid.Row="1" Grid.Column="1" IsOn="True" OnContent="" OffContent=""/>
+                                                
+                                                <TextBlock Text="Ping-Pong by Default" Grid.Row="2" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimDefaultTilePingPong" Grid.Row="2" Grid.Column="1" IsOn="False" OnContent="" OffContent=""/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- Tile Onion Skin Defaults -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8" Padding="16">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Onion Skin" FontWeight="SemiBold" FontSize="14"/>
+                                            
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                
+                                                <TextBlock Text="Enable by Default" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimDefaultTileOnionSkin" Grid.Column="1" IsOn="False" OnContent="" OffContent=""/>
+                                            </Grid>
+                                            
+                                            <TextBlock Text="Tile animation uses the same frames before/after and opacity settings as canvas animation." 
+                                                       Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </PivotItem>
+                        
+                        <!-- Timeline Tab -->
+                        <PivotItem Header="Timeline">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12,0,0">
+                                <StackPanel Spacing="16">
+                                    <!-- Timeline Settings -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8" Padding="16">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Playback Behavior" FontWeight="SemiBold" FontSize="14"/>
+                                            
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                
+                                                <TextBlock Text="Auto-scroll with Playhead" VerticalAlignment="Center" Opacity="0.9"/>
+                                                <ToggleSwitch x:Name="AnimAutoScrollPlayhead" Grid.Column="1" IsOn="True" OnContent="" OffContent=""/>
+                                            </Grid>
+                                            
+                                            <TextBlock Text="When enabled, the timeline will automatically scroll to keep the playhead visible during playback." 
+                                                       Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </PivotItem>
+                    </Pivot>
+                </StackPanel>
+
+                <!-- ═══════════════════════════════════════════════════════════════ -->
+                <!-- EXPORT PANEL -->
+                <!-- ═══════════════════════════════════════════════════════════════ -->
+                <StackPanel x:Name="ExportPanel" Visibility="Collapsed" Spacing="16">
+                    <TextBlock Text="Export Settings" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="Default settings for exporting images and animations." Opacity="0.7" FontSize="12"/>
+                    
+                    <!-- Image Export Defaults -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8" Padding="16">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Image Export" FontWeight="SemiBold" FontSize="14"/>
+                            
+                            <Grid ColumnSpacing="16" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <TextBlock Text="Default Format" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ComboBox x:Name="ExportDefaultFormat" Grid.Column="1" Width="140" SelectedIndex="0">
+                                    <ComboBoxItem Content="PNG"/>
+                                    <ComboBoxItem Content="BMP"/>
+                                    <ComboBoxItem Content="JPEG"/>
+                                    <ComboBoxItem Content="TIFF"/>
+                                    <ComboBoxItem Content="GIF"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Default Scale" Grid.Row="1" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ComboBox x:Name="ExportDefaultScale" Grid.Row="1" Grid.Column="1" Width="140" SelectedIndex="0">
+                                    <ComboBoxItem Content="1x (Original)"/>
+                                    <ComboBoxItem Content="2x"/>
+                                    <ComboBoxItem Content="4x"/>
+                                    <ComboBoxItem Content="8x"/>
+                                    <ComboBoxItem Content="16x"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Include Background" Grid.Row="2" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ToggleSwitch x:Name="ExportIncludeBackground" Grid.Row="2" Grid.Column="1" IsOn="False" OnContent="" OffContent=""/>
+                            </Grid>
+                            
+                            <TextBlock Text="PNG is recommended for pixel art as it preserves transparency and uses lossless compression." 
+                                       Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Animation Export Defaults -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8" Padding="16">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Animation Export" FontWeight="SemiBold" FontSize="14"/>
+                            
+                            <Grid ColumnSpacing="16" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <TextBlock Text="Default Format" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ComboBox x:Name="ExportAnimDefaultFormat" Grid.Column="1" Width="140" SelectedIndex="0">
+                                    <ComboBoxItem Content="GIF"/>
+                                    <ComboBoxItem Content="PNG Sequence"/>
+                                    <ComboBoxItem Content="Sprite Sheet"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Default Scale" Grid.Row="1" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ComboBox x:Name="ExportAnimDefaultScale" Grid.Row="1" Grid.Column="1" Width="140" SelectedIndex="0">
+                                    <ComboBoxItem Content="1x (Original)"/>
+                                    <ComboBoxItem Content="2x"/>
+                                    <ComboBoxItem Content="4x"/>
+                                    <ComboBoxItem Content="8x"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Loop Animation" Grid.Row="2" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ToggleSwitch x:Name="ExportAnimLoop" Grid.Row="2" Grid.Column="1" IsOn="True" OnContent="" OffContent=""/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Sprite Sheet Options -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8" Padding="16">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Sprite Sheet Options" FontWeight="SemiBold" FontSize="14"/>
+                            
+                            <Grid ColumnSpacing="16" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <TextBlock Text="Layout Direction" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ComboBox x:Name="ExportSheetDirection" Grid.Column="1" Width="140" SelectedIndex="0">
+                                    <ComboBoxItem Content="Horizontal"/>
+                                    <ComboBoxItem Content="Vertical"/>
+                                    <ComboBoxItem Content="Grid"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Columns (Grid)" Grid.Row="1" VerticalAlignment="Center" Opacity="0.9"/>
+                                <NumberBox x:Name="ExportSheetColumns" Grid.Row="1" Grid.Column="1" 
+                                           Minimum="1" Maximum="64" Value="8" 
+                                           SpinButtonPlacementMode="Compact" Width="100" HorizontalAlignment="Left"/>
+                                
+                                <TextBlock Text="Frame Padding" Grid.Row="2" VerticalAlignment="Center" Opacity="0.9"/>
+                                <NumberBox x:Name="ExportSheetPadding" Grid.Row="2" Grid.Column="1" 
+                                           Minimum="0" Maximum="32" Value="0" 
+                                           SpinButtonPlacementMode="Compact" Width="100" HorizontalAlignment="Left"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- File Naming -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8" Padding="16">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="File Naming" FontWeight="SemiBold" FontSize="14"/>
+                            
+                            <Grid ColumnSpacing="16" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <TextBlock Text="Sequence Numbering" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ComboBox x:Name="ExportSequenceNumbering" Grid.Column="1" Width="180" SelectedIndex="1">
+                                    <ComboBoxItem Content="_0, _1, _2..."/>
+                                    <ComboBoxItem Content="_001, _002, _003..."/>
+                                    <ComboBoxItem Content="_0001, _0002..."/>
+                                    <ComboBoxItem Content="(1), (2), (3)..."/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Remember Last Folder" Grid.Row="1" VerticalAlignment="Center" Opacity="0.9"/>
+                                <ToggleSwitch x:Name="ExportRememberFolder" Grid.Row="1" Grid.Column="1" IsOn="True" OnContent="" OffContent=""/>
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>

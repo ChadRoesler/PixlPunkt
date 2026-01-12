@@ -52,6 +52,22 @@
                         <StackPanel Spacing="12" Width="280">
                             <TextBlock Text="Animation Settings" FontWeight="SemiBold" FontSize="14"/>
                             
+                            <!-- Keyframe Settings -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Keyframes" FontSize="12" Opacity="0.7"/>
+                                
+                                <ToggleSwitch x:Name="AutoKeyframeToggle" 
+                                              Header="Auto-create Keyframes" 
+                                              Toggled="AutoKeyframe_Toggled"/>
+                                <TextBlock Text="When enabled, painting on an animated layer automatically creates a keyframe at the current frame." 
+                                           FontSize="10" 
+                                           Opacity="0.5" 
+                                           TextWrapping="Wrap" 
+                                           Margin="0,-4,0,0"/>
+                            </StackPanel>
+                            
+                            <MenuFlyoutSeparator/>
+                            
                             <!-- Playback Settings -->
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Playback" FontSize="12" Opacity="0.7"/>

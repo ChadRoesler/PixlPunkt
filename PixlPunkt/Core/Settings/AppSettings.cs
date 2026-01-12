@@ -129,6 +129,24 @@ namespace PixlPunkt.Core.Settings
         public string? SkippedUpdateVersion { get; set; }
 
         // ====================================================================
+        // ANIMATION SETTINGS
+        // ====================================================================
+
+        /// <summary>
+        /// Gets or sets the default animation settings for new documents.
+        /// </summary>
+        public AnimationSettings Animation { get; set; } = new AnimationSettings();
+
+        // ====================================================================
+        // EXPORT SETTINGS
+        // ====================================================================
+
+        /// <summary>
+        /// Gets or sets the default export settings.
+        /// </summary>
+        public ExportSettings Export { get; set; } = new ExportSettings();
+
+        // ====================================================================
         // LOAD / SAVE
         // ====================================================================
 

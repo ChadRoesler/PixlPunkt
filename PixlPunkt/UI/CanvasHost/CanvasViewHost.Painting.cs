@@ -774,11 +774,16 @@ namespace PixlPunkt.UI.CanvasHost
             var animState = Document.CanvasAnimationState;
             if (animState == null) return;
 
+            // Always update existing keyframe if one exists at current frame
             if (animState.HasKeyframe(rl, animState.CurrentFrameIndex))
             {
                 animState.CaptureKeyframe(rl, animState.CurrentFrameIndex);
+                return;
             }
-            else
+
+            // If AutoKeyframe is enabled, create a new keyframe when editing a layer
+            // that has any keyframes (i.e., is participating in animation)
+            if (animState.AutoKeyframe)
             {
                 var track = animState.GetTrackForLayer(rl);
                 if (track != null && track.Keyframes.Count > 0)

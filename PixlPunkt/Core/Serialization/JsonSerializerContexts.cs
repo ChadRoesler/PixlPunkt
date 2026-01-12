@@ -78,6 +78,8 @@ namespace PixlPunkt.Core.Serialization
         WriteIndented = true,
         PropertyNameCaseInsensitive = true)]
     [JsonSerializable(typeof(AppSettings))]
+    [JsonSerializable(typeof(AnimationSettings))]
+    [JsonSerializable(typeof(ExportSettings))]
     public partial class AppSettingsJsonContext : JsonSerializerContext
     {
     }

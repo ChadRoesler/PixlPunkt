@@ -382,6 +382,9 @@ namespace PixlPunkt.UI.CanvasHost
             _selCumulativeAngleDeg = 0.0;
             _toolState?.SetRotationAngle(0.0);
             UpdateActiveLayerPreview();
+
+            // Capture keyframe if in canvas animation mode and layer has animation
+            AutoCaptureKeyframeIfNeeded();
         }
 
         /// <summary>
@@ -737,6 +740,9 @@ namespace PixlPunkt.UI.CanvasHost
             Document.RaiseStructureChanged();
             Document.RaiseDocumentModified(); // Notify animation panels of pixel changes
             InvalidateMainCanvas();
+
+            // Capture keyframe if in canvas animation mode and layer has animation
+            AutoCaptureKeyframeIfNeeded();
         }
 
         // ────────────────────────────────────────────────────────────────────

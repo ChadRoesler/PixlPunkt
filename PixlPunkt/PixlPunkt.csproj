@@ -121,19 +121,25 @@
   <!-- ═══════════════════════════════════════════════════════════════════════
        ICON AND CONTENT FILES
   ═══════════════════════════════════════════════════════════════════════ -->
+  
+  <!-- 
+    Disable Uno Resizetizer icon/splash generation - we use our own PixlPunkt.ico.
+    The original icon.svg and icon_foreground.svg files have been renamed to .disabled
+    because they contained the default Uno logo placeholder.
+  -->
+  <PropertyGroup>
+    <UnoIconGenerate>false</UnoIconGenerate>
+    <UnoSplashGenerate>false</UnoSplashGenerate>
+  </PropertyGroup>
+
   <ItemGroup>
-    <!-- Ensure icon files are copied to output -->
-    <Content Include="Assets\Icons\PixlPunkt.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Assets\Icons\Icon.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <!-- Copy PixlPunkt.ico to output root as icon.ico for runtime window icon -->
+    <None Include="Assets\Icons\PixlPunkt.ico" CopyToOutputDirectory="PreserveNewest" Link="icon.ico" />
+    <!-- Also keep in Assets folder for fallback access -->
+    <Content Include="Assets\Icons\PixlPunkt.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Icons\Icon.png" CopyToOutputDirectory="PreserveNewest" />
     <!-- File type icons for Windows file associations -->
-    <Content Include="Assets\Icons\FileTypes\*.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>Assets\Icons\FileTypes\%(Filename)%(Extension)</Link>
-    </Content>
+    <Content Include="Assets\Icons\FileTypes\*.ico" CopyToOutputDirectory="PreserveNewest" Link="Assets\Icons\FileTypes\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- ═══════════════════════════════════════════════════════════════════════

@@ -795,10 +795,35 @@ namespace PixlPunkt.UI.CanvasHost
             var outlineColor = _stageSelected ? StageOutlineSelectedColor : StageOutlineColor;
             float outlineWidth = _stageSelected ? 3f : 2f;
 
-            float stageX = stage.StageX;
-            float stageY = stage.StageY;
-            float stageW = stage.StageWidth;
-            float stageH = stage.StageHeight;
+            // Get the interpolated stage transform at the current frame
+            var stageTransform = animState.GetStageTransformAt(animState.CurrentFrameIndex);
+
+            float stageX, stageY, stageW, stageH;
+
+            if (stageTransform != null)
+            {
+                // Use interpolated position from keyframes
+                // StageKeyframeData stores center position, so convert to top-left corner
+                float centerX = stageTransform.PositionX;
+                float centerY = stageTransform.PositionY;
+                float scaleX = stageTransform.ScaleX;
+                float scaleY = stageTransform.ScaleY;
+
+                // Calculate stage dimensions based on inverse scale
+                // (zooming in = smaller source area, zooming out = larger source area)
+                stageW = stage.StageWidth / scaleX;
+                stageH = stage.StageHeight / scaleY;
+                stageX = centerX - stageW / 2f;
+                stageY = centerY - stageH / 2f;
+            }
+            else
+            {
+                // No keyframes, use base stage settings
+                stageX = stage.StageX;
+                stageY = stage.StageY;
+                stageW = stage.StageWidth;
+                stageH = stage.StageHeight;
+            }
 
             float screenStageX = (float)(dest.X + stageX * scale);
             float screenStageY = (float)(dest.Y + stageY * scale);
