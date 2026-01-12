@@ -6,7 +6,7 @@ A complete guide to the PixlPunkt user interface.
 
 ## Main Window Layout
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/screenshots/PixlPunktUi.png" width="16">
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/screenshots/PixlPunktUi.png">
 
 ---
 

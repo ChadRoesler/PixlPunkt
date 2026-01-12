@@ -8,7 +8,7 @@ Color palette management in PixlPunkt.
 
 The Palette Panel is your color management hub:
 
-<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/screenshots/PalettePanel.png" width="16">
+<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/screenshots/PalettePanel.png">
 
 ---
 

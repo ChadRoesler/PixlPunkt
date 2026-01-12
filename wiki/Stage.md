@@ -26,7 +26,7 @@ The Stage is essentially a "window" into your canvas that can be animated. While
 
 ### Stage vs Canvas
 
-<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/screenshots/CanvasAnimation_Stage.png" width="16">
+<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/screenshots/CanvasAnimation_Stage.png">
 
 Only content within the Stage viewport is rendered/exported.
 
