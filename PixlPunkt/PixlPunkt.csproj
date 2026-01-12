@@ -6,10 +6,14 @@
          -p:DesktopOnly=true     (builds desktop + windows + wasm)
          -p:SkiaOnly=true        (builds only net10.0-desktop)
          -p:WinAppSdkOnly=true   (builds only net10.0-windows10.0.26100)
+         -p:WithAndroid=true     (includes Android - requires UnoIcon SVGs)
   ═══════════════════════════════════════════════════════════════════════ -->
   <PropertyGroup>
-    <!-- Default: all platforms -->
-    <TargetFrameworks Condition="'$(DesktopOnly)' != 'true' and '$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true'">net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    <!-- Default: Windows + iOS/macOS (no Android - it requires UnoIcon SVGs) -->
+    <TargetFrameworks Condition="'$(DesktopOnly)' != 'true' and '$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true' and '$(WithAndroid)' != 'true'">net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    
+    <!-- WithAndroid: includes Android (requires UnoIcon with proper SVG files) -->
+    <TargetFrameworks Condition="'$(WithAndroid)' == 'true'">net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
     
     <!-- DesktopOnly: excludes Android and iOS -->
     <TargetFrameworks Condition="'$(DesktopOnly)' == 'true'">net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
@@ -141,6 +145,25 @@
     <!-- File type icons for Windows file associations -->
     <Content Include="Assets\Icons\FileTypes\*.ico" CopyToOutputDirectory="PreserveNewest" Link="Assets\Icons\FileTypes\%(Filename)%(Extension)" />
   </ItemGroup>
+
+  <!-- 
+    Fix empty ShowNameOnTiles element that Uno Resizetizer adds to the manifest.
+    This target runs after Uno Resizetizer and replaces the empty/malformed element with a valid one.
+  -->
+  <Target Name="FixShowNameOnTiles" AfterTargets="UnoResizetizerProcessAppManifest" Condition="$(TargetFramework.Contains('windows10'))">
+    <PropertyGroup>
+      <_ManifestPath>$(IntermediateOutputPath)unoresizetizer\m\Package.appxmanifest</_ManifestPath>
+    </PropertyGroup>
+    <!-- Handle self-closing empty tag -->
+    <WriteLinesToFile
+      File="$(_ManifestPath)"
+      Lines="$([System.IO.File]::ReadAllText('$(_ManifestPath)').Replace('&lt;uap:ShowNameOnTiles /&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=&quot;square150x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;square310x310Logo&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;'))"
+      Overwrite="true"
+      Condition="Exists('$(_ManifestPath)')" />
+    <!-- Handle unclosed opening tag (Uno Resizetizer bug) - replace the broken pattern -->
+    <Exec Command="powershell -NoProfile -Command &quot;(Get-Content '$(_ManifestPath)' -Raw) -replace '&lt;uap:ShowNameOnTiles&gt;\s*&lt;/uap:DefaultTile&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=\&quot;square150x150Logo\&quot;/&gt;&lt;uap:ShowOn Tile=\&quot;wide310x150Logo\&quot;/&gt;&lt;uap:ShowOn Tile=\&quot;square310x310Logo\&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;&lt;/uap:DefaultTile&gt;' | Set-Content '$(_ManifestPath)' -NoNewline&quot;"
+      Condition="Exists('$(_ManifestPath)')" />
+  </Target>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
        SHARED DEPENDENCIES (CPM - no versions here)
