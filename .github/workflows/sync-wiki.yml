@@ -6,7 +6,12 @@ on:
       - main
     paths:
       - 'wiki/**'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force sync even if no changes detected'
+        type: boolean
+        default: false
 
 jobs:
   sync-wiki:
@@ -17,32 +22,60 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: main
+          fetch-depth: 1
 
       - name: Checkout wiki repo
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}.wiki
           path: wiki-repo
-          # Use PAT instead of GITHUB_TOKEN for wiki write access
           token: ${{ secrets.WIKI_PAT }}
+
+      - name: Show source files
+        run: |
+          echo "=== Files in main/wiki/ ==="
+          ls -la main/wiki/ || echo "No wiki folder!"
+          echo ""
+          echo "=== Markdown file count in main/wiki/ ==="
+          find main/wiki -name "*.md" 2>/dev/null | wc -l
+
+      - name: Show current wiki repo state
+        run: |
+          echo "=== Files currently in wiki-repo/ ==="
+          ls -la wiki-repo/ || echo "Empty!"
+          echo ""
+          echo "=== Markdown file count in wiki-repo/ ==="
+          find wiki-repo -maxdepth 1 -name "*.md" 2>/dev/null | wc -l
 
       - name: Sync wiki content
         run: |
           # Check if wiki folder exists in main repo
           if [ ! -d "main/wiki" ]; then
-            echo "No wiki folder found in main repo, skipping sync"
-            exit 0
+            echo "? No wiki folder found in main repo!"
+            exit 1
           fi
           
+          # Count source files
+          SOURCE_COUNT=$(find main/wiki -maxdepth 1 -name "*.md" | wc -l)
+          echo "?? Found $SOURCE_COUNT markdown files to sync"
+          
           # Remove old wiki content (except .git)
+          echo "?? Cleaning wiki-repo..."
           find wiki-repo -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
           
           # Copy new content from main repo's wiki folder
-          cp -r main/wiki/* wiki-repo/
+          echo "?? Copying files..."
+          cp -rv main/wiki/* wiki-repo/
           
-          # List what we're syncing
-          echo "=== Files being synced to wiki ==="
-          ls -la wiki-repo/
+          # Verify copy
+          DEST_COUNT=$(find wiki-repo -maxdepth 1 -name "*.md" | wc -l)
+          echo ""
+          echo "? Copied $DEST_COUNT markdown files to wiki-repo"
+          
+          # List all files
+          echo ""
+          echo "=== Files now in wiki-repo/ ==="
+          ls -la wiki-repo/*.md
 
       - name: Push to wiki
         run: |
@@ -50,12 +83,33 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Check if there are changes
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to sync"
-            exit 0
+          # Show git status
+          echo "=== Git status ==="
+          git status
+          
+          # Add all files
+          git add -A
+          
+          # Show what will be committed
+          echo ""
+          echo "=== Files staged for commit ==="
+          git diff --cached --name-status
+          
+          # Check if there are changes (unless force is enabled)
+          FORCE="${{ github.event.inputs.force }}"
+          if [ "$FORCE" != "true" ]; then
+            if git diff --cached --quiet; then
+              echo ""
+              echo "? No changes to sync - wiki is already up to date"
+              exit 0
+            fi
           fi
           
-          git add -A
+          # Commit and push
+          echo ""
+          echo "?? Committing and pushing..."
           git commit -m "Sync wiki from main repo @ ${{ github.sha }}"
           git push
+          
+          echo ""
+          echo "? Wiki synced successfully!"
