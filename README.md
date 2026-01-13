@@ -282,6 +282,8 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - [x] Uno Platform migration (cross-platform support!)
 - [x] Symmetry tools
 - [ ] Sprite sheet export improvements
+- [ ] Font Creation
+- [ ] Music? IDK
 
 ---
 
