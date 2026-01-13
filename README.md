@@ -21,7 +21,7 @@
 
 ## Documentation
 
-### 🚀 Quick Reference
+### Quick Reference
 *For when you're in the zone and just need a reminder*
 
 | Document | Description |
@@ -29,7 +29,7 @@
 | **[Quick Start Guide](docs/QUICK_START.md)** | Get up and running in 5 minutes |
 | **[Cheat Sheet](docs/CHEAT_SHEET.md)** | One-page keyboard shortcuts & tool reference |
 
-### 📚 The Wiki (Deep Dive)
+### The Wiki (Deep Dive)
 *For when you actually want to RTFM*
 
 **[→ PixlPunkt Wiki](https://github.com/ChadRoesler/PixlPunkt/wiki)**
@@ -44,7 +44,7 @@
 | [Stage & Camera](https://github.com/ChadRoesler/PixlPunkt/wiki/Stage) | Pan, zoom, rotate - cinematic camera |
 | [Shortcuts](https://github.com/ChadRoesler/PixlPunkt/wiki/Shortcuts) | Complete keyboard reference |
 
-### 🔌 Plugin Development
+### Plugin Development
 
 | Document | Description |
 |----------|-------------|
