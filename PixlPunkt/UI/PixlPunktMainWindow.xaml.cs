@@ -472,7 +472,11 @@ namespace PixlPunkt.UI
 #if WINDOWS
             // On Windows, extend content into title bar for seamless menu bar
             ExtendsContentIntoTitleBar = true;
-            SetTitleBar(TitleBarRoot);
+            
+            // IMPORTANT: Only set the drag region (icon area) as the title bar, NOT the entire TitleBarRoot.
+            // This ensures the MenuBar is NOT part of the drag region and can receive clicks properly.
+            // This fixes menu bar click issues on Windows 10.
+            SetTitleBar(TitleBarDragRegion);
             
             // Configure title bar colors to match theme
             try
@@ -1186,8 +1190,17 @@ namespace PixlPunkt.UI
         /// </summary>
         private void OnRootPointerPressed(object sender, PointerRoutedEventArgs e)
         {
+#if WINDOWS
+            // On WinAppSdk, keyboard focus works correctly without intervention.
+            // The passthrough regions handle title bar/menu bar click issues.
+            return;
+#else
             // Don't steal focus if clicking on a text input control
             if (IsTextInputFocused()) return;
+
+            // Don't steal focus if clicking on the menu bar area
+            // This prevents menu bar click issues on Windows 10 Skia
+            if (IsPointerInMenuBar(e)) return;
 
             // Defer focus restoration to allow the click to be processed first
             // This prevents interfering with button clicks, menu interactions, etc.
@@ -1199,7 +1212,44 @@ namespace PixlPunkt.UI
                     Root.Focus(FocusState.Programmatic);
                 }
             });
+#endif
         }
+
+#if !WINDOWS
+        /// <summary>
+        /// Checks if the pointer event is within the menu bar area.
+        /// Only used on Skia platforms where focus handling can interfere with menus.
+        /// </summary>
+        private bool IsPointerInMenuBar(PointerRoutedEventArgs e)
+        {
+            try
+            {
+                // Get pointer position relative to the menu bar
+                var point = e.GetCurrentPoint(MainMenuBar);
+                var menuBarBounds = new Windows.Foundation.Rect(0, 0, MainMenuBar.ActualWidth, MainMenuBar.ActualHeight);
+                
+                if (menuBarBounds.Contains(point.Position))
+                {
+                    return true;
+                }
+
+                // Also check the entire title bar root (which contains the menu bar)
+                var titleBarPoint = e.GetCurrentPoint(TitleBarRoot);
+                var titleBarBounds = new Windows.Foundation.Rect(0, 0, TitleBarRoot.ActualWidth, TitleBarRoot.ActualHeight);
+                
+                if (titleBarBounds.Contains(titleBarPoint.Position))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // If we can't determine position, err on the side of not interfering
+            }
+
+            return false;
+        }
+#endif
 
         private void SuspendToolAccelerators(bool suspend)
         {

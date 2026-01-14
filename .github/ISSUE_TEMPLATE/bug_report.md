@@ -26,6 +26,7 @@ If applicable, add screenshots to help explain your problem.
 - **OS**: [e.g., Windows 11 23H2]
 - **PixlPunkt Version**: [e.g., 1.0.0]
 - **Architecture**: [e.g., x64, ARM64]
+- **Installer Type Used**: [e.g., Microsoft Store, Standalone .exe]
 
 ## Document Details (if applicable)
 - Canvas size: [e.g., 64x64]

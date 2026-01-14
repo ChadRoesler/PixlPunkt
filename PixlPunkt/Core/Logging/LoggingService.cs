@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -120,6 +121,138 @@ namespace PixlPunkt.Core.Logging
             {
                 _levelSwitch.MinimumLevel = level;
                 Info("Log level changed at runtime to {LogLevel}", level);
+            }
+        }
+
+        /// <summary>
+        /// Logs comprehensive build and environment information at startup.
+        /// This helps identify which build type is running (WinAppSdk, Desktop Skia, etc.).
+        /// </summary>
+        public static void LogBuildEnvironment()
+        {
+            try
+            {
+                // Determine build type based on compile-time constants
+                string buildType;
+                string framework;
+                
+#if WINDOWS
+                // WinAppSdk build (net10.0-windows10.0.26100)
+                buildType = "WinAppSdk";
+                framework = "net10.0-windows10.0.26100";
+#elif HAS_UNO_SKIA
+                // Desktop Skia build (net10.0-desktop)
+                buildType = "Desktop-Skia";
+                framework = "net10.0-desktop";
+#else
+                // Unknown/other platform
+                buildType = "Unknown";
+                framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
+#endif
+
+                // Detect package type (MSIX vs unpackaged)
+                string packageType = DetectPackageType();
+
+                // OS and architecture info
+                string osDescription = RuntimeInformation.OSDescription;
+                string osArchitecture = RuntimeInformation.OSArchitecture.ToString();
+                string processArchitecture = RuntimeInformation.ProcessArchitecture.ToString();
+                
+                // Windows version detection
+                string windowsVersion = "N/A";
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    windowsVersion = Environment.OSVersion.Version.ToString();
+                    
+                    // Friendly name for Windows version
+                    var ver = Environment.OSVersion.Version;
+                    if (ver.Build >= 22000)
+                        windowsVersion += " (Windows 11)";
+                    else if (ver.Build >= 10240)
+                        windowsVersion += " (Windows 10)";
+                }
+
+                // Runtime info
+                string runtimeVersion = Environment.Version.ToString();
+                string clrVersion = RuntimeInformation.FrameworkDescription;
+
+                // App version
+                string appVersion = Core.Updates.UpdateService.GetCurrentVersionString();
+
+                // Log all the info
+                Info("===============================================================");
+                Info("PixlPunkt Build Environment");
+                Info("===============================================================");
+                Info("  App Version:      {AppVersion}", appVersion);
+                Info("  Build Type:       {BuildType}", buildType);
+                Info("  Target Framework: {Framework}", framework);
+                Info("  Package Type:     {PackageType}", packageType);
+                Info("===============================================================");
+                Info("  OS:               {OSDescription}", osDescription);
+                Info("  Windows Version:  {WindowsVersion}", windowsVersion);
+                Info("  OS Architecture:  {OSArch}", osArchitecture);
+                Info("  Process Arch:     {ProcessArch}", processArchitecture);
+                Info("===============================================================");
+                Info("  .NET Version:     {RuntimeVersion}", runtimeVersion);
+                Info("  CLR:              {CLRVersion}", clrVersion);
+                Info("  Base Directory:   {BaseDir}", AppContext.BaseDirectory);
+                Info("===============================================================");
+            }
+            catch (Exception ex)
+            {
+                Warning("Failed to log build environment: {Error}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Detects whether the app is running as MSIX packaged, Velopack installed, or portable.
+        /// </summary>
+        private static string DetectPackageType()
+        {
+            try
+            {
+#if WINDOWS
+                // Check if running as MSIX packaged app
+                try
+                {
+                    var package = Windows.ApplicationModel.Package.Current;
+                    if (package != null)
+                    {
+                        var id = package.Id;
+                        return $"MSIX ({id.Name} v{id.Version.Major}.{id.Version.Minor}.{id.Version.Build})";
+                    }
+                }
+                catch
+                {
+                    // Not packaged - check for Velopack
+                }
+#endif
+
+                // Check for Velopack installation (look for Update.exe in parent directory)
+                var baseDir = AppContext.BaseDirectory;
+                var parentDir = Path.GetDirectoryName(baseDir.TrimEnd(Path.DirectorySeparatorChar));
+                
+                if (parentDir != null)
+                {
+                    var updateExe = Path.Combine(parentDir, "Update.exe");
+                    if (File.Exists(updateExe))
+                    {
+                        return "Velopack (Installed)";
+                    }
+                }
+
+                // Check if running from a "current" subdirectory (Velopack structure)
+                if (baseDir.Contains("current", StringComparison.OrdinalIgnoreCase) ||
+                    baseDir.Contains("app-", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Velopack (Installed)";
+                }
+
+                return "Portable/Unpackaged";
+            }
+            catch
+            {
+                return "Unknown";
             }
         }
 

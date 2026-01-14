@@ -93,6 +93,7 @@ namespace PixlPunkt.Core.Palette.Helpers.Defaults
                 Solarized16(),
                 Grayscale16(),
                 SkinTones16(),
+                K6BDThroneDream24(),
             };
 
             All = list;
@@ -592,6 +593,27 @@ namespace PixlPunkt.Core.Palette.Helpers.Defaults
                 "#6A4638", "#7D5542", "#8F624A", "#A27156",
                 "#B58062", "#C78E6F", "#D89E7E", "#E4AF8F",
                 "#EDBF9F", "#F3CFB5", "#F8E0CC", "#FDECE0"
+            )
+        );
+
+        /// <summary>
+        /// Creates the K6BD: Throne Dream palette (16 colors).
+        /// </summary>
+        /// <returns>A diverse range of colors inspired by Kill 6 Billion Demons.</returns>
+        /// <remarks>
+        /// Specialized palette for character art covering a broad spectrum of melanin levels.
+        /// Graduated steps ensure smooth shading transitions for portraits and figure work.
+        /// Useful for inclusive character representation across diverse ethnicities.
+        /// </remarks>
+        private static NamedPalette K6BDThroneDream24() => new(
+            "K6BD: Throne Dream (24)",
+            RGBArr(
+                "#07060A", "#151021", "#2E2A3A", "#6C6472", 
+                "#F2E9D8", "#FFF8F0", "#E6C44A", "#1E3A8A",
+                "#D01F2B", "#F4D6E6", "#E8872C", "#5A2A86",
+                "#2BB673", "#B78B2A", "#7A5520", "#8A0F18",
+                "#4A0810", "#2B1348", "#5E2E8C", "#9A6BFF",
+                "#17407D", "#2B7CFF", "#24D6FF", "#D8FF57"
             )
         );
     }

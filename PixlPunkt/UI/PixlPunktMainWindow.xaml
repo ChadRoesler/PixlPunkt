@@ -61,6 +61,7 @@
               Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -72,13 +73,15 @@
                    VerticalAlignment="Center"
                    Source="ms-appx:///Assets/Icons/Icon.png" />
 
-            <!-- Menu Bar (inside title bar on Windows) -->
+            <!-- Menu Bar (NOT part of drag region - needs to receive clicks) -->
             <MenuBar x:Name="MainMenuBar"
                      Grid.Column="1"
+                     VerticalAlignment="Center"
                      MinHeight="32">
                 <MenuBar.Resources>
                     <Style TargetType="MenuBarItem">
-                        <Setter Property="Margin" Value="5,2,5,0" />
+                        <Setter Property="Margin" Value="5,0,5,0" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
                         <Setter Property="HorizontalContentAlignment" Value="Center" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                     </Style>
@@ -264,6 +267,13 @@
                     <MenuFlyoutItem Text="About PixlPunkt" Click="Help_About_Click"/>
                 </MenuBarItem>
             </MenuBar>
+
+            <!-- Drag region - empty space to the right of menu bar for dragging the window -->
+            <Border x:Name="TitleBarDragRegion" 
+                    Grid.Column="2"
+                    Background="Transparent"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"/>
         </Grid>
 
         <!-- Simple tool strip -->

@@ -145,6 +145,9 @@ public partial class App : Application
             LoggingService.Debug("Failed to apply log level from settings: {Error}", ex.Message);
         }
 
+        // Log build environment info (helps identify WinAppSdk vs Desktop Skia, MSIX vs Portable, etc.)
+        LoggingService.LogBuildEnvironment();
+
         LoggingService.Info("PixlPunkt application starting");
 
         // Log startup file if present
