@@ -211,27 +211,25 @@ namespace PixlPunkt.Core.Logging
         {
             try
             {
-#if WINDOWS
-                // Check if running as MSIX packaged app
-                try
-                {
-                    var package = Windows.ApplicationModel.Package.Current;
-                    if (package != null)
-                    {
-                        var id = package.Id;
-                        return $"MSIX ({id.Name} v{id.Version.Major}.{id.Version.Minor}.{id.Version.Build})";
-                    }
-                }
-                catch
-                {
-                    // Not packaged - check for Velopack
-                }
-#endif
-
-                // Check for Velopack installation (look for Update.exe in parent directory)
                 var baseDir = AppContext.BaseDirectory;
+
+                // Check for Velopack installation FIRST (more reliable detection)
+                // Velopack uses a "current" folder or "app-X.X.X" folder structure
+                if (baseDir.Contains(Path.DirectorySeparatorChar + "current" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                    baseDir.EndsWith(Path.DirectorySeparatorChar + "current" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                    baseDir.EndsWith(Path.DirectorySeparatorChar + "current", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Velopack (Installed)";
+                }
+
+                // Also check for app-X.X.X pattern
+                if (System.Text.RegularExpressions.Regex.IsMatch(baseDir, @"[/\\]app-\d+\.\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                {
+                    return "Velopack (Installed)";
+                }
+
+                // Check for Update.exe in parent directory (another Velopack indicator)
                 var parentDir = Path.GetDirectoryName(baseDir.TrimEnd(Path.DirectorySeparatorChar));
-                
                 if (parentDir != null)
                 {
                     var updateExe = Path.Combine(parentDir, "Update.exe");
@@ -241,12 +239,26 @@ namespace PixlPunkt.Core.Logging
                     }
                 }
 
-                // Check if running from a "current" subdirectory (Velopack structure)
-                if (baseDir.Contains("current", StringComparison.OrdinalIgnoreCase) ||
-                    baseDir.Contains("app-", StringComparison.OrdinalIgnoreCase))
+#if WINDOWS
+                // Check if running as MSIX packaged app (only if not Velopack)
+                try
                 {
-                    return "Velopack (Installed)";
+                    var package = Windows.ApplicationModel.Package.Current;
+                    if (package != null)
+                    {
+                        var id = package.Id;
+                        // Additional check: MSIX apps run from WindowsApps folder
+                        if (baseDir.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return $"MSIX ({id.Name} v{id.Version.Major}.{id.Version.Minor}.{id.Version.Build})";
+                        }
+                    }
                 }
+                catch
+                {
+                    // Not packaged
+                }
+#endif
 
                 return "Portable/Unpackaged";
             }

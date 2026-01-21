@@ -473,9 +473,8 @@ namespace PixlPunkt.UI
             // On Windows, extend content into title bar for seamless menu bar
             ExtendsContentIntoTitleBar = true;
             
-            // IMPORTANT: Only set the drag region (icon area) as the title bar, NOT the entire TitleBarRoot.
+            // IMPORTANT: Only set the drag region (empty space right of menu) as the title bar.
             // This ensures the MenuBar is NOT part of the drag region and can receive clicks properly.
-            // This fixes menu bar click issues on Windows 10.
             SetTitleBar(TitleBarDragRegion);
             
             // Configure title bar colors to match theme
@@ -520,6 +519,12 @@ namespace PixlPunkt.UI
             {
                 Core.Logging.LoggingService.Debug("Failed to configure title bar colors: {Error}", ex.Message);
             }
+            
+            // WINDOWS 10 FIX: Additionally set up passthrough regions for the menu bar.
+            // On Windows 10, even with SetTitleBar pointing to a specific element,
+            // the entire title bar row can intercept clicks. This explicitly marks
+            // the menu bar and icon as "passthrough" regions that receive normal input.
+            SetupMenuBarPassthroughRegions();
 #else
             // On Linux/macOS (Skia), use standard window chrome
             // The native window manager provides the title bar
@@ -527,6 +532,82 @@ namespace PixlPunkt.UI
             ExtendsContentIntoTitleBar = false;
 #endif
         }
+
+#if WINDOWS
+        /// <summary>
+        /// Sets up passthrough regions for Windows 10 compatibility.
+        /// Marks the menu bar and icon as interactive (non-draggable) regions.
+        /// </summary>
+        private void SetupMenuBarPassthroughRegions()
+        {
+            // Wait for layout to complete before calculating regions
+            TitleBarRoot.Loaded += (_, __) => UpdateMenuBarPassthroughRegions();
+            TitleBarRoot.SizeChanged += (_, __) => UpdateMenuBarPassthroughRegions();
+            MainMenuBar.SizeChanged += (_, __) => UpdateMenuBarPassthroughRegions();
+        }
+
+        /// <summary>
+        /// Updates the passthrough regions for the menu bar.
+        /// Called when layout changes.
+        /// </summary>
+        private void UpdateMenuBarPassthroughRegions()
+        {
+            try
+            {
+                var appWindow = this.AppWindow;
+                if (appWindow == null) return;
+
+                // Get the InputNonClientPointerSource to configure passthrough regions
+                var nonClientSource = Microsoft.UI.Input.InputNonClientPointerSource.GetForWindowId(appWindow.Id);
+                if (nonClientSource == null) return;
+
+                // Get the scale factor for DPI-aware positioning
+                var scaleFactor = TitleBarRoot.XamlRoot?.RasterizationScale ?? 1.0;
+
+                // Calculate the entire left side (icon + menu bar) as passthrough
+                // This is everything EXCEPT the drag region on the right
+                var iconTransform = ((FrameworkElement)TitleBarRoot.Children[0]).TransformToVisual(null);
+                var iconPosition = iconTransform.TransformPoint(new Windows.Foundation.Point(0, 0));
+
+                // Calculate the combined width of icon + menu bar
+                double iconWidth = ((FrameworkElement)TitleBarRoot.Children[0]).ActualWidth;
+                double menuBarWidth = MainMenuBar.ActualWidth;
+                double combinedWidth = iconWidth + menuBarWidth;
+                double titleBarHeight = TitleBarRoot.ActualHeight;
+
+                int rectX = (int)(iconPosition.X * scaleFactor);
+                int rectY = (int)(iconPosition.Y * scaleFactor);
+                int rectWidth = (int)(combinedWidth * scaleFactor);
+                int rectHeight = (int)(titleBarHeight * scaleFactor);
+
+                // Only set up regions if we have valid dimensions
+                if (rectWidth <= 0 || rectHeight <= 0) return;
+
+                var passthroughRect = new Windows.Graphics.RectInt32
+                {
+                    X = rectX,
+                    Y = rectY,
+                    Width = rectWidth,
+                    Height = rectHeight
+                };
+
+                // Clear any existing passthrough regions and set the new one
+                nonClientSource.ClearRegionRects(Microsoft.UI.Input.NonClientRegionKind.Passthrough);
+                nonClientSource.SetRegionRects(
+                    Microsoft.UI.Input.NonClientRegionKind.Passthrough,
+                    [passthroughRect]);
+
+                LoggingService.Debug("Menu bar passthrough region set: X={X}, Y={Y}, W={W}, H={H}",
+                    rectX, rectY, rectWidth, rectHeight);
+            }
+            catch (Exception ex)
+            {
+                // This API may not be available on older Windows versions or may fail
+                // The SetTitleBar approach should still work as primary fix
+                LoggingService.Debug("Failed to set menu bar passthrough regions: {Error}", ex.Message);
+            }
+        }
+#endif
 
         // ─────────────────────────────────────────────────────────────
         // KEYBOARD FOCUS / INPUT UTILITIES
