@@ -235,6 +235,7 @@ namespace PixlPunkt.UI.CanvasHost
         // ════════════════════════════════════════════════════════════════════
 
         private bool _spacePan = false;
+        private bool _initialFitDone = false;
 
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - CURSOR OVERLAY

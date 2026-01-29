@@ -46,6 +46,9 @@ namespace PixlPunkt.UI.Layers.Controls
             // Initialize canvas element based on platform
             InitializeCanvasElement();
 
+            // Apply stripe colors immediately to ensure correct colors before first render
+            ApplyStripeColors();
+
             Loaded += (_, __) =>
             {
                 HookDpi();

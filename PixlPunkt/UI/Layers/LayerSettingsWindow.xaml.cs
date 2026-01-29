@@ -73,6 +73,11 @@ namespace PixlPunkt.UI.Layers
         /// </summary>
         public LayerSettingsViewModel ViewModel { get; }
 
+        /// <summary>
+        /// The layer being edited, exposed for XAML bindings.
+        /// </summary>
+        public RasterLayer Layer => _layer;
+
         // ────────────────────────────────────────────────────────────────────
         // CTOR
         // ────────────────────────────────────────────────────────────────────
@@ -98,8 +103,10 @@ namespace PixlPunkt.UI.Layers
 
             InitializeComponent();
 
-            // Keep DataContext on the layer so Opacity/Blend/Vis/Lock stay live-bound.
-            Root.DataContext = _layer;
+            // Set DataContext to this window so all bindings can access both
+            // window properties (EditableName, BlendModes, ViewModel) and 
+            // layer properties via the Layer property.
+            Root.DataContext = this;
 
             Title = $"Layer Settings - {_origName}";
 

@@ -38,7 +38,12 @@ namespace PixlPunkt.UI.CanvasHost
         {
             _mainCanvas.Loaded += (_, __) => 
             {
-                DoFit();
+                // Only fit on first load to preserve zoom when switching tabs
+                if (!_initialFitDone)
+                {
+                    DoFit();
+                    _initialFitDone = true;
+                }
                 // Explicitly invalidate rulers after fit to ensure they draw correctly
                 InvalidateRulers();
             };

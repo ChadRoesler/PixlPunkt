@@ -102,7 +102,7 @@
                     Grid.Column="1"
                     Minimum="0"
                     Maximum="255"
-                    Value="{Binding Opacity, Mode=TwoWay, Converter={StaticResource ByteToDouble}}"
+                    Value="{Binding Layer.Opacity, Mode=TwoWay, Converter={StaticResource ByteToDouble}}"
                     ValueChanged="Opacity_ValueChanged" />
             <NumberBox x:Name="OpacityBox"
                        Grid.Row="1"
@@ -110,7 +110,7 @@
                        Minimum="0"
                        Maximum="255"
                        Width="64"
-                       Value="{Binding Opacity, Mode=TwoWay, Converter={StaticResource ByteToDouble}}"
+                       Value="{Binding Layer.Opacity, Mode=TwoWay, Converter={StaticResource ByteToDouble}}"
                        ValueChanged="Opacity_ValueChanged" />
 
             <!-- Blend mode selection -->
@@ -125,7 +125,7 @@
                       Grid.ColumnSpan="2"
                       Width="240"
                       ItemsSource="{Binding BlendModes, Mode=OneTime}"
-                      SelectedItem="{Binding Blend, Mode=TwoWay}"
+                      SelectedItem="{Binding Layer.Blend, Mode=TwoWay}"
                       SelectionChanged="BlendCombo_SelectionChanged" />
 
             <!-- Visibility / Lock / Solo toggles -->
@@ -137,7 +137,7 @@
                 <!-- Visibility toggle -->
                 <ToggleButton x:Name="VisBtn"
                               ToolTipService.ToolTip="Visibility"
-                              IsChecked="{Binding Visible, Mode=TwoWay}"
+                              IsChecked="{Binding Layer.Visible, Mode=TwoWay}"
                               Click="VisBtn_Click">
                     <Grid>
                         <ic:FluentIcon Icon="Eye"
@@ -150,7 +150,7 @@
                 <!-- Lock toggle -->
                 <ToggleButton x:Name="LockBtn"
                               ToolTipService.ToolTip="Lock"
-                              IsChecked="{Binding Locked, Mode=TwoWay}"
+                              IsChecked="{Binding Layer.Locked, Mode=TwoWay}"
                               Click="LockBtn_Click">
                     <Grid>
                         <ic:FluentIcon Icon="LockClosed"
