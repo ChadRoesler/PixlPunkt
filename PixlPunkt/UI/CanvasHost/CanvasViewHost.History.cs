@@ -383,6 +383,12 @@ namespace PixlPunkt.UI.CanvasHost
             _toolState?.SetRotationAngle(0.0);
             UpdateActiveLayerPreview();
 
+            // Raise frame to update tile animation previews (main playback)
+            RaiseFrame();
+
+            // Notify document modified to update Frame Edit panel thumbnails
+            Document.RaiseDocumentModified();
+
             // Capture keyframe if in canvas animation mode and layer has animation
             AutoCaptureKeyframeIfNeeded();
         }

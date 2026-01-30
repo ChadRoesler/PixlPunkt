@@ -247,6 +247,7 @@ Automatic tile selection based on neighbors:
 |----------|--------|
 | `Shift+T` | Tile Stamper tool |
 | `Ctrl+T` | Tile Modifier tool |
+| `Shift+A` | Tile Animation tool |
 | `Ctrl+Shift+'` | Toggle tile grid |
 | `F7` | Toggle Tiles Panel |
 

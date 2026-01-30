@@ -105,8 +105,9 @@ Complete keyboard shortcut reference for PixlPunkt.
 
 | Shortcut | Tool | Icon |
 |----------|------|:----:|
-| `Shift+T` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> |
-| `Ctrl+T` | Tile Modifier | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_16.png" width="16"> |
+| `Shift+T` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_16.png" width="16"> |
+| `Ctrl+T` | Tile Modifier | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> |
+| `Shift+A` | Tile Animation | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_16.png" width="16"> |
 
 ### Utility Tools
 

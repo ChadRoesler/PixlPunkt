@@ -89,8 +89,8 @@ namespace PixlPunkt.Core.Tools.Tile
             _isDragging = true;
             _isActive = true;
 
-            // Check if shift is held to add to existing
-            _addToExisting = isShiftHeld;
+            // Use setting value OR shift key modifier to add to existing
+            _addToExisting = _settings.AddToExisting || isShiftHeld;
 
             _context.Invalidate();
             return true;
@@ -196,13 +196,14 @@ namespace PixlPunkt.Core.Tools.Tile
         public bool IsDragging => _isDragging;
 
         /// <summary>
-        /// Gets the list of tile grid positions in the current selection (row-major order).
+        /// Gets the list of tile grid positions in the current selection.
+        /// Order is determined by <see cref="TileAnimationToolSettings.SelectionOrder"/>.
         /// </summary>
         public List<(int tileX, int tileY)> GetSelectedTilePositions()
         {
             var positions = new List<(int, int)>();
 
-            // Normalize start/end to ensure start <= end in row-major order
+            // Normalize start/end to ensure start <= end
             int startX = Math.Min(_startTileX, _endTileX);
             int startY = Math.Min(_startTileY, _endTileY);
             int endX = Math.Max(_startTileX, _endTileX);
@@ -214,12 +215,27 @@ namespace PixlPunkt.Core.Tools.Tile
             endX = Math.Min(_context.TileCountX - 1, endX);
             endY = Math.Min(_context.TileCountY - 1, endY);
 
-            // Get positions in row-major order
-            for (int y = startY; y <= endY; y++)
+            // Get positions based on selection order setting
+            if (_settings.SelectionOrder == TileSelectionOrder.ColumnMajor)
             {
+                // Column-major: top-to-bottom, then left-to-right
                 for (int x = startX; x <= endX; x++)
                 {
-                    positions.Add((x, y));
+                    for (int y = startY; y <= endY; y++)
+                    {
+                        positions.Add((x, y));
+                    }
+                }
+            }
+            else
+            {
+                // Row-major (default): left-to-right, then top-to-bottom
+                for (int y = startY; y <= endY; y++)
+                {
+                    for (int x = startX; x <= endX; x++)
+                    {
+                        positions.Add((x, y));
+                    }
                 }
             }
 

@@ -74,8 +74,7 @@ Complete mapping of icons used in PixlPunkt, extracted from source code.
 |------------|-------------|:----:|-------|
 | `table` | Table | <img src="table_16.png" width="16"> | Tile category |
 | `table_edit` | TableEdit | <img src="table_edit_16.png" width="16"> | Tile stamper |
-| `table_cell_edit` | TableCellEdit | <img src="table_cell_edit_16.png" width="16"> | Tile modifier |
-| `table_lightning` | TableLightning | <img src="table_lightning_16.png" width="16"> | Tile animation |
+| `table_cell_edit` | TableCellEdit | <img src="table_cell_edit_16.png" width="16"> | Tile animation |
 
 ### <img src="flip_horizontal_20.png" width="20"> Symmetry
 | Local Name | Fluent Name | Icon | Usage |

@@ -55,16 +55,31 @@ References to specific tile positions with optional custom timing.
 
 ## The Tile Animation Tool
 
-Use the **Tile Animation Tool** to select tile positions for your reel:
+Use the **Tile Animation Tool** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_20.png" width="20"> to select tile positions for your reel:
 
-**Shortcut:** Available in the Tiles tool group
+**Shortcut:** `Shift+A`
+
+### Tool Options
+
+| Option | Description |
+|--------|-------------|
+| **Add to Existing** | When enabled, selected tiles are appended to the current reel instead of replacing existing frames. Can also be toggled by holding `Shift` during selection. |
+| **Frame Order** | Controls the order tiles are added as frames: **Row Major (→↓)** reads left-to-right then top-to-bottom; **Column Major (↓→)** reads top-to-bottom then left-to-right. |
 
 ### Using the Tile Animation Tool
 
-1. Select the Tile Animation tool
+1. Select the Tile Animation tool (`Shift+A`)
 2. **Click and drag** on the canvas to select a range of tiles
-3. Tiles are added in **row-major order** (left-to-right, top-to-bottom)
-4. Hold `Shift` while dragging to **add to existing** frames instead of replacing
+3. Tiles are added based on the **Frame Order** setting
+4. Enable **Add to Existing** or hold `Shift` while dragging to append frames
+
+### Actions
+
+| Input | Action |
+|-------|--------|
+| **LMB drag** | Select tile positions for animation frames |
+| **Shift + LMB drag** | Add to existing frames instead of replacing |
+| **RMB** | Sample tile (tile dropper) |
 
 ### Adding Frames
 - **Drag to select** tile positions on the canvas

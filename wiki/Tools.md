@@ -24,8 +24,9 @@ PixlPunkt includes a comprehensive set of drawing, selection, and editing tools.
 | `Z` | Zoom | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/zoom_in_16.png" width="16"> | Utility |
 | `I` | Rectangle | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> | Shapes |
 | `P` | Ellipse | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> | Shapes |
-| `Shift+T` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> | Tiles |
-| `Ctrl+T` | Tile Modifier | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_16.png" width="16"> | Tiles |
+| `Shift+T` | Tile Stamper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_16.png" width="16"> | Tiles |
+| `Ctrl+T` | Tile Modifier | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> | Tiles |
+| `Shift+A` | Tile Animation | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_16.png" width="16"> | Tiles |
 
 ---
 
@@ -296,7 +297,7 @@ Places tiles from your tileset onto the canvas.
 
 ---
 
-### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_20.png" width="20"> Tile Modifier (Ctrl+T)
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_20.png" width="20"> Tile Modifier (Ctrl+T)
 
 Offsets and transforms tile content within boundaries.
 
@@ -306,6 +307,29 @@ Offsets and transforms tile content within boundaries.
 |--------|-------------|
 | **Offset X/Y** | Shift content within tile |
 | **Wrap** | Wrap around when offsetting |
+
+---
+
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_20.png" width="20"> Tile Animation (Shift+A)
+
+Select tile positions to create animation frames for tile-based sprite animations.
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| **Add to Existing** | Append frames to current reel instead of replacing (or hold `Shift`) |
+| **Frame Order** | **Row Major (→↓)** or **Column Major (↓→)** tile reading order |
+
+**Actions:**
+
+| Input | Action |
+|-------|--------|
+| `LMB drag` | Select tile positions for animation frames |
+| `Shift + LMB drag` | Add to existing frames instead of replacing |
+| `RMB` | Sample tile (tile dropper) |
+
+See [[Tile Animation]] for complete documentation.
 
 ---
 

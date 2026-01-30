@@ -24914,28 +24914,83 @@
             Cycles through symmetry modes.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.Tools.Settings.TileSelectionOrder">
+            <summary>
+            Selection order for tile animation frame creation.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Tools.Settings.TileSelectionOrder.RowMajor">
+            <summary>Frames are ordered left-to-right, then top-to-bottom.</summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Tools.Settings.TileSelectionOrder.ColumnMajor">
+            <summary>Frames are ordered top-to-bottom, then left-to-right.</summary>
+        </member>
         <member name="T:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings">
             <summary>
             Settings for the Tile Animation tool.
             </summary>
             <remarks>
             <para>
-            The Tile Animation tool allows users to paint frame selections across tiles.
-            Click and drag to select a range of tiles in row-major order for animation frames.
+            The Tile Animation tool allows users to select tile positions on the canvas
+            to create animation frames. Click and drag to select a rectangular range of tiles.
             </para>
+            <para><strong>Actions:</strong></para>
+            <list type="bullet">
+            <item>LMB drag: Select tile positions for animation frames</item>
+            <item>Shift + LMB: Add tiles to existing frames instead of replacing</item>
+            <item>RMB: Sample tile (tile dropper)</item>
+            </list>
             </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.Icon">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.DisplayName">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.Description">
+            <inheritdoc/>
         </member>
         <member name="P:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.Shortcut">
             <inheritdoc/>
         </member>
         <member name="P:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.AddToExisting">
             <summary>
-            Gets or sets whether to add tiles to existing frames (vs replacing).
+            Gets whether to add tiles to existing frames instead of replacing them.
             </summary>
+            <remarks>
+            When true, selected tiles are appended to the current reel's frames.
+            When false, existing frames are cleared before adding new ones.
+            Can also be toggled by holding Shift during selection.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.SelectionOrder">
+            <summary>
+            Gets the order in which tiles are added as frames.
+            </summary>
+            <remarks>
+            <list type="bullet">
+            <item><see cref="F:PixlPunkt.Core.Tools.Settings.TileSelectionOrder.RowMajor"/>: Left-to-right, then top-to-bottom</item>
+            <item><see cref="F:PixlPunkt.Core.Tools.Settings.TileSelectionOrder.ColumnMajor"/>: Top-to-bottom, then left-to-right</item>
+            </list>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.GetOptions">
+            <inheritdoc/>
         </member>
         <member name="M:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.SetAddToExisting(System.Boolean)">
             <summary>
             Sets whether to add tiles to existing frames.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.SetSelectionOrder(PixlPunkt.Core.Tools.Settings.TileSelectionOrder)">
+            <summary>
+            Sets the selection order for frame creation.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.SetSelectionOrderByIndex(System.Int32)">
+            <summary>
+            Sets the selection order by dropdown index.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Tools.Settings.TileModifierToolSettings">
@@ -25843,7 +25898,8 @@
         </member>
         <member name="M:PixlPunkt.Core.Tools.Tile.TileAnimationHandler.GetSelectedTilePositions">
             <summary>
-            Gets the list of tile grid positions in the current selection (row-major order).
+            Gets the list of tile grid positions in the current selection.
+            Order is determined by <see cref="P:PixlPunkt.Core.Tools.Settings.TileAnimationToolSettings.SelectionOrder"/>.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Tools.Tile.TileAnimationHandler.SampleTileAt(System.Int32,System.Int32)">
