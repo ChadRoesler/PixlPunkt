@@ -171,6 +171,27 @@
       Condition="Exists('$(_ManifestPath)')" />
   </Target>
 
+  <!--
+    Update the MSIX package version in the appxmanifest.
+    When -p:Version=x.y.z.w is passed (e.g., from CI), update the manifest to match.
+    MSIX versions must be 4 parts (x.y.z.w), so we pad with zeros if needed.
+  -->
+  <Target Name="UpdateAppxManifestVersion" AfterTargets="FixShowNameOnTiles" Condition="$(TargetFramework.Contains('windows10')) and '$(Version)' != ''">
+    <PropertyGroup>
+      <_ManifestPath>$(IntermediateOutputPath)unoresizetizer\m\Package.appxmanifest</_ManifestPath>
+      <!-- Ensure version has 4 parts for MSIX -->
+      <_VersionParts>$(Version.Split('.').Length)</_VersionParts>
+      <_MsixVersion Condition="$(_VersionParts) == '1'">$(Version).0.0.0</_MsixVersion>
+      <_MsixVersion Condition="$(_VersionParts) == '2'">$(Version).0.0</_MsixVersion>
+      <_MsixVersion Condition="$(_VersionParts) == '3'">$(Version).0</_MsixVersion>
+      <_MsixVersion Condition="$(_VersionParts) >= '4'">$(Version)</_MsixVersion>
+    </PropertyGroup>
+    <Message Text="Updating MSIX version to $(_MsixVersion)" Importance="high" />
+    <Exec 
+      Command="powershell -NoProfile -Command &quot;(Get-Content '$(_ManifestPath)') -replace 'Version=\&quot;1\.0\.0\.0\&quot;', 'Version=\&quot;$(_MsixVersion)\&quot;' | Set-Content '$(_ManifestPath)'&quot;"
+      Condition="Exists('$(_ManifestPath)')" />
+  </Target>
+
   <!-- ═══════════════════════════════════════════════════════════════════════
        SHARED DEPENDENCIES (CPM - no versions here)
   ═══════════════════════════════════════════════════════════════════════ -->
