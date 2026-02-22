@@ -1,5 +1,6 @@
 using Uno.UI.Hosting;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace PixlPunkt;
 
@@ -38,6 +39,7 @@ public class Program
     /// Initializes Velopack for Windows auto-update support.
     /// Must be called as early as possible in Main().
     /// </summary>
+    [SupportedOSPlatform("windows")]
     private static void InitializeVelopackWindows()
     {
         try
@@ -48,22 +50,22 @@ public class Program
                           ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
 
             Velopack.VelopackApp.Build()
-                .WithFirstRun(v =>
+                .OnFirstRun(v =>
                 {
                     System.Diagnostics.Debug.WriteLine($"[Velopack] First run! Version: {v}");
                     Core.FileAssociations.WindowsFileAssociations.Register(exePath);
                 })
-                .WithAfterInstallFastCallback(v =>
+                .OnAfterInstallFastCallback(v =>
                 {
                     System.Diagnostics.Debug.WriteLine($"[Velopack] After install: {v}");
                     Core.FileAssociations.WindowsFileAssociations.Register(exePath);
                 })
-                .WithAfterUpdateFastCallback(v =>
+                .OnAfterUpdateFastCallback(v =>
                 {
                     System.Diagnostics.Debug.WriteLine($"[Velopack] After update: {v}");
                     Core.FileAssociations.WindowsFileAssociations.Register(exePath);
                 })
-                .WithBeforeUninstallFastCallback(v =>
+                .OnBeforeUninstallFastCallback(v =>
                 {
                     System.Diagnostics.Debug.WriteLine($"[Velopack] Before uninstall: {v}");
                     Core.FileAssociations.WindowsFileAssociations.Unregister();

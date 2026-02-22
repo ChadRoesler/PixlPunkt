@@ -183,8 +183,8 @@ public class PixelOpsTests
 
         // Assert - should be ~2x4 (tall) with some expansion
         // Rotated bounds are larger due to diagonal fitting
-        w.Should().BeGreaterOrEqualTo(2);
-        h.Should().BeGreaterOrEqualTo(4);
+        w.Should().BeGreaterThanOrEqualTo(2);
+        h.Should().BeGreaterThanOrEqualTo(4);
     }
 
     [Test]
@@ -255,8 +255,8 @@ public class PixelOpsTests
         PixelOps.RotatedBounds(100, 50, rad90, out int outW, out int outH);
 
         // Assert - should swap dimensions approximately
-        outW.Should().BeGreaterOrEqualTo(50);
-        outH.Should().BeGreaterOrEqualTo(100);
+        outW.Should().BeGreaterThanOrEqualTo(50);
+        outH.Should().BeGreaterThanOrEqualTo(100);
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -535,8 +535,8 @@ public class PixelOpsTests
         var (buf, w, h) = PixelOps.RotateSpriteApprox(src, 8, 8, 0);
 
         // Assert - should be approximately same size
-        w.Should().BeGreaterOrEqualTo(7);
-        h.Should().BeGreaterOrEqualTo(7);
+        w.Should().BeGreaterThanOrEqualTo(7);
+        h.Should().BeGreaterThanOrEqualTo(7);
         buf.Should().NotBeEmpty();
     }
 
@@ -564,8 +564,8 @@ public class PixelOpsTests
         var (buf, w, h) = PixelOps.RotateSpriteApprox(src, 2, 2, 90);
 
         // Assert
-        w.Should().BeGreaterOrEqualTo(1);
-        h.Should().BeGreaterOrEqualTo(1);
+        w.Should().BeGreaterThanOrEqualTo(1);
+        h.Should().BeGreaterThanOrEqualTo(1);
         buf.Should().NotBeEmpty();
     }
 

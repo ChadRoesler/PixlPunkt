@@ -21,8 +21,8 @@ public class SettingsTests
         var settings = new MockAppSettings();
 
         // Assert
-        settings.AutoBackupMinutes.Should().BeGreaterOrEqualTo(4, "backup interval should be at least 4 minutes");
-        settings.MaxBackupCount.Should().BeGreaterOrEqualTo(1, "should keep at least 1 backup");
+        settings.AutoBackupMinutes.Should().BeGreaterThanOrEqualTo(4, "backup interval should be at least 4 minutes");
+        settings.MaxBackupCount.Should().BeGreaterThanOrEqualTo(1, "should keep at least 1 backup");
         settings.PaletteSwatchSize.Should().BeInRange(8, 64, "swatch size should be in valid range");
         settings.TileSwatchSize.Should().BeInRange(16, 128, "tile swatch size should be in valid range");
     }
@@ -72,7 +72,7 @@ public class SettingsTests
         settings.ValidateAndClamp();
 
         // Assert
-        settings.AutoBackupMinutes.Should().BeGreaterOrEqualTo(4);
+        settings.AutoBackupMinutes.Should().BeGreaterThanOrEqualTo(4);
     }
 
     [Test]
@@ -85,7 +85,7 @@ public class SettingsTests
         settings.ValidateAndClamp();
 
         // Assert
-        settings.MaxBackupCount.Should().BeGreaterOrEqualTo(1);
+        settings.MaxBackupCount.Should().BeGreaterThanOrEqualTo(1);
     }
 
     [Test]
@@ -100,7 +100,7 @@ public class SettingsTests
         settingsHigh.ValidateAndClamp();
 
         // Assert
-        settingsLow.PaletteSwatchSize.Should().BeGreaterOrEqualTo(8);
+        settingsLow.PaletteSwatchSize.Should().BeGreaterThanOrEqualTo(8);
         settingsHigh.PaletteSwatchSize.Should().BeLessThanOrEqualTo(64);
     }
 
@@ -116,7 +116,7 @@ public class SettingsTests
         settingsHigh.ValidateAndClamp();
 
         // Assert
-        settingsLow.TileSwatchSize.Should().BeGreaterOrEqualTo(16);
+        settingsLow.TileSwatchSize.Should().BeGreaterThanOrEqualTo(16);
         settingsHigh.TileSwatchSize.Should().BeLessThanOrEqualTo(128);
     }
 
@@ -195,7 +195,7 @@ public class SettingsTests
         int clamped = Math.Clamp(-5, 1, 128);
 
         // Assert
-        clamped.Should().BeGreaterOrEqualTo(1);
+        clamped.Should().BeGreaterThanOrEqualTo(1);
         clamped.Should().BeLessThanOrEqualTo(128);
     }
 

@@ -40,8 +40,6 @@ namespace PixlPunkt.UI.Controls
             var curLineSize = new UvSize(Orientation);
             var panelSize = new UvSize(Orientation);
             var uvConstraint = new UvSize(Orientation, availableSize.Width, availableSize.Height);
-            double itemWidth = double.PositiveInfinity;
-            double itemHeight = double.PositiveInfinity;
 
             var children = Children;
 
@@ -88,8 +86,6 @@ namespace PixlPunkt.UI.Controls
         protected override Size ArrangeOverride(Size finalSize)
         {
             int firstInLine = 0;
-            double itemWidth = double.PositiveInfinity;
-            double itemHeight = double.PositiveInfinity;
             double accumulatedV = 0;
             var curLineSize = new UvSize(Orientation);
             var uvFinalSize = new UvSize(Orientation, finalSize.Width, finalSize.Height);
