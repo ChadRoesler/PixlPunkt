@@ -116,6 +116,36 @@ The native format preserves everything:
 - Print workflow
 - High-quality archival
 
+### SVG (Vector)
+
+**Import:** Not supported
+**Export:** ? Full support
+
+| Feature | Support |
+|---------|---------|
+| Transparency | ? Full alpha |
+| Scalability | ? Infinite |
+| Editing | ? Vector editors |
+| File size | Compact (Monolith) |
+
+**Export Modes:**
+
+| Mode | Description |
+|------|-------------|
+| **Monolith** (Recommended) | Greedy meshing algorithm merges adjacent same-color pixels into larger rectangles. Produces compact `<path>` elements grouped by color. Significantly smaller files and ideal for editing in Inkscape, Illustrator, etc. |
+| **Lego** | Each pixel becomes an individual 1x1 `<rect>`. Exact pixel representation but large element count. May impact performance in vector editors for images above ~64x64. |
+
+**Best for:**
+- Printing (stickers, t-shirts, posters) — infinite scaling
+- Web graphics where sharp edges at any size are needed
+- Vector editor workflows (Inkscape, Illustrator, Figma)
+- Game UI assets that need to scale to any resolution
+
+**Preparation tips:**
+- Export at native pixel resolution (16x16, 32x32, etc.)
+- Avoid gradients or blurred imagery — SVG is optimized for hard pixel edges
+- Monolith mode can reduce element count by 80-90% vs Lego for typical pixel art
+
 ---
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> Animation Formats
@@ -280,6 +310,8 @@ Export at multiple sizes:
 - **4×** - Quadruple
 - **Custom** - Any integer multiplier
 
+> **SVG Note:** Scale still applies — each pixel becomes `scale × scale` SVG units. Since SVGs are infinitely scalable, 1× is usually fine unless you need a specific `viewBox` size.
+
 ### Interpolation
 
 | Mode | Description |
@@ -332,14 +364,24 @@ See [[Plugin Development|Plugins]] for creating format handlers.
 | Tile sets | PNG |
 | Animation preview | GIF / APNG |
 | Sprite sheets | PNG + JSON |
+| Scalable UI elements | SVG (Monolith) |
 
 ### For Web / Social
 
 | Use Case | Format |
 |----------|--------|
 | Static image | PNG |
+| Scalable graphics | SVG |
 | Animation | GIF or APNG |
 | Video | MP4 |
+
+### For Print / Merch
+
+| Use Case | Format |
+|----------|--------|
+| Stickers / T-shirts | SVG (Monolith) |
+| Posters | SVG or PNG (high scale) |
+| Print quality | TIFF or PNG |
 
 ### For Archival
 
