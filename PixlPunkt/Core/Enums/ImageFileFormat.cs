@@ -32,6 +32,11 @@ namespace PixlPunkt.Core.Enums
         /// <summary>
         /// Windows cursor file format containing one or more images with hotspot information.
         /// </summary>
-        Cur
+        Cur,
+
+        /// <summary>
+        /// Scalable Vector Graphics format using greedy-meshed paths for pixel-perfect vector output.
+        /// </summary>
+        Svg
     }
 }

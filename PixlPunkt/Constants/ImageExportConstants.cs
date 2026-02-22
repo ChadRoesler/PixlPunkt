@@ -6,10 +6,10 @@ namespace PixlPunkt.Constants
     public static class ImageExportConstants
     {
         /// <summary>Supported image export formats.</summary>
-        public static readonly string[] SupportedFormats = ["png", "gif", "bmp", "jpeg", "tiff"];
+        public static readonly string[] SupportedFormats = ["png", "gif", "bmp", "jpeg", "tiff", "svg"];
 
         /// <summary>Display names for supported export formats.</summary>
-        public static readonly string[] FormatDisplayNames = ["PNG", "GIF", "BMP", "JPEG", "TIFF"];
+        public static readonly string[] FormatDisplayNames = ["PNG", "GIF", "BMP", "JPEG", "TIFF", "SVG (Vector)"];
 
         /// <summary>Default export format.</summary>
         public const string DefaultFormat = "png";
@@ -53,6 +53,9 @@ namespace PixlPunkt.Constants
         /// <summary>Grey background color (blue component) for preview.</summary>
         public static readonly byte GreyB = 170;
 
+        /// <summary>SVG export modes.</summary>
+        public static readonly string[] SvgModes = ["Monolith (Optimized)", "Block (Per-Pixel)"];
+
         /// <summary>File type choices for file picker dialogs.</summary>
         public static readonly (string description, string extension)[] FileTypeChoices =
         [
@@ -60,7 +63,8 @@ namespace PixlPunkt.Constants
             ("GIF Image", ".gif"),
             ("BMP Image", ".bmp"),
             ("JPEG Image", ".jpg"),
-            ("TIFF Image", ".tiff")
+            ("TIFF Image", ".tiff"),
+            ("SVG Vector", ".svg")
         ];
     }
 }

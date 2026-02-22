@@ -10,6 +10,7 @@ using PixlPunkt.Constants;
 using PixlPunkt.Core.Coloring.Helpers;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Enums;
+using PixlPunkt.Core.Export;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.UI.ColorPick;
 using PixlPunkt.UI.Helpers;
@@ -34,6 +35,8 @@ namespace PixlPunkt.UI.Dialogs.Export
         // UI Controls
         private readonly NumberBox _scaleNumberBox;
         private readonly ComboBox _formatComboBox;
+        private readonly ComboBox _svgModeComboBox;
+        private readonly StackPanel _svgModePanel;
         private readonly CheckBox _separateLayersCheckBox;
         private readonly StackPanel _backgroundColorPanel;
         private readonly Border _backgroundColorSwatch;
@@ -45,6 +48,9 @@ namespace PixlPunkt.UI.Dialogs.Export
         public string SelectedFormat { get; private set; }
         public bool SeparateLayers => _separateLayersCheckBox.IsChecked == true;
         public uint BackgroundColor => ColorUtil.ToBGRA(_backgroundColor);
+        public SvgExportMode SvgMode => _svgModeComboBox.SelectedIndex == 1
+            ? SvgExportMode.Block
+            : SvgExportMode.Monolith;
 
         public ImageExportDialog(CanvasDocument document)
         {
@@ -82,6 +88,24 @@ namespace PixlPunkt.UI.Dialogs.Export
 
             _formatComboBox = new ComboBox { Width = 160 };
             _separateLayersCheckBox = new CheckBox { Content = DialogMessages.LayersAsSeparateFiles };
+
+            _svgModeComboBox = new ComboBox { Width = 200 };
+            foreach (var mode in ImageExportConstants.SvgModes)
+                _svgModeComboBox.Items.Add(mode);
+            _svgModeComboBox.SelectedIndex = 0;
+
+            _svgModePanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Visibility = Visibility.Collapsed
+            };
+            _svgModePanel.Children.Add(new TextBlock
+            {
+                Text = "SVG Mode",
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            _svgModePanel.Children.Add(_svgModeComboBox);
 
             _backgroundColorSwatch = new Border
             {
@@ -165,6 +189,7 @@ namespace PixlPunkt.UI.Dialogs.Export
 
             // Row 2: Options
             mainPanel.Children.Add(_separateLayersCheckBox);
+            mainPanel.Children.Add(_svgModePanel);
             mainPanel.Children.Add(_backgroundColorPanel);
 
             // Preview section
@@ -204,6 +229,11 @@ namespace PixlPunkt.UI.Dialogs.Export
                 SelectedFormat) >= 0;
 
             _backgroundColorPanel.Visibility = needsBackground
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            // Show SVG mode selector only for SVG format
+            _svgModePanel.Visibility = SelectedFormat == "svg"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }

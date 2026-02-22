@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using PixlPunkt.Core.Enums;
+using PixlPunkt.Core.Export;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Logging;
 
@@ -61,6 +62,10 @@ namespace PixlPunkt.Core.FIleOps
 
                     case ImageFileFormat.Cur:
                         SaveAsCursor(surface, path, hotspotX, hotspotY);
+                        break;
+
+                    case ImageFileFormat.Svg:
+                        SvgExporter.ExportToFile(surface, path, SvgExportMode.Monolith);
                         break;
 
                     default:

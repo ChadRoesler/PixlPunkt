@@ -584,6 +584,9 @@
         <member name="F:PixlPunkt.Constants.ImageExportConstants.GreyB">
             <summary>Grey background color (blue component) for preview.</summary>
         </member>
+        <member name="F:PixlPunkt.Constants.ImageExportConstants.SvgModes">
+            <summary>SVG export modes.</summary>
+        </member>
         <member name="F:PixlPunkt.Constants.ImageExportConstants.FileTypeChoices">
             <summary>File type choices for file picker dialogs.</summary>
         </member>
@@ -9202,6 +9205,11 @@
             Windows cursor file format containing one or more images with hotspot information.
             </summary>
         </member>
+        <member name="F:PixlPunkt.Core.Enums.ImageFileFormat.Svg">
+            <summary>
+            Scalable Vector Graphics format using greedy-meshed paths for pixel-perfect vector output.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Enums.PaletteSortMode">
             <summary>
             Defines the sorting mode for palette colors.
@@ -9566,6 +9574,141 @@
         <member name="M:PixlPunkt.Core.Export.ImageSequenceExporter.ExportByLayerAsync(System.Collections.Generic.Dictionary{System.String,System.Collections.Generic.List{PixlPunkt.Core.Export.AnimationExportService.RenderedFrame}},System.String,PixlPunkt.Core.Export.ImageSequenceFormat,System.UInt32,System.IProgress{System.Double},System.Threading.CancellationToken)">
             <summary>
             Exports frames grouped by layer to subfolders.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Export.SvgExportMode">
+            <summary>
+            SVG export mode for pixel art conversion.
+            </summary>
+            <remarks>
+            Inspired by GLORP's pixel-to-SVG methodology.
+            See <see href="https://github.com/ZackGphom/GLORP"/> for the original Python implementation.
+            </remarks>
+        </member>
+        <member name="F:PixlPunkt.Core.Export.SvgExportMode.Monolith">
+            <summary>
+            Greedy meshing: merges adjacent same-color pixels into larger rectangles,
+            producing compact <c>&lt;path&gt;</c> elements grouped by color.
+            Significantly reduces SVG element count and file size.
+            Recommended for most use cases and ideal for editing in vector software.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Export.SvgExportMode.Block">
+            <summary>
+            Each pixel becomes an individual 1×1 <c>&lt;rect&gt;</c>.
+            Produces an exact pixel representation but with a large element count.
+            May reduce performance in vector editors for large images.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Export.SvgExporter">
+            <summary>
+            Exports pixel art (BGRA byte arrays) to optimized SVG using greedy meshing.
+            </summary>
+            <remarks>
+            <para>
+            Provides two export modes:
+            </para>
+            <list type="bullet">
+            <item>
+            <strong>Monolith</strong> — Groups pixels by color, then applies a greedy rectangle-merging
+            algorithm to combine adjacent same-color pixels into the largest possible rectangles.
+            All rectangles of the same color are emitted as a single SVG <c>&lt;path&gt;</c> with
+            multiple sub-paths, dramatically reducing the element count.
+            </item>
+            <item>
+            <strong>Block</strong> — Each visible pixel becomes an individual <c>&lt;rect&gt;</c>.
+            Simple and accurate, but produces very large files for images above ~64×64.
+            </item>
+            </list>
+            <para>
+            Both modes use <c>shape-rendering="crispEdges"</c> to ensure browsers render
+            pixel-perfect edges without anti-aliasing.
+            </para>
+            </remarks>
+        </member>
+        <member name="F:PixlPunkt.Core.Export.SvgExporter.MaxPixelCount">
+            <summary>
+            Maximum pixel count safety cap (width × height).
+            Images exceeding this limit are rejected to prevent runaway SVG generation.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.Export(System.Byte[],System.Int32,System.Int32,PixlPunkt.Core.Export.SvgExportMode,System.Int32)">
+            <summary>
+            Exports BGRA pixel data to an SVG string.
+            </summary>
+            <param name="pixels">BGRA byte array (4 bytes per pixel, row-major order).</param>
+            <param name="width">Image width in pixels.</param>
+            <param name="height">Image height in pixels.</param>
+            <param name="mode">Export mode (Monolith or Block).</param>
+            <param name="scale">Pixel scale factor (1 = native resolution). Each pixel
+            becomes <paramref name="scale"/>×<paramref name="scale"/> SVG units.</param>
+            <returns>Complete SVG document as a UTF-8 string.</returns>
+            <exception cref="T:System.ArgumentException">
+            Thrown if pixel data is null, too short, or the image exceeds the safety cap.
+            </exception>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.ExportToFile(System.Byte[],System.Int32,System.Int32,System.String,PixlPunkt.Core.Export.SvgExportMode,System.Int32)">
+            <summary>
+            Exports BGRA pixel data to SVG and writes it to a file.
+            </summary>
+            <param name="pixels">BGRA byte array.</param>
+            <param name="width">Image width in pixels.</param>
+            <param name="height">Image height in pixels.</param>
+            <param name="outputPath">Output file path.</param>
+            <param name="mode">Export mode.</param>
+            <param name="scale">Pixel scale factor.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.ExportToFile(PixlPunkt.Core.Imaging.PixelSurface,System.String,PixlPunkt.Core.Export.SvgExportMode,System.Int32)">
+            <summary>
+            Exports a <see cref="T:PixlPunkt.Core.Imaging.PixelSurface"/> to SVG and writes it to a file.
+            </summary>
+            <param name="surface">The pixel surface to export.</param>
+            <param name="outputPath">Output file path.</param>
+            <param name="mode">Export mode.</param>
+            <param name="scale">Pixel scale factor.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.ExportToBytes(System.Byte[],System.Int32,System.Int32,PixlPunkt.Core.Export.SvgExportMode,System.Int32)">
+            <summary>
+            Exports BGRA pixel data to SVG as a UTF-8 byte array.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.ExportMonolith(System.Byte[],System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Exports using greedy meshing: groups pixels by color, merges adjacent
+            same-color pixels into larger rectangles, emits one <c>&lt;path&gt;</c> per color.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.GreedyMesh(System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32}},System.Int32,System.Int32)">
+            <summary>
+            Greedy meshing algorithm: merges adjacent same-color pixels into the
+            largest possible axis-aligned rectangles.
+            </summary>
+            <remarks>
+            <para><strong>Algorithm:</strong></para>
+            <para>
+            Scans through pixel positions in their natural (row-major) order.
+            For each unvisited pixel:
+            </para>
+            <list type="number">
+            <item>Expand right as far as possible while the next pixel is present and unvisited</item>
+            <item>Expand down row-by-row as long as the <em>entire</em> row width matches</item>
+            <item>Mark all covered pixels as visited</item>
+            </list>
+            <para>
+            This produces a near-optimal rectangle covering with O(width × height) complexity per color.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.WriteColorPath(System.Text.StringBuilder,System.UInt32,System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32,System.Int32,System.Int32}},System.Int32)">
+            <summary>
+            Writes all rectangles for a single color as one combined SVG <c>&lt;path&gt;</c>.
+            Each rectangle becomes an <c>M x y h w v h H x Z</c> sub-path.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Export.SvgExporter.ExportBlock(System.Byte[],System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Exports with one <c>&lt;rect&gt;</c> per visible pixel.
+            Simple and exact, but produces large SVG files.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Export.TimelapseExportService">

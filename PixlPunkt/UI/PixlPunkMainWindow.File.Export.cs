@@ -1205,7 +1205,16 @@ namespace PixlPunkt.UI
                         int h = doc.PixelHeight;
 
                         var outBgra = ComposePixelsForExport(src, w, h, layer.Opacity, bgColorU, format);
-                        await SaveBgraToFileAsync(outBgra, w, h, scale, file, format);
+
+                        if (format == "svg")
+                        {
+                            var svgMode = dialog.SvgMode;
+                            Core.Export.SvgExporter.ExportToFile(outBgra, w, h, file.Path, svgMode, scale);
+                        }
+                        else
+                        {
+                            await SaveBgraToFileAsync(outBgra, w, h, scale, file, format);
+                        }
                     }
                 }
                 else
@@ -1223,19 +1232,37 @@ namespace PixlPunkt.UI
                     savePicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
                     savePicker.SuggestedFileName = doc.Name ?? FileDefaults.DefaultExportName;
 
-                    // Add all supported file types
-                    foreach (var (description, extension) in ImageExportConstants.FileTypeChoices)
+                    // Only offer the chosen format in the save picker
+                    var match = Array.Find(
+                        ImageExportConstants.FileTypeChoices,
+                        c => c.extension.TrimStart('.').Equals(format, StringComparison.OrdinalIgnoreCase)
+                            || (format == "jpeg" && c.extension == ".jpg"));
+
+                    if (match != default)
                     {
-                        savePicker.FileTypeChoices.Add(description, [extension]);
+                        savePicker.FileTypeChoices.Add(match.description, [match.extension]);
+                    }
+                    else
+                    {
+                        savePicker.FileTypeChoices.Add($"{format.ToUpperInvariant()} File", [$".{format}"]);
                     }
 
-                    // Set default extension based on selected format
-                    savePicker.DefaultFileExtension = "." + format;
+                    savePicker.DefaultFileExtension = match != default ? match.extension : $".{format}";
                     var file = await savePicker.PickSaveFileAsync();
                     if (file is null) return;
 
                     var outBgra = ComposePixelsForExport(src, w, h, 255, bgColorU, format);
-                    await SaveBgraToFileAsync(outBgra, w, h, scale, file, format);
+
+                    if (format == "svg")
+                    {
+                        // SVG uses text-based export, not BitmapEncoder
+                        var svgMode = dialog.SvgMode;
+                        Core.Export.SvgExporter.ExportToFile(outBgra, w, h, file.Path, svgMode, scale);
+                    }
+                    else
+                    {
+                        await SaveBgraToFileAsync(outBgra, w, h, scale, file, format);
+                    }
                 }
 
                 await ShowDialogGuardedAsync(new ContentDialog
