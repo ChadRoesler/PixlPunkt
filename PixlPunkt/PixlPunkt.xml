@@ -33312,6 +33312,57 @@
             Sets both window icon (WM_SETICON) and class icon (SetClassLongPtr) for taskbar support.
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Help.HelpWindow">
+            <summary>
+            Offline help viewer window using Docsify to render the bundled wiki documentation.
+            </summary>
+            <remarks>
+            <para>
+            Renders the application's Markdown documentation using a bundled copy of
+            <see href="https://docsify.js.org/">Docsify</see> inside a <see cref="T:Microsoft.UI.Xaml.Controls.WebView2"/> control.
+            All assets (JS, CSS, Markdown files) are packaged with the application for
+            fully offline access.
+            </para>
+            <para>
+            Uses <see cref="M:Microsoft.Web.WebView2.Core.CoreWebView2.SetVirtualHostNameToFolderMapping(System.String,System.String,Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind)"/> to serve local
+            files through a virtual hostname (<c>pixlpunkt.help</c>), which allows Docsify's
+            AJAX requests to work — <c>file://</c> protocol blocks AJAX for security.
+            </para>
+            <para>
+            The wiki-style <c>[[Page|Link]]</c> syntax is automatically converted to standard
+            Markdown links by a Docsify plugin defined in <c>index.html</c>.
+            </para>
+            </remarks>
+        </member>
+        <member name="F:PixlPunkt.UI.Help.HelpWindow.VirtualHost">
+            <summary>
+            Virtual hostname used to serve the Help directory via WebView2.
+            Docsify navigates to <c>https://pixlpunkt.help/index.html</c> which maps
+            to the local <c>Help/</c> folder.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Help.HelpWindow.HelpDirectory">
+            <summary>
+            Gets the path to the Help directory containing the Docsify assets and wiki files.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Help.HelpWindow.InitializeAsync">
+            <summary>
+            Initializes WebView2 and sets up the virtual host mapping.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Help.HelpWindow.Show(System.String)">
+            <summary>
+            Opens the help window (singleton — reuses existing window if open).
+            </summary>
+            <param name="page">Optional page name to navigate to (e.g., "Tools", "Shortcuts").</param>
+        </member>
+        <member name="M:PixlPunkt.UI.Help.HelpWindow.NavigateToPage(System.String)">
+            <summary>
+            Navigates to a specific help page within the Docsify SPA.
+            </summary>
+            <param name="page">Page name (e.g., "Tools", "Shortcuts", "Tile-Animation").</param>
+        </member>
         <member name="T:PixlPunkt.UI.History.__internal.__HistoryPanel_Dummy">
             <remarks>Internal Use for iOS only.</remarks>
         </member>
@@ -34821,6 +34872,11 @@
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.ShowUpdateAvailableDialogAsync(PixlPunkt.Core.Updates.UpdateInfo)">
             <summary>
             Shows the update available dialog and handles the user's response.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Help_Documentation_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Opens the offline help documentation window.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Help_CheckForUpdates_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">

@@ -259,6 +259,12 @@
                     <MenuFlyoutItem Text="Glyph Set Editor…" Click="OpenGlyphSetEditor_Click"/>
                 </MenuBarItem>
                 <MenuBarItem Title="Help">
+                    <MenuFlyoutItem Text="Documentation" Click="Help_Documentation_Click">
+                        <MenuFlyoutItem.KeyboardAccelerators>
+                            <KeyboardAccelerator Key="F1"/>
+                        </MenuFlyoutItem.KeyboardAccelerators>
+                    </MenuFlyoutItem>
+                    <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Check for Updates…" Click="Help_CheckForUpdates_Click"/>
                     <MenuFlyoutItem Text="View Releases on GitHub" Click="Help_ViewReleases_Click"/>
                     <MenuFlyoutSeparator/>

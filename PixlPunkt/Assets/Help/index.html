@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PixlPunkt Help</title>
+  <link rel="stylesheet" href="vendor/docsify-dark.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    window.$docsify = {
+      name: 'PixlPunkt',
+      nameLink: '#/',
+      repo: false,
+      homepage: 'Home.md',
+      loadSidebar: true,
+      subMaxLevel: 3,
+      auto2top: true,
+      noEmoji: true,
+      search: {
+        placeholder: 'Search docs…',
+        noData: 'No results.',
+        depth: 3
+      },
+      plugins: [
+        function rewriteContent(hook) {
+          hook.beforeEach(function(content) {
+            // Convert wiki links: [[Display|Link]] -> [Display](Link)
+            content = content.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '[$1]($2)');
+            content = content.replace(/\[\[([^\]]+)\]\]/g, '[$1]($1)');
+            // Rewrite GitHub icon URLs to local bundled copies
+            content = content.replace(
+              /https:\/\/raw\.githubusercontent\.com\/ChadRoesler\/PixlPunkt\/main\/docs\/assets\/icons\//g,
+              'assets/icons/'
+            );
+            return content;
+          });
+        }
+      ]
+    };
+  </script>
+
+  <script src="vendor/docsify.min.js"></script>
+  <script src="vendor/docsify-search.min.js"></script>
+
+  <!-- Theme overrides AFTER docsify renders so they win specificity -->
+  <style>
+    :root {
+      --base-background-color: #1e1e1e;
+      --sidebar-bg: #252526;
+      --sidebar-border: #3c3c3c;
+      --theme-color: #569cd6;
+      --text-color: #cccccc;
+      --heading-color: #e0e0e0;
+    }
+
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      background: var(--base-background-color) !important;
+      color: var(--text-color) !important;
+    }
+
+    /* Sidebar: pin to left edge, full height */
+    body > .sidebar,
+    .sidebar {
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      width: 280px !important;
+      background: var(--sidebar-bg) !important;
+      border-right: 1px solid var(--sidebar-border) !important;
+      overflow-y: auto !important;
+      z-index: 20 !important;
+    }
+
+    /* Content: fill everything to the right of sidebar */
+    body > section.content,
+    section.content {
+      position: fixed !important;
+      left: 280px !important;
+      top: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      overflow-y: auto !important;
+      background: var(--base-background-color) !important;
+    }
+
+    /* Hide the hamburger toggle */
+    .sidebar-toggle {
+      display: none !important;
+    }
+
+    /* Sidebar nav links */
+    .sidebar .sidebar-nav li a {
+      color: var(--text-color);
+      font-size: 14px;
+    }
+    .sidebar .sidebar-nav li a:hover {
+      color: var(--theme-color);
+      text-decoration: none;
+    }
+    .sidebar .sidebar-nav li.active > a {
+      color: var(--theme-color);
+      font-weight: 600;
+      border-right: 3px solid var(--theme-color);
+    }
+
+    /* Sidebar section headers */
+    .sidebar .sidebar-nav > ul > li > strong {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 18px;
+      margin-bottom: 4px;
+      padding: 0 16px;
+    }
+
+    /* App name */
+    .app-name-link {
+      color: var(--heading-color) !important;
+      font-size: 18px !important;
+      font-weight: 700 !important;
+      padding: 16px 16px 8px !important;
+    }
+
+    /* Content area */
+    .markdown-section {
+      max-width: 900px;
+      padding: 30px 40px 40px 40px;
+      color: var(--text-color);
+    }
+    .markdown-section h1,
+    .markdown-section h2,
+    .markdown-section h3 {
+      color: var(--heading-color);
+    }
+    .markdown-section h1 {
+      border-bottom: 2px solid var(--sidebar-border);
+      padding-bottom: 10px;
+      margin-top: 0;
+    }
+    .markdown-section h2 {
+      border-bottom: 1px solid #333;
+      padding-bottom: 6px;
+    }
+
+    /* Tables */
+    .markdown-section table { border-collapse: collapse; width: 100%; }
+    .markdown-section table th {
+      background: #2d2d30; color: #e0e0e0;
+      padding: 8px 12px; text-align: left; border: 1px solid #3c3c3c;
+    }
+    .markdown-section table td {
+      padding: 8px 12px; border: 1px solid #3c3c3c;
+    }
+    .markdown-section table tr:nth-child(even) { background: #252526; }
+
+    /* Code */
+    .markdown-section code {
+      background: #2d2d30; color: #ce9178;
+      padding: 2px 6px; border-radius: 3px; font-size: 13px;
+    }
+    .markdown-section pre {
+      background: #1e1e1e !important;
+      border: 1px solid #3c3c3c; border-radius: 4px; padding: 16px;
+    }
+    .markdown-section pre code {
+      background: transparent; color: #d4d4d4; padding: 0;
+    }
+
+    /* Blockquotes */
+    .markdown-section blockquote {
+      border-left: 4px solid var(--theme-color);
+      background: #252526; padding: 12px 16px; margin: 16px 0; color: #bbb;
+    }
+    .markdown-section blockquote p { margin: 0; }
+
+    /* Links */
+    .markdown-section a { color: var(--theme-color); text-decoration: none; }
+    .markdown-section a:hover { color: #7cc3f7; text-decoration: underline; }
+
+    /* Inline icons */
+    .markdown-section img { vertical-align: middle; }
+
+    /* Search */
+    .search { border-bottom: 1px solid var(--sidebar-border) !important; padding: 8px !important; }
+    .search input {
+      background: #2d2d30 !important; color: var(--text-color) !important;
+      border: 1px solid #3c3c3c !important; border-radius: 4px !important;
+      padding: 6px 10px !important; width: 100% !important; box-sizing: border-box !important;
+    }
+    .search input::placeholder { color: #666 !important; }
+    .search .matching-post { border-bottom: 1px solid #3c3c3c; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--base-background-color); }
+    ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #777; }
+  </style>
+</body>
+</html>

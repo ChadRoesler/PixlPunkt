@@ -198,6 +198,14 @@ namespace PixlPunkt.UI
                 return;
             }
 
+            // F1: Open help documentation
+            if (e.Key == VirtualKey.F1)
+            {
+                Help.HelpWindow.Show();
+                e.Handled = true;
+                return;
+            }
+
             // Skip tool shortcuts if text input is focused or accelerators are suspended
             if (IsTextInputFocused() || _suspendToolAccelerators)
             {

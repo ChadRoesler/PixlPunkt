@@ -1522,6 +1522,14 @@ namespace PixlPunkt.UI
         }
 
         /// <summary>
+        /// Opens the offline help documentation window.
+        /// </summary>
+        private void Help_Documentation_Click(object sender, RoutedEventArgs e)
+        {
+            Help.HelpWindow.Show();
+        }
+
+        /// <summary>
         /// Manually check for updates (triggered from Help menu).
         /// </summary>
         private async void Help_CheckForUpdates_Click(object sender, RoutedEventArgs e)

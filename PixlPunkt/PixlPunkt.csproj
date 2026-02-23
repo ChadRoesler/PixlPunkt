@@ -156,6 +156,25 @@
     <Content Include="Assets\Icons\FileTypes\*.ico" CopyToOutputDirectory="PreserveNewest" Link="Assets\Icons\FileTypes\%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       OFFLINE HELP (Docsify)
+       Bundles the wiki markdown files + docsify assets for the in-app help viewer.
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <ItemGroup>
+    <!-- Docsify engine, theme, and index page -->
+    <Content Include="Assets\Help\index.html" CopyToOutputDirectory="PreserveNewest" Link="Help\index.html" />
+    <Content Include="Assets\Help\_sidebar.md" CopyToOutputDirectory="PreserveNewest" Link="Help\_sidebar.md" />
+    <Content Include="Assets\Help\vendor\*.js" CopyToOutputDirectory="PreserveNewest" Link="Help\vendor\%(Filename)%(Extension)" />
+    <Content Include="Assets\Help\vendor\*.css" CopyToOutputDirectory="PreserveNewest" Link="Help\vendor\%(Filename)%(Extension)" />
+    <!-- Bundled icons for offline help (rewritten from GitHub URLs by docsify plugin) -->
+    <Content Include="..\docs\assets\icons\*.png" CopyToOutputDirectory="PreserveNewest" Link="Help\assets\icons\%(Filename)%(Extension)" />
+    <!-- Wiki markdown files — served by docsify at runtime (exclude wiki _Sidebar and README) -->
+    <Content Include="..\wiki\*.md"
+             Exclude="..\wiki\_Sidebar.md;..\wiki\README.md"
+             CopyToOutputDirectory="PreserveNewest"
+             Link="Help\%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <!-- 
     Fix empty ShowNameOnTiles element that Uno Resizetizer adds to the manifest.
     This target runs after Uno Resizetizer and replaces the empty element with a valid one.
