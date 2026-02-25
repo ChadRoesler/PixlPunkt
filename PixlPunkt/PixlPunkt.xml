@@ -15528,51 +15528,6 @@
         <member name="M:PixlPunkt.Core.Platform.DesktopPlatformFileService.SaveToTempAsync(System.Byte[],System.String)">
             <inheritdoc/>
         </member>
-        <member name="T:PixlPunkt.Core.Platform.IosPlatformFileService">
-            <summary>
-            iOS implementation of <see cref="T:PixlPunkt.Core.Platform.IPlatformFileService"/> using native iOS APIs.
-            </summary>
-            <remarks>
-            <para>Uses the following iOS APIs:</para>
-            <list type="bullet">
-            <item><see cref="T:UIKit.UIDocumentPickerViewController"/> for file picking</item>
-            <item><see cref="T:UIKit.UIActivityViewController"/> for sharing (share sheet)</item>
-            <item>App's Documents directory for temporary storage</item>
-            </list>
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.Core.Platform.IosPlatformFileService.SupportsFileSystem">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Core.Platform.IosPlatformFileService.SupportsSharing">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Core.Platform.IosPlatformFileService.SupportsFolderPicking">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.Platform.IosPlatformFileService.SaveFileAsync(System.Byte[],System.String,System.String,System.String)">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.Platform.IosPlatformFileService.OpenFileAsync(System.String,System.String[])">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.Platform.IosPlatformFileService.PickFolderAsync">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.Platform.IosPlatformFileService.ShareFileAsync(System.Byte[],System.String,System.String,System.String)">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.Platform.IosPlatformFileService.ShareFilesAsync(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.Byte[],System.String,System.String}},System.String)">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.Platform.IosPlatformFileService.SaveToTempAsync(System.Byte[],System.String)">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.Platform.IosPlatformFileService.GetPresentingViewController">
-            <summary>
-            Gets the topmost view controller for presenting UI.
-            </summary>
-        </member>
         <member name="T:PixlPunkt.Core.Platform.FileSaveResult">
             <summary>
             Result from a file save operation.
@@ -28528,24 +28483,6 @@
             Provides a zoomed, focused editing experience for a single tile.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Animation.__internal.__AnimationPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Animation.__internal.__FrameEditPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Animation.__internal.__PlaybackPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Animation.__internal.__ReelListPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Animation.__internal.__StagePreviewPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Animation.__internal.__TileFrameEditorCanvas_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="T:PixlPunkt.UI.Ascii.GlyphSetEditorWindow">
             <summary>
             Window for creating and editing custom ASCII glyph sets.
@@ -28746,15 +28683,6 @@
             <summary>
             Template for glyph set items.
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Ascii.__internal.__GlyphSetEditorWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.CanvasArea.__internal.__DocumentWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.CanvasArea.__internal.__SelectionOverlay_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.CanvasViewHost">
             <summary>
@@ -31170,9 +31098,6 @@
             <param name="canvas">The SKCanvas to draw on.</param>
             <param name="area">The available drawing area size.</param>
         </member>
-        <member name="T:PixlPunkt.UI.CanvasHost.__internal.__CanvasViewHost_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="E:PixlPunkt.UI.ColorPick.ColorPickerWindow.DropperModeRequested">
             <summary>
             Event raised when the dropper button is toggled on, requesting canvas pick mode.
@@ -31389,18 +31314,6 @@
             <param name="t">Parameter [0, 1].</param>
             <returns>Point on the curve.</returns>
         </member>
-        <member name="T:PixlPunkt.UI.ColorPick.Controls.__internal.__HslSquare_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.ColorPick.Controls.__internal.__HueSlider_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.ColorPick.Controls.__internal.__LadderRow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.ColorPick.Controls.__internal.__TriangleCurveEditor_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="E:PixlPunkt.UI.ColorPick.GradientWindow.DropperModeRequested">
             <summary>
             Event raised when the dropper button is toggled on, requesting canvas pick mode.
@@ -31418,12 +31331,6 @@
             <summary>
             Gets whether dropper mode is currently active.
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.ColorPick.__internal.__ColorPickerWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.ColorPick.__internal.__GradientWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.Controls.CollapsibleSplitter">
             <summary>
@@ -31788,21 +31695,6 @@
             U = primary axis (width for horizontal, height for vertical)
             V = secondary axis (height for horizontal, width for vertical)
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Controls.__internal.__CollapsibleSplitter_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Controls.__internal.__CollapsibleSplitterHorizontal_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Controls.__internal.__ColorSwatchButton_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Controls.__internal.__PaletteSwatchRow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Controls.__internal.__SectionCard_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.Converters.BgraToBrushConverter">
             <summary>
@@ -32710,30 +32602,6 @@
             Builds the export settings from current UI values.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__AnimationExportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__BatchTileAnimationExportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__BrushExportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__CursorExportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__ExportProgressDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__IconExportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__ImageExportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Export.__internal.__TimelapseExportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="T:PixlPunkt.UI.Dialogs.Import.ImageImportDialog">
             <summary>
             Dialog for importing images with tile-based canvas configuration.
@@ -32804,9 +32672,6 @@
             <summary>
             Updates calculated canvas dimensions based on current settings.
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.Import.__internal.__ImageImportDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.Dialogs.ShortcutConflictWarningDialog">
             <summary>
@@ -33010,18 +32875,6 @@
             Gets the source tile set for size comparison during import.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Dialogs.__internal.__EditCanvasWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.__internal.__ImportTilesDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.__internal.__NewCanvasDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Dialogs.__internal.__UpdateAvailableDialog_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="T:PixlPunkt.UI.Helpers.LayerTreeTemplateSelector">
             <summary>
             Selects <see cref="T:Microsoft.UI.Xaml.DataTemplate"/> for <see cref="T:Microsoft.UI.Xaml.Controls.TreeView"/> items based on layer type.
@@ -33207,12 +33060,6 @@
             Sets the window icon from the application's icon asset using AppWindow.SetIcon.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIconWin32(Microsoft.UI.Xaml.Window)">
-            <summary>
-            Sets the window icon using Win32 API for better taskbar/title bar support on unpackaged apps.
-            Works on both WinAppSdk and Skia Desktop when running on Windows.
-            </summary>
-        </member>
         <member name="M:PixlPunkt.UI.Helpers.WindowHost.FindIconPath">
             <summary>
             Finds the icon file path, checking multiple possible locations.
@@ -33306,12 +33153,6 @@
             <param name="window">The window to set the icon for.</param>
             <param name="windowTitle">The window title to use for FindWindow fallback.</param>
         </member>
-        <member name="M:PixlPunkt.UI.Helpers.WindowHost.SetWindowIconWin32WithTitle(Microsoft.UI.Xaml.Window,System.String)">
-            <summary>
-            Sets the window icon using Win32 API, with window title fallback for finding the handle.
-            Sets both window icon (WM_SETICON) and class icon (SetClassLongPtr) for taskbar support.
-            </summary>
-        </member>
         <member name="T:PixlPunkt.UI.Help.HelpWindow">
             <summary>
             Offline help viewer window using Docsify to render the bundled wiki documentation.
@@ -33362,9 +33203,6 @@
             Navigates to a specific help page within the Docsify SPA.
             </summary>
             <param name="page">Page name (e.g., "Tools", "Shortcuts", "Tile-Animation").</param>
-        </member>
-        <member name="T:PixlPunkt.UI.History.__internal.__HistoryPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout">
             <summary>
@@ -33588,21 +33426,6 @@
             <summary>
             Shows the flyout at the specified element for the given reference layer.
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Layers.Controls.__internal.__LayerFolderMenuFlyout_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Layers.Controls.__internal.__LayerPreviewHost_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Layers.Controls.__internal.__LayersPanelMenuFlyout_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Layers.Controls.__internal.__RasterLayerMenuFlyout_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Layers.Controls.__internal.__ReferenceLayerMenuFlyout_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.Layers.DynamicEffectTemplateSelector">
             <summary>
@@ -33923,15 +33746,6 @@
             and is never saved to the document.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Layers.__internal.__LayerSettingsWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Layers.__internal.__LayersPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Layers.__internal.__ReferenceLayerSettingsWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="T:PixlPunkt.UI.Palette.Controls.PalettePanelMenuFlyout">
             <summary>
             Reusable MenuFlyout for the Palette panel background (empty area).
@@ -33962,12 +33776,6 @@
             <summary>
             Shows the flyout at the specified element for the given swatch.
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Palette.Controls.__internal.__PalettePanelMenuFlyout_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Palette.Controls.__internal.__SwatchMenuFlyout_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.Palette.PalettePanel">
             <summary>
@@ -34117,12 +33925,6 @@
             Finds an ancestor element in the visual tree with the specified name.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Palette.__internal.__PalettePanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Palette.__internal.__QuickSwatches_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="T:PixlPunkt.UI.Panels.PanelInfo">
             <summary>
             Defines information about a dockable panel.
@@ -34262,9 +34064,6 @@
             Removes the content from this window so it can be returned to the main window.
             </summary>
             <returns>The content element that was hosted.</returns>
-        </member>
-        <member name="T:PixlPunkt.UI.Panels.__internal.__PanelWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.PixlPunktMainWindow">
             <summary>
@@ -34993,9 +34792,6 @@
             <param name="canvas">The SKCanvas to draw on.</param>
             <param name="area">The available drawing area size.</param>
         </member>
-        <member name="T:PixlPunkt.UI.Preview.__internal.__CanvasPreview_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="T:PixlPunkt.UI.Rendering.PatternBackgroundService">
             <summary>
             Provides pattern background configuration and theme-aware colors.
@@ -35102,12 +34898,6 @@
             Dialog for editing a single keyboard shortcut.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Settings.__internal.__SettingsWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Settings.__internal.__ShortcutSettingsPanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
         <member name="T:PixlPunkt.UI.Tiles.TilePanel">
             <summary>
             Tile panel for managing the document's tile set.
@@ -35179,12 +34969,6 @@
             <summary>
             Binds the window to a specific tile from a tile set.
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Tiles.__internal.__TilePanel_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Tiles.__internal.__TileTessellationWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.UI.Tools.ToolOptionFactory">
             <summary>
@@ -35432,15 +35216,6 @@
             <summary>
             Unchecks all tool buttons.
             </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.Tools.__internal.__ToolOptionsBar_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.Tools.__internal.__ToolRail_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
-        </member>
-        <member name="T:PixlPunkt.UI.__internal.__PixlPunktMainWindow_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.__KeyEqualityProvider">
             <summary>
@@ -39052,9 +38827,6 @@
             <summary>
             Builder for PixlPunkt.UI.Tools.ToolRail
             </summary>
-        </member>
-        <member name="T:PixlPunkt.__internal.__App_Dummy">
-            <remarks>Internal Use for iOS only.</remarks>
         </member>
         <member name="T:PixlPunkt.__Sources__.EmbeddedXamlSourcesProvider">
             <summary>
