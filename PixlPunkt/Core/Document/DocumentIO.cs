@@ -9,6 +9,7 @@ using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Tile;
+using PixlPunkt.Core.Voxel;
 using Windows.Graphics;
 using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 
@@ -91,8 +92,10 @@ namespace PixlPunkt.Core.Document
         /// Version 8: Added multiple audio tracks support
         /// Version 9: Added layer masks
         /// Version 10: Added animation sub-routines
+        /// Version 11: Added voxel preview state
+        /// Version 12: Added voxel preview manual face color overrides
         /// </summary>
-        private const int CurrentVersion = 10;
+        private const int CurrentVersion = 12;
 
         private const int NodeType_RasterLayer = 1;
         private const int NodeType_Folder = 2;
@@ -172,6 +175,9 @@ namespace PixlPunkt.Core.Document
             {
                 WriteLayerItem(bw, item);
             }
+
+            // Voxel preview state (Version 11+)
+            WriteVoxelPreviewState(bw, doc.VoxelPreviewState);
 
             bw.Flush();
         }
@@ -494,6 +500,48 @@ namespace PixlPunkt.Core.Document
             }
         }
 
+        private static void WriteVoxelPreviewState(BinaryWriter bw, VoxelPreviewDocumentState state)
+        {
+            bw.Write(state.HasState);
+
+            bw.Write(state.FaceModeIndex);
+            bw.Write(state.ColorLinkingEnabled);
+            bw.Write(state.ColorTolerance);
+
+            bw.Write(state.FrontTileId3);
+            bw.Write(state.SideTileId3);
+            bw.Write(state.TopTileId3);
+
+            bw.Write(state.FrontTileId6);
+            bw.Write(state.BackTileId6);
+            bw.Write(state.LeftTileId6);
+            bw.Write(state.RightTileId6);
+            bw.Write(state.TopTileId6);
+            bw.Write(state.BottomTileId6);
+
+            bw.Write(state.OutlineEnabled);
+            bw.Write(state.OutlineColor);
+            bw.Write(state.OutlineSize);
+            bw.Write(state.PixelPreviewEnabled);
+            bw.Write(state.PixelBaseSize);
+            bw.Write(state.BackdropGridEnabled);
+
+            bw.Write(state.CameraPitch);
+            bw.Write(state.CameraYaw);
+            bw.Write(state.CameraZoomPercent);
+
+            bw.Write(state.FaceColorOverrides.Count);
+            for (int i = 0; i < state.FaceColorOverrides.Count; i++)
+            {
+                var o = state.FaceColorOverrides[i];
+                bw.Write(o.X);
+                bw.Write(o.Y);
+                bw.Write(o.Z);
+                bw.Write((int)o.Face);
+                bw.Write(o.ColorBgra);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════
         // LOAD
         // ═══════════════════════════════════════════════════════════════
@@ -603,6 +651,11 @@ namespace PixlPunkt.Core.Document
             for (int i = 0; i < rootItemCount; i++)
             {
                 ReadLayerItem(br, doc, pixelWidth, pixelHeight, null, removeDefaultLayer && !replacedDefault, ref replacedDefault, warnings, hasLayerIds, hasMasks);
+            }
+
+            if (version >= 11)
+            {
+                ReadVoxelPreviewState(br, doc.VoxelPreviewState, version);
             }
 
             if (doc.Layers.Count > 0)
@@ -1264,6 +1317,57 @@ namespace PixlPunkt.Core.Document
             }
 
             return mapping;
+        }
+
+        private static void ReadVoxelPreviewState(BinaryReader br, VoxelPreviewDocumentState state, int version)
+        {
+            state.HasState = br.ReadBoolean();
+
+            state.FaceModeIndex = br.ReadInt32();
+            state.ColorLinkingEnabled = br.ReadBoolean();
+            state.ColorTolerance = br.ReadInt32();
+
+            state.FrontTileId3 = br.ReadInt32();
+            state.SideTileId3 = br.ReadInt32();
+            state.TopTileId3 = br.ReadInt32();
+
+            state.FrontTileId6 = br.ReadInt32();
+            state.BackTileId6 = br.ReadInt32();
+            state.LeftTileId6 = br.ReadInt32();
+            state.RightTileId6 = br.ReadInt32();
+            state.TopTileId6 = br.ReadInt32();
+            state.BottomTileId6 = br.ReadInt32();
+
+            state.OutlineEnabled = br.ReadBoolean();
+            state.OutlineColor = br.ReadUInt32();
+            state.OutlineSize = br.ReadInt32();
+            state.PixelPreviewEnabled = br.ReadBoolean();
+            state.PixelBaseSize = br.ReadInt32();
+            state.BackdropGridEnabled = br.ReadBoolean();
+
+            state.CameraPitch = br.ReadSingle();
+            state.CameraYaw = br.ReadSingle();
+            state.CameraZoomPercent = br.ReadSingle();
+
+            state.FaceColorOverrides.Clear();
+            if (version >= 12)
+            {
+                int count = br.ReadInt32();
+                for (int i = 0; i < count; i++)
+                {
+                    int x = br.ReadInt32();
+                    int y = br.ReadInt32();
+                    int z = br.ReadInt32();
+                    var face = (Face)br.ReadInt32();
+                    uint colorBgra = br.ReadUInt32();
+
+                    // Skip obviously invalid data rather than failing the whole document load.
+                    if ((int)face < 0 || (int)face > 5)
+                        continue;
+
+                    state.FaceColorOverrides.Add(new VoxelFaceColorOverride(x, y, z, face, colorBgra));
+                }
+            }
         }
 
         /// <summary>

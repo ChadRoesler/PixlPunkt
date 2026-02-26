@@ -1255,6 +1255,11 @@ namespace PixlPunkt.Core.Document
         /// </summary>
         public int SelectedTileId { get; set; } = -1;
 
+        /// <summary>
+        /// Gets persisted voxel preview settings/state stored with the document.
+        /// </summary>
+        public VoxelPreviewDocumentState VoxelPreviewState { get; } = new();
+
         // ════════════════════════════════════════════════════════════════════
         // REFERENCE LAYER SUPPORT
         // ════════════════════════════════════════════════════════════════════

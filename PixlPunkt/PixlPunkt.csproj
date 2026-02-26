@@ -169,10 +169,7 @@
     <!-- Bundled icons for offline help (rewritten from GitHub URLs by docsify plugin) -->
     <Content Include="..\docs\assets\icons\*.png" CopyToOutputDirectory="PreserveNewest" Link="Help\assets\icons\%(Filename)%(Extension)" />
     <!-- Wiki markdown files — served by docsify at runtime (exclude wiki _Sidebar and README) -->
-    <Content Include="..\wiki\*.md"
-             Exclude="..\wiki\_Sidebar.md;..\wiki\README.md"
-             CopyToOutputDirectory="PreserveNewest"
-             Link="Help\%(Filename)%(Extension)" />
+    <Content Include="..\wiki\*.md" Exclude="..\wiki\_Sidebar.md;..\wiki\README.md" CopyToOutputDirectory="PreserveNewest" Link="Help\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- 
@@ -183,11 +180,7 @@
     <PropertyGroup>
       <_ManifestPath>$(IntermediateOutputPath)unoresizetizer\m\Package.appxmanifest</_ManifestPath>
     </PropertyGroup>
-    <WriteLinesToFile
-      File="$(_ManifestPath)"
-      Lines="$([System.IO.File]::ReadAllText('$(_ManifestPath)').Replace('&lt;uap:ShowNameOnTiles /&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=&quot;square150x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;square310x310Logo&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;'))"
-      Overwrite="true"
-      Condition="Exists('$(_ManifestPath)')" />
+    <WriteLinesToFile File="$(_ManifestPath)" Lines="$([System.IO.File]::ReadAllText('$(_ManifestPath)').Replace('&lt;uap:ShowNameOnTiles /&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=&quot;square150x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;square310x310Logo&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;'))" Overwrite="true" Condition="Exists('$(_ManifestPath)')" />
   </Target>
 
   <!--
@@ -203,12 +196,10 @@
       <_MsixVersion Condition="$(_VersionParts) == '1'">$(Version).0.0.0</_MsixVersion>
       <_MsixVersion Condition="$(_VersionParts) == '2'">$(Version).0.0</_MsixVersion>
       <_MsixVersion Condition="$(_VersionParts) == '3'">$(Version).0</_MsixVersion>
-      <_MsixVersion Condition="$(_VersionParts) >= '4'">$(Version)</_MsixVersion>
+      <_MsixVersion Condition="$(_VersionParts) &gt;= '4'">$(Version)</_MsixVersion>
     </PropertyGroup>
     <Message Text="Updating MSIX version to $(_MsixVersion)" Importance="high" />
-    <Exec 
-      Command="powershell -NoProfile -Command &quot;(Get-Content '$(_ManifestPath)') -replace 'Version=\&quot;1\.0\.0\.0\&quot;', 'Version=\&quot;$(_MsixVersion)\&quot;' | Set-Content '$(_ManifestPath)'&quot;"
-      Condition="Exists('$(_ManifestPath)')" />
+    <Exec Command="powershell -NoProfile -Command &quot;(Get-Content '$(_ManifestPath)') -replace 'Version=\&quot;1\.0\.0\.0\&quot;', 'Version=\&quot;$(_MsixVersion)\&quot;' | Set-Content '$(_ManifestPath)'&quot;" Condition="Exists('$(_ManifestPath)')" />
   </Target>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
@@ -245,6 +236,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="UI\Voxel\VoxelPreviewWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
 
 </Project>

@@ -782,5 +782,43 @@ namespace PixlPunkt.UI
             TilePanel?.RefreshTiles();
             CurrentHost?.InvalidateCanvas();
         }
+
+        //////////////////////////////////////////////////////////////////
+        // VOXEL PREVIEW
+        //////////////////////////////////////////////////////////////////
+
+        /// <summary>
+        /// Opens the voxel preview window for the current document.
+        /// </summary>
+        private async void Tiles_VoxelPreview_Click(object sender, RoutedEventArgs e)
+        {
+            var doc = CurrentHost?.Document;
+            if (doc is null)
+            {
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    XamlRoot = Content.XamlRoot,
+                    Title = "No Document",
+                    Content = "Open a document before using Voxel Preview.",
+                    CloseButtonText = "OK"
+                });
+                return;
+            }
+
+            var tileSet = doc.TileSet;
+            if (tileSet == null || tileSet.Count == 0)
+            {
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    XamlRoot = Content.XamlRoot,
+                    Title = "No Tiles",
+                    Content = "The document has no tiles. Create tiles first to use Voxel Preview.",
+                    CloseButtonText = "OK"
+                });
+                return;
+            }
+
+            Voxel.VoxelPreviewWindow.Show(doc, this);
+        }
     }
 }

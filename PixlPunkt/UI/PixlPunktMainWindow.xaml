@@ -236,6 +236,8 @@
                     <MenuFlyoutItem Text="Merge Duplicate Tiles" Click="Tiles_MergeDuplicates_Click"/>
                     <MenuFlyoutItem Text="Remove Unused Tiles" Click="Tiles_RemoveUnused_Click"/>
                     <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Voxel Preview…" Click="Tiles_VoxelPreview_Click"/>
+                    <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Export Tiles…" Click="Tiles_Export_Click"/>
                     <MenuFlyoutSubItem Text="Import Tiles…">
                         <MenuFlyoutItem Text="From Open Document…" Click="Tiles_ImportFromDocument_Click"/>
