@@ -1256,7 +1256,18 @@ namespace PixlPunkt.Core.Document
         public int SelectedTileId { get; set; } = -1;
 
         /// <summary>
+        /// Gets the canonical voxel model payload persisted with the document.
+        /// </summary>
+        public VoxelModelDocumentState VoxelModel { get; } = new();
+
+        /// <summary>
+        /// Gets persisted voxel workspace/editor state stored with the document.
+        /// </summary>
+        public VoxelWorkspaceDocumentState VoxelWorkspace { get; } = new();
+
+        /// <summary>
         /// Gets persisted voxel preview settings/state stored with the document.
+        /// Legacy transitional state used by the current standalone voxel preview window.
         /// </summary>
         public VoxelPreviewDocumentState VoxelPreviewState { get; } = new();
 

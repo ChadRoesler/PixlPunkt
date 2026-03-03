@@ -108,6 +108,7 @@ namespace PixlPunkt.UI.Settings
             DefaultTileSetPathBox.Text = s.DefaultTileSetPath;
             AppThemeChoice.SelectedIndex = (int)s.AppTheme;
             StripeChoice.SelectedIndex = (int)s.StripeTheme;
+            SwapToolRailWhenVoxelActiveToggle.IsOn = s.SwapGlobalToolRailWhenVoxelPaneActive;
             DefaultPaletteSortCombo.SelectedIndex = (int)s.DefaultPaletteSortMode;
 
             // Initialize log path display
@@ -841,6 +842,7 @@ namespace PixlPunkt.UI.Settings
                 s.DefaultTileSetPath = DefaultTileSetPathBox.Text ?? string.Empty;
                 s.AppTheme = (AppThemeChoice)AppThemeChoice.SelectedIndex;
                 s.StripeTheme = (StripeThemeChoice)StripeChoice.SelectedIndex;
+                s.SwapGlobalToolRailWhenVoxelPaneActive = SwapToolRailWhenVoxelActiveToggle.IsOn;
                 s.DefaultPalette = GetSelectedDefaultPalette();
                 s.DefaultPaletteSortMode = (PaletteSortMode)DefaultPaletteSortCombo.SelectedIndex;
 
@@ -878,6 +880,7 @@ namespace PixlPunkt.UI.Settings
                         main.SetAppTheme(s.AppTheme);
                         main.SetStripeTheme(s.StripeTheme);
                         main.SetPaletteSwatchSize(s.PaletteSwatchSize);
+                        main.SetSwapGlobalToolRailWhenVoxelActive(s.SwapGlobalToolRailWhenVoxelPaneActive);
                     }
                 }
                 catch { }

@@ -94,8 +94,17 @@ namespace PixlPunkt.Core.Document
         /// Version 10: Added animation sub-routines
         /// Version 11: Added voxel preview state
         /// Version 12: Added voxel preview manual face color overrides
+        /// Version 13: Added canonical voxel model state + voxel workspace state
+        /// Version 14: Added persisted in-tab voxel pane layout (visibility + width)
+        /// Version 15: Added voxel workspace shadow color for lighting preview
+        /// Version 16: Added voxel workspace shadow strength for lighting preview
+        /// Version 17: Added voxel workspace projected backdrop tiles toggle
+        /// Version 18: Added voxel workspace backdrop cage scale
+        /// Version 19: Added voxel pixel-preview antialiasing toggle
+        /// Version 20: Added voxel pixel-preview antialiasing strength
+        /// Version 21: Removed voxel lighting ambient from workspace state and added voxel sidebar section collapse state
         /// </summary>
-        private const int CurrentVersion = 12;
+        private const int CurrentVersion = 21;
 
         private const int NodeType_RasterLayer = 1;
         private const int NodeType_Folder = 2;
@@ -176,8 +185,14 @@ namespace PixlPunkt.Core.Document
                 WriteLayerItem(bw, item);
             }
 
-            // Voxel preview state (Version 11+)
+            // Transitional sync: current voxel UI still writes legacy preview state.
+            // Mirror it into the new workspace state until the UI migrates fully.
+            doc.VoxelWorkspace.CopyFromPreviewState(doc.VoxelPreviewState);
+
+            // Voxel preview state (legacy transitional, Version 11+)
             WriteVoxelPreviewState(bw, doc.VoxelPreviewState);
+            WriteVoxelModelState(bw, doc.VoxelModel);
+            WriteVoxelWorkspaceState(bw, doc.VoxelWorkspace);
 
             bw.Flush();
         }
@@ -523,6 +538,8 @@ namespace PixlPunkt.Core.Document
             bw.Write(state.OutlineColor);
             bw.Write(state.OutlineSize);
             bw.Write(state.PixelPreviewEnabled);
+            bw.Write(state.PixelPreviewAntialiasEnabled);
+            bw.Write(state.PixelPreviewAntialiasStrength);
             bw.Write(state.PixelBaseSize);
             bw.Write(state.BackdropGridEnabled);
 
@@ -540,6 +557,88 @@ namespace PixlPunkt.Core.Document
                 bw.Write((int)o.Face);
                 bw.Write(o.ColorBgra);
             }
+        }
+
+        private static void WriteVoxelModelState(BinaryWriter bw, VoxelModelDocumentState state)
+        {
+            bw.Write(state.HasModel);
+            bw.Write(state.Width);
+            bw.Write(state.Height);
+            bw.Write(state.Depth);
+            bw.Write((int)state.SourceKind);
+            bw.Write(state.DirtyFromSource);
+            bw.Write(state.LastGeneratedUtcTicks);
+
+            if (!state.HasModel)
+            {
+                bw.Write(0); // occupancy count
+                bw.Write(0); // face color count
+                return;
+            }
+
+            bw.Write(state.Occupancy.Length);
+            bw.Write(state.Occupancy);
+
+            bw.Write(state.FaceColorsBgra.Length);
+            for (int i = 0; i < state.FaceColorsBgra.Length; i++)
+            {
+                bw.Write(state.FaceColorsBgra[i]);
+            }
+        }
+
+        private static void WriteVoxelWorkspaceState(BinaryWriter bw, VoxelWorkspaceDocumentState state)
+        {
+            bw.Write(state.HasState);
+
+            bw.Write(state.FaceModeIndex);
+            bw.Write(state.ColorLinkingEnabled);
+            bw.Write(state.ColorTolerance);
+
+            bw.Write(state.FrontTileId3);
+            bw.Write(state.SideTileId3);
+            bw.Write(state.TopTileId3);
+
+            bw.Write(state.FrontTileId6);
+            bw.Write(state.BackTileId6);
+            bw.Write(state.LeftTileId6);
+            bw.Write(state.RightTileId6);
+            bw.Write(state.TopTileId6);
+            bw.Write(state.BottomTileId6);
+
+            bw.Write(state.OutlineEnabled);
+            bw.Write(state.OutlineColor);
+            bw.Write(state.OutlineSize);
+            bw.Write(state.PixelPreviewEnabled);
+            bw.Write(state.PixelPreviewAntialiasEnabled);
+            bw.Write(state.PixelPreviewAntialiasStrength);
+            bw.Write(state.PixelBaseSize);
+            bw.Write(state.BackdropGridEnabled);
+            bw.Write(state.BackdropProjectionTilesEnabled);
+            bw.Write(state.BackdropCageScale);
+            bw.Write(state.SurfaceVoxelGridEnabled);
+
+            bw.Write(state.CameraPitch);
+            bw.Write(state.CameraYaw);
+            bw.Write(state.CameraZoomPercent);
+
+            bw.Write(state.LightingEnabled);
+            bw.Write(state.LightPosX);
+            bw.Write(state.LightPosY);
+            bw.Write(state.LightPosZ);
+            bw.Write(state.LightColorBgra);
+            bw.Write(state.ShadowColorBgra);
+            bw.Write(state.LightShadowStrength);
+            bw.Write(state.LightIntensity);
+            bw.Write(state.LightFalloff);
+            bw.Write(state.LightCastShadows);
+
+            bw.Write(state.VoxelPaneVisible);
+            bw.Write(state.VoxelPaneWidth);
+            bw.Write(state.ToolOptionsSectionExpanded);
+            bw.Write(state.FaceMappingSectionExpanded);
+            bw.Write(state.DisplaySectionExpanded);
+            bw.Write(state.VoxelEditSectionExpanded);
+            bw.Write(state.ActionsSectionExpanded);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -656,6 +755,20 @@ namespace PixlPunkt.Core.Document
             if (version >= 11)
             {
                 ReadVoxelPreviewState(br, doc.VoxelPreviewState, version);
+            }
+
+            if (version >= 13)
+            {
+                ReadVoxelModelState(br, doc.VoxelModel);
+                ReadVoxelWorkspaceState(br, doc.VoxelWorkspace, version);
+
+                // Transitional sync for the current standalone voxel preview window.
+                doc.VoxelWorkspace.ApplyToPreviewState(doc.VoxelPreviewState);
+            }
+            else if (version >= 11)
+            {
+                // Migrate legacy preview settings into the new workspace state.
+                doc.VoxelWorkspace.CopyFromPreviewState(doc.VoxelPreviewState);
             }
 
             if (doc.Layers.Count > 0)
@@ -1342,6 +1455,8 @@ namespace PixlPunkt.Core.Document
             state.OutlineColor = br.ReadUInt32();
             state.OutlineSize = br.ReadInt32();
             state.PixelPreviewEnabled = br.ReadBoolean();
+            state.PixelPreviewAntialiasEnabled = version >= 19 && br.ReadBoolean();
+            state.PixelPreviewAntialiasStrength = version >= 20 ? br.ReadSingle() : 0.35f;
             state.PixelBaseSize = br.ReadInt32();
             state.BackdropGridEnabled = br.ReadBoolean();
 
@@ -1367,6 +1482,129 @@ namespace PixlPunkt.Core.Document
 
                     state.FaceColorOverrides.Add(new VoxelFaceColorOverride(x, y, z, face, colorBgra));
                 }
+            }
+        }
+
+        private static void ReadVoxelModelState(BinaryReader br, VoxelModelDocumentState state)
+        {
+            bool hasModel = br.ReadBoolean();
+            int width = br.ReadInt32();
+            int height = br.ReadInt32();
+            int depth = br.ReadInt32();
+            int sourceKindRaw = br.ReadInt32();
+            bool dirtyFromSource = br.ReadBoolean();
+            long lastGeneratedUtcTicks = br.ReadInt64();
+
+            int occupancyCount = br.ReadInt32();
+            byte[] occupancy = occupancyCount > 0 ? br.ReadBytes(occupancyCount) : Array.Empty<byte>();
+            if (occupancy.Length != occupancyCount)
+                throw new EndOfStreamException("Unexpected end of stream while reading voxel model occupancy.");
+
+            int faceColorCount = br.ReadInt32();
+            uint[] faceColors = faceColorCount > 0 ? new uint[faceColorCount] : Array.Empty<uint>();
+            for (int i = 0; i < faceColorCount; i++)
+            {
+                faceColors[i] = br.ReadUInt32();
+            }
+
+            if (!hasModel)
+            {
+                state.Clear();
+                return;
+            }
+
+            state.SetStorage(width, height, depth, occupancy, faceColors, hasModel: true);
+            state.SourceKind = Enum.IsDefined(typeof(VoxelModelSourceKind), sourceKindRaw)
+                ? (VoxelModelSourceKind)sourceKindRaw
+                : VoxelModelSourceKind.None;
+            state.DirtyFromSource = dirtyFromSource;
+            state.LastGeneratedUtcTicks = lastGeneratedUtcTicks;
+
+            if (!state.IsStorageValid)
+            {
+                LoggingService.Warning(
+                    "Invalid voxel model payload in document. Clearing model. dims={Width}x{Height}x{Depth} occ={OccCount} faces={FaceCount}",
+                    width, height, depth, occupancyCount, faceColorCount);
+                state.Clear();
+            }
+        }
+
+        private static void ReadVoxelWorkspaceState(BinaryReader br, VoxelWorkspaceDocumentState state, int version)
+        {
+            state.HasState = br.ReadBoolean();
+
+            state.FaceModeIndex = br.ReadInt32();
+            state.ColorLinkingEnabled = br.ReadBoolean();
+            state.ColorTolerance = br.ReadInt32();
+
+            state.FrontTileId3 = br.ReadInt32();
+            state.SideTileId3 = br.ReadInt32();
+            state.TopTileId3 = br.ReadInt32();
+
+            state.FrontTileId6 = br.ReadInt32();
+            state.BackTileId6 = br.ReadInt32();
+            state.LeftTileId6 = br.ReadInt32();
+            state.RightTileId6 = br.ReadInt32();
+            state.TopTileId6 = br.ReadInt32();
+            state.BottomTileId6 = br.ReadInt32();
+
+            state.OutlineEnabled = br.ReadBoolean();
+            state.OutlineColor = br.ReadUInt32();
+            state.OutlineSize = br.ReadInt32();
+            state.PixelPreviewEnabled = br.ReadBoolean();
+            state.PixelPreviewAntialiasEnabled = version >= 19 && br.ReadBoolean();
+            state.PixelPreviewAntialiasStrength = version >= 20 ? br.ReadSingle() : 0.35f;
+            state.PixelBaseSize = br.ReadInt32();
+            state.BackdropGridEnabled = br.ReadBoolean();
+            state.BackdropProjectionTilesEnabled = version >= 17 ? br.ReadBoolean() : true;
+            state.BackdropCageScale = version >= 18 ? br.ReadSingle() : 1.6f;
+            state.SurfaceVoxelGridEnabled = br.ReadBoolean();
+
+            state.CameraPitch = br.ReadSingle();
+            state.CameraYaw = br.ReadSingle();
+            state.CameraZoomPercent = br.ReadSingle();
+
+            state.LightingEnabled = br.ReadBoolean();
+            state.LightPosX = br.ReadSingle();
+            state.LightPosY = br.ReadSingle();
+            state.LightPosZ = br.ReadSingle();
+            state.LightColorBgra = br.ReadUInt32();
+            state.ShadowColorBgra = version >= 15 ? br.ReadUInt32() : 0xC0000000;
+            state.LightShadowStrength = version >= 16 ? br.ReadSingle() : 1f;
+            state.LightIntensity = br.ReadSingle();
+            state.LightFalloff = br.ReadSingle();
+            if (version <= 20)
+            {
+                _ = br.ReadSingle(); // legacy ambient field (removed in v21)
+            }
+            state.LightCastShadows = br.ReadBoolean();
+
+            if (version >= 14)
+            {
+                state.VoxelPaneVisible = br.ReadBoolean();
+                state.VoxelPaneWidth = br.ReadDouble();
+            }
+            else
+            {
+                state.VoxelPaneVisible = false;
+                state.VoxelPaneWidth = 560d;
+            }
+
+            if (version >= 21)
+            {
+                state.ToolOptionsSectionExpanded = br.ReadBoolean();
+                state.FaceMappingSectionExpanded = br.ReadBoolean();
+                state.DisplaySectionExpanded = br.ReadBoolean();
+                state.VoxelEditSectionExpanded = br.ReadBoolean();
+                state.ActionsSectionExpanded = br.ReadBoolean();
+            }
+            else
+            {
+                state.ToolOptionsSectionExpanded = true;
+                state.FaceMappingSectionExpanded = true;
+                state.DisplaySectionExpanded = true;
+                state.VoxelEditSectionExpanded = true;
+                state.ActionsSectionExpanded = true;
             }
         }
 

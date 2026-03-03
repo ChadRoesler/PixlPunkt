@@ -818,6 +818,15 @@ namespace PixlPunkt.UI
                 return;
             }
 
+            // Phase 3: prefer the in-tab voxel workspace pane.
+            var activeWorkspaceHost = GetActiveDocumentWorkspaceHost();
+            if (activeWorkspaceHost != null && ReferenceEquals(activeWorkspaceHost.Document, doc))
+            {
+                activeWorkspaceHost.ShowVoxelPane();
+                return;
+            }
+
+            // Fallback to floating host (e.g., if invoked outside a tabbed document context).
             Voxel.VoxelPreviewWindow.Show(doc, this);
         }
     }

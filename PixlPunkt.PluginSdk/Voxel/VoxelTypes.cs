@@ -131,9 +131,10 @@ namespace PixlPunkt.PluginSdk.Voxel
         public bool Enabled { get; set; }
         public Vector3 Position { get; set; } = new(32f, 48f, 32f);
         public uint LightColorBgra { get; set; } = 0xFFFFFFFF;
+        public uint ShadowColorBgra { get; set; } = 0xC0000000;
+        public float ShadowStrength { get; set; } = 1f;
         public float Intensity { get; set; } = 1f;
         public float Falloff { get; set; } = 0.05f;
-        public float Ambient { get; set; } = 0f;
         public bool CastShadows { get; set; }
 
         public VoxelLightingSettings Clone()
@@ -142,9 +143,10 @@ namespace PixlPunkt.PluginSdk.Voxel
                 Enabled = Enabled,
                 Position = Position,
                 LightColorBgra = LightColorBgra,
+                ShadowColorBgra = ShadowColorBgra,
+                ShadowStrength = ShadowStrength,
                 Intensity = Intensity,
                 Falloff = Falloff,
-                Ambient = Ambient,
                 CastShadows = CastShadows,
             };
     }

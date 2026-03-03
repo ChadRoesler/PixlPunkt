@@ -7,6 +7,7 @@
     xmlns:layers="using:PixlPunkt.UI.Layers"
     xmlns:tiles="using:PixlPunkt.UI.Tiles"
     xmlns:tools="using:PixlPunkt.UI.Tools"
+    xmlns:voxeltools="using:PixlPunkt.UI.Voxel.Tools"
     xmlns:preview="using:PixlPunkt.UI.Preview"
     xmlns:history="using:PixlPunkt.UI.History"
     xmlns:animation="using:PixlPunkt.UI.Animation">
@@ -302,6 +303,12 @@
             <!-- LEFT: ToolRail - Use Grid instead of StackPanel to constrain height -->
             <Grid Grid.Column="0" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" VerticalAlignment="Stretch">
                 <tools:ToolRail x:Name="ToolRail" MinWidth="102" RequestedTheme="{Binding ElementName=Root, Path=RequestedTheme}" />
+                <voxeltools:VoxelToolRail x:Name="VoxelGlobalToolRail"
+                                          Visibility="Collapsed"
+                                          Margin="8"
+                                          Orientation="Vertical"
+                                          ShowLabels="False"
+                                          RequestedTheme="{Binding ElementName=Root, Path=RequestedTheme}" />
             </Grid>
 
             <!-- Collapsible Splitter between Left and Center -->

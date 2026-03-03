@@ -3,6 +3,7 @@ using System.Numerics;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Document.Layer;
+using PixlPunkt.Core.History;
 using PixlPunkt.Core.Painting.Dithering;
 using PixlPunkt.Core.Painting.Painters;
 using PixlPunkt.Core.Rendering;
@@ -100,12 +101,18 @@ namespace PixlPunkt.UI.CanvasHost
             if (_toolState == null) return;
 
             var settings = _toolState.GradientFill;
+            bool hasTileMapping = rl.TileMapping != null && Document.TileSet != null;
 
             // Get selection mask if any
             Func<int, int, bool>? selMask = null;
             if (_selectionEngine.HasActiveSelection)
             {
                 selMask = (x, y) => _selectionEngine.Sel.Mask.Contains(x, y);
+            }
+
+            if (hasTileMapping)
+            {
+                BeginLiveTilePropagation();
             }
 
             // Render the gradient
@@ -117,18 +124,41 @@ namespace PixlPunkt.UI.CanvasHost
                 _fg, _bgColor,
                 selMask);
 
+            TileMappedPixelChangeItem? tileMappedItem = null;
+            if (hasTileMapping)
+            {
+                if (historyItem is PixelChangeItem gradientPixelItem)
+                {
+                    var bounds = gradientPixelItem.GetBoundingRect();
+                    if (bounds.HasValue)
+                    {
+                        var b = bounds.Value;
+                        PropagateLiveTileChanges(b.minX, b.minY, b.maxX, b.maxY);
+                    }
+                }
+
+                tileMappedItem = EndLiveTilePropagation(historyItem?.Description ?? "Gradient Fill");
+            }
+
             // Push to history
-            if (historyItem != null && !historyItem.IsEmpty)
+            if (tileMappedItem != null)
+            {
+                tileMappedItem.HistoryIcon = historyItem?.HistoryIcon ?? FluentIcons.Common.Icon.CalendarPattern;
+                Document.History.Push(tileMappedItem);
+            }
+            else if (historyItem != null && !historyItem.IsEmpty)
             {
                 Document.History.Push(historyItem);
             }
 
             // Composite and update
             Document.CompositeTo(Document.Surface);
+            Document.RaiseDocumentModified();
             UpdateActiveLayerPreview();
             InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             RaiseFrame();
+            AutoCaptureKeyframeIfNeeded();
 
             _mainCanvas.ReleasePointerCaptures();
         }

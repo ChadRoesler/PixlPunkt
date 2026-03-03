@@ -21,6 +21,7 @@ using PixlPunkt.Core.Session;
 using PixlPunkt.Core.Settings;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Updates;
+using PixlPunkt.UI.CanvasArea;
 using PixlPunkt.UI.CanvasHost;
 using PixlPunkt.UI.Dialogs;
 using PixlPunkt.UI.Helpers;
@@ -94,6 +95,7 @@ namespace PixlPunkt.UI
         // Keyboard modifier tracking
         private bool _shiftDown;
         private bool _ctrlDown;
+        private bool _swapGlobalToolRailWhenVoxelPaneActive;
 
         // ─────────────────────────────────────────────────────────────
         // CONSTRUCTOR
@@ -194,6 +196,13 @@ namespace PixlPunkt.UI
                 ToolRail.NotifyBrushOpacityChanged(a);
             };
             ToolRail.RequestSetBrushColor = c => ApplyBrushColor(c);
+            if (VoxelGlobalToolRail != null)
+            {
+                VoxelGlobalToolRail.Orientation = Orientation.Vertical;
+                VoxelGlobalToolRail.ShowLabels = false;
+                VoxelGlobalToolRail.Visibility = Visibility.Collapsed;
+            }
+            SetSwapGlobalToolRailWhenVoxelActive(AppSettings.Instance.SwapGlobalToolRailWhenVoxelPaneActive);
 
             // NOTE: ForegroundPicked already subscribed above via _onForegroundPicked
             // BackgroundPicked reserved for future BG tool bindings (no-op for now)
@@ -402,7 +411,7 @@ namespace PixlPunkt.UI
 
             foreach (TabViewItem tab in DocsTab.TabItems)
             {
-                if (tab.Content is CanvasViewHost host && host.Document.IsDirty)
+                if (GetCanvasHostFromTab(tab) is CanvasViewHost host && host.Document.IsDirty)
                 {
                     dirtyDocs.Add(host.Document);
                 }
@@ -455,6 +464,39 @@ namespace PixlPunkt.UI
             catch (Exception ex)
             {
                 LoggingService.Debug("Failed to set palette swatch size: {Error}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Enables or disables auto-swapping of the global tool rail to voxel tools
+        /// when the active document has an active voxel pane.
+        /// </summary>
+        public void SetSwapGlobalToolRailWhenVoxelActive(bool enabled)
+        {
+            _swapGlobalToolRailWhenVoxelPaneActive = enabled;
+            UpdateGlobalToolRailMode();
+        }
+
+        private void UpdateGlobalToolRailMode()
+        {
+            if (ToolRail == null || VoxelGlobalToolRail == null)
+                return;
+
+            DocumentWorkspaceHost? workspaceHost = GetActiveDocumentWorkspaceHost();
+            bool useVoxelRail = _swapGlobalToolRailWhenVoxelPaneActive &&
+                                workspaceHost is { IsVoxelPaneActive: true };
+
+            if (useVoxelRail && workspaceHost != null)
+            {
+                VoxelGlobalToolRail.ToolState = workspaceHost.VoxelWorkspace.VoxelTools;
+                VoxelGlobalToolRail.Visibility = Visibility.Visible;
+                ToolRail.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                VoxelGlobalToolRail.ToolState = null;
+                VoxelGlobalToolRail.Visibility = Visibility.Collapsed;
+                ToolRail.Visibility = Visibility.Visible;
             }
         }
 
@@ -683,14 +725,12 @@ namespace PixlPunkt.UI
 
         private void UndoBtn_Click(object sender, RoutedEventArgs e)
         {
-            CurrentHost?.Undo();
-            UpdateHistoryUI();
+            _ = TryUndoFromActiveWorkspace();
         }
 
         private void RedoBtn_Click(object sender, RoutedEventArgs e)
         {
-            CurrentHost?.Redo();
-            UpdateHistoryUI();
+            _ = TryRedoFromActiveWorkspace();
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -1184,21 +1224,13 @@ namespace PixlPunkt.UI
         private void Edit_Undo_Click(object sender, RoutedEventArgs e)
         {
             if (IsTextInputFocused()) return;
-            if (CurrentHost?.CanUndo == true)
-            {
-                CurrentHost.Undo();
-                UpdateHistoryUI();
-            }
+            _ = TryUndoFromActiveWorkspace();
         }
 
         private void Edit_Redo_Click(object sender, RoutedEventArgs e)
         {
             if (IsTextInputFocused()) return;
-            if (CurrentHost?.CanRedo == true)
-            {
-                CurrentHost.Redo();
-                UpdateHistoryUI();
-            }
+            _ = TryRedoFromActiveWorkspace();
         }
 
         private void Edit_EditCanvas_Click(object sender, RoutedEventArgs e)

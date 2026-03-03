@@ -146,6 +146,15 @@
                                 </ComboBox>
                             </StackPanel>
                             <TextBlock Text="Controls the transparency pattern shown behind images" Opacity="0.5" FontSize="11" Margin="0,-8,0,0"/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="Swap Tool Rail in Voxel" FontWeight="SemiBold" Opacity="0.9" VerticalAlignment="Center" Width="160"/>
+                                <ToggleSwitch x:Name="SwapToolRailWhenVoxelActiveToggle"
+                                              OnContent="On"
+                                              OffContent="Off"
+                                              IsOn="False"/>
+                            </StackPanel>
+                            <TextBlock Text="When enabled, the global left tool rail switches to voxel tools only while the voxel pane is active." Opacity="0.5" FontSize="11" Margin="0,-8,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
                     

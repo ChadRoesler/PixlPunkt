@@ -152,6 +152,9 @@
     <!-- Also keep in Assets folder for fallback access -->
     <Content Include="Assets\Icons\PixlPunkt.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Icons\Icon.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Custom icon fonts for tool glyph overrides -->
+    <Content Include="Assets\Fonts\*.ttf" CopyToOutputDirectory="PreserveNewest" Link="Assets\Fonts\%(Filename)%(Extension)" />
+    <Content Include="Assets\Fonts\*.otf" CopyToOutputDirectory="PreserveNewest" Link="Assets\Fonts\%(Filename)%(Extension)" />
     <!-- File type icons for Windows file associations -->
     <Content Include="Assets\Icons\FileTypes\*.ico" CopyToOutputDirectory="PreserveNewest" Link="Assets\Icons\FileTypes\%(Filename)%(Extension)" />
   </ItemGroup>

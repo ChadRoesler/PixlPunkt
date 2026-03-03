@@ -331,7 +331,7 @@ namespace PixlPunkt.UI
         {
             foreach (TabViewItem tab in DocsTab.TabItems.Cast<TabViewItem>())
             {
-                if (tab.Content is CanvasViewHost host &&
+                if (GetCanvasHostFromTab(tab) is CanvasViewHost host &&
                     ReferenceEquals(host.Document, doc))
                 {
                     tab.Header = MakeTabHeader(doc, tab);

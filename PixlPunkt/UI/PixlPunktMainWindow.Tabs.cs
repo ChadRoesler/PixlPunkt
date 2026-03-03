@@ -38,13 +38,16 @@ namespace PixlPunkt.UI
 
         private TabViewItem MakeTab(CanvasDocument doc)
         {
-            var host = new CanvasViewHost(doc);
+            var workspaceHost = new DocumentWorkspaceHost(doc, _palette);
+            workspaceHost.VoxelPaneVisibilityChanged += _ => UpdateGlobalToolRailMode();
+            workspaceHost.VoxelPaneActiveChanged += _ => UpdateGlobalToolRailMode();
+            var host = workspaceHost.CanvasHost;
             // Determine effective theme: prefer runtime-forced value, fall back to persisted setting, then to system
             var effectiveTheme = _stripeForcedTheme ?? (AppSettings.Instance.StripeTheme != StripeThemeChoice.System
                 ? (AppSettings.Instance.StripeTheme == StripeThemeChoice.Light ? ElementTheme.Light : ElementTheme.Dark)
                 : Root.ActualTheme);
             host.UpdateTransparencyPatternForTheme(effectiveTheme);
-            var tab = new TabViewItem { Content = host };
+            var tab = new TabViewItem { Content = workspaceHost };
             tab.Header = MakeTabHeader(doc, tab);
 
             var flyout = new MenuFlyout();
@@ -52,8 +55,12 @@ namespace PixlPunkt.UI
             miDetach.Click += (_, __) => DetachTabToWindow(tab, doc);
             var miDuplicate = new MenuFlyoutItem { Text = "Duplicate in New Window" };
             miDuplicate.Click += (_, __) => OpenDocInWindow(doc);
+            var miVoxel = new MenuFlyoutItem { Text = "Toggle Voxel Workspace" };
+            miVoxel.Click += (_, __) => GetDocumentWorkspaceHost(tab)?.ToggleVoxelPane();
             flyout.Items.Add(miDetach);
             flyout.Items.Add(miDuplicate);
+            flyout.Items.Add(new MenuFlyoutSeparator());
+            flyout.Items.Add(miVoxel);
             tab.ContextFlyout = flyout;
             return tab;
         }
@@ -217,14 +224,14 @@ namespace PixlPunkt.UI
         {
             if (e.RemovedItems.Count > 0 &&
                 e.RemovedItems[0] is TabViewItem oldTab &&
-                oldTab.Content is CanvasViewHost oldHost)
+                GetCanvasHostFromTab(oldTab) is CanvasViewHost oldHost)
             {
                 oldHost.CommitSelection();
                 DetachHost(oldHost);
             }
 
             if (DocsTab.SelectedItem is TabViewItem newTab &&
-                newTab.Content is CanvasViewHost newHost)
+                GetCanvasHostFromTab(newTab) is CanvasViewHost newHost)
             {
                 AttachHost(newHost);
             }
@@ -236,6 +243,7 @@ namespace PixlPunkt.UI
                 AnimationPanel.Bind(null);
             }
             UpdateHistoryUI();
+            UpdateGlobalToolRailMode();
 
             // Update session state when active document changes
             UpdateSessionState();
@@ -243,7 +251,7 @@ namespace PixlPunkt.UI
 
         private async void DocsTab_TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
         {
-            if (args.Item is not TabViewItem tab || tab.Content is not CanvasViewHost host)
+            if (args.Item is not TabViewItem tab || GetCanvasHostFromTab(tab) is not CanvasViewHost host)
                 return;
 
             var doc = host.Document;
@@ -288,6 +296,7 @@ namespace PixlPunkt.UI
                 TilePanel.Bind(null, null);
                 AnimationPanel.Bind(null);
             }
+            UpdateGlobalToolRailMode();
             UpdateAddButtonOffset(DocsTab);
 
             // Update session state when document is closed
@@ -604,5 +613,21 @@ namespace PixlPunkt.UI
         {
             SetAnimationPanelFocus(false);
         }
+
+        private static DocumentWorkspaceHost? GetDocumentWorkspaceHost(TabViewItem? tab)
+            => tab?.Content as DocumentWorkspaceHost;
+
+        private static CanvasViewHost? GetCanvasHostFromTab(TabViewItem? tab)
+        {
+            if (tab == null) return null;
+
+            if (tab.Content is DocumentWorkspaceHost workspaceHost)
+                return workspaceHost.CanvasHost;
+
+            return tab.Content as CanvasViewHost;
+        }
+
+        private DocumentWorkspaceHost? GetActiveDocumentWorkspaceHost()
+            => DocsTab.SelectedItem is TabViewItem tab ? GetDocumentWorkspaceHost(tab) : null;
     }
 }

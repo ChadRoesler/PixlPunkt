@@ -114,10 +114,10 @@ namespace PixlPunkt.Core.Voxel
             new("east",      Deg(30), Deg(90)),
             new("southeast", Deg(30), Deg(135)),
             // Orthographic
-            new("front",     0f, MathF.PI),
-            new("back",      0f, 0f),
-            new("left",      0f, Deg(270)),
-            new("right",     0f, Deg(90)),
+            new("front",     0f, 0f),
+            new("back",      0f, MathF.PI),
+            new("left",      0f, Deg(90)),
+            new("right",     0f, Deg(270)),
             new("top",       Deg(90), MathF.PI),
             new("bottom",   -Deg(90), MathF.PI),
         };
@@ -345,15 +345,19 @@ namespace PixlPunkt.Core.Voxel
                     continue;
 
                 CurrentSnapName = snap.Name;
+                bool isTopBottom = IsTopBottomName(snap.Name);
+                float targetYaw = isTopBottom ? _yaw : snap.Yaw;
 
                 if (animated)
                 {
-                    StartAnimation(snap.Pitch, snap.Yaw, 350);
+                    // Top/Bottom lock should not force a yaw snap; keep current spin.
+                    StartAnimation(snap.Pitch, targetYaw, 350);
                 }
                 else
                 {
                     _pitch = snap.Pitch;
-                    _yaw = snap.Yaw;
+                    if (!isTopBottom)
+                        _yaw = targetYaw;
                     _animation = null;
                 }
                 return;
@@ -433,21 +437,29 @@ namespace PixlPunkt.Core.Voxel
             float y = _cameraDistance * MathF.Sin(_pitch);
             float z = _cameraDistance * MathF.Cos(_yaw) * MathF.Cos(_pitch);
 
-            var up = Vector3.UnitY;
+            // Keep position numerically stable exactly at the poles.
             float poleEps = Deg(1.5f);
             if (MathF.Abs(MathF.Abs(_pitch) - MathF.PI * 0.5f) < poleEps)
             {
                 x = 0f;
                 z = 0f;
                 y = _pitch >= 0f ? _cameraDistance : -_cameraDistance;
-
-                float qy = _pitch >= 0f
-                    ? QuantizeAngleTo90(_yaw - MathF.PI)
-                    : QuantizeAngleTo90(_yaw);
-                up = UpFromQuantizedYaw(qy);
             }
 
-            return new CameraPose(new Vector3(x, y, z), Vector3.Zero, up);
+            var position = new Vector3(x, y, z);
+            var forward = SafeNormalize(Vector3.Zero - position, new Vector3(0f, -1f, 0f));
+
+            // Build a continuous no-roll-up vector with a pole-safe fallback.
+            // This avoids the old 90° quantization jump when entering top/bottom.
+            var right = Vector3.Cross(forward, Vector3.UnitY);
+            if (!IsFinite(right) || right.LengthSquared() < 1e-8f)
+            {
+                right = new Vector3(MathF.Cos(_yaw), 0f, -MathF.Sin(_yaw));
+            }
+            right = SafeNormalize(right, Vector3.UnitX);
+
+            var up = SafeNormalize(Vector3.Cross(right, forward), Vector3.UnitY);
+            return new CameraPose(position, Vector3.Zero, up);
         }
 
         /// <summary>
@@ -455,9 +467,18 @@ namespace PixlPunkt.Core.Voxel
         /// </summary>
         public CameraBasis GetCameraBasis(CameraPose pose)
         {
-            var forward = Vector3.Normalize(pose.Target - pose.Position);
-            var right = Vector3.Normalize(Vector3.Cross(forward, pose.Up));
-            var up = Vector3.Normalize(Vector3.Cross(right, forward));
+            var forward = SafeNormalize(pose.Target - pose.Position, new Vector3(0f, 0f, -1f));
+            var right = Vector3.Cross(forward, pose.Up);
+            if (!IsFinite(right) || right.LengthSquared() < 1e-8f)
+            {
+                right = Vector3.Cross(forward, Vector3.UnitY);
+                if (!IsFinite(right) || right.LengthSquared() < 1e-8f)
+                {
+                    right = Vector3.Cross(forward, Vector3.UnitZ);
+                }
+            }
+            right = SafeNormalize(right, Vector3.UnitX);
+            var up = SafeNormalize(Vector3.Cross(right, forward), Vector3.UnitY);
             return new CameraBasis(right, up, forward);
         }
 
@@ -547,8 +568,7 @@ namespace PixlPunkt.Core.Voxel
                 float diffYaw = MathF.Abs(ShortestAngleDelta(_yaw, snap.Yaw));
 
                 // Top/bottom only check pitch
-                bool isTopBottom = string.Equals(snap.Name, "top", StringComparison.OrdinalIgnoreCase) ||
-                                   string.Equals(snap.Name, "bottom", StringComparison.OrdinalIgnoreCase);
+                bool isTopBottom = IsTopBottomName(snap.Name);
 
                 if (isTopBottom)
                     diffYaw = 0f;
@@ -567,7 +587,8 @@ namespace PixlPunkt.Core.Voxel
             if (best.HasValue)
             {
                 _pitch = best.Value.Pitch;
-                _yaw = best.Value.Yaw;
+                if (!IsTopBottomName(best.Value.Name))
+                    _yaw = best.Value.Yaw;
                 CurrentSnapName = best.Value.Name;
             }
             else
@@ -618,24 +639,23 @@ namespace PixlPunkt.Core.Voxel
             return Wrap0To2Pi(na + d * t);
         }
 
-        private static float QuantizeAngleTo90(float angle)
+        private static bool IsTopBottomName(string? name)
         {
-            float step = MathF.PI * 0.5f;
-            return MathF.Round(angle / step) * step;
+            return string.Equals(name, "top", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(name, "bottom", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static Vector3 UpFromQuantizedYaw(float qy)
+        private static bool IsFinite(Vector3 v)
         {
-            float ny = Wrap0To2Pi(qy);
-            float step = MathF.PI * 0.5f;
-            int k = ((int)MathF.Round(ny / step)) % 4;
-            return k switch
-            {
-                0 => new Vector3(0f, 0f, 1f),
-                1 => new Vector3(1f, 0f, 0f),
-                2 => new Vector3(0f, 0f, -1f),
-                _ => new Vector3(-1f, 0f, 0f),
-            };
+            return float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
+        }
+
+        private static Vector3 SafeNormalize(Vector3 v, Vector3 fallback)
+        {
+            if (!IsFinite(v)) return fallback;
+            float lenSq = v.LengthSquared();
+            if (lenSq < 1e-12f) return fallback;
+            return v / MathF.Sqrt(lenSq);
         }
     }
 }

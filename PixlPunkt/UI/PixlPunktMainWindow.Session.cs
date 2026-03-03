@@ -263,7 +263,7 @@ namespace PixlPunkt.UI
 
             foreach (TabViewItem tab in DocsTab.TabItems)
             {
-                if (tab.Content is CanvasViewHost host)
+                if (GetCanvasHostFromTab(tab) is CanvasViewHost host)
                 {
                     var doc = host.Document;
                     var docPath = _documentPaths.TryGetValue(doc, out var p) ? p : null;

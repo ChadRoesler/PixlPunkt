@@ -1427,8 +1427,8 @@ namespace PixlPunkt.UI.CanvasHost
                     }
                 }
 
-                if (positions.Count <= 1)
-                    continue; // No propagation needed for single instance
+                if (positions.Count == 0)
+                    continue;
 
                 // Merge changes from all affected positions into the tile definition
                 byte[] mergedPixels = (byte[])tileSet.GetTilePixels(tileId)!.Clone();
@@ -1823,8 +1823,8 @@ namespace PixlPunkt.UI.CanvasHost
                     }
                 }
 
-                if (positions.Count <= 1)
-                    continue; // No propagation needed for single instance
+                if (positions.Count == 0)
+                    continue;
 
                 // Merge changes from all affected positions into the tile definition
                 byte[] mergedPixels = (byte[])tileSet.GetTilePixels(tileId)!.Clone();

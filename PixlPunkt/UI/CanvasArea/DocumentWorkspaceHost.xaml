@@ -1,0 +1,66 @@
+<UserControl
+    x:Class="PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctrl="using:PixlPunkt.UI.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootGrid">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition x:Name="SplitterColumn" Width="0" />
+            <ColumnDefinition x:Name="VoxelColumn" Width="0" />
+        </Grid.ColumnDefinitions>
+
+        <Border x:Name="CanvasPaneBorder"
+                Grid.Column="0"
+                BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1,0,0,0"
+                Background="Transparent">
+            <Grid>
+                <ContentControl x:Name="CanvasHostPresenter"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch" />
+                <Border x:Name="CanvasActiveIndicator"
+                        Height="2"
+                        VerticalAlignment="Top"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"/>
+            </Grid>
+        </Border>
+
+        <ctrl:CollapsibleSplitter x:Name="PaneSplitter"
+                                  Grid.Column="1"
+                                  Width="6"
+                                  CollapseLeft="False"
+                                  DefaultExpandedWidth="560"
+                                  MinExpandedWidth="360"
+                                  VerticalAlignment="Stretch"
+                                  Visibility="Collapsed"/>
+
+        <Border x:Name="VoxelPaneBorder"
+                Grid.Column="2"
+                BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1,0,0,0"
+                Visibility="Collapsed">
+            <Grid>
+                <ContentControl x:Name="VoxelWorkspacePresenter"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch" />
+                <Border x:Name="VoxelActiveIndicator"
+                        Height="2"
+                        VerticalAlignment="Top"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

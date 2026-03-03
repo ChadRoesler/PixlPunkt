@@ -6227,9 +6227,20 @@
             Gets or sets the currently selected tile ID for animation editing.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Document.CanvasDocument.VoxelModel">
+            <summary>
+            Gets the canonical voxel model payload persisted with the document.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.CanvasDocument.VoxelWorkspace">
+            <summary>
+            Gets persisted voxel workspace/editor state stored with the document.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Document.CanvasDocument.VoxelPreviewState">
             <summary>
             Gets persisted voxel preview settings/state stored with the document.
+            Legacy transitional state used by the current standalone voxel preview window.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.CanvasDocument.AddReferenceLayer(System.String,System.Byte[],System.Int32,System.Int32,System.String)">
@@ -6345,6 +6356,15 @@
             Version 10: Added animation sub-routines
             Version 11: Added voxel preview state
             Version 12: Added voxel preview manual face color overrides
+            Version 13: Added canonical voxel model state + voxel workspace state
+            Version 14: Added persisted in-tab voxel pane layout (visibility + width)
+            Version 15: Added voxel workspace shadow color for lighting preview
+            Version 16: Added voxel workspace shadow strength for lighting preview
+            Version 17: Added voxel workspace projected backdrop tiles toggle
+            Version 18: Added voxel workspace backdrop cage scale
+            Version 19: Added voxel pixel-preview antialiasing toggle
+            Version 20: Added voxel pixel-preview antialiasing strength
+            Version 21: Removed voxel lighting ambient from workspace state and added voxel sidebar section collapse state
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.DocumentIO.Save(PixlPunkt.Core.Document.CanvasDocument,System.String)">
@@ -7956,10 +7976,54 @@
             Override color stored as packed BGRA (same packing used by renderer/UI swatches).
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.Document.VoxelModelDocumentState">
+            <summary>
+            Canonical voxel model payload persisted with the document.
+            </summary>
+            <remarks>
+            Stores voxel occupancy and per-face colors in a dimension-aware layout.
+            Internally, the current renderer/editor can still convert to/from <see cref="T:PixlPunkt.Core.Voxel.VoxelVolume"/>
+            when the model is cubic and within the legacy size cap.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.VoxelModelDocumentState.SourceKind">
+            <summary>
+            Sparse/derived source provenance for rebuild flows.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.VoxelModelDocumentState.DirtyFromSource">
+            <summary>
+            Indicates the model was manually edited after generation and may no longer match source projections.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.VoxelModelDocumentState.LastGeneratedUtcTicks">
+            <summary>
+            Optional UTC timestamp of the last generation/import step.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.VoxelModelDocumentState.Occupancy">
+            <summary>
+            Occupancy payload in row-major x + Width * (y + Height * z) order.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.VoxelModelDocumentState.FaceColorsBgra">
+            <summary>
+            Packed BGRA per-face colors. Indexed as voxelIndex * 6 + face.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Document.VoxelPreviewDocumentState">
             <summary>
             Persisted voxel preview UI + camera state stored inside the .pxp document.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.VoxelWorkspaceDocumentState">
+            <summary>
+            Persisted voxel workspace/editor UI and viewport state.
+            </summary>
+            <remarks>
+            This is intentionally separate from <see cref="T:PixlPunkt.Core.Document.VoxelModelDocumentState"/> so camera/view/tool
+            preferences can evolve independently from canonical voxel model data.
+            </remarks>
         </member>
         <member name="T:PixlPunkt.Core.Effects.Builders.EffectBuilder">
             <summary>
@@ -16958,6 +17022,9 @@
         <member name="M:PixlPunkt.Core.Plugins.PluginRegistry.GetPluginForEffect(System.String)">
             <summary>Gets the plugin ID that provides a given effect.</summary>
         </member>
+        <member name="M:PixlPunkt.Core.Plugins.PluginRegistry.GetPluginForVoxelTool(System.String)">
+            <summary>Gets the plugin ID that provides a given voxel tool.</summary>
+        </member>
         <member name="M:PixlPunkt.Core.Plugins.PluginRegistry.GetPluginForImport(System.String)">
             <summary>Gets the plugin ID that provides a given import handler.</summary>
         </member>
@@ -16969,6 +17036,9 @@
         </member>
         <member name="M:PixlPunkt.Core.Plugins.PluginRegistry.Dispose">
             <summary>Disposes the plugin registry and unloads all plugins.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Plugins.PluginVoxelToolRegistration">
+            <summary>Adapts SDK voxel tool registrations to core voxel tool registrations.</summary>
         </member>
         <member name="T:PixlPunkt.Core.Reference.ReferenceImage">
             <summary>
@@ -20053,6 +20123,12 @@
             If the file doesn't exist or fails to load, a warning is shown and no tile set is loaded.
             Empty string means no default tile set.
             </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.SwapGlobalToolRailWhenVoxelPaneActive">
+            <summary>
+            Gets or sets whether the global left tool rail should swap to voxel tools
+            when the voxel pane is active.
+            </summary>
         </member>
         <member name="P:PixlPunkt.Core.Settings.AppSettings.LogLevel">
             <summary>
@@ -28371,6 +28447,21 @@
             Alpha is preserved.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory">
+            <summary>
+            Lightweight undo/redo stack for voxel workspace operations.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Editing.VoxelEditEngine">
+            <summary>
+            Core voxel edit engine for canonical voxel model operations (Phase 1 scaffold).
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Editing.VoxelSelectionService">
+            <summary>
+            Maintains voxel selection state for the voxel workspace.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Voxel.Face">
             <summary>
             Identifies one of the six faces of a voxel cube.
@@ -28713,7 +28804,7 @@
                View cameras (orthographic):
                  Front : at +Z looking toward −Z  → sees X (col, flipped), Y (row, flipped)
                  Side  : at −X looking toward +X  → sees Z (col, flipped), Y (row, flipped)
-                 Top   : at +Y looking toward −Y  → sees X (col, flipped), Z (row, flipped)
+                 Top   : at +Y looking toward −Y  → sees X (col), Z (row, flipped)
              </code>
              <para>
              The <c>Flip</c> helper converts between screen coordinates (top-left origin)
@@ -29056,6 +29147,43 @@
             color computed from the referenced tile's opaque pixels.
             </returns>
         </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.VoxelBuiltInTools">
+            <summary>
+            Registration point for built-in voxel tools.
+            </summary>
+            <remarks>
+            Phase 0 scaffolding only: built-in voxel tool registrations are added in later phases.
+            </remarks>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.VoxelLightingToolSettings">
+            <summary>
+            Built-in voxel lighting utility settings exposed through the shared tool options UI.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.IVoxelToolRegistration">
+            <summary>Core/runtime voxel tool registration contract.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.IVoxelToolBehavior">
+            <summary>Core/runtime voxel tool behavior metadata.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.IVoxelToolHandler">
+            <summary>Core/runtime voxel tool handler contract.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.IVoxelToolContext">
+            <summary>Core/runtime host services for voxel tools.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.VoxelToolIds">
+            <summary>Built-in voxel tool identifiers.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.IVoxelToolRegistry">
+            <summary>Registry for voxel workspace tools (built-in and plugin-provided).</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.VoxelToolRegistry">
+            <summary>Default registry implementation for voxel tools.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Tools.VoxelToolState">
+            <summary>Minimal state container for voxel workspace active tool and settings synchronization.</summary>
+        </member>
         <member name="T:PixlPunkt.Core.Voxel.VoxelRenderer">
             <summary>
             Renders a <see cref="T:PixlPunkt.Core.Voxel.VoxelVolume"/> to a BGRA pixel buffer using
@@ -29073,8 +29201,8 @@
             <item>Optionally draw a postprocess silhouette outline.</item>
             </list>
             <para>
-            Face lighting applies a fixed brightness multiplier per face direction,
-            simulating directional ambient light.
+            Optional lighting uses a point-light preview model (diffuse with distance attenuation).
+            When lighting is disabled, face colors are rendered flat/unlit.
             </para>
             </remarks>
         </member>
@@ -29114,14 +29242,62 @@
         <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropGridMarginVoxels">
             <summary>Minimum grid extent past the model bounds in voxel units.</summary>
         </member>
-        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightTop">
-            <summary>Top face lighting multiplier. Default 1.0.</summary>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropCageScale">
+            <summary>Backdrop cage half-extent scale relative to model half-size.</summary>
         </member>
-        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightSide">
-            <summary>Side face (left/right) lighting multiplier. Default 0.86.</summary>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.DrawBackdropProjectionTiles">
+            <summary>Draw source projection tiles on the corresponding cage faces.</summary>
         </member>
-        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightFront">
-            <summary>Front/back/bottom face lighting multiplier. Default 0.76.</summary>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropFrontProjection">
+            <summary>Front (+Z) projection image for the cage.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropBackProjection">
+            <summary>Back (-Z) projection image for the cage.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropLeftProjection">
+            <summary>Left (-X) projection image for the cage.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropRightProjection">
+            <summary>Right (+X) projection image for the cage.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropTopProjection">
+            <summary>Top (+Y) projection image for the cage.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.BackdropBottomProjection">
+            <summary>Bottom (-Y) projection image for the cage.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.DrawSurfaceVoxelGrid">
+            <summary>Draw a visible grid over the model's voxel surface boundaries.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.SurfaceVoxelGridColor">
+            <summary>Surface voxel grid line color (packed BGRA, alpha supported).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightingEnabled">
+            <summary>Enable lighting preview shading. Off = flat/unlit face colors.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightPosition">
+            <summary>World-space point light position in voxel units.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightColor">
+            <summary>Point light color (packed BGRA).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.ShadowColor">
+            <summary>Shadow tint color (packed BGRA; alpha controls tint strength).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.ShadowStrength">
+            <summary>Overall shadow influence [0..1].</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightIntensity">
+            <summary>Diffuse intensity multiplier.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.AmbientIntensity">
+            <summary>Baseline ambient contribution [0..1] applied when lighting is enabled.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightFalloff">
+            <summary>Distance attenuation factor (0 = none).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions.LightCastShadows">
+            <summary>Enable hard voxel cast shadows for the point light.</summary>
         </member>
         <member name="M:PixlPunkt.Core.Voxel.VoxelRenderer.Render(PixlPunkt.Core.Voxel.VoxelVolume,PixlPunkt.Core.Voxel.OrbitCamera,System.Int32,System.Int32,System.Byte[],System.UInt32,PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions)">
             <summary>
@@ -30056,6 +30232,26 @@
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasArea.DocumentWindow.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost">
+            <summary>
+            In-tab document workspace host that contains the 2D canvas and optional voxel workspace pane.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost.GetBindingConnector(System.Int32,System.Object)">
             <summary>
             GetBindingConnector(int connectionId, object target)
             </summary>
@@ -34902,6 +35098,22 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Icons.PixlPunktCodicon">
+            <summary>
+            Custom codicons from the PixlPunkt icon font.
+            Add new codepoints here as needed.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Icons.PixlPunktGlyph">
+            <summary>
+            Back-compat alias. Prefer <see cref="T:PixlPunkt.UI.Icons.PixlPunktCodicon"/>.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Icons.PixlPunktIconFont">
+            <summary>
+            Helper for rendering custom icon-font glyphs with fallback detection.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Layers.Controls.LayerFolderMenuFlyout">
             <summary>
             Reusable MenuFlyout for LayerFolder context menu.
@@ -36433,6 +36645,12 @@
             Update palette swatch size at runtime.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.SetSwapGlobalToolRailWhenVoxelActive(System.Boolean)">
+            <summary>
+            Enables or disables auto-swapping of the global tool rail to voxel tools
+            when the active document has an active voxel pane.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.SetupMergedTitleBar">
             <summary>
             Configures the title bar based on platform capabilities.
@@ -37149,9 +37367,55 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Voxel.Tools.VoxelToolOptionsBar">
+            <summary>
+            Minimal voxel tool options host using the shared <see cref="T:PixlPunkt.UI.Tools.ToolOptionFactory"/>.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Voxel.Tools.VoxelToolRail">
+            <summary>
+            Voxel tool rail driven by <see cref="T:PixlPunkt.Core.Voxel.Tools.VoxelToolState"/>.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Voxel.Tools.VoxelToolRail.Orientation">
+            <summary>
+            Gets or sets the button layout orientation.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Voxel.Tools.VoxelToolRail.ShowLabels">
+            <summary>
+            Gets or sets whether labels are shown next to icons.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Voxel.VoxelPreviewWindow">
             <summary>
-            Window that renders a 3D voxel preview from tile face selections.
+            Thin floating-window host wrapper for <see cref="T:PixlPunkt.UI.Voxel.VoxelWorkspaceControl"/>.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.Show(PixlPunkt.Core.Document.CanvasDocument,Microsoft.UI.Xaml.Window)">
+            <summary>
+            Opens the voxel workspace in a floating window for the specified document.
+            Reuses the existing window if already open.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Voxel.VoxelWorkspaceControl">
+            <summary>
+            Reusable voxel workspace control that renders a 3D voxel editor/preview.
             </summary>
             <remarks>
             <para>
@@ -37170,101 +37434,100 @@
             </list>
             </remarks>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.Show(PixlPunkt.Core.Document.CanvasDocument,Microsoft.UI.Xaml.Window)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.SyncLightingControlsFromDocument">
             <summary>
-            Opens the voxel preview window for the specified document.
-            Reuses the existing window if already open.
+            Pushes lighting state values from the document into the permanent lighting controls.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.PopulateTilePickers">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.PopulateTilePickers(System.Boolean)">
             <summary>
             Populates all tile picker ComboBoxes with tiles from the document's TileSet.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.GetSelectedTile(Microsoft.UI.Xaml.Controls.ComboBox)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.GetSelectedTile(Microsoft.UI.Xaml.Controls.ComboBox)">
             <summary>
             Gets the selected <see cref="T:PixlPunkt.Core.Tile.TileDefinition"/> from a picker, or null if "(None)".
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.GetColorTolerance">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.GetColorTolerance">
             <summary>
             Gets the current color tolerance value, or -1 if color linking is disabled.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.BuildAndRender">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.BuildAndRender">
             <summary>
             Builds the voxel volume from selected tiles and renders the viewport.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.TileToImage(PixlPunkt.Core.Tile.TileDefinition)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TileToImage(PixlPunkt.Core.Tile.TileDefinition)">
             <summary>
             Converts a tile to an <see cref="T:PixlPunkt.Core.Voxel.ImageData"/>, or returns null.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.ApplySixFaceOverrides(PixlPunkt.Core.Voxel.VoxelVolume,PixlPunkt.Core.Tile.TileDefinition,PixlPunkt.Core.Tile.TileDefinition,PixlPunkt.Core.Tile.TileDefinition)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.ApplySixFaceOverrides(PixlPunkt.Core.Voxel.VoxelVolume,PixlPunkt.Core.Tile.TileDefinition,PixlPunkt.Core.Tile.TileDefinition,PixlPunkt.Core.Tile.TileDefinition)">
             <summary>
             In 6-face mode, overrides face colors for back/right/bottom faces
             using individually selected tiles.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.ApplySixFaceOverrides(PixlPunkt.Core.Voxel.VoxelVolume,PixlPunkt.Core.Voxel.ImageData,PixlPunkt.Core.Voxel.ImageData,PixlPunkt.Core.Voxel.ImageData)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.ApplySixFaceOverrides(PixlPunkt.Core.Voxel.VoxelVolume,PixlPunkt.Core.Voxel.ImageData,PixlPunkt.Core.Voxel.ImageData,PixlPunkt.Core.Voxel.ImageData)">
             <summary>
             In 6-face mode, overrides face colors for back/right/bottom faces
             using per-view images.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.ApplyManualFaceOverrides(PixlPunkt.Core.Voxel.VoxelVolume)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.ApplyManualFaceOverrides(PixlPunkt.Core.Voxel.VoxelVolume)">
             <summary>
             Applies persisted sparse manual face-color overrides onto the generated volume.
             This is the phase-1 foundation for a voxel face painter (manual overrides win last).
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.SetManualFaceColorOverride(System.Int32,System.Int32,System.Int32,PixlPunkt.Core.Voxel.Face,System.UInt32)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.SetManualFaceColorOverride(System.Int32,System.Int32,System.Int32,PixlPunkt.Core.Voxel.Face,System.UInt32)">
             <summary>
             Sets or updates one manual face-color override in document state and applies it
             to the current preview volume if available. This is intended for a future face-paint tool.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.ClearManualFaceColorOverride(System.Int32,System.Int32,System.Int32,PixlPunkt.Core.Voxel.Face)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.ClearManualFaceColorOverride(System.Int32,System.Int32,System.Int32,PixlPunkt.Core.Voxel.Face)">
             <summary>
             Removes one manual face-color override and rebuilds the voxel preview volume so the
             face color falls back to generated/mapped data.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.ClearAllManualFaceColorOverrides">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.ClearAllManualFaceColorOverrides">
             <summary>
             Clears all manual face overrides from the preview/document and rebuilds if needed.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.TryGetMappedViewImages(System.Boolean,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TryGetMappedViewImages(System.Boolean,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@,PixlPunkt.Core.Voxel.ImageData@)">
             <summary>
             Attempts to build orthographic voxel input images from tile-mapped document layers.
             Layer names are matched by tokens (e.g. "front", "side"/"left", "top").
             6-face mode optionally uses "back", "right", and "bottom" for face overrides.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.RenderViewport">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.RenderViewport">
             <summary>
             Renders the current mesh to the viewport Image control.
             </summary>
             <remarks>
-            In normal mode, renders at <see cref="F:PixlPunkt.UI.Voxel.VoxelPreviewWindow._viewportWidth"/> × <see cref="F:PixlPunkt.UI.Voxel.VoxelPreviewWindow._viewportHeight"/>.
+            In normal mode, renders at <see cref="F:PixlPunkt.UI.Voxel.VoxelWorkspaceControl._viewportWidth"/> × <see cref="F:PixlPunkt.UI.Voxel.VoxelWorkspaceControl._viewportHeight"/>.
             In pixel preview mode, renders at the volume's native resolution (e.g. 16×16)
             then nearest-neighbor upscales to the viewport size, preserving the crisp
             pixel-art aesthetic at any rotation.
             </remarks>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.FillClear(System.Byte[],System.Int32)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.FillClear(System.Byte[],System.Int32)">
             <summary>
             Fills the buffer with the clear color.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.StartAnimationLoop">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.StartAnimationLoop">
             <summary>
             Starts a render loop that ticks until the camera animation completes.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.TryRenderCachedPixelPreviewSprite(PixlPunkt.Core.Voxel.VoxelVolume,System.Int32,System.Int32,System.Byte[],System.UInt32,PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TryRenderCachedPixelPreviewSprite(PixlPunkt.Core.Voxel.VoxelVolume,System.Int32,System.Int32,System.Byte[],System.UInt32,PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions)">
             <summary>
             Pixel-preview zoom in PixZel feels stable because zooming mainly scales a low-res
             render, rather than re-rasterizing geometry at every zoom step. For free rotation
@@ -37272,7 +37535,7 @@
             reuse it while only zoom changes.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.TryRenderExactCardinalPixelPreview(PixlPunkt.Core.Voxel.VoxelVolume,System.Int32,System.Int32,System.Byte[],System.UInt32,PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TryRenderExactCardinalPixelPreview(PixlPunkt.Core.Voxel.VoxelVolume,System.Int32,System.Int32,System.Byte[],System.UInt32,PixlPunkt.Core.Voxel.VoxelRenderer.RenderOptions)">
             <summary>
             In pixel preview + snapped orthographic views, bypasses the triangle rasterizer and
             stamps an exact voxel-orthographic image into the low-res render target. This makes
@@ -37280,28 +37543,28 @@
             geometry on each step.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Voxel.VoxelPreviewWindow.TilePickerItem">
+        <member name="T:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TilePickerItem">
             <summary>
             Wrapper for ComboBox items that displays a tile thumbnail
             and holds a reference to the <see cref="T:PixlPunkt.Core.Tile.TileDefinition"/>.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.CreateTileThumbnail(PixlPunkt.Core.Tile.TileDefinition)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.CreateTileThumbnail(PixlPunkt.Core.Tile.TileDefinition)">
             <summary>
             Creates a <see cref="T:Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap"/> from a tile's BGRA pixel data.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.InitializeComponent">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.InitializeComponent">
             <summary>
             InitializeComponent()
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.Connect(System.Int32,System.Object)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.Connect(System.Int32,System.Object)">
             <summary>
             Connect()
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelPreviewWindow.GetBindingConnector(System.Int32,System.Object)">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.GetBindingConnector(System.Int32,System.Object)">
             <summary>
             GetBindingConnector(int connectionId, object target)
             </summary>

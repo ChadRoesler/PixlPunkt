@@ -32,6 +32,8 @@ namespace PixlPunkt.Core.Document
         public uint OutlineColor { get; set; } = 0xFF000000;
         public int OutlineSize { get; set; } = 1;
         public bool PixelPreviewEnabled { get; set; }
+        public bool PixelPreviewAntialiasEnabled { get; set; }
+        public float PixelPreviewAntialiasStrength { get; set; } = 0.35f;
         public int PixelBaseSize { get; set; } = 16;
         public bool BackdropGridEnabled { get; set; } = true;
 

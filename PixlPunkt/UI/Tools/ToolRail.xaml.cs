@@ -260,8 +260,8 @@ namespace PixlPunkt.UI.Tools
                 // Don't set Background - let it be transparent so parent background shows through
                 var grid = new Grid
                 {
-                    ColumnSpacing = 8,
-                    RowSpacing = 8
+                    ColumnSpacing = 6,
+                    RowSpacing = 6
                 };
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -347,14 +347,15 @@ namespace PixlPunkt.UI.Tools
             // Don't explicitly set Background - let ToggleButton use its default theme-aware styling
             var button = new ToggleButton
             {
-                Height = 32,
+                Height = 36,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(0),
+                Padding = new Thickness(2),
                 Tag = toolId,
                 Content = new FluentIcon
                 {
                     Icon = icon,
+                    FontSize = 22,
                     Style = (Style)Application.Current.Resources["ToolRailIcon"]
                 }
             };

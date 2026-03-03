@@ -48,7 +48,7 @@ namespace PixlPunkt.Core.Voxel
     ///   View cameras (orthographic):
     ///     Front : at +Z looking toward −Z  → sees X (col, flipped), Y (row, flipped)
     ///     Side  : at −X looking toward +X  → sees Z (col, flipped), Y (row, flipped)
-    ///     Top   : at +Y looking toward −Y  → sees X (col, flipped), Z (row, flipped)
+    ///     Top   : at +Y looking toward −Y  → sees X (col), Z (row, flipped)
     /// </code>
     /// <para>
     /// The <c>Flip</c> helper converts between screen coordinates (top-left origin)
@@ -195,11 +195,10 @@ namespace PixlPunkt.Core.Voxel
             {
                 for (int x = 0; x < size; x++)
                 {
-                    int xFlip = Flip(x, size);
                     for (int z = 0; z < size; z++)
                     {
                         int zFlip = Flip(z, size);
-                        var c = top.GetPixel(xFlip, zFlip);
+                        var c = top.GetPixel(x, zFlip);
                         if (c.A == 0) continue;
                         volume.SetVoxel(x, mid, Flip(z, size), c);
                     }
@@ -248,10 +247,10 @@ namespace PixlPunkt.Core.Voxel
                             if (s.A == 0) continue;
                         }
 
-                        // Top view → col = flipped x, row = flipped z
+                        // Top view → col = x, row = flipped z
                         if (top != null)
                         {
-                            t = top.GetPixel(xFlip, zFlip);
+                            t = top.GetPixel(x, zFlip);
                             if (t.A == 0) continue;
                         }
 
@@ -358,15 +357,15 @@ namespace PixlPunkt.Core.Voxel
                             side.SetPixel(z, yFlip, new Rgba32(c.R, c.G, c.B, 255));
                         }
 
-                        // ── Top: col = flipped x, row = flipped z ──
+                        // ── Top: col = x, row = flipped z ──
                         // Nearest to top camera (at +Y) = lowest y
                         // Uses Face.Bottom color (the face pointing toward −Y, facing the +Y camera)
-                        int pTop = Flip(x, size) + zFlip * size;
+                        int pTop = x + zFlip * size;
                         if (depthTop[pTop] < 0 || y < depthTop[pTop])
                         {
                             depthTop[pTop] = y;
                             var c = volume.GetFaceColor(x, y, z, Face.Bottom);
-                            top.SetPixel(Flip(x, size), zFlip, new Rgba32(c.R, c.G, c.B, 255));
+                            top.SetPixel(x, zFlip, new Rgba32(c.R, c.G, c.B, 255));
                         }
                     }
                 }
