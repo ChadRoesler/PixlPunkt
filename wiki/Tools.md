@@ -329,7 +329,25 @@ Select tile positions to create animation frames for tile-based sprite animation
 | `Shift + LMB drag` | Add to existing frames instead of replacing |
 | `RMB` | Sample tile (tile dropper) |
 
-See [[Tile Animation]] for complete documentation.
+See [[Tile Animation|Tile-Animation]] for complete documentation.
+
+---
+
+## Voxel Tools
+
+Voxel editing tools run inside the in-tab Voxel Workspace and are separate from the 2D canvas tool rail.
+
+Built-in voxel tools:
+- Face Paint
+- Face Dropper
+- Face Erase Override
+- Voxel Create
+- Voxel Delete
+- Voxel Select
+- Voxel Move
+- Lighting
+
+See [[Voxel Workspace|Voxel-Workspace]] for workspace flow and [[Voxel Tools|Voxel-Tools]] for per-tool behavior.
 
 ---
 
@@ -365,4 +383,6 @@ Sample colors from the canvas.
 
 - [[Gradient Fill|Gradient-Fill]] - Deep dive on the gradient fill tool
 - [[Brushes]] - Custom brush creation and management
+- [[Voxel Workspace|Voxel-Workspace]] - Build and edit voxel models from mapped tiles
+- [[Voxel Tools|Voxel-Tools]] - Voxel tool reference
 - [[Shortcuts]] - Complete keyboard reference

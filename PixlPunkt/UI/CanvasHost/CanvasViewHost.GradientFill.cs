@@ -101,18 +101,13 @@ namespace PixlPunkt.UI.CanvasHost
             if (_toolState == null) return;
 
             var settings = _toolState.GradientFill;
-            bool hasTileMapping = rl.TileMapping != null && Document.TileSet != null;
+            bool hasTileMapping = BeginTileWriteThroughIfMapped();
 
             // Get selection mask if any
             Func<int, int, bool>? selMask = null;
             if (_selectionEngine.HasActiveSelection)
             {
                 selMask = (x, y) => _selectionEngine.Sel.Mask.Contains(x, y);
-            }
-
-            if (hasTileMapping)
-            {
-                BeginLiveTilePropagation();
             }
 
             // Render the gradient
@@ -127,17 +122,7 @@ namespace PixlPunkt.UI.CanvasHost
             TileMappedPixelChangeItem? tileMappedItem = null;
             if (hasTileMapping)
             {
-                if (historyItem is PixelChangeItem gradientPixelItem)
-                {
-                    var bounds = gradientPixelItem.GetBoundingRect();
-                    if (bounds.HasValue)
-                    {
-                        var b = bounds.Value;
-                        PropagateLiveTileChanges(b.minX, b.minY, b.maxX, b.maxY);
-                    }
-                }
-
-                tileMappedItem = EndLiveTilePropagation(historyItem?.Description ?? "Gradient Fill");
+                tileMappedItem = FinalizeTileWriteThrough(historyItem, "Gradient Fill");
             }
 
             // Push to history

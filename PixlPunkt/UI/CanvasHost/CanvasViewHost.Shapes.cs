@@ -178,78 +178,28 @@ namespace PixlPunkt.UI.CanvasHost
                     : shapeReg.DisplayName
             };
 
-            // Check if shape overlaps any mapped tiles
-            var bounds = CreateRect(lx, ty, rx - lx + 1, by - ty + 1);
-            bool hasTileMapping = rl.TileMapping != null && Document.TileSet != null;
-            bool affectsTiles = false;
+            bool hasTileMapping = BeginTileWriteThroughIfMapped();
+            var result = shapeReg.EffectiveRenderer.Render(rl, points, context);
+            Core.History.TileMappedPixelChangeItem? tileMappedItem = null;
 
             if (hasTileMapping)
             {
-                // Check if the shape bounds intersect any mapped tiles
-                var mapping = rl.TileMapping!;
-                var tileSet = Document.TileSet!;
-                int tileW = tileSet.TileWidth;
-                int tileH = tileSet.TileHeight;
-
-                int startTileX = Math.Max(0, lx / tileW);
-                int startTileY = Math.Max(0, ty / tileH);
-                int endTileX = Math.Min(mapping.Width - 1, rx / tileW);
-                int endTileY = Math.Min(mapping.Height - 1, by / tileH);
-
-                for (int tileY = startTileY; tileY <= endTileY && !affectsTiles; tileY++)
-                {
-                    for (int tileX = startTileX; tileX <= endTileX && !affectsTiles; tileX++)
-                    {
-                        if (mapping.GetTileId(tileX, tileY) >= 0)
-                        {
-                            affectsTiles = true;
-                        }
-                    }
-                }
+                // Shape points can be expanded by brush footprint; use bounds fallback
+                // when a renderer does not provide PixelChangeItem bounds.
+                tileMappedItem = FinalizeTileWriteThrough(
+                    result,
+                    context.Description,
+                    (lx, ty, rx, by));
             }
 
-            if (affectsTiles)
+            if (tileMappedItem != null)
             {
-                // Capture tile states before rendering
-                var tileBeforeStates = new Dictionary<int, byte[]>();
-                var tileSet = Document.TileSet!;
-                foreach (var tileId in tileSet.TileIds)
-                {
-                    var pixels = tileSet.GetTilePixels(tileId);
-                    if (pixels != null)
-                    {
-                        tileBeforeStates[tileId] = (byte[])pixels.Clone();
-                    }
-                }
-
-                // Capture layer pixels before rendering
-                var pixelsBefore = CopyRectBytes(rl.Surface.Pixels, rl.Surface.Width, rl.Surface.Height, bounds);
-
-                // Render the shape
-                shapeReg.EffectiveRenderer.Render(rl, points, context);
-
-                // Capture layer pixels after rendering
-                var pixelsAfter = CopyRectBytes(rl.Surface.Pixels, rl.Surface.Width, rl.Surface.Height, bounds);
-
-                // Propagate to mapped tiles
-                PropagateSelectionChangesToMappedTiles(bounds);
-
-                // Create a tile-aware history item
-                var tileAwareItem = new Core.History.TileAwarePixelChangeItem(
-                    rl, tileSet, bounds, pixelsBefore, pixelsAfter, context.Description);
-
-                Document.History.Push(tileAwareItem);
+                tileMappedItem.HistoryIcon = result?.HistoryIcon ?? FluentIcons.Common.Icon.ShapeUnion;
+                Document.History.Push(tileMappedItem);
             }
-            else
+            else if (result is { CanPushToHistory: true } and Core.History.IHistoryItem historyItem)
             {
-                // No tiles affected - use standard rendering flow
-                var result = shapeReg.EffectiveRenderer.Render(rl, points, context);
-
-                // Push to unified history if result supports it
-                if (result is { CanPushToHistory: true } and Core.History.IHistoryItem historyItem)
-                {
-                    Document.History.Push(historyItem);
-                }
+                Document.History.Push(historyItem);
             }
 
             // Restore brush settings after shape drawing

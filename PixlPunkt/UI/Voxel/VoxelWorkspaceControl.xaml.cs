@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Text.Json;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -16,6 +18,7 @@ using Microsoft.UI.Xaml.Shapes;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
+using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Tile;
@@ -24,6 +27,7 @@ using PixlPunkt.Core.Voxel.Editing;
 using PixlPunkt.Core.Voxel.Tools;
 using PixlPunkt.PluginSdk.Voxel;
 using PixlPunkt.UI.Controls;
+using PixlPunkt.UI.Helpers;
 using PixlPunkt.UI.Voxel.Tools;
 using Windows.System;
 using Windows.Storage.Pickers;
@@ -69,11 +73,136 @@ namespace PixlPunkt.UI.Voxel
             LightHandle,
         }
 
+        private delegate bool TryGetPlaneColor(int u, int v, out uint color);
+
         private enum ToolPointerPhase
         {
             Pressed,
             Moved,
             Released,
+        }
+
+        private enum ModelMeshMode
+        {
+            MergeCoplanar = 0,
+            PerVoxel = 1,
+        }
+
+        private enum ModelAxisPreset
+        {
+            PixlPunkt = 0,
+            BlenderZUp = 1,
+        }
+
+        private enum ModelExportFormat
+        {
+            Obj = 0,
+            Glb = 1,
+            Stl = 2,
+            Vox = 3,
+        }
+
+        private enum ModelPivotPreset
+        {
+            Center = 0,
+            BottomCenter = 1,
+            Origin = 2,
+        }
+
+        private sealed record ViewportRenderOverrides
+        {
+            public bool? DrawOutline { get; init; }
+            public bool? DrawBackdropGrid { get; init; }
+            public bool? DrawBackdropProjectionTiles { get; init; }
+            public bool? DrawSurfaceVoxelGrid { get; init; }
+            public bool IncludeSelectionOverlay { get; init; } = true;
+            public uint? ClearColor { get; init; }
+        }
+
+        private readonly record struct VoxelImageExportOptions(
+            int Scale,
+            bool TransparentBackground,
+            bool IncludeOutline,
+            bool IncludeBackdropCage,
+            bool IncludeProjectionTiles,
+            bool IncludeModelGrid,
+            bool TrimTransparentBounds,
+            int TrimPadding,
+            bool BatchExportViews,
+            bool BatchIncludeCardinalViews,
+            bool BatchIncludeDirectionalViews);
+
+        private readonly record struct VoxelModelExportOptions(
+            ModelExportFormat Format,
+            ModelMeshMode MeshMode,
+            ModelAxisPreset AxisPreset,
+            float UnitScale,
+            ModelPivotPreset PivotPreset,
+            bool GlbDoubleSided);
+
+        private readonly record struct VoxelExportPreset(
+            VoxelImageExportOptions Image,
+            VoxelModelExportOptions Model);
+
+        private sealed class VoxelExportPresetFile
+        {
+            public int Version { get; set; } = 1;
+            public VoxelImageExportPresetFile? Image { get; set; }
+            public VoxelModelExportPresetFile? Model { get; set; }
+        }
+
+        private sealed class VoxelImageExportPresetFile
+        {
+            public int Scale { get; set; } = 1;
+            public bool TransparentBackground { get; set; }
+            public bool IncludeOutline { get; set; } = true;
+            public bool IncludeBackdropCage { get; set; } = true;
+            public bool IncludeProjectionTiles { get; set; } = true;
+            public bool IncludeModelGrid { get; set; }
+            public bool TrimTransparentBounds { get; set; }
+            public int TrimPadding { get; set; } = 1;
+            public bool BatchExportViews { get; set; }
+            public bool BatchIncludeCardinalViews { get; set; } = true;
+            public bool BatchIncludeDirectionalViews { get; set; } = true;
+        }
+
+        private sealed class VoxelModelExportPresetFile
+        {
+            public int Format { get; set; }
+            public int MeshMode { get; set; }
+            public int AxisPreset { get; set; }
+            public float UnitScale { get; set; } = 1f;
+            public int PivotPreset { get; set; }
+            public bool GlbDoubleSided { get; set; } = true;
+        }
+
+        private readonly record struct ExportFaceQuad(
+            Face Face,
+            int X,
+            int Y,
+            int Z,
+            int Width,
+            int Height,
+            uint ColorBgra);
+
+        private readonly record struct ExportTriangle(
+            Vector3 A,
+            Vector3 B,
+            Vector3 C,
+            Vector3 Normal,
+            uint ColorBgra);
+
+        private readonly record struct TransformedVoxelBounds(
+            int MinX,
+            int MinY,
+            int MinZ,
+            int MaxX,
+            int MaxY,
+            int MaxZ)
+        {
+            public int SizeX => (MaxX - MinX) + 1;
+            public int SizeY => (MaxY - MinY) + 1;
+            public int SizeZ => (MaxZ - MinZ) + 1;
         }
 
         private sealed class PixelPreviewSpriteCache
@@ -103,6 +232,13 @@ namespace PixlPunkt.UI.Voxel
             public bool LightCastShadows;
         }
 
+        private sealed class VoxelWorkspaceHistorySnapshot
+        {
+            public required VoxelModelDocumentState Model;
+            public required Int3[] Selection;
+            public required VoxelFaceColorOverride[] FaceOverrides;
+        }
+
         private readonly CanvasDocument _document;
         private readonly PaletteService? _palette;
         private readonly VoxelToolState _voxelToolState;
@@ -120,6 +256,7 @@ namespace PixlPunkt.UI.Voxel
         private VoxelVolume? _lastVolume;
         private byte[]? _renderBuffer;
         private byte[]? _pixelPreviewAaBuffer;
+        private byte[]? _displayBuffer;
         private WriteableBitmap? _viewportBitmap;
         private int _viewportWidth = 512;
         private int _viewportHeight = 512;
@@ -150,10 +287,31 @@ namespace PixlPunkt.UI.Voxel
         private VoxelLightingSettings? _pendingLightingHistoryAfter;
         private bool _suppressLightingHistoryRecording;
         private int _lastKnownTileSetCount = -1;
+        private int _lastImageExportScale = 1;
+        private bool _lastImageExportTransparentBackground;
+        private bool _lastImageExportIncludeOutline;
+        private bool _lastImageExportIncludeBackdropCage = true;
+        private bool _lastImageExportIncludeProjectionTiles = true;
+        private bool _lastImageExportIncludeModelGrid;
+        private bool _lastImageExportTrimTransparentBounds = true;
+        private int _lastImageExportTrimPadding = 1;
+        private bool _lastImageExportBatchViews;
+        private bool _lastImageExportBatchCardinalViews = true;
+        private bool _lastImageExportBatchDirectionalViews = true;
+        private ModelExportFormat _lastModelExportFormat = ModelExportFormat.Obj;
+        private ModelMeshMode _lastModelExportMeshMode = ModelMeshMode.MergeCoplanar;
+        private ModelAxisPreset _lastModelExportAxisPreset = ModelAxisPreset.PixlPunkt;
+        private float _lastModelExportUnitScale = 1f;
+        private ModelPivotPreset _lastModelExportPivotPreset = ModelPivotPreset.Center;
+        private bool _lastModelExportGlbDoubleSided = true;
+
+        private static readonly string[] BatchCardinalViewNames = { "front", "back", "left", "right", "top", "bottom" };
+        private static readonly string[] BatchDirectionalViewNames = { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" };
 
         // Background color (dark gray, BGRA packed)
         private const uint ClearColor = 0xFF1E1E1E;
         private const float LightHandleHitRadiusDip = 16f;
+        private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
         private sealed class WorkspaceVoxelToolContext : IVoxelToolContext
         {
@@ -357,7 +515,7 @@ namespace PixlPunkt.UI.Voxel
                 _lastVolume = modelVolume;
                 RefreshOccupiedBoundsCache();
                 _camera.ConfigureForVolume(modelVolume.Size);
-                ExportButton.IsEnabled = modelVolume.OccupiedCount > 0;
+                SetExportButtonsEnabled(modelVolume.OccupiedCount > 0);
                 RenderViewport();
             }
             else
@@ -632,8 +790,10 @@ namespace PixlPunkt.UI.Voxel
             if (_suppressEditEngineModelSync)
                 return;
 
+            _cachedCardinalPixelPreviewImages = null;
+            _pixelPreviewSpriteCache = null;
             SyncPreviewVolumeFromCanonicalModel();
-            ExportButton.IsEnabled = _lastVolume != null && _lastVolume.OccupiedCount > 0;
+            SetExportButtonsEnabled(_lastVolume != null && _lastVolume.OccupiedCount > 0);
             RenderViewport();
         }
 
@@ -1142,7 +1302,7 @@ namespace PixlPunkt.UI.Voxel
                     _editEngine.Selection.Clear();
                     _cachedCardinalPixelPreviewImages = null;
                     _pixelPreviewSpriteCache = null;
-                    ExportButton.IsEnabled = false;
+                    SetExportButtonsEnabled(false);
                     UpdateVoxelSelectionStatusText();
                     RenderViewport();
                     return;
@@ -1182,7 +1342,7 @@ namespace PixlPunkt.UI.Voxel
                 _camera.ConfigureForVolume(volume.Size);
                 _editEngine.Selection.Clear();
 
-                ExportButton.IsEnabled = volume.OccupiedCount > 0;
+                SetExportButtonsEnabled(volume.OccupiedCount > 0);
 
                 LoggingService.Info("Voxel built: {Occupied} occupied",
                     volume.OccupiedCount);
@@ -1408,6 +1568,55 @@ namespace PixlPunkt.UI.Voxel
                 BuildAndRender();
             else
                 RenderViewport();
+        }
+
+        private VoxelWorkspaceHistorySnapshot CaptureWorkspaceHistorySnapshot()
+        {
+            var overrides = _document.VoxelPreviewState.FaceColorOverrides;
+            var clonedOverrides = new VoxelFaceColorOverride[overrides.Count];
+            for (int i = 0; i < overrides.Count; i++)
+            {
+                var o = overrides[i];
+                clonedOverrides[i] = new VoxelFaceColorOverride(o.X, o.Y, o.Z, o.Face, o.ColorBgra);
+            }
+
+            return new VoxelWorkspaceHistorySnapshot
+            {
+                Model = _document.VoxelModel.Clone(),
+                Selection = _editEngine.Selection.ToArray(),
+                FaceOverrides = clonedOverrides,
+            };
+        }
+
+        private void RestoreWorkspaceHistorySnapshot(VoxelWorkspaceHistorySnapshot snapshot)
+        {
+            _suppressEditEngineModelSync = true;
+            try
+            {
+                _document.VoxelModel.CopyFrom(snapshot.Model);
+                _editEngine.Selection.ReplaceAll(snapshot.Selection);
+
+                var state = _document.VoxelPreviewState;
+                state.ClearFaceColorOverrides();
+                state.HasState = true;
+                for (int i = 0; i < snapshot.FaceOverrides.Length; i++)
+                {
+                    var o = snapshot.FaceOverrides[i];
+                    state.FaceColorOverrides.Add(new VoxelFaceColorOverride(o.X, o.Y, o.Z, o.Face, o.ColorBgra));
+                }
+            }
+            finally
+            {
+                _suppressEditEngineModelSync = false;
+            }
+
+            _cachedCardinalPixelPreviewImages = null;
+            _pixelPreviewSpriteCache = null;
+            SyncPreviewVolumeFromCanonicalModel();
+            SetExportButtonsEnabled(_lastVolume != null && _lastVolume.OccupiedCount > 0);
+            UpdateVoxelSelectionStatusText();
+            PersistVoxelPreviewStateToDocument();
+            RenderViewport();
         }
 
         private static Rgba32 RgbaFromPackedBgra(uint bgra)
@@ -1871,16 +2080,71 @@ namespace PixlPunkt.UI.Voxel
         private void SetFaceColorFromTool(int x, int y, int z, VoxelFace face, uint bgra)
         {
             var coreFace = ToCoreFace(face);
-            if (_editEngine.SetFaceColor(x, y, z, coreFace, bgra))
+            var state = _document.VoxelPreviewState;
+            bool hadOverrideBefore = state.TryGetFaceColorOverride(x, y, z, coreFace, out uint beforeOverrideColor);
+            bool openedTransaction = !_editEngine.History.IsTransactionOpen;
+
+            if (openedTransaction)
+                _editEngine.BeginHistoryTransaction("Voxel Face Color");
+
+            try
             {
-                _document.VoxelPreviewState.HasState = true;
-                _document.VoxelPreviewState.SetFaceColorOverride(x, y, z, coreFace, bgra);
+                if (!_editEngine.SetFaceColor(x, y, z, coreFace, bgra))
+                {
+                    if (openedTransaction)
+                        _editEngine.CancelHistoryTransaction();
+                    return;
+                }
+
+                state.HasState = true;
+                state.SetFaceColorOverride(x, y, z, coreFace, bgra);
+
+                _editEngine.History.Push(new VoxelCommandHistory.DelegateCommand(
+                    "Voxel Face Override",
+                    undo: () =>
+                    {
+                        if (hadOverrideBefore)
+                            state.SetFaceColorOverride(x, y, z, coreFace, beforeOverrideColor);
+                        else
+                            state.RemoveFaceColorOverride(x, y, z, coreFace);
+
+                        PersistVoxelPreviewStateToDocument();
+                    },
+                    redo: () =>
+                    {
+                        state.SetFaceColorOverride(x, y, z, coreFace, bgra);
+                        PersistVoxelPreviewStateToDocument();
+                    }));
+
                 _document.VoxelModel.SourceKind = VoxelModelSourceKind.Hybrid;
+                PersistVoxelPreviewStateToDocument();
+                if (openedTransaction)
+                    _editEngine.CommitHistoryTransaction();
+            }
+            catch
+            {
+                if (openedTransaction)
+                    _editEngine.CancelHistoryTransaction();
+                throw;
             }
         }
 
         private void ClearFaceColorOverrideFromTool(int x, int y, int z, VoxelFace face)
-            => ClearManualFaceColorOverride(x, y, z, ToCoreFace(face));
+        {
+            var coreFace = ToCoreFace(face);
+            var state = _document.VoxelPreviewState;
+            if (!state.TryGetFaceColorOverride(x, y, z, coreFace, out _))
+                return;
+
+            var before = CaptureWorkspaceHistorySnapshot();
+            ClearManualFaceColorOverride(x, y, z, coreFace);
+            var after = CaptureWorkspaceHistorySnapshot();
+
+            _editEngine.History.Push(new VoxelCommandHistory.DelegateCommand(
+                "Erase Face Override",
+                undo: () => RestoreWorkspaceHistorySnapshot(before),
+                redo: () => RestoreWorkspaceHistorySnapshot(after)));
+        }
 
         private void SetVoxelFromTool(int x, int y, int z, uint colorBgra)
         {
@@ -2035,7 +2299,10 @@ namespace PixlPunkt.UI.Voxel
         /// then nearest-neighbor upscales to the viewport size, preserving the crisp
         /// pixel-art aesthetic at any rotation.
         /// </remarks>
-        private void RenderViewport()
+        private void RenderViewport(
+            ViewportRenderOverrides? renderOverrides = null,
+            bool presentOnViewport = true,
+            Action<byte[], int, int>? renderedBufferSink = null)
         {
             try
             {
@@ -2047,6 +2314,12 @@ namespace PixlPunkt.UI.Voxel
                 bool pixelMode = PixelPreviewCheckBox?.IsChecked == true && _lastVolume != null;
                 bool pixelPreviewAntialias = pixelMode && PixelPreviewAntialiasCheckBox?.IsChecked == true;
                 float pixelPreviewAaStrength = Math.Clamp((float)(PixelPreviewAaStrengthSlider?.Value ?? 0.35d), 0f, 1f);
+                bool drawOutline = renderOverrides?.DrawOutline ?? (OutlineCheckBox?.IsChecked == true);
+                bool drawBackdropGrid = renderOverrides?.DrawBackdropGrid ?? (BackdropGridCheckBox?.IsChecked != false);
+                bool drawBackdropProjectionTiles = renderOverrides?.DrawBackdropProjectionTiles ?? (BackdropProjectionTilesCheckBox?.IsChecked == true);
+                bool drawSurfaceVoxelGridUi = renderOverrides?.DrawSurfaceVoxelGrid ?? (SurfaceVoxelGridCheckBox?.IsChecked == true);
+                bool includeSelectionOverlay = renderOverrides?.IncludeSelectionOverlay ?? true;
+                uint clearColor = renderOverrides?.ClearColor ?? ClearColor;
                 int renderW, renderH;
                 int displayW = _viewportWidth;
                 int displayH = _viewportHeight;
@@ -2105,9 +2378,11 @@ namespace PixlPunkt.UI.Voxel
                 }
 
                 bool renderedExactCardinal = false;
+                bool drawSurfaceVoxelGrid = !pixelMode && (SurfaceVoxelGridCheckBox?.IsChecked == true);
                 if (_lastVolume != null && _lastVolume.OccupiedCount > 0)
                 {
                     EnsureRecommendedLightingDefaultsForCurrentVolume();
+                    drawSurfaceVoxelGrid = !pixelMode && drawSurfaceVoxelGridUi;
 
                     int outlineVoxelSize = Math.Max(1, (int)Math.Round(OutlineSizeBox?.Value ?? 1d));
                     int outlineRenderSize = outlineVoxelSize;
@@ -2141,8 +2416,8 @@ namespace PixlPunkt.UI.Voxel
                         LightCastShadows = ws?.LightCastShadows ?? false,
                         // In pixel preview we draw the backing grid as a separate 2D pass
                         // so it does not change the voxel rasterization path.
-                        DrawBackdropGrid = !pixelMode && (BackdropGridCheckBox?.IsChecked != false),
-                        DrawBackdropProjectionTiles = !pixelMode && (BackdropProjectionTilesCheckBox?.IsChecked == true),
+                        DrawBackdropGrid = !pixelMode && drawBackdropGrid,
+                        DrawBackdropProjectionTiles = !pixelMode && drawBackdropProjectionTiles,
                         BackdropCageScale = Math.Clamp((float)(BackdropCageScaleBox?.Value ?? ws?.BackdropCageScale ?? 1.6d), 1.05f, 4f),
                         BackdropFrontProjection = _backdropFrontProjectionImage,
                         BackdropBackProjection = _backdropBackProjectionImage,
@@ -2150,8 +2425,8 @@ namespace PixlPunkt.UI.Voxel
                         BackdropRightProjection = _backdropRightProjectionImage,
                         BackdropTopProjection = _backdropTopProjectionImage,
                         BackdropBottomProjection = _backdropBottomProjectionImage,
-                        DrawSurfaceVoxelGrid = SurfaceVoxelGridCheckBox?.IsChecked == true,
-                        DrawOutline = OutlineCheckBox?.IsChecked == true,
+                        DrawSurfaceVoxelGrid = drawSurfaceVoxelGrid,
+                        DrawOutline = drawOutline,
                         OutlineColor = OutlineColorSwatch.Color,
                         OutlineSize = outlineRenderSize,
                     };
@@ -2160,12 +2435,12 @@ namespace PixlPunkt.UI.Voxel
                     if (pixelMode)
                     {
                         renderedExactCardinal = TryRenderExactCardinalPixelPreview(
-                            _lastVolume, renderW, renderH, _renderBuffer, ClearColor, opts);
+                            _lastVolume, renderW, renderH, _renderBuffer, clearColor, opts);
 
                         if (!renderedExactCardinal)
                         {
                             renderedFromPixelSpriteCache = TryRenderCachedPixelPreviewSprite(
-                                _lastVolume, renderW, renderH, _renderBuffer, ClearColor, opts);
+                                _lastVolume, renderW, renderH, _renderBuffer, clearColor, opts);
                         }
                     }
 
@@ -2175,12 +2450,12 @@ namespace PixlPunkt.UI.Voxel
                             _lastVolume, _camera,
                             renderW, renderH,
                             _renderBuffer,
-                            ClearColor, opts);
+                            clearColor, opts);
                     }
                 }
                 else
                 {
-                    FillClear(_renderBuffer, pixelCount);
+                    FillClear(_renderBuffer, pixelCount, clearColor);
                 }
 
                 byte[] renderSource = _renderBuffer;
@@ -2200,10 +2475,11 @@ namespace PixlPunkt.UI.Voxel
                     // screenPixelSize × screenPixelSize screen pixels — no distortion
                     displayW = renderW * screenPixelSize;
                     displayH = renderH * screenPixelSize;
-                    displayBuffer = new byte[displayW * displayH * 4];
-                    FillClear(displayBuffer, displayW * displayH);
+                    EnsureDisplayBuffer(displayW * displayH * 4);
+                    displayBuffer = _displayBuffer!;
+                    FillClear(displayBuffer, displayW * displayH, clearColor);
 
-                    if (BackdropGridCheckBox?.IsChecked != false && _lastVolume != null)
+                    if (drawBackdropGrid && _lastVolume != null)
                     {
                         float cageScale = Math.Clamp((float)(BackdropCageScaleBox?.Value ?? _document.VoxelWorkspace.BackdropCageScale), 1.05f, 4f);
                         DrawPixelPreviewBackdropCage3D(
@@ -2220,7 +2496,7 @@ namespace PixlPunkt.UI.Voxel
 
                     if (renderedExactCardinal &&
                         screenPixelSize > 1 &&
-                        SurfaceVoxelGridCheckBox?.IsChecked == true)
+                        drawSurfaceVoxelGrid)
                     {
                         DrawExactCardinalPixelPreviewSurfaceGrid(
                             _renderBuffer, renderW, renderH,
@@ -2236,17 +2512,31 @@ namespace PixlPunkt.UI.Voxel
                     displayBuffer = renderSource;
                 }
 
-                OverlaySelectionHighlight(
-                    displayBuffer,
-                    displayW,
-                    displayH,
-                    renderW,
-                    renderH,
-                    pixelMode,
-                    screenPixelSize);
+                if (includeSelectionOverlay)
+                {
+                    OverlaySelectionHighlight(
+                        displayBuffer,
+                        displayW,
+                        displayH,
+                        renderW,
+                        renderH,
+                        pixelMode,
+                        screenPixelSize);
+                }
+
+                renderedBufferSink?.Invoke(displayBuffer, displayW, displayH);
+
+                if (!presentOnViewport)
+                    return;
 
                 // Push to WriteableBitmap
-                _viewportBitmap = new WriteableBitmap(displayW, displayH);
+                if (_viewportBitmap == null ||
+                    _viewportBitmap.PixelWidth != displayW ||
+                    _viewportBitmap.PixelHeight != displayH)
+                {
+                    _viewportBitmap = new WriteableBitmap(displayW, displayH);
+                }
+
                 using var stream = _viewportBitmap.PixelBuffer.AsStream();
                 stream.Seek(0, SeekOrigin.Begin);
                 stream.Write(displayBuffer, 0, displayW * displayH * 4);
@@ -2269,6 +2559,14 @@ namespace PixlPunkt.UI.Voxel
             if (_pixelPreviewAaBuffer == null || _pixelPreviewAaBuffer.Length != byteLength)
             {
                 _pixelPreviewAaBuffer = new byte[byteLength];
+            }
+        }
+
+        private void EnsureDisplayBuffer(int byteLength)
+        {
+            if (_displayBuffer == null || _displayBuffer.Length != byteLength)
+            {
+                _displayBuffer = new byte[byteLength];
             }
         }
 
@@ -2609,12 +2907,12 @@ namespace PixlPunkt.UI.Voxel
         /// <summary>
         /// Fills the buffer with the clear color.
         /// </summary>
-        private static void FillClear(byte[] buffer, int pixelCount)
+        private static void FillClear(byte[] buffer, int pixelCount, uint clearColor)
         {
-            byte b = (byte)(ClearColor & 0xFF);
-            byte g = (byte)((ClearColor >> 8) & 0xFF);
-            byte r = (byte)((ClearColor >> 16) & 0xFF);
-            byte a = (byte)((ClearColor >> 24) & 0xFF);
+            byte b = (byte)(clearColor & 0xFF);
+            byte g = (byte)((clearColor >> 8) & 0xFF);
+            byte r = (byte)((clearColor >> 16) & 0xFF);
+            byte a = (byte)((clearColor >> 24) & 0xFF);
 
             for (int i = 0; i < pixelCount; i++)
             {
@@ -3012,7 +3310,7 @@ namespace PixlPunkt.UI.Voxel
                 case FacePainterMode.Paint:
                 {
                     uint color = _palette?.Foreground ?? 0xFF000000;
-                    SetManualFaceColorOverride(picked.X, picked.Y, picked.Z, picked.Face, color);
+                    SetFaceColorFromTool(picked.X, picked.Y, picked.Z, ToVoxelFace(picked.Face), color);
                     break;
                 }
 
@@ -3026,7 +3324,7 @@ namespace PixlPunkt.UI.Voxel
 
                 case FacePainterMode.EraseOverride:
                 {
-                    ClearManualFaceColorOverride(picked.X, picked.Y, picked.Z, picked.Face);
+                    ClearFaceColorOverrideFromTool(picked.X, picked.Y, picked.Z, ToVoxelFace(picked.Face));
                     break;
                 }
             }
@@ -4133,7 +4431,7 @@ namespace PixlPunkt.UI.Voxel
             _camera.EnablePixelPerfectFrustum(renderW, renderH);
             _camera.ResizeViewport(renderW, renderH);
 
-            FillClear(buffer, renderW * renderH);
+            FillClear(buffer, renderW * renderH, clearColor);
             BlitCenteredOpaqueOverBackground(
                 _pixelPreviewSpriteCache.Buffer,
                 _pixelPreviewSpriteCache.Width, _pixelPreviewSpriteCache.Height,
@@ -4286,7 +4584,6 @@ namespace PixlPunkt.UI.Voxel
             VoxelRenderer.RenderOptions opts)
         {
             if (volume == null) return false;
-            if (opts.LightingEnabled) return false;
             if (_camera.IsAnimating) return false;
 
             string? snap = _camera.CurrentSnapName;
@@ -4298,7 +4595,10 @@ namespace PixlPunkt.UI.Voxel
             if (!TryGetCachedCardinalPixelPreviewImage(volume, snap, out var img, out var visibleFace))
                 return false;
 
-            FillClear(buffer, renderW * renderH);
+            // Keep cardinal pixel-preview on the exact image path even with lighting enabled.
+            // This avoids low-res triangle-raster cracks when lighting is toggled on.
+
+            FillClear(buffer, renderW * renderH, clearColor);
 
             int size = img.Width;
             int startX = (renderW - size) / 2;
@@ -5067,53 +5367,63 @@ namespace PixlPunkt.UI.Voxel
         // EXPORT
         // ════════════════════════════════════════════════════════════════════
 
+        private void SetExportButtonsEnabled(bool enabled)
+        {
+            if (ExportButton != null)
+                ExportButton.IsEnabled = enabled;
+            if (ExportModelButton != null)
+                ExportModelButton.IsEnabled = enabled;
+        }
+
         private async void ExportButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_renderBuffer == null || _lastVolume == null || _lastVolume.OccupiedCount == 0) return;
+            if (_lastVolume == null || _lastVolume.OccupiedCount == 0) return;
 
             try
             {
-                var savePicker = new FileSavePicker();
-                WinRT.Interop.InitializeWithWindow.Initialize(
-                    savePicker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+                var options = await PromptImageExportOptionsAsync();
+                if (options is null)
+                    return;
+
+                var ownerWindow = App.PixlPunktMainWindow;
+                if (ownerWindow == null)
+                    return;
+
+                if (options.Value.BatchExportViews)
+                {
+                    await ExportImageBatchAsync(ownerWindow, options.Value);
+                    return;
+                }
+
+                if (!TryBuildImageExportBuffer(options.Value, out var exportBuffer, out int exportWidth, out int exportHeight))
+                    return;
+
+                var savePicker = WindowHost.CreateFileSavePicker(ownerWindow, "voxel_preview", ".png");
                 savePicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-                savePicker.SuggestedFileName = "voxel_preview";
-                savePicker.FileTypeChoices.Add("PNG Image", new[] { ".png" });
-                savePicker.DefaultFileExtension = ".png";
+                WindowHost.TrySetDefaultFileExtension(savePicker, ".png");
 
                 var file = await savePicker.PickSaveFileAsync();
                 if (file == null) return;
 
-                // Render at current viewport size
-                _camera.DisablePixelPerfectFrustum();
-                _camera.ResizeViewport(_viewportWidth, _viewportHeight);
-                var exportBuffer = new byte[_viewportWidth * _viewportHeight * 4];
-                VoxelRenderer.Render(
-                    _lastVolume, _camera,
-                    _viewportWidth, _viewportHeight,
-                    exportBuffer, ClearColor);
-
-                // Encode to PNG via WriteableBitmap
-                var bmp = new WriteableBitmap(_viewportWidth, _viewportHeight);
-                using (var stream = bmp.PixelBuffer.AsStream())
+                if (!string.IsNullOrWhiteSpace(file.Path))
                 {
-                    stream.Seek(0, SeekOrigin.Begin);
-                    stream.Write(exportBuffer, 0, exportBuffer.Length);
+                    await SaveBgraPngAsync(file.Path, exportWidth, exportHeight, exportBuffer, options.Value.TransparentBackground);
                 }
-
-                // Save using the existing image export pipeline
-                var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
-                    Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId,
-                    await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite));
-
-                encoder.SetPixelData(
-                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                    Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
-                    (uint)_viewportWidth, (uint)_viewportHeight,
-                    96, 96,
-                    exportBuffer);
-
-                await encoder.FlushAsync();
+                else
+                {
+                    using var outStream = await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite);
+                    var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
+                        Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, outStream);
+                    encoder.SetPixelData(
+                        Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
+                        options.Value.TransparentBackground
+                            ? Windows.Graphics.Imaging.BitmapAlphaMode.Straight
+                            : Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
+                        (uint)exportWidth, (uint)exportHeight,
+                        96, 96,
+                        exportBuffer);
+                    await encoder.FlushAsync();
+                }
 
                 LoggingService.Info("Voxel exported to {Path}", file.Path);
             }
@@ -5122,6 +5432,2040 @@ namespace PixlPunkt.UI.Voxel
                 LoggingService.Error("Voxel export failed", ex);
             }
         }
+
+        private async void ExportModelButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_lastVolume == null || _lastVolume.OccupiedCount == 0)
+                return;
+
+            try
+            {
+                var options = await PromptModelExportOptionsAsync();
+                if (options is null)
+                    return;
+
+                if (options.Value.Format == ModelExportFormat.Vox)
+                {
+                    var bounds = ComputeTransformedVoxelBounds(_lastVolume, options.Value.AxisPreset);
+                    if (bounds.HasValue)
+                    {
+                        var b = bounds.Value;
+                        if (b.SizeX > 255 || b.SizeY > 255 || b.SizeZ > 255)
+                        {
+                            var owner = App.PixlPunktMainWindow;
+                            if (owner != null)
+                            {
+                                var warn = new ContentDialog
+                                {
+                                    XamlRoot = XamlRoot,
+                                    Title = "VOX Export Limit",
+                                    PrimaryButtonText = "OK",
+                                    DefaultButton = ContentDialogButton.Primary,
+                                    Content = $"VOX supports up to 255 units per axis. Current transformed size is {b.SizeX}x{b.SizeY}x{b.SizeZ}.",
+                                };
+                                await warn.ShowAsync();
+                            }
+
+                            return;
+                        }
+                    }
+                }
+
+                var ownerWindow = App.PixlPunktMainWindow;
+                if (ownerWindow == null)
+                    return;
+
+                var extension = GetModelExportPrimaryExtension(options.Value.Format);
+                var savePicker = WindowHost.CreateFileSavePicker(ownerWindow, "voxel_model", extension);
+                savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+                WindowHost.TrySetDefaultFileExtension(savePicker, extension);
+
+                var outputFile = await savePicker.PickSaveFileAsync();
+                if (outputFile == null)
+                    return;
+
+                var outputPath = outputFile.Path;
+                if (string.IsNullOrWhiteSpace(outputPath))
+                    return;
+
+                var folder = System.IO.Path.GetDirectoryName(outputPath);
+                if (string.IsNullOrWhiteSpace(folder))
+                    return;
+
+                var baseName = System.IO.Path.GetFileNameWithoutExtension(outputPath);
+                if (string.IsNullOrWhiteSpace(baseName))
+                    baseName = "voxel_model";
+
+                switch (options.Value.Format)
+                {
+                    case ModelExportFormat.Glb:
+                    {
+                        var glbBytes = await BuildGlbExportAsync(_lastVolume, options.Value);
+                        await System.IO.File.WriteAllBytesAsync(outputPath, glbBytes);
+                        break;
+                    }
+                    case ModelExportFormat.Stl:
+                    {
+                        var stlBytes = BuildStlExport(_lastVolume, options.Value);
+                        await System.IO.File.WriteAllBytesAsync(outputPath, stlBytes);
+                        break;
+                    }
+                    case ModelExportFormat.Vox:
+                    {
+                        var voxBytes = BuildVoxExport(_lastVolume, options.Value);
+                        await System.IO.File.WriteAllBytesAsync(outputPath, voxBytes);
+                        break;
+                    }
+                    default:
+                    {
+                        // Keep external references OBJ/MTL-friendly (avoid spaces and odd tokens that some importers misread).
+                        var refBaseName = SanitizeFileName(baseName).Replace(' ', '_');
+                        if (string.IsNullOrWhiteSpace(refBaseName))
+                            refBaseName = "voxel_model";
+
+                        var mtlFileName = $"{refBaseName}.mtl";
+                        var textureFileName = $"{refBaseName}.png";
+                        var mtlPath = System.IO.Path.Combine(folder, mtlFileName);
+                        var texturePath = System.IO.Path.Combine(folder, textureFileName);
+
+                        var export = BuildObjExport(_lastVolume, mtlFileName, textureFileName, options.Value);
+
+                        await System.IO.File.WriteAllTextAsync(outputPath, export.ObjText, Utf8NoBom);
+                        await System.IO.File.WriteAllTextAsync(mtlPath, export.MtlText, Utf8NoBom);
+                        await SaveBgraTextureToPngAsync(texturePath, export.TextureWidth, export.TextureHeight, export.TexturePixelsBgra);
+                        break;
+                    }
+                }
+
+                LoggingService.Info("Voxel model exported to {Path} as {Format}", outputPath, options.Value.Format);
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Error("Voxel model export failed", ex);
+            }
+        }
+
+        private async Task ExportImageBatchAsync(Window ownerWindow, VoxelImageExportOptions options)
+        {
+            var folderPicker = WindowHost.CreateFolderPicker(ownerWindow, PickerLocationId.PicturesLibrary);
+            var folder = await folderPicker.PickSingleFolderAsync();
+            if (folder == null || string.IsNullOrWhiteSpace(folder.Path))
+                return;
+
+            var views = new List<string>(16);
+            if (options.BatchIncludeCardinalViews)
+                views.AddRange(BatchCardinalViewNames);
+            if (options.BatchIncludeDirectionalViews)
+                views.AddRange(BatchDirectionalViewNames);
+            if (views.Count == 0)
+                return;
+
+            float oldPitch = _camera.Pitch;
+            float oldYaw = _camera.Yaw;
+            float oldZoom = _camera.ZoomPercent;
+            string? oldSnap = _camera.CurrentSnapName;
+
+            string rawBaseName = string.IsNullOrWhiteSpace(_document.Name) ? "voxel_preview" : _document.Name;
+            string safeBaseName = SanitizeFileName(rawBaseName);
+
+            try
+            {
+                foreach (var view in views)
+                {
+                    _camera.SetView(view, animated: false);
+                    _camera.SetZoomPercent(oldZoom);
+
+                    if (!TryBuildImageExportBuffer(options, out var exportBuffer, out int exportWidth, out int exportHeight))
+                        continue;
+
+                    string safeView = SanitizeFileName(view);
+                    string fileName = $"{safeBaseName}_{safeView}.png";
+                    string path = System.IO.Path.Combine(folder.Path, fileName);
+                    await SaveBgraPngAsync(path, exportWidth, exportHeight, exportBuffer, options.TransparentBackground);
+                }
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(oldSnap))
+                    _camera.SetView(oldSnap, animated: false);
+                else
+                    _camera.SetOrientation(oldPitch, oldYaw, allowSnap: false);
+
+                _camera.SetZoomPercent(oldZoom);
+                RenderViewport();
+            }
+        }
+
+        private bool TryBuildImageExportBuffer(
+            VoxelImageExportOptions options,
+            out byte[] exportBuffer,
+            out int exportWidth,
+            out int exportHeight)
+        {
+            exportBuffer = Array.Empty<byte>();
+            exportWidth = 0;
+            exportHeight = 0;
+
+            byte[]? rendered = null;
+            int renderedW = 0;
+            int renderedH = 0;
+            uint exportClearColor = options.TransparentBackground ? 0x00000000u : ClearColor;
+
+            RenderViewport(
+                new ViewportRenderOverrides
+                {
+                    DrawOutline = options.IncludeOutline,
+                    DrawBackdropGrid = options.IncludeBackdropCage,
+                    DrawBackdropProjectionTiles = options.IncludeProjectionTiles,
+                    DrawSurfaceVoxelGrid = options.IncludeModelGrid,
+                    IncludeSelectionOverlay = false,
+                    ClearColor = exportClearColor,
+                },
+                presentOnViewport: false,
+                renderedBufferSink: (buffer, w, h) =>
+                {
+                    renderedW = w;
+                    renderedH = h;
+                    rendered = new byte[w * h * 4];
+                    Buffer.BlockCopy(buffer, 0, rendered, 0, rendered.Length);
+                });
+
+            if (rendered == null || renderedW <= 0 || renderedH <= 0)
+                return false;
+
+            int scale = Math.Max(1, options.Scale);
+            if (scale == 1)
+            {
+                exportBuffer = rendered;
+                exportWidth = renderedW;
+                exportHeight = renderedH;
+            }
+            else
+            {
+                exportWidth = renderedW * scale;
+                exportHeight = renderedH * scale;
+                exportBuffer = new byte[exportWidth * exportHeight * 4];
+                UpscaleNearestBgra(rendered, renderedW, renderedH, exportBuffer, exportWidth, exportHeight, scale);
+            }
+
+            if (options.TransparentBackground && options.TrimTransparentBounds)
+            {
+                TrimTransparentBoundsBgra(
+                    exportBuffer,
+                    exportWidth,
+                    exportHeight,
+                    Math.Clamp(options.TrimPadding, 0, 128),
+                    out var trimmedBuffer,
+                    out var trimmedWidth,
+                    out var trimmedHeight);
+                exportBuffer = trimmedBuffer;
+                exportWidth = trimmedWidth;
+                exportHeight = trimmedHeight;
+            }
+
+            return true;
+        }
+
+        private async Task<VoxelImageExportOptions?> PromptImageExportOptionsAsync()
+        {
+            var defaults = GetImageExportDefaultsFromLastOrUi();
+            int defaultScale = Math.Clamp(defaults.Scale, 1, 64);
+            bool useCustomScale = defaultScale != 1 && defaultScale != 2 && defaultScale != 4;
+
+            var scaleModeCombo = new ComboBox
+            {
+                MinWidth = 170,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            scaleModeCombo.Items.Add(new ComboBoxItem { Content = "1x", Tag = 1 });
+            scaleModeCombo.Items.Add(new ComboBoxItem { Content = "2x", Tag = 2 });
+            scaleModeCombo.Items.Add(new ComboBoxItem { Content = "4x", Tag = 4 });
+            scaleModeCombo.Items.Add(new ComboBoxItem { Content = "Custom", Tag = 0 });
+            scaleModeCombo.SelectedIndex = useCustomScale
+                ? 3
+                : (defaultScale == 2 ? 1 : (defaultScale == 4 ? 2 : 0));
+
+            var customScaleBox = new NumberBox
+            {
+                Minimum = 1,
+                Maximum = 64,
+                Value = defaultScale,
+                Width = 110,
+                IsEnabled = useCustomScale,
+                HorizontalAlignment = HorizontalAlignment.Left,
+            };
+            scaleModeCombo.SelectionChanged += (_, _) =>
+            {
+                bool custom = scaleModeCombo.SelectedIndex == 3;
+                customScaleBox.IsEnabled = custom;
+                if (!custom && scaleModeCombo.SelectedItem is ComboBoxItem item && item.Tag is int p && p > 0)
+                {
+                    customScaleBox.Value = p;
+                }
+            };
+
+            var transparentBackgroundBox = new CheckBox
+            {
+                Content = "Transparent background",
+                IsChecked = defaults.TransparentBackground,
+            };
+
+            var includeOutlineBox = new CheckBox
+            {
+                Content = "Include outline",
+                IsChecked = defaults.IncludeOutline,
+            };
+            var includeCageBox = new CheckBox
+            {
+                Content = "Include backdrop cage",
+                IsChecked = defaults.IncludeBackdropCage,
+            };
+            var includeProjectionTilesBox = new CheckBox
+            {
+                Content = "Include projection tiles",
+                IsChecked = defaults.IncludeProjectionTiles,
+            };
+            var includeModelGridBox = new CheckBox
+            {
+                Content = "Include model voxel grid",
+                IsChecked = defaults.IncludeModelGrid,
+            };
+
+            var trimTransparentBoundsBox = new CheckBox
+            {
+                Content = "Trim transparent bounds",
+                IsChecked = defaults.TrimTransparentBounds,
+                Margin = new Thickness(0, 4, 0, 0),
+            };
+            var trimPaddingRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Margin = new Thickness(20, 0, 0, 0),
+            };
+            trimPaddingRow.Children.Add(new TextBlock { Text = "Trim padding", Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center });
+            var trimPaddingBox = new NumberBox
+            {
+                Width = 90,
+                Minimum = 0,
+                Maximum = 128,
+                Value = defaults.TrimPadding,
+            };
+            trimPaddingRow.Children.Add(trimPaddingBox);
+
+            var batchExportViewsBox = new CheckBox
+            {
+                Content = "Batch export views (pack)",
+                IsChecked = defaults.BatchExportViews,
+                Margin = new Thickness(0, 6, 0, 0),
+            };
+            var includeBatchCardinalViewsBox = new CheckBox
+            {
+                Content = "Include Front/Back/Left/Right/Top/Bottom",
+                IsChecked = defaults.BatchIncludeCardinalViews,
+                Margin = new Thickness(20, 0, 0, 0),
+            };
+            var includeBatchDirectionalViewsBox = new CheckBox
+            {
+                Content = "Include N/NE/E/SE/S/SW/W/NW",
+                IsChecked = defaults.BatchIncludeDirectionalViews,
+                Margin = new Thickness(20, 0, 0, 0),
+            };
+
+            void SyncImageExportDependentUi()
+            {
+                bool transparent = transparentBackgroundBox.IsChecked == true;
+                trimTransparentBoundsBox.IsEnabled = transparent;
+                bool trimEnabled = transparent && (trimTransparentBoundsBox.IsChecked == true);
+                trimPaddingRow.IsHitTestVisible = trimEnabled;
+                trimPaddingRow.Opacity = trimEnabled ? 1.0 : 0.55;
+
+                bool batch = batchExportViewsBox.IsChecked == true;
+                includeBatchCardinalViewsBox.IsEnabled = batch;
+                includeBatchDirectionalViewsBox.IsEnabled = batch;
+            }
+            transparentBackgroundBox.Checked += (_, _) => SyncImageExportDependentUi();
+            transparentBackgroundBox.Unchecked += (_, _) => SyncImageExportDependentUi();
+            trimTransparentBoundsBox.Checked += (_, _) => SyncImageExportDependentUi();
+            trimTransparentBoundsBox.Unchecked += (_, _) => SyncImageExportDependentUi();
+            batchExportViewsBox.Checked += (_, _) => SyncImageExportDependentUi();
+            batchExportViewsBox.Unchecked += (_, _) => SyncImageExportDependentUi();
+            SyncImageExportDependentUi();
+
+            VoxelImageExportOptions BuildCurrentImageOptionsFromControls()
+            {
+                int scale = 1;
+                if (scaleModeCombo.SelectedItem is ComboBoxItem selectedScaleItem &&
+                    selectedScaleItem.Tag is int presetScale &&
+                    presetScale > 0)
+                {
+                    scale = presetScale;
+                }
+                else
+                {
+                    scale = (int)Math.Round(double.IsFinite(customScaleBox.Value) ? customScaleBox.Value : defaultScale);
+                }
+
+                return new VoxelImageExportOptions(
+                    Scale: Math.Clamp(scale, 1, 64),
+                    TransparentBackground: transparentBackgroundBox.IsChecked == true,
+                    IncludeOutline: includeOutlineBox.IsChecked == true,
+                    IncludeBackdropCage: includeCageBox.IsChecked == true,
+                    IncludeProjectionTiles: includeProjectionTilesBox.IsChecked == true,
+                    IncludeModelGrid: includeModelGridBox.IsChecked == true,
+                    TrimTransparentBounds: trimTransparentBoundsBox.IsChecked == true,
+                    TrimPadding: Math.Clamp((int)Math.Round(double.IsFinite(trimPaddingBox.Value) ? trimPaddingBox.Value : defaults.TrimPadding), 0, 128),
+                    BatchExportViews: batchExportViewsBox.IsChecked == true,
+                    BatchIncludeCardinalViews: includeBatchCardinalViewsBox.IsChecked != false,
+                    BatchIncludeDirectionalViews: includeBatchDirectionalViewsBox.IsChecked != false);
+            }
+
+            void ApplyImageOptionsToControls(VoxelImageExportOptions loadedOptions)
+            {
+                int loadedScale = Math.Clamp(loadedOptions.Scale, 1, 64);
+                bool loadedCustomScale = loadedScale != 1 && loadedScale != 2 && loadedScale != 4;
+                scaleModeCombo.SelectedIndex = loadedCustomScale
+                    ? 3
+                    : (loadedScale == 2 ? 1 : (loadedScale == 4 ? 2 : 0));
+                customScaleBox.Value = loadedScale;
+                customScaleBox.IsEnabled = loadedCustomScale;
+
+                transparentBackgroundBox.IsChecked = loadedOptions.TransparentBackground;
+                includeOutlineBox.IsChecked = loadedOptions.IncludeOutline;
+                includeCageBox.IsChecked = loadedOptions.IncludeBackdropCage;
+                includeProjectionTilesBox.IsChecked = loadedOptions.IncludeProjectionTiles;
+                includeModelGridBox.IsChecked = loadedOptions.IncludeModelGrid;
+                trimTransparentBoundsBox.IsChecked = loadedOptions.TrimTransparentBounds;
+                trimPaddingBox.Value = loadedOptions.TrimPadding;
+                batchExportViewsBox.IsChecked = loadedOptions.BatchExportViews;
+                includeBatchCardinalViewsBox.IsChecked = loadedOptions.BatchIncludeCardinalViews;
+                includeBatchDirectionalViewsBox.IsChecked = loadedOptions.BatchIncludeDirectionalViews;
+                SyncImageExportDependentUi();
+            }
+
+            var savePresetButton = new Button { Content = "Save Preset…" };
+            savePresetButton.Click += async (_, _) =>
+            {
+                try
+                {
+                    var image = BuildCurrentImageOptionsFromControls();
+                    var model = GetModelExportDefaultsFromLast();
+                    await SaveExportPresetAsync(new VoxelExportPreset(image, model));
+                }
+                catch (Exception ex)
+                {
+                    LoggingService.Error("Failed to save voxel export preset", ex);
+                }
+            };
+
+            var loadPresetButton = new Button { Content = "Load Preset…" };
+            loadPresetButton.Click += async (_, _) =>
+            {
+                try
+                {
+                    var loadedPreset = await LoadExportPresetAsync();
+                    if (loadedPreset is null)
+                        return;
+
+                    ApplyImageOptionsToControls(loadedPreset.Value.Image);
+                    ApplyModelExportOptionDefaults(loadedPreset.Value.Model);
+                }
+                catch (Exception ex)
+                {
+                    LoggingService.Error("Failed to load voxel export preset", ex);
+                }
+            };
+
+            var layout = new StackPanel { Spacing = 10 };
+            layout.Children.Add(new TextBlock { Text = "Scale", Opacity = 0.85 });
+            var scaleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            scaleRow.Children.Add(scaleModeCombo);
+            scaleRow.Children.Add(customScaleBox);
+            layout.Children.Add(scaleRow);
+            var presetRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            presetRow.Children.Add(savePresetButton);
+            presetRow.Children.Add(loadPresetButton);
+            layout.Children.Add(presetRow);
+            layout.Children.Add(transparentBackgroundBox);
+            layout.Children.Add(includeOutlineBox);
+            layout.Children.Add(includeCageBox);
+            layout.Children.Add(includeProjectionTilesBox);
+            layout.Children.Add(includeModelGridBox);
+            layout.Children.Add(trimTransparentBoundsBox);
+            layout.Children.Add(trimPaddingRow);
+            layout.Children.Add(batchExportViewsBox);
+            layout.Children.Add(includeBatchCardinalViewsBox);
+            layout.Children.Add(includeBatchDirectionalViewsBox);
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "Export Image",
+                PrimaryButtonText = "Export",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                Content = layout,
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary)
+                return null;
+
+            var chosen = BuildCurrentImageOptionsFromControls();
+            ApplyImageExportOptionDefaults(chosen);
+            return chosen;
+        }
+
+        private async Task<VoxelModelExportOptions?> PromptModelExportOptionsAsync()
+        {
+            var formatCombo = new ComboBox
+            {
+                MinWidth = 230,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            formatCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "OBJ (.obj + .mtl + .png)",
+                Tag = ModelExportFormat.Obj,
+            });
+            formatCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "glTF Binary (.glb)",
+                Tag = ModelExportFormat.Glb,
+            });
+            formatCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "STL Binary (.stl)",
+                Tag = ModelExportFormat.Stl,
+            });
+            formatCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "MagicaVoxel (.vox)",
+                Tag = ModelExportFormat.Vox,
+            });
+            formatCombo.SelectedIndex = _lastModelExportFormat switch
+            {
+                ModelExportFormat.Glb => 1,
+                ModelExportFormat.Stl => 2,
+                ModelExportFormat.Vox => 3,
+                _ => 0,
+            };
+
+            var meshModeCombo = new ComboBox
+            {
+                MinWidth = 230,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            meshModeCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "Merge coplanar faces",
+                Tag = ModelMeshMode.MergeCoplanar,
+            });
+            meshModeCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "Keep per-voxel faces",
+                Tag = ModelMeshMode.PerVoxel,
+            });
+            meshModeCombo.SelectedIndex = _lastModelExportMeshMode == ModelMeshMode.PerVoxel ? 1 : 0;
+
+            var axisPresetCombo = new ComboBox
+            {
+                MinWidth = 230,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            axisPresetCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "PixlPunkt (Y-up)",
+                Tag = ModelAxisPreset.PixlPunkt,
+            });
+            axisPresetCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "Blender (Z-up)",
+                Tag = ModelAxisPreset.BlenderZUp,
+            });
+            axisPresetCombo.SelectedIndex = _lastModelExportAxisPreset == ModelAxisPreset.BlenderZUp ? 1 : 0;
+
+            var pivotPresetCombo = new ComboBox
+            {
+                MinWidth = 230,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            pivotPresetCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "Center",
+                Tag = ModelPivotPreset.Center,
+            });
+            pivotPresetCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "Bottom Center",
+                Tag = ModelPivotPreset.BottomCenter,
+            });
+            pivotPresetCombo.Items.Add(new ComboBoxItem
+            {
+                Content = "Origin",
+                Tag = ModelPivotPreset.Origin,
+            });
+            pivotPresetCombo.SelectedIndex = _lastModelExportPivotPreset switch
+            {
+                ModelPivotPreset.BottomCenter => 1,
+                ModelPivotPreset.Origin => 2,
+                _ => 0,
+            };
+
+            var unitScaleBox = new NumberBox
+            {
+                MinWidth = 120,
+                Maximum = 10000,
+                Minimum = 0.0001,
+                Value = _lastModelExportUnitScale <= 0f ? 1f : _lastModelExportUnitScale,
+                HorizontalAlignment = HorizontalAlignment.Left,
+            };
+
+            var glbDoubleSidedBox = new CheckBox
+            {
+                Content = "GLB: Double-sided material",
+                IsChecked = _lastModelExportGlbDoubleSided,
+            };
+
+            var voxWarningText = new TextBlock
+            {
+                TextWrapping = TextWrapping.WrapWholeWords,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Goldenrod),
+                Opacity = 0.95,
+                Visibility = Visibility.Collapsed,
+            };
+
+            VoxelModelExportOptions BuildCurrentModelOptionsFromControls()
+            {
+                var format = formatCombo.SelectedItem is ComboBoxItem formatItem && formatItem.Tag is ModelExportFormat formatValue
+                    ? formatValue
+                    : ModelExportFormat.Obj;
+                var meshMode = meshModeCombo.SelectedItem is ComboBoxItem meshItem && meshItem.Tag is ModelMeshMode meshValue
+                    ? meshValue
+                    : ModelMeshMode.MergeCoplanar;
+                var axisPreset = axisPresetCombo.SelectedItem is ComboBoxItem axisItem && axisItem.Tag is ModelAxisPreset axisValue
+                    ? axisValue
+                    : ModelAxisPreset.PixlPunkt;
+                var pivotPreset = pivotPresetCombo.SelectedItem is ComboBoxItem pivotItem && pivotItem.Tag is ModelPivotPreset pivotValue
+                    ? pivotValue
+                    : ModelPivotPreset.Center;
+                float unitScale = (float)(double.IsFinite(unitScaleBox.Value) ? unitScaleBox.Value : 1d);
+                unitScale = Math.Clamp(unitScale, 0.0001f, 10000f);
+                bool glbDoubleSided = glbDoubleSidedBox.IsChecked != false;
+                return new VoxelModelExportOptions(format, meshMode, axisPreset, unitScale, pivotPreset, glbDoubleSided);
+            }
+
+            void ApplyModelOptionsToControls(VoxelModelExportOptions loaded)
+            {
+                formatCombo.SelectedIndex = loaded.Format switch
+                {
+                    ModelExportFormat.Glb => 1,
+                    ModelExportFormat.Stl => 2,
+                    ModelExportFormat.Vox => 3,
+                    _ => 0,
+                };
+                meshModeCombo.SelectedIndex = loaded.MeshMode == ModelMeshMode.PerVoxel ? 1 : 0;
+                axisPresetCombo.SelectedIndex = loaded.AxisPreset == ModelAxisPreset.BlenderZUp ? 1 : 0;
+                pivotPresetCombo.SelectedIndex = loaded.PivotPreset switch
+                {
+                    ModelPivotPreset.BottomCenter => 1,
+                    ModelPivotPreset.Origin => 2,
+                    _ => 0,
+                };
+                unitScaleBox.Value = Math.Clamp(loaded.UnitScale, 0.0001f, 10000f);
+                glbDoubleSidedBox.IsChecked = loaded.GlbDoubleSided;
+            }
+
+            void RefreshFormatSpecificControls()
+            {
+                var selectedFormat = formatCombo.SelectedItem is ComboBoxItem selectedItem &&
+                                     selectedItem.Tag is ModelExportFormat selectedValue
+                    ? selectedValue
+                    : ModelExportFormat.Obj;
+
+                glbDoubleSidedBox.Visibility = selectedFormat == ModelExportFormat.Glb
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+                if (selectedFormat != ModelExportFormat.Vox)
+                {
+                    voxWarningText.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                if (_lastVolume == null || _lastVolume.OccupiedCount <= 0)
+                {
+                    voxWarningText.Text = "VOX exports palette-indexed voxel colors only.";
+                    voxWarningText.Visibility = Visibility.Visible;
+                    return;
+                }
+
+                var currentOptions = BuildCurrentModelOptionsFromControls();
+                var bounds = ComputeTransformedVoxelBounds(_lastVolume, currentOptions.AxisPreset);
+                if (!bounds.HasValue)
+                {
+                    voxWarningText.Text = "VOX exports palette-indexed voxel colors only.";
+                    voxWarningText.Visibility = Visibility.Visible;
+                    return;
+                }
+
+                var b = bounds.Value;
+                bool outOfRange = b.SizeX > 255 || b.SizeY > 255 || b.SizeZ > 255;
+                voxWarningText.Text = outOfRange
+                    ? $"Warning: VOX supports <=255 units per axis. Current transformed size is {b.SizeX}x{b.SizeY}x{b.SizeZ}."
+                    : $"VOX note: size {b.SizeX}x{b.SizeY}x{b.SizeZ}, 255 max per axis, pivot/unit scale are ignored.";
+                voxWarningText.Visibility = Visibility.Visible;
+            }
+
+            var savePresetButton = new Button { Content = "Save Preset…" };
+            savePresetButton.Click += async (_, _) =>
+            {
+                try
+                {
+                    var model = BuildCurrentModelOptionsFromControls();
+                    var image = GetImageExportDefaultsFromLastOrUi();
+                    await SaveExportPresetAsync(new VoxelExportPreset(image, model));
+                }
+                catch (Exception ex)
+                {
+                    LoggingService.Error("Failed to save voxel export preset", ex);
+                }
+            };
+
+            var loadPresetButton = new Button { Content = "Load Preset…" };
+            loadPresetButton.Click += async (_, _) =>
+            {
+                try
+                {
+                    var loadedPreset = await LoadExportPresetAsync();
+                    if (loadedPreset is null)
+                        return;
+
+                    ApplyModelOptionsToControls(loadedPreset.Value.Model);
+                    ApplyImageExportOptionDefaults(loadedPreset.Value.Image);
+                    RefreshFormatSpecificControls();
+                }
+                catch (Exception ex)
+                {
+                    LoggingService.Error("Failed to load voxel export preset", ex);
+                }
+            };
+
+            var layout = new StackPanel { Spacing = 10 };
+            var presetRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            presetRow.Children.Add(savePresetButton);
+            presetRow.Children.Add(loadPresetButton);
+            layout.Children.Add(presetRow);
+            layout.Children.Add(new TextBlock { Text = "Format", Opacity = 0.85 });
+            layout.Children.Add(formatCombo);
+            layout.Children.Add(new TextBlock { Text = "Mesh", Opacity = 0.85 });
+            layout.Children.Add(meshModeCombo);
+            layout.Children.Add(new TextBlock { Text = "Axis Preset", Opacity = 0.85 });
+            layout.Children.Add(axisPresetCombo);
+            layout.Children.Add(new TextBlock { Text = "Pivot", Opacity = 0.85 });
+            layout.Children.Add(pivotPresetCombo);
+            layout.Children.Add(new TextBlock { Text = "Unit Scale", Opacity = 0.85 });
+            layout.Children.Add(unitScaleBox);
+            layout.Children.Add(glbDoubleSidedBox);
+            layout.Children.Add(voxWarningText);
+
+            formatCombo.SelectionChanged += (_, _) => RefreshFormatSpecificControls();
+            axisPresetCombo.SelectionChanged += (_, _) => RefreshFormatSpecificControls();
+            RefreshFormatSpecificControls();
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "Export Model",
+                PrimaryButtonText = "Export",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                Content = layout,
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary)
+                return null;
+
+            var chosen = BuildCurrentModelOptionsFromControls();
+            ApplyModelExportOptionDefaults(chosen);
+            return chosen;
+        }
+
+        private VoxelImageExportOptions GetImageExportDefaultsFromLastOrUi()
+            => new(
+                Scale: Math.Clamp(_lastImageExportScale, 1, 64),
+                TransparentBackground: _lastImageExportTransparentBackground,
+                IncludeOutline: _lastImageExportIncludeOutline,
+                IncludeBackdropCage: _lastImageExportIncludeBackdropCage,
+                IncludeProjectionTiles: _lastImageExportIncludeProjectionTiles,
+                IncludeModelGrid: _lastImageExportIncludeModelGrid,
+                TrimTransparentBounds: _lastImageExportTrimTransparentBounds,
+                TrimPadding: Math.Clamp(_lastImageExportTrimPadding, 0, 128),
+                BatchExportViews: _lastImageExportBatchViews,
+                BatchIncludeCardinalViews: _lastImageExportBatchCardinalViews,
+                BatchIncludeDirectionalViews: _lastImageExportBatchDirectionalViews);
+
+        private VoxelModelExportOptions GetModelExportDefaultsFromLast()
+            => new(
+                Format: _lastModelExportFormat,
+                MeshMode: _lastModelExportMeshMode,
+                AxisPreset: _lastModelExportAxisPreset,
+                UnitScale: _lastModelExportUnitScale <= 0f ? 1f : _lastModelExportUnitScale,
+                PivotPreset: _lastModelExportPivotPreset,
+                GlbDoubleSided: _lastModelExportGlbDoubleSided);
+
+        private void ApplyImageExportOptionDefaults(VoxelImageExportOptions options)
+        {
+            _lastImageExportScale = Math.Clamp(options.Scale, 1, 64);
+            _lastImageExportTransparentBackground = options.TransparentBackground;
+            _lastImageExportIncludeOutline = options.IncludeOutline;
+            _lastImageExportIncludeBackdropCage = options.IncludeBackdropCage;
+            _lastImageExportIncludeProjectionTiles = options.IncludeProjectionTiles;
+            _lastImageExportIncludeModelGrid = options.IncludeModelGrid;
+            _lastImageExportTrimTransparentBounds = options.TrimTransparentBounds;
+            _lastImageExportTrimPadding = Math.Clamp(options.TrimPadding, 0, 128);
+            _lastImageExportBatchViews = options.BatchExportViews;
+            _lastImageExportBatchCardinalViews = options.BatchIncludeCardinalViews;
+            _lastImageExportBatchDirectionalViews = options.BatchIncludeDirectionalViews;
+        }
+
+        private void ApplyModelExportOptionDefaults(VoxelModelExportOptions options)
+        {
+            _lastModelExportFormat = options.Format;
+            _lastModelExportMeshMode = options.MeshMode;
+            _lastModelExportAxisPreset = options.AxisPreset;
+            _lastModelExportUnitScale = Math.Clamp(options.UnitScale, 0.0001f, 10000f);
+            _lastModelExportPivotPreset = options.PivotPreset;
+            _lastModelExportGlbDoubleSided = options.GlbDoubleSided;
+        }
+
+        private async Task SaveExportPresetAsync(VoxelExportPreset preset)
+        {
+            var ownerWindow = App.PixlPunktMainWindow;
+            if (ownerWindow == null)
+                return;
+
+            var picker = WindowHost.CreateFileSavePicker(ownerWindow, "voxel_export_preset", ".pxvexpreset", ".json");
+            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            WindowHost.TrySetDefaultFileExtension(picker, ".pxvexpreset");
+            var file = await picker.PickSaveFileAsync();
+            if (file == null)
+                return;
+
+            var payload = new VoxelExportPresetFile
+            {
+                Version = 1,
+                Image = new VoxelImageExportPresetFile
+                {
+                    Scale = preset.Image.Scale,
+                    TransparentBackground = preset.Image.TransparentBackground,
+                    IncludeOutline = preset.Image.IncludeOutline,
+                    IncludeBackdropCage = preset.Image.IncludeBackdropCage,
+                    IncludeProjectionTiles = preset.Image.IncludeProjectionTiles,
+                    IncludeModelGrid = preset.Image.IncludeModelGrid,
+                    TrimTransparentBounds = preset.Image.TrimTransparentBounds,
+                    TrimPadding = preset.Image.TrimPadding,
+                    BatchExportViews = preset.Image.BatchExportViews,
+                    BatchIncludeCardinalViews = preset.Image.BatchIncludeCardinalViews,
+                    BatchIncludeDirectionalViews = preset.Image.BatchIncludeDirectionalViews,
+                },
+                Model = new VoxelModelExportPresetFile
+                {
+                    Format = (int)preset.Model.Format,
+                    MeshMode = (int)preset.Model.MeshMode,
+                    AxisPreset = (int)preset.Model.AxisPreset,
+                    UnitScale = preset.Model.UnitScale,
+                    PivotPreset = (int)preset.Model.PivotPreset,
+                    GlbDoubleSided = preset.Model.GlbDoubleSided,
+                },
+            };
+
+            string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+            await Windows.Storage.FileIO.WriteTextAsync(file, json);
+        }
+
+        private async Task<VoxelExportPreset?> LoadExportPresetAsync()
+        {
+            var ownerWindow = App.PixlPunktMainWindow;
+            if (ownerWindow == null)
+                return null;
+
+            var picker = WindowHost.CreateFileOpenPicker(ownerWindow, ".pxvexpreset", ".json");
+            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            var file = await picker.PickSingleFileAsync();
+            if (file == null)
+                return null;
+
+            string json = await Windows.Storage.FileIO.ReadTextAsync(file);
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+
+            VoxelExportPresetFile? payload = JsonSerializer.Deserialize<VoxelExportPresetFile>(json);
+            if (payload == null)
+                return null;
+
+            var fallbackImage = GetImageExportDefaultsFromLastOrUi();
+            var fallbackModel = GetModelExportDefaultsFromLast();
+
+            var loadedImage = payload.Image != null
+                ? new VoxelImageExportOptions(
+                    Scale: Math.Clamp(payload.Image.Scale, 1, 64),
+                    TransparentBackground: payload.Image.TransparentBackground,
+                    IncludeOutline: payload.Image.IncludeOutline,
+                    IncludeBackdropCage: payload.Image.IncludeBackdropCage,
+                    IncludeProjectionTiles: payload.Image.IncludeProjectionTiles,
+                    IncludeModelGrid: payload.Image.IncludeModelGrid,
+                    TrimTransparentBounds: payload.Image.TrimTransparentBounds,
+                    TrimPadding: Math.Clamp(payload.Image.TrimPadding, 0, 128),
+                    BatchExportViews: payload.Image.BatchExportViews,
+                    BatchIncludeCardinalViews: payload.Image.BatchIncludeCardinalViews,
+                    BatchIncludeDirectionalViews: payload.Image.BatchIncludeDirectionalViews)
+                : fallbackImage;
+
+            var loadedModel = payload.Model != null
+                ? new VoxelModelExportOptions(
+                    Format: Enum.IsDefined(typeof(ModelExportFormat), payload.Model.Format)
+                        ? (ModelExportFormat)payload.Model.Format
+                        : fallbackModel.Format,
+                    MeshMode: Enum.IsDefined(typeof(ModelMeshMode), payload.Model.MeshMode)
+                        ? (ModelMeshMode)payload.Model.MeshMode
+                        : fallbackModel.MeshMode,
+                    AxisPreset: Enum.IsDefined(typeof(ModelAxisPreset), payload.Model.AxisPreset)
+                        ? (ModelAxisPreset)payload.Model.AxisPreset
+                        : fallbackModel.AxisPreset,
+                    UnitScale: Math.Clamp(payload.Model.UnitScale, 0.0001f, 10000f),
+                    PivotPreset: Enum.IsDefined(typeof(ModelPivotPreset), payload.Model.PivotPreset)
+                        ? (ModelPivotPreset)payload.Model.PivotPreset
+                        : fallbackModel.PivotPreset,
+                    GlbDoubleSided: payload.Model.GlbDoubleSided)
+                : fallbackModel;
+
+            return new VoxelExportPreset(loadedImage, loadedModel);
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "voxel_export";
+
+            var invalid = System.IO.Path.GetInvalidFileNameChars();
+            var sb = new StringBuilder(value.Length);
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                sb.Append(Array.IndexOf(invalid, ch) >= 0 ? '_' : ch);
+            }
+
+            var safe = sb.ToString().Trim();
+            return string.IsNullOrWhiteSpace(safe) ? "voxel_export" : safe;
+        }
+
+        private static string GetModelExportPrimaryExtension(ModelExportFormat format)
+            => format switch
+            {
+                ModelExportFormat.Glb => ".glb",
+                ModelExportFormat.Stl => ".stl",
+                ModelExportFormat.Vox => ".vox",
+                _ => ".obj",
+            };
+
+        private static ObjExportData BuildObjExport(
+            VoxelVolume volume,
+            string mtlFileName,
+            string textureFileName,
+            VoxelModelExportOptions options)
+        {
+            int size = volume.Size;
+            float unitScale = Math.Clamp(options.UnitScale, 0.0001f, 10000f);
+            Vector3 pivotOffset = GetModelPivotOffset(size, options.PivotPreset);
+            var exportQuads = BuildExportFaceQuads(volume, options.MeshMode);
+            var colorToIndex = new Dictionary<uint, int>();
+            var colors = new List<uint>();
+            for (int i = 0; i < exportQuads.Count; i++)
+            {
+                uint color = exportQuads[i].ColorBgra;
+                if (!colorToIndex.ContainsKey(color))
+                {
+                    colorToIndex[color] = colors.Count;
+                    colors.Add(color);
+                }
+            }
+
+            int texSize = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(Math.Max(1, colors.Count))));
+            var texPixels = new byte[texSize * texSize * 4];
+            for (int i = 0; i < colors.Count; i++)
+            {
+                uint c = colors[i];
+                int tx = i % texSize;
+                int ty = i / texSize;
+                int o = (ty * texSize + tx) * 4;
+                texPixels[o + 0] = (byte)(c & 0xFF);         // B
+                texPixels[o + 1] = (byte)((c >> 8) & 0xFF);  // G
+                texPixels[o + 2] = (byte)((c >> 16) & 0xFF); // R
+                texPixels[o + 3] = (byte)((c >> 24) & 0xFF); // A
+            }
+
+            var obj = new StringBuilder(exportQuads.Count * 120 + 256);
+            var mtl = new StringBuilder(256);
+            obj.AppendLine("# PixlPunkt Voxel Export");
+            obj.Append("mtllib ").AppendLine(EncodeObjPathToken(mtlFileName));
+            obj.AppendLine("o voxel_model");
+            obj.AppendLine("usemtl voxel_material");
+
+            int vIndex = 1;
+            int vtIndex = 1;
+            foreach (var f in exportQuads)
+            {
+                GetFaceQuadVertices(
+                    f.Face,
+                    f.X + pivotOffset.X,
+                    f.Y + pivotOffset.Y,
+                    f.Z + pivotOffset.Z,
+                    f.Width,
+                    f.Height,
+                    out var p0,
+                    out var p1,
+                    out var p2,
+                    out var p3);
+                p0 *= unitScale;
+                p1 *= unitScale;
+                p2 *= unitScale;
+                p3 *= unitScale;
+                p0 = TransformExportVertex(p0, options.AxisPreset);
+                p1 = TransformExportVertex(p1, options.AxisPreset);
+                p2 = TransformExportVertex(p2, options.AxisPreset);
+                p3 = TransformExportVertex(p3, options.AxisPreset);
+                AppendVertex(obj, p0);
+                AppendVertex(obj, p1);
+                AppendVertex(obj, p2);
+                AppendVertex(obj, p3);
+
+                int ci = colorToIndex[f.ColorBgra];
+                float u = ((ci % texSize) + 0.5f) / texSize;
+                float v = 1f - (((ci / texSize) + 0.5f) / texSize);
+
+                AppendUv(obj, u, v);
+                AppendUv(obj, u, v);
+                AppendUv(obj, u, v);
+                AppendUv(obj, u, v);
+
+                obj.Append("f ")
+                   .Append(vIndex).Append('/').Append(vtIndex).Append(' ')
+                   .Append(vIndex + 1).Append('/').Append(vtIndex + 1).Append(' ')
+                   .Append(vIndex + 2).Append('/').Append(vtIndex + 2).Append(' ')
+                   .Append(vIndex + 3).Append('/').Append(vtIndex + 3).AppendLine();
+
+                vIndex += 4;
+                vtIndex += 4;
+            }
+
+            mtl.AppendLine("newmtl voxel_material");
+            mtl.AppendLine("Ka 1.000000 1.000000 1.000000");
+            mtl.AppendLine("Kd 1.000000 1.000000 1.000000");
+            mtl.AppendLine("Ks 0.000000 0.000000 0.000000");
+            mtl.AppendLine("d 1.0");
+            mtl.AppendLine("illum 1");
+            mtl.Append("map_Kd ").AppendLine(EncodeObjPathToken(textureFileName));
+
+            return new ObjExportData(obj.ToString(), mtl.ToString(), texSize, texSize, texPixels);
+        }
+
+        private static async Task<byte[]> BuildGlbExportAsync(VoxelVolume volume, VoxelModelExportOptions options)
+        {
+            int size = volume.Size;
+            var quads = BuildExportFaceQuads(volume, options.MeshMode);
+            if (quads.Count == 0)
+            {
+                const string emptyJson = "{\"asset\":{\"version\":\"2.0\",\"generator\":\"PixlPunkt\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{}]}";
+                return BuildGlbContainer(Encoding.UTF8.GetBytes(emptyJson), Array.Empty<byte>());
+            }
+
+            var colorToIndex = new Dictionary<uint, int>();
+            var colors = new List<uint>();
+            for (int i = 0; i < quads.Count; i++)
+            {
+                uint color = quads[i].ColorBgra;
+                if (!colorToIndex.ContainsKey(color))
+                {
+                    colorToIndex[color] = colors.Count;
+                    colors.Add(color);
+                }
+            }
+
+            int texSize = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(Math.Max(1, colors.Count))));
+            var texPixels = new byte[texSize * texSize * 4];
+            for (int i = 0; i < colors.Count; i++)
+            {
+                uint c = colors[i];
+                int tx = i % texSize;
+                int ty = i / texSize;
+                int o = (ty * texSize + tx) * 4;
+                texPixels[o + 0] = (byte)(c & 0xFF);
+                texPixels[o + 1] = (byte)((c >> 8) & 0xFF);
+                texPixels[o + 2] = (byte)((c >> 16) & 0xFF);
+                texPixels[o + 3] = (byte)((c >> 24) & 0xFF);
+            }
+            byte[] texturePng = await EncodeBgraPngBytesAsync(texSize, texSize, texPixels, transparentBackground: true);
+
+            int vertexCount = quads.Count * 6; // two triangles per quad, no index buffer
+            var binStream = new MemoryStream(Math.Max(2048, vertexCount * 32));
+            using var binWriter = new BinaryWriter(binStream, Utf8NoBom, leaveOpen: true);
+
+            float minX = float.PositiveInfinity, minY = float.PositiveInfinity, minZ = float.PositiveInfinity;
+            float maxX = float.NegativeInfinity, maxY = float.NegativeInfinity, maxZ = float.NegativeInfinity;
+
+            static void UpdateMinMax(Vector3 p, ref float minX, ref float minY, ref float minZ, ref float maxX, ref float maxY, ref float maxZ)
+            {
+                if (p.X < minX) minX = p.X;
+                if (p.Y < minY) minY = p.Y;
+                if (p.Z < minZ) minZ = p.Z;
+                if (p.X > maxX) maxX = p.X;
+                if (p.Y > maxY) maxY = p.Y;
+                if (p.Z > maxZ) maxZ = p.Z;
+            }
+
+            static void PadTo4(BinaryWriter writer, MemoryStream stream)
+            {
+                while ((stream.Position & 3) != 0)
+                    writer.Write((byte)0);
+            }
+
+            int posOffset = (int)binStream.Position;
+            for (int i = 0; i < quads.Count; i++)
+            {
+                GetTransformedFaceVertices(quads[i], size, options, out var p0, out var p1, out var p2, out var p3);
+                binWriter.Write(p0.X); binWriter.Write(p0.Y); binWriter.Write(p0.Z);
+                binWriter.Write(p1.X); binWriter.Write(p1.Y); binWriter.Write(p1.Z);
+                binWriter.Write(p2.X); binWriter.Write(p2.Y); binWriter.Write(p2.Z);
+                binWriter.Write(p0.X); binWriter.Write(p0.Y); binWriter.Write(p0.Z);
+                binWriter.Write(p2.X); binWriter.Write(p2.Y); binWriter.Write(p2.Z);
+                binWriter.Write(p3.X); binWriter.Write(p3.Y); binWriter.Write(p3.Z);
+
+                UpdateMinMax(p0, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
+                UpdateMinMax(p1, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
+                UpdateMinMax(p2, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
+                UpdateMinMax(p3, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
+            }
+            int posLength = (int)binStream.Position - posOffset;
+
+            PadTo4(binWriter, binStream);
+            int normalOffset = (int)binStream.Position;
+            for (int i = 0; i < quads.Count; i++)
+            {
+                GetTransformedFaceVertices(quads[i], size, options, out var p0, out var p1, out var p2, out _);
+                var n = Vector3.Cross(p1 - p0, p2 - p0);
+                if (n.LengthSquared() > 1e-12f)
+                    n = Vector3.Normalize(n);
+                else
+                    n = Vector3.UnitY;
+
+                for (int v = 0; v < 6; v++)
+                {
+                    binWriter.Write(n.X);
+                    binWriter.Write(n.Y);
+                    binWriter.Write(n.Z);
+                }
+            }
+            int normalLength = (int)binStream.Position - normalOffset;
+
+            PadTo4(binWriter, binStream);
+            int uvOffset = (int)binStream.Position;
+            for (int i = 0; i < quads.Count; i++)
+            {
+                int colorIndex = colorToIndex[quads[i].ColorBgra];
+                float u = ((colorIndex % texSize) + 0.5f) / texSize;
+                float v = 1f - (((colorIndex / texSize) + 0.5f) / texSize);
+                for (int vt = 0; vt < 6; vt++)
+                {
+                    binWriter.Write(u);
+                    binWriter.Write(v);
+                }
+            }
+            int uvLength = (int)binStream.Position - uvOffset;
+
+            PadTo4(binWriter, binStream);
+            int imageOffset = (int)binStream.Position;
+            binWriter.Write(texturePng);
+            int imageLength = texturePng.Length;
+
+            var bin = binStream.ToArray();
+            string F(float value) => value.ToString("0.######", CultureInfo.InvariantCulture);
+
+            var json = new StringBuilder(1400);
+            string glbDoubleSided = options.GlbDoubleSided ? "true" : "false";
+            json.Append('{')
+                .Append("\"asset\":{\"version\":\"2.0\",\"generator\":\"PixlPunkt\"},")
+                .Append("\"scene\":0,")
+                .Append("\"scenes\":[{\"nodes\":[0]}],")
+                .Append("\"nodes\":[{\"mesh\":0}],")
+                .Append("\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0,\"NORMAL\":1,\"TEXCOORD_0\":2},\"material\":0,\"mode\":4}]}],")
+                .Append("\"materials\":[{\"pbrMetallicRoughness\":{\"baseColorTexture\":{\"index\":0},\"metallicFactor\":0,\"roughnessFactor\":1},\"doubleSided\":")
+                .Append(glbDoubleSided)
+                .Append(",\"alphaMode\":\"BLEND\"}],")
+                .Append("\"textures\":[{\"sampler\":0,\"source\":0}],")
+                .Append("\"samplers\":[{\"magFilter\":9728,\"minFilter\":9728,\"wrapS\":33071,\"wrapT\":33071}],")
+                .Append("\"images\":[{\"bufferView\":3,\"mimeType\":\"image/png\"}],")
+                .Append("\"buffers\":[{\"byteLength\":").Append(bin.Length).Append("}],")
+                .Append("\"bufferViews\":[")
+                .Append("{\"buffer\":0,\"byteOffset\":").Append(posOffset).Append(",\"byteLength\":").Append(posLength).Append(",\"target\":34962},")
+                .Append("{\"buffer\":0,\"byteOffset\":").Append(normalOffset).Append(",\"byteLength\":").Append(normalLength).Append(",\"target\":34962},")
+                .Append("{\"buffer\":0,\"byteOffset\":").Append(uvOffset).Append(",\"byteLength\":").Append(uvLength).Append(",\"target\":34962},")
+                .Append("{\"buffer\":0,\"byteOffset\":").Append(imageOffset).Append(",\"byteLength\":").Append(imageLength).Append("}")
+                .Append("],")
+                .Append("\"accessors\":[")
+                .Append("{\"bufferView\":0,\"componentType\":5126,\"count\":").Append(vertexCount).Append(",\"type\":\"VEC3\",\"min\":[")
+                .Append(F(minX)).Append(',').Append(F(minY)).Append(',').Append(F(minZ)).Append("],\"max\":[")
+                .Append(F(maxX)).Append(',').Append(F(maxY)).Append(',').Append(F(maxZ)).Append("]},")
+                .Append("{\"bufferView\":1,\"componentType\":5126,\"count\":").Append(vertexCount).Append(",\"type\":\"VEC3\"},")
+                .Append("{\"bufferView\":2,\"componentType\":5126,\"count\":").Append(vertexCount).Append(",\"type\":\"VEC2\"}")
+                .Append("]")
+                .Append('}');
+
+            return BuildGlbContainer(Encoding.UTF8.GetBytes(json.ToString()), bin);
+        }
+
+        private static byte[] BuildGlbContainer(byte[] jsonUtf8, byte[] bin)
+        {
+            jsonUtf8 ??= Array.Empty<byte>();
+            bin ??= Array.Empty<byte>();
+
+            int jsonPaddedLength = (jsonUtf8.Length + 3) & ~3;
+            int binPaddedLength = (bin.Length + 3) & ~3;
+            int totalLength = 12 + 8 + jsonPaddedLength + 8 + binPaddedLength;
+
+            using var stream = new MemoryStream(totalLength);
+            using var writer = new BinaryWriter(stream, Utf8NoBom, leaveOpen: true);
+
+            writer.Write(0x46546C67); // glTF
+            writer.Write(2);          // version
+            writer.Write(totalLength);
+
+            writer.Write(jsonPaddedLength);
+            writer.Write(0x4E4F534A); // JSON
+            writer.Write(jsonUtf8);
+            for (int i = jsonUtf8.Length; i < jsonPaddedLength; i++)
+                writer.Write((byte)0x20);
+
+            writer.Write(binPaddedLength);
+            writer.Write(0x004E4942); // BIN
+            writer.Write(bin);
+            for (int i = bin.Length; i < binPaddedLength; i++)
+                writer.Write((byte)0x00);
+
+            return stream.ToArray();
+        }
+
+        private static byte[] BuildStlExport(VoxelVolume volume, VoxelModelExportOptions options)
+        {
+            var triangles = BuildExportTriangles(volume, options);
+            uint triangleCount = (uint)triangles.Count;
+
+            using var stream = new MemoryStream(84 + (int)triangleCount * 50);
+            using var writer = new BinaryWriter(stream, Utf8NoBom, leaveOpen: true);
+
+            var header = new byte[80];
+            var headerText = Encoding.ASCII.GetBytes("PixlPunkt Voxel STL");
+            Buffer.BlockCopy(headerText, 0, header, 0, Math.Min(headerText.Length, header.Length));
+            writer.Write(header);
+            writer.Write(triangleCount);
+
+            for (int i = 0; i < triangles.Count; i++)
+            {
+                var t = triangles[i];
+                writer.Write(t.Normal.X);
+                writer.Write(t.Normal.Y);
+                writer.Write(t.Normal.Z);
+
+                writer.Write(t.A.X); writer.Write(t.A.Y); writer.Write(t.A.Z);
+                writer.Write(t.B.X); writer.Write(t.B.Y); writer.Write(t.B.Z);
+                writer.Write(t.C.X); writer.Write(t.C.Y); writer.Write(t.C.Z);
+                writer.Write((ushort)0);
+            }
+
+            return stream.ToArray();
+        }
+
+        private static byte[] BuildVoxExport(VoxelVolume volume, VoxelModelExportOptions options)
+        {
+            var voxels = new List<(int X, int Y, int Z, byte PaletteIndex)>(Math.Max(1, volume.OccupiedCount));
+            var palette = new List<uint>(255);
+            var paletteLookup = new Dictionary<uint, byte>();
+            int size = volume.Size;
+
+            var bounds = ComputeTransformedVoxelBounds(volume, options.AxisPreset);
+            int minX = bounds?.MinX ?? 0;
+            int minY = bounds?.MinY ?? 0;
+            int minZ = bounds?.MinZ ?? 0;
+            int sizeX = bounds?.SizeX ?? 1;
+            int sizeY = bounds?.SizeY ?? 1;
+            int sizeZ = bounds?.SizeZ ?? 1;
+
+            for (int z = 0; z < size; z++)
+            {
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        if (!volume.IsOccupied(x, y, z))
+                            continue;
+
+                        var tc = TransformVoxelCoordinate(x, y, z, options.AxisPreset);
+
+                        uint color = GetRepresentativeVoxelColor(volume, x, y, z);
+                        byte paletteIndex = ResolveVoxPaletteIndex(color, palette, paletteLookup);
+                        voxels.Add((tc.X, tc.Y, tc.Z, paletteIndex));
+                    }
+                }
+            }
+            if (sizeX > 255 || sizeY > 255 || sizeZ > 255)
+            {
+                throw new InvalidOperationException(
+                    $"VOX export supports <=255 units per axis. Current transformed size is {sizeX}x{sizeY}x{sizeZ}.");
+            }
+
+            using var childrenStream = new MemoryStream();
+            using var childrenWriter = new BinaryWriter(childrenStream, Utf8NoBom, leaveOpen: true);
+
+            WriteChunk(childrenWriter, "SIZE", contentWriter =>
+            {
+                contentWriter.Write(sizeX);
+                contentWriter.Write(sizeY);
+                contentWriter.Write(sizeZ);
+            });
+
+            WriteChunk(childrenWriter, "XYZI", contentWriter =>
+            {
+                contentWriter.Write(voxels.Count);
+                for (int i = 0; i < voxels.Count; i++)
+                {
+                    var v = voxels[i];
+                    contentWriter.Write((byte)(v.X - minX));
+                    contentWriter.Write((byte)(v.Y - minY));
+                    contentWriter.Write((byte)(v.Z - minZ));
+                    contentWriter.Write(v.PaletteIndex);
+                }
+            });
+
+            WriteChunk(childrenWriter, "RGBA", contentWriter =>
+            {
+                for (int i = 0; i < 256; i++)
+                {
+                    uint rgba = i == 0 || i > palette.Count ? 0u : BgraToRgba(palette[i - 1]);
+                    contentWriter.Write((byte)(rgba & 0xFF));
+                    contentWriter.Write((byte)((rgba >> 8) & 0xFF));
+                    contentWriter.Write((byte)((rgba >> 16) & 0xFF));
+                    contentWriter.Write((byte)((rgba >> 24) & 0xFF));
+                }
+            });
+
+            byte[] childrenBytes = childrenStream.ToArray();
+            using var outStream = new MemoryStream(32 + childrenBytes.Length);
+            using var writer = new BinaryWriter(outStream, Utf8NoBom, leaveOpen: true);
+            writer.Write(Encoding.ASCII.GetBytes("VOX "));
+            writer.Write(150); // VOX version
+            writer.Write(Encoding.ASCII.GetBytes("MAIN"));
+            writer.Write(0); // main content size
+            writer.Write(childrenBytes.Length); // child chunks size
+            writer.Write(childrenBytes);
+
+            return outStream.ToArray();
+        }
+
+        private static TransformedVoxelBounds? ComputeTransformedVoxelBounds(VoxelVolume? volume, ModelAxisPreset axisPreset)
+        {
+            if (volume == null || volume.OccupiedCount <= 0)
+                return null;
+
+            int minX = int.MaxValue;
+            int minY = int.MaxValue;
+            int minZ = int.MaxValue;
+            int maxX = int.MinValue;
+            int maxY = int.MinValue;
+            int maxZ = int.MinValue;
+            int size = volume.Size;
+
+            for (int z = 0; z < size; z++)
+            {
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        if (!volume.IsOccupied(x, y, z))
+                            continue;
+
+                        var tc = TransformVoxelCoordinate(x, y, z, axisPreset);
+                        if (tc.X < minX) minX = tc.X;
+                        if (tc.Y < minY) minY = tc.Y;
+                        if (tc.Z < minZ) minZ = tc.Z;
+                        if (tc.X > maxX) maxX = tc.X;
+                        if (tc.Y > maxY) maxY = tc.Y;
+                        if (tc.Z > maxZ) maxZ = tc.Z;
+                    }
+                }
+            }
+
+            if (minX == int.MaxValue)
+                return null;
+
+            return new TransformedVoxelBounds(minX, minY, minZ, maxX, maxY, maxZ);
+        }
+
+        private static void WriteChunk(BinaryWriter writer, string id, Action<BinaryWriter> writeContent)
+        {
+            using var contentStream = new MemoryStream();
+            using (var contentWriter = new BinaryWriter(contentStream, Utf8NoBom, leaveOpen: true))
+            {
+                writeContent(contentWriter);
+            }
+
+            byte[] contentBytes = contentStream.ToArray();
+            writer.Write(Encoding.ASCII.GetBytes(id));
+            writer.Write(contentBytes.Length);
+            writer.Write(0); // no nested children
+            writer.Write(contentBytes);
+        }
+
+        private static uint GetRepresentativeVoxelColor(VoxelVolume volume, int x, int y, int z)
+        {
+            int sumR = 0, sumG = 0, sumB = 0, count = 0;
+            foreach (Face face in Enum.GetValues(typeof(Face)))
+            {
+                var c = volume.GetFaceColor(x, y, z, face);
+                if (c.A == 0)
+                    continue;
+                sumR += c.R;
+                sumG += c.G;
+                sumB += c.B;
+                count++;
+            }
+
+            if (count <= 0)
+            {
+                var fallback = volume.GetFaceColor(x, y, z, Face.Front);
+                return ToBgra(fallback);
+            }
+
+            byte r = (byte)(sumR / count);
+            byte g = (byte)(sumG / count);
+            byte b = (byte)(sumB / count);
+            return (0xFFu << 24) | ((uint)r << 16) | ((uint)g << 8) | b;
+        }
+
+        private static byte ResolveVoxPaletteIndex(uint color, List<uint> palette, Dictionary<uint, byte> lookup)
+        {
+            if (lookup.TryGetValue(color, out byte existing))
+                return existing;
+
+            if (palette.Count < 255)
+            {
+                byte next = (byte)(palette.Count + 1);
+                palette.Add(color);
+                lookup[color] = next;
+                return next;
+            }
+
+            byte nearest = FindNearestPaletteIndex(color, palette);
+            lookup[color] = nearest;
+            return nearest;
+        }
+
+        private static byte FindNearestPaletteIndex(uint color, List<uint> palette)
+        {
+            int r = (int)((color >> 16) & 0xFF);
+            int g = (int)((color >> 8) & 0xFF);
+            int b = (int)(color & 0xFF);
+            int bestScore = int.MaxValue;
+            byte bestIndex = 1;
+
+            for (int i = 0; i < palette.Count; i++)
+            {
+                uint c = palette[i];
+                int dr = r - (int)((c >> 16) & 0xFF);
+                int dg = g - (int)((c >> 8) & 0xFF);
+                int db = b - (int)(c & 0xFF);
+                int score = (dr * dr) + (dg * dg) + (db * db);
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    bestIndex = (byte)(i + 1);
+                }
+            }
+
+            return bestIndex;
+        }
+
+        private static uint BgraToRgba(uint bgra)
+        {
+            byte b = (byte)(bgra & 0xFF);
+            byte g = (byte)((bgra >> 8) & 0xFF);
+            byte r = (byte)((bgra >> 16) & 0xFF);
+            byte a = (byte)((bgra >> 24) & 0xFF);
+            return ((uint)r) | ((uint)g << 8) | ((uint)b << 16) | ((uint)a << 24);
+        }
+
+        private static (int X, int Y, int Z) TransformVoxelCoordinate(int x, int y, int z, ModelAxisPreset axisPreset)
+            => axisPreset switch
+            {
+                ModelAxisPreset.BlenderZUp => (x, z, -y),
+                _ => (x, y, z),
+            };
+
+        private static List<ExportTriangle> BuildExportTriangles(VoxelVolume volume, VoxelModelExportOptions options)
+        {
+            int size = volume.Size;
+            var quads = BuildExportFaceQuads(volume, options.MeshMode);
+            var triangles = new List<ExportTriangle>(Math.Max(1, quads.Count * 2));
+
+            for (int i = 0; i < quads.Count; i++)
+            {
+                GetTransformedFaceVertices(quads[i], size, options, out var p0, out var p1, out var p2, out var p3);
+
+                var n = Vector3.Cross(p1 - p0, p2 - p0);
+                if (n.LengthSquared() <= 1e-12f)
+                    continue;
+                n = Vector3.Normalize(n);
+
+                triangles.Add(new ExportTriangle(p0, p1, p2, n, quads[i].ColorBgra));
+                triangles.Add(new ExportTriangle(p0, p2, p3, n, quads[i].ColorBgra));
+            }
+
+            return triangles;
+        }
+
+        private static void GetTransformedFaceVertices(
+            ExportFaceQuad faceQuad,
+            int volumeSize,
+            VoxelModelExportOptions options,
+            out Vector3 p0,
+            out Vector3 p1,
+            out Vector3 p2,
+            out Vector3 p3)
+        {
+            float unitScale = Math.Clamp(options.UnitScale, 0.0001f, 10000f);
+            Vector3 pivotOffset = GetModelPivotOffset(volumeSize, options.PivotPreset);
+
+            GetFaceQuadVertices(
+                faceQuad.Face,
+                faceQuad.X + pivotOffset.X,
+                faceQuad.Y + pivotOffset.Y,
+                faceQuad.Z + pivotOffset.Z,
+                faceQuad.Width,
+                faceQuad.Height,
+                out p0,
+                out p1,
+                out p2,
+                out p3);
+
+            p0 *= unitScale;
+            p1 *= unitScale;
+            p2 *= unitScale;
+            p3 *= unitScale;
+
+            p0 = TransformExportVertex(p0, options.AxisPreset);
+            p1 = TransformExportVertex(p1, options.AxisPreset);
+            p2 = TransformExportVertex(p2, options.AxisPreset);
+            p3 = TransformExportVertex(p3, options.AxisPreset);
+        }
+
+        private static List<ExportFaceQuad> BuildExportFaceQuads(VoxelVolume volume, ModelMeshMode mode)
+            => mode == ModelMeshMode.MergeCoplanar
+                ? BuildMergedExportFaceQuads(volume)
+                : BuildPerVoxelExportFaceQuads(volume);
+
+        private static List<ExportFaceQuad> BuildPerVoxelExportFaceQuads(VoxelVolume volume)
+        {
+            int size = volume.Size;
+            var quads = new List<ExportFaceQuad>(Math.Max(128, volume.OccupiedCount * 3));
+
+            for (int z = 0; z < size; z++)
+            {
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        if (!volume.IsOccupied(x, y, z))
+                            continue;
+
+                        TryAddFace(Face.Front, x, y, z, 0, 0, -1);
+                        TryAddFace(Face.Back, x, y, z, 0, 0, 1);
+                        TryAddFace(Face.Left, x, y, z, -1, 0, 0);
+                        TryAddFace(Face.Right, x, y, z, 1, 0, 0);
+                        TryAddFace(Face.Top, x, y, z, 0, 1, 0);
+                        TryAddFace(Face.Bottom, x, y, z, 0, -1, 0);
+                    }
+                }
+            }
+
+            return quads;
+
+            void TryAddFace(Face face, int x, int y, int z, int nx, int ny, int nz)
+            {
+                if (volume.IsOccupied(x + nx, y + ny, z + nz))
+                    return;
+                quads.Add(new ExportFaceQuad(face, x, y, z, 1, 1, ToBgra(volume.GetFaceColor(x, y, z, face))));
+            }
+        }
+
+        private static List<ExportFaceQuad> BuildMergedExportFaceQuads(VoxelVolume volume)
+        {
+            int size = volume.Size;
+            var quads = new List<ExportFaceQuad>(Math.Max(64, volume.OccupiedCount));
+
+            // Front/back faces (planes across Z; merged over X/Y).
+            for (int z = 0; z < size; z++)
+            {
+                BuildPlaneQuads(
+                    width: size,
+                    height: size,
+                    tryGetColor: (int u, int v, out uint color) =>
+                    {
+                        int x = u;
+                        int y = v;
+                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y, z - 1))
+                        {
+                            color = 0;
+                            return false;
+                        }
+
+                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Front));
+                        return true;
+                    },
+                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Front, u, v, z, w, h, color)));
+
+                BuildPlaneQuads(
+                    width: size,
+                    height: size,
+                    tryGetColor: (int u, int v, out uint color) =>
+                    {
+                        int x = u;
+                        int y = v;
+                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y, z + 1))
+                        {
+                            color = 0;
+                            return false;
+                        }
+
+                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Back));
+                        return true;
+                    },
+                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Back, u, v, z, w, h, color)));
+            }
+
+            // Left/right faces (planes across X; merged over Z/Y).
+            for (int x = 0; x < size; x++)
+            {
+                BuildPlaneQuads(
+                    width: size,
+                    height: size,
+                    tryGetColor: (int u, int v, out uint color) =>
+                    {
+                        int z = u;
+                        int y = v;
+                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x - 1, y, z))
+                        {
+                            color = 0;
+                            return false;
+                        }
+
+                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Left));
+                        return true;
+                    },
+                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Left, x, v, u, w, h, color)));
+
+                BuildPlaneQuads(
+                    width: size,
+                    height: size,
+                    tryGetColor: (int u, int v, out uint color) =>
+                    {
+                        int z = u;
+                        int y = v;
+                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x + 1, y, z))
+                        {
+                            color = 0;
+                            return false;
+                        }
+
+                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Right));
+                        return true;
+                    },
+                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Right, x, v, u, w, h, color)));
+            }
+
+            // Top/bottom faces (planes across Y; merged over X/Z).
+            for (int y = 0; y < size; y++)
+            {
+                BuildPlaneQuads(
+                    width: size,
+                    height: size,
+                    tryGetColor: (int u, int v, out uint color) =>
+                    {
+                        int x = u;
+                        int z = v;
+                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y + 1, z))
+                        {
+                            color = 0;
+                            return false;
+                        }
+
+                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Top));
+                        return true;
+                    },
+                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Top, u, y, v, w, h, color)));
+
+                BuildPlaneQuads(
+                    width: size,
+                    height: size,
+                    tryGetColor: (int u, int v, out uint color) =>
+                    {
+                        int x = u;
+                        int z = v;
+                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y - 1, z))
+                        {
+                            color = 0;
+                            return false;
+                        }
+
+                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Bottom));
+                        return true;
+                    },
+                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Bottom, u, y, v, w, h, color)));
+            }
+
+            return quads;
+        }
+
+        private static void BuildPlaneQuads(
+            int width,
+            int height,
+            TryGetPlaneColor tryGetColor,
+            Action<int, int, int, int, uint> emit)
+        {
+            var colors = new uint[width * height];
+            var mask = new bool[width * height];
+
+            for (int v = 0; v < height; v++)
+            {
+                for (int u = 0; u < width; u++)
+                {
+                    int idx = (v * width) + u;
+                    if (!tryGetColor(u, v, out uint color))
+                        continue;
+                    mask[idx] = true;
+                    colors[idx] = color;
+                }
+            }
+
+            var visited = new bool[width * height];
+            for (int v = 0; v < height; v++)
+            {
+                for (int u = 0; u < width; u++)
+                {
+                    int idx = (v * width) + u;
+                    if (!mask[idx] || visited[idx])
+                        continue;
+
+                    uint color = colors[idx];
+                    int quadW = 1;
+                    while ((u + quadW) < width)
+                    {
+                        int n = (v * width) + (u + quadW);
+                        if (!mask[n] || visited[n] || colors[n] != color)
+                            break;
+                        quadW++;
+                    }
+
+                    int quadH = 1;
+                    while ((v + quadH) < height)
+                    {
+                        bool rowOk = true;
+                        for (int ux = 0; ux < quadW; ux++)
+                        {
+                            int n = ((v + quadH) * width) + (u + ux);
+                            if (!mask[n] || visited[n] || colors[n] != color)
+                            {
+                                rowOk = false;
+                                break;
+                            }
+                        }
+
+                        if (!rowOk)
+                            break;
+                        quadH++;
+                    }
+
+                    for (int vy = 0; vy < quadH; vy++)
+                    {
+                        for (int ux = 0; ux < quadW; ux++)
+                        {
+                            visited[((v + vy) * width) + (u + ux)] = true;
+                        }
+                    }
+
+                    emit(u, v, quadW, quadH, color);
+                }
+            }
+        }
+
+        private static uint ToBgra(Rgba32 c)
+            => ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
+
+        private static string EncodeObjPathToken(string fileName)
+            => (fileName ?? string.Empty)
+                .Replace('\\', '/')
+                .Replace(" ", "\\ ");
+
+        private static Vector3 GetModelPivotOffset(int size, ModelPivotPreset pivotPreset)
+        {
+            float half = MathF.Max(1f, size) * 0.5f;
+            return pivotPreset switch
+            {
+                ModelPivotPreset.BottomCenter => new Vector3(-half, 0f, -half),
+                ModelPivotPreset.Origin => Vector3.Zero,
+                _ => new Vector3(-half, -half, -half),
+            };
+        }
+
+        private static Vector3 TransformExportVertex(Vector3 p, ModelAxisPreset axisPreset)
+            => axisPreset switch
+            {
+                ModelAxisPreset.BlenderZUp => new Vector3(p.X, p.Z, -p.Y),
+                _ => p,
+            };
+
+        private static void AppendVertex(StringBuilder sb, Vector3 p)
+        {
+            sb.Append("v ")
+              .Append(p.X.ToString("0.######", CultureInfo.InvariantCulture)).Append(' ')
+              .Append(p.Y.ToString("0.######", CultureInfo.InvariantCulture)).Append(' ')
+              .Append(p.Z.ToString("0.######", CultureInfo.InvariantCulture)).AppendLine();
+        }
+
+        private static void AppendUv(StringBuilder sb, float u, float v)
+        {
+            sb.Append("vt ")
+              .Append(u.ToString("0.######", CultureInfo.InvariantCulture)).Append(' ')
+              .Append(v.ToString("0.######", CultureInfo.InvariantCulture)).AppendLine();
+        }
+
+        private static void GetFaceQuadVertices(
+            Face face,
+            float x,
+            float y,
+            float z,
+            int width,
+            int height,
+            out Vector3 p0,
+            out Vector3 p1,
+            out Vector3 p2,
+            out Vector3 p3)
+        {
+            // Local voxel corners in [0,1] space; matches renderer face orientation.
+            width = Math.Max(1, width);
+            height = Math.Max(1, height);
+            float w = width;
+            float h = height;
+
+            switch (face)
+            {
+                case Face.Back:
+                    p0 = new Vector3(x + 0f, y + 0f, z + 1f);
+                    p1 = new Vector3(x + w, y + 0f, z + 1f);
+                    p2 = new Vector3(x + w, y + h, z + 1f);
+                    p3 = new Vector3(x + 0f, y + h, z + 1f);
+                    break;
+                case Face.Front:
+                    p0 = new Vector3(x + w, y + 0f, z + 0f);
+                    p1 = new Vector3(x + 0f, y + 0f, z + 0f);
+                    p2 = new Vector3(x + 0f, y + h, z + 0f);
+                    p3 = new Vector3(x + w, y + h, z + 0f);
+                    break;
+                case Face.Left:
+                    p0 = new Vector3(x + 0f, y + 0f, z + 0f);
+                    p1 = new Vector3(x + 0f, y + 0f, z + w);
+                    p2 = new Vector3(x + 0f, y + h, z + w);
+                    p3 = new Vector3(x + 0f, y + h, z + 0f);
+                    break;
+                case Face.Right:
+                    p0 = new Vector3(x + 1f, y + 0f, z + w);
+                    p1 = new Vector3(x + 1f, y + 0f, z + 0f);
+                    p2 = new Vector3(x + 1f, y + h, z + 0f);
+                    p3 = new Vector3(x + 1f, y + h, z + w);
+                    break;
+                case Face.Top:
+                    p0 = new Vector3(x + 0f, y + 1f, z + h);
+                    p1 = new Vector3(x + w, y + 1f, z + h);
+                    p2 = new Vector3(x + w, y + 1f, z + 0f);
+                    p3 = new Vector3(x + 0f, y + 1f, z + 0f);
+                    break;
+                default:
+                    p0 = new Vector3(x + 0f, y + 0f, z + 0f);
+                    p1 = new Vector3(x + w, y + 0f, z + 0f);
+                    p2 = new Vector3(x + w, y + 0f, z + h);
+                    p3 = new Vector3(x + 0f, y + 0f, z + h);
+                    break;
+            }
+        }
+
+        private static void TrimTransparentBoundsBgra(
+            byte[] source,
+            int sourceWidth,
+            int sourceHeight,
+            int padding,
+            out byte[] trimmed,
+            out int trimmedWidth,
+            out int trimmedHeight)
+        {
+            trimmed = Array.Empty<byte>();
+            trimmedWidth = 1;
+            trimmedHeight = 1;
+
+            if (source == null || sourceWidth <= 0 || sourceHeight <= 0 || source.Length < sourceWidth * sourceHeight * 4)
+            {
+                trimmed = new byte[4];
+                return;
+            }
+
+            int minX = sourceWidth;
+            int minY = sourceHeight;
+            int maxX = -1;
+            int maxY = -1;
+
+            for (int y = 0; y < sourceHeight; y++)
+            {
+                int row = y * sourceWidth;
+                for (int x = 0; x < sourceWidth; x++)
+                {
+                    int a = source[((row + x) * 4) + 3];
+                    if (a == 0)
+                        continue;
+
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+            {
+                trimmed = new byte[4];
+                return;
+            }
+
+            padding = Math.Clamp(padding, 0, 128);
+            minX = Math.Max(0, minX - padding);
+            minY = Math.Max(0, minY - padding);
+            maxX = Math.Min(sourceWidth - 1, maxX + padding);
+            maxY = Math.Min(sourceHeight - 1, maxY + padding);
+
+            trimmedWidth = Math.Max(1, (maxX - minX) + 1);
+            trimmedHeight = Math.Max(1, (maxY - minY) + 1);
+            trimmed = new byte[trimmedWidth * trimmedHeight * 4];
+
+            for (int y = 0; y < trimmedHeight; y++)
+            {
+                int srcY = minY + y;
+                int srcOffset = ((srcY * sourceWidth) + minX) * 4;
+                int dstOffset = y * trimmedWidth * 4;
+                Buffer.BlockCopy(source, srcOffset, trimmed, dstOffset, trimmedWidth * 4);
+            }
+        }
+
+        private static async Task<byte[]> EncodeBgraPngBytesAsync(
+            int width,
+            int height,
+            byte[] pixels,
+            bool transparentBackground)
+        {
+            try
+            {
+                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
+                    Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId,
+                    stream);
+
+                encoder.SetPixelData(
+                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
+                    transparentBackground
+                        ? Windows.Graphics.Imaging.BitmapAlphaMode.Straight
+                        : Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
+                    (uint)Math.Max(1, width),
+                    (uint)Math.Max(1, height),
+                    96,
+                    96,
+                    pixels ?? Array.Empty<byte>());
+
+                await encoder.FlushAsync();
+                stream.Seek(0);
+
+                using var ms = new MemoryStream();
+                using var src = stream.AsStreamForRead();
+                await src.CopyToAsync(ms);
+                return ms.ToArray();
+            }
+            catch (NotImplementedException)
+            {
+                return await Task.Run(() =>
+                    SkiaImageEncoder.EncodeToBytes(
+                        pixels ?? Array.Empty<byte>(),
+                        Math.Max(1, width),
+                        Math.Max(1, height),
+                        SkiaImageEncoder.ImageFormat.Png));
+            }
+        }
+
+        private static async Task SaveBgraPngAsync(
+            string filePath,
+            int width,
+            int height,
+            byte[] pixels,
+            bool transparentBackground)
+        {
+            if (!System.IO.File.Exists(filePath))
+            {
+                await System.IO.File.WriteAllBytesAsync(filePath, Array.Empty<byte>());
+            }
+
+            try
+            {
+                var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(filePath);
+                using var stream = await storageFile.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite);
+                var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
+                    Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, stream);
+
+                encoder.SetPixelData(
+                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
+                    transparentBackground
+                        ? Windows.Graphics.Imaging.BitmapAlphaMode.Straight
+                        : Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
+                    (uint)Math.Max(1, width), (uint)Math.Max(1, height),
+                    96, 96,
+                    pixels);
+
+                await encoder.FlushAsync();
+            }
+            catch (NotImplementedException)
+            {
+                await Task.Run(() =>
+                    SkiaImageEncoder.Encode(
+                        pixels,
+                        Math.Max(1, width),
+                        Math.Max(1, height),
+                        filePath,
+                        SkiaImageEncoder.ImageFormat.Png));
+            }
+        }
+
+        private static async Task SaveBgraTextureToPngAsync(string filePath, int width, int height, byte[] pixels)
+            => await SaveBgraPngAsync(filePath, width, height, pixels, transparentBackground: false);
+
+        private readonly record struct ObjExportData(
+            string ObjText,
+            string MtlText,
+            int TextureWidth,
+            int TextureHeight,
+            byte[] TexturePixelsBgra);
 
         // ════════════════════════════════════════════════════════════════════
         // TILE PICKER ITEM
@@ -5160,3 +7504,4 @@ namespace PixlPunkt.UI.Voxel
         }
     }
 }
+

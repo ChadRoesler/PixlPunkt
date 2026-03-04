@@ -417,30 +417,15 @@ namespace PixlPunkt.UI.CanvasHost
                     SelectionMask = selectionMask
                 };
 
-                bool hasTileMapping = rl.TileMapping != null && Document.TileSet != null;
-                if (hasTileMapping)
-                {
-                    // Capture pre-fill tile/layer state so mapped fills become tile write-through edits.
-                    BeginLiveTilePropagation();
-                }
+                bool hasTileMapping = BeginTileWriteThroughIfMapped();
 
                 var result = fillReg.EffectiveFillPainter.FillAt(rl, fx, fy, context);
                 TileMappedPixelChangeItem? tileMappedItem = null;
 
                 if (hasTileMapping)
                 {
-                    if (result is PixelChangeItem fillPixelItem)
-                    {
-                        var bounds = fillPixelItem.GetBoundingRect();
-                        if (bounds.HasValue)
-                        {
-                            var b = bounds.Value;
-                            PropagateLiveTileChanges(b.minX, b.minY, b.maxX, b.maxY);
-                        }
-                    }
-
                     // Finalize and build tile-aware history (if mapped tiles were touched).
-                    tileMappedItem = EndLiveTilePropagation(result?.Description ?? context.Description);
+                    tileMappedItem = FinalizeTileWriteThrough(result, context.Description);
                 }
 
                 if (result != null) result.HistoryIcon = icon;

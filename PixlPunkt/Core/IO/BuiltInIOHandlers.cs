@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Serialization;
 
 namespace PixlPunkt.Core.IO
@@ -376,7 +377,7 @@ namespace PixlPunkt.Core.IO
                 .WithFormat(".png", "PNG Image", "Portable Network Graphics image")
                 .WithPriority(100)
                 .WithMagicBytes([0x89, 0x50, 0x4E, 0x47]) // PNG magic
-                .WithHandler(ctx => ImportImageWithGdi(ctx))
+                .WithHandler(ctx => ImportImageWithSkia(ctx))
                 .Build();
         }
 
@@ -389,7 +390,7 @@ namespace PixlPunkt.Core.IO
                 .WithFormat(".bmp", "BMP Image", "Windows Bitmap image")
                 .WithPriority(100)
                 .WithMagicBytes([0x42, 0x4D]) // "BM"
-                .WithHandler(ctx => ImportImageWithGdi(ctx))
+                .WithHandler(ctx => ImportImageWithSkia(ctx))
                 .Build();
         }
 
@@ -404,7 +405,7 @@ namespace PixlPunkt.Core.IO
                 .WithMagicBytes([0xFF, 0xD8, 0xFF]) // JPEG magic
                 .WithCanImport((ext, _) => ext.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
                                            ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))
-                .WithHandler(ctx => ImportImageWithGdi(ctx))
+                .WithHandler(ctx => ImportImageWithSkia(ctx))
                 .Build();
         }
 
@@ -417,85 +418,40 @@ namespace PixlPunkt.Core.IO
                 .WithFormat(".gif", "GIF Image", "Graphics Interchange Format image")
                 .WithPriority(100)
                 .WithMagicBytes([0x47, 0x49, 0x46]) // "GIF"
-                .WithHandler(ctx => ImportImageWithGdi(ctx))
+                .WithHandler(ctx => ImportImageWithSkia(ctx))
                 .Build();
         }
 
         /// <summary>
-        /// Imports an image using System.Drawing (GDI+).
+        /// Imports an image using SkiaSharp decode path.
         /// </summary>
-        private static ImageImportResult ImportImageWithGdi(IImportContext ctx)
+        private static ImageImportResult ImportImageWithSkia(IImportContext ctx)
         {
             try
             {
                 var bytes = ctx.ReadAllBytes();
-                using var ms = new MemoryStream(bytes);
-                using var bmp = new System.Drawing.Bitmap(ms);
+                var (bgraPixels, width, height) = SkiaImageEncoder.DecodeFromBytes(bytes);
+                var pixels = new uint[width * height];
 
-                int width = bmp.Width;
-                int height = bmp.Height;
-
-                // Convert to 32bpp ARGB and extract pixels
-                var rect = new System.Drawing.Rectangle(0, 0, width, height);
-
-                System.Drawing.Bitmap? converted = null;
-                try
+                for (int i = 0; i < pixels.Length; i++)
                 {
-                    if (bmp.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppArgb)
-                    {
-                        converted = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                        using (var g = System.Drawing.Graphics.FromImage(converted))
-                        {
-                            g.DrawImage(bmp, 0, 0, width, height);
-                        }
-                    }
+                    int offset = i * 4;
+                    byte b = bgraPixels[offset + 0];
+                    byte g = bgraPixels[offset + 1];
+                    byte r = bgraPixels[offset + 2];
+                    byte a = bgraPixels[offset + 3];
 
-                    var source = converted ?? bmp;
-                    var data = source.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly,
-                        System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-
-                    try
-                    {
-                        var pixels = new uint[width * height];
-                        int stride = data.Stride;
-
-                        unsafe
-                        {
-                            byte* srcBase = (byte*)data.Scan0;
-                            for (int y = 0; y < height; y++)
-                            {
-                                byte* srcRow = srcBase + y * stride;
-                                for (int x = 0; x < width; x++)
-                                {
-                                    int offset = x * 4;
-                                    byte b = srcRow[offset];
-                                    byte g = srcRow[offset + 1];
-                                    byte r = srcRow[offset + 2];
-                                    byte a = srcRow[offset + 3];
-
-                                    // Pack as ARGB uint (matches PixlPunkt internal format)
-                                    pixels[y * width + x] = ((uint)a << 24) | ((uint)r << 16) | ((uint)g << 8) | b;
-                                }
-                            }
-                        }
-
-                        return new ImageImportResult
-                        {
-                            Pixels = pixels,
-                            Width = width,
-                            Height = height,
-                            SuggestedName = Path.GetFileNameWithoutExtension(ctx.FileName)
-                        };
-                    }
-                    finally
-                    {
-                        source.UnlockBits(data);
-                    }
+                    // Pack as ARGB uint (matches PixlPunkt internal format)
+                    pixels[i] = ((uint)a << 24) | ((uint)r << 16) | ((uint)g << 8) | b;
                 }
-                finally
+
+                return new ImageImportResult
                 {
-                    converted?.Dispose();
-                }
+                    Pixels = pixels,
+                    Width = width,
+                    Height = height,
+                    SuggestedName = Path.GetFileNameWithoutExtension(ctx.FileName)
+                };
             }
             catch (Exception ex)
             {

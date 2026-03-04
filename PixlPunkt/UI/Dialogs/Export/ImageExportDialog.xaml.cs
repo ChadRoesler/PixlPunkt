@@ -24,6 +24,7 @@ namespace PixlPunkt.UI.Dialogs.Export
     /// Dialog for exporting single images in various formats (PNG, GIF, BMP, JPEG, TIFF).
     /// Supports scaling, background color selection for non-alpha formats, and layer separation.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Uno", "Uno0006", Justification = "Dialog UI is intentionally built in code for dynamic export options.")]
     public sealed partial class ImageExportDialog : ContentDialog
     {
         private readonly CanvasDocument _document;
@@ -303,7 +304,7 @@ namespace PixlPunkt.UI.Dialogs.Export
 
             WindowHost.FitToContentAfterLayout(
                 colorPicker,
-                (FrameworkElement)colorPicker.Content,
+                colorPicker.Content,
                 maxScreenFraction: 0.90,
                 minLogicalWidth: 420,
                 minLogicalHeight: 380);
@@ -419,11 +420,10 @@ namespace PixlPunkt.UI.Dialogs.Export
             await encoder.FlushAsync();
 
             stream.Seek(0);
-            var reader = new Windows.Storage.Streams.DataReader(stream.GetInputStreamAt(0));
-            var bytes = new byte[stream.Size];
-            await reader.LoadAsync((uint)stream.Size);
-            reader.ReadBytes(bytes);
-            return bytes;
+            using var ms = new System.IO.MemoryStream();
+            using var src = stream.AsStreamForRead();
+            await src.CopyToAsync(ms);
+            return ms.ToArray();
         }
 
         /// <summary>
@@ -474,3 +474,4 @@ namespace PixlPunkt.UI.Dialogs.Export
         }
     }
 }
+

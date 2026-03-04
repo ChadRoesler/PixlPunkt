@@ -21,90 +21,90 @@
                 Background="{ThemeResource LayerFillColorDefaultBrush}" 
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
                 BorderThickness="0,0,1,0">
-            <ListBox x:Name="NavList" 
+            <ListView x:Name="NavList" 
                      SelectionMode="Single" 
                      Background="Transparent"
                      Padding="8">
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
                         <Setter Property="Padding" Value="12,10"/>
                         <Setter Property="Margin" Value="0,2"/>
                         <Setter Property="CornerRadius" Value="6"/>
                     </Style>
-                </ListBox.ItemContainerStyle>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                </ListView.ItemContainerStyle>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="AppGeneric" />
                             <TextBlock Text="General" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="Keyboard" />
                             <TextBlock Text="Shortcuts" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="DockRow" />
                             <TextBlock Text="Palette" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="Grid" />
                             <TextBlock Text="Tiles" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="PaintBrush" />
                             <TextBlock Text="Brushes" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="DocumentFit" />
                             <TextBlock Text="Templates" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="Play" />
                             <TextBlock Text="Animation" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="ArrowExport" />
                             <TextBlock Text="Export" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <ListBoxItem.Content>
+                    </ListViewItem.Content>
+                </ListViewItem>
+                <ListViewItem>
+                    <ListViewItem.Content>
                         <StackPanel Orientation="Horizontal" Padding="4">
                             <ic:FluentIcon Icon="PlugDisconnected" />
                             <TextBlock Text="Plugins" Margin="8,0,8,0"/>
                         </StackPanel>
-                    </ListBoxItem.Content>
-                </ListBoxItem>
-            </ListBox>
+                    </ListViewItem.Content>
+                </ListViewItem>
+            </ListView>
         </Border>
 
         <!-- Right content area -->
@@ -939,3 +939,4 @@
         </Border>
     </Grid>
 </Window>
+

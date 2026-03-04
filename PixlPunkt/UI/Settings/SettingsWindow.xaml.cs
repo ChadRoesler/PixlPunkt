@@ -361,7 +361,7 @@ namespace PixlPunkt.UI.Settings
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = (Content as FrameworkElement)?.XamlRoot,
                 Title = "Delete Palette",
                 Content = $"Are you sure you want to delete the palette \"{selected.Name}\"?\n\nThis cannot be undone.",
                 PrimaryButtonText = "Delete",
@@ -496,7 +496,7 @@ namespace PixlPunkt.UI.Settings
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = (Content as FrameworkElement)?.XamlRoot,
                 Title = "Delete Template",
                 Content = $"Are you sure you want to delete the template \"{selected.Name}\"?\n\nThis cannot be undone.",
                 PrimaryButtonText = "Delete",
@@ -930,3 +930,4 @@ namespace PixlPunkt.UI.Settings
         }
     }
 }
+

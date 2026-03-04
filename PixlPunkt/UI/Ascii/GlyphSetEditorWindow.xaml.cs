@@ -783,7 +783,7 @@ namespace PixlPunkt.UI.Ascii
                     PrimaryButtonText = "Delete",
                     CloseButtonText = "Cancel",
                     DefaultButton = ContentDialogButton.Close,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = (Content as FrameworkElement)?.XamlRoot
                 };
 
                 var result = await dialog.ShowAsync();
@@ -833,7 +833,7 @@ namespace PixlPunkt.UI.Ascii
                 PrimaryButtonText = "Delete",
                 CloseButtonText = "Cancel",
                 DefaultButton = ContentDialogButton.Close,
-                XamlRoot = Content.XamlRoot
+                XamlRoot = (Content as FrameworkElement)?.XamlRoot
             };
 
             var res = await dlg.ShowAsync();
@@ -1076,3 +1076,4 @@ namespace PixlPunkt.UI.Ascii
         }
     }
 }
+

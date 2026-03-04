@@ -173,7 +173,29 @@ Effects are non-destructive - toggle them on/off anytime with <img src="assets/i
 
 ---
 
-## 8. Animate Your Sprites
+## 8. Build a Voxel Workspace from Tiles (Optional)
+
+If your document uses tiles, you can build and edit a voxel model in-tab:
+
+1. Open **Tiles → Voxel Preview…**
+2. Pick face sources in **Face Mapping**:
+   - `3 Faces (mirrored)` for quick setup
+   - `6 Faces (individual)` for full control
+3. Click **Build Voxel**
+4. Use voxel tools in the viewport strip:
+   - Face Paint / Dropper / Erase
+   - Voxel Create / Delete / Select / Move
+5. Use **Display** options for Outline, Pixel Preview, and Backdrop Cage
+6. Use **Actions**:
+   - `Reload Tiles` or `Reload + Build` after tile edits
+   - `Export Image…` for preview output
+   - `Export Model…` for OBJ, GLB, STL, or VOX
+
+For full controls and shortcuts: [Voxel Workspace wiki page](https://github.com/ChadRoesler/PixlPunkt/wiki/Voxel-Workspace).
+
+---
+
+## 9. Animate Your Sprites
 
 PixlPunkt has two animation systems for different needs:
 
@@ -261,7 +283,7 @@ Tile animation uses coordinates in a tileset rather than full frames:
 
 ---
 
-## 9. Save Your Work
+## 10. Save Your Work
 
 ### Quick Save
 Press `Ctrl+S` to save as `.pxp` (PixlPunkt format)
@@ -274,7 +296,7 @@ Press `Ctrl+S` to save as `.pxp` (PixlPunkt format)
 
 ---
 
-## 10. Keyboard Shortcuts Cheat Sheet
+## 11. Keyboard Shortcuts Cheat Sheet
 
 ```
 File                    Tools
@@ -304,13 +326,14 @@ Right-click  Pick
 
 ---
 
-## 11. Next Steps
+## 12. Next Steps
 
 Now that you know the basics:
 
 - **Read the full [User Guide](USER_GUIDE.md)** for all features
 - **Master Gradient Fill** <img src="assets/icons/data_sunburst_16.png" width="16"> - experiment with all dithering styles
 - **Try layer effects** <img src="assets/icons/image_sparkle_16.png" width="16"> like Glow, Scanlines, and CRT
+- **Try voxel workflow** - open **Tiles → Voxel Preview…** and build a model from tile faces
 - **Create an animation** - start with a simple 4-frame walk cycle
 - **Use the Stage** <img src="assets/icons/camera_16.png" width="16"> for cinematic camera movements
 - **Import Aseprite files** - bring in existing work

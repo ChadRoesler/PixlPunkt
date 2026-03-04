@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -118,7 +119,7 @@ namespace PixlPunkt.UI
                     Title = "Template Not Found",
                     Content = "The template file could not be found. It may have been moved or deleted.",
                     CloseButtonText = "OK",
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 BuildAdvancedTemplatesMenu(); // Refresh menu
                 return;
@@ -147,7 +148,7 @@ namespace PixlPunkt.UI
                     Title = "Template Error",
                     Content = $"Could not create document from template.\n{ex.Message}",
                     CloseButtonText = "OK",
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -166,7 +167,7 @@ namespace PixlPunkt.UI
                     Title = "No Document",
                     Content = "Open a document before exporting as a template.",
                     CloseButtonText = "OK",
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -226,7 +227,7 @@ namespace PixlPunkt.UI
                 PrimaryButtonText = "Export",
                 CloseButtonText = "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             var result = await ShowDialogGuardedAsync(dialog);
@@ -254,7 +255,7 @@ namespace PixlPunkt.UI
                     Content = $"Template '{templateName}' has been saved.\n\n" +
                               $"You can create new documents from it via:\nFile ? New from Template",
                     CloseButtonText = "OK",
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
 
                 LoggingService.Info("Exported advanced template: {TemplateName} -> {Path}", templateName, templatePath);
@@ -267,7 +268,7 @@ namespace PixlPunkt.UI
                     Title = "Export Failed",
                     Content = $"Could not save template.\n{ex.Message}",
                     CloseButtonText = "OK",
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -325,10 +326,13 @@ namespace PixlPunkt.UI
                 await encoder.FlushAsync();
 
                 stream.Seek(0);
-                var bytes = new byte[stream.Size];
-                var reader = new DataReader(stream.GetInputStreamAt(0));
-                await reader.LoadAsync((uint)stream.Size);
-                reader.ReadBytes(bytes);
+                byte[] bytes;
+                using (var ms = new MemoryStream())
+                using (var src = stream.AsStreamForRead())
+                {
+                    await src.CopyToAsync(ms);
+                    bytes = ms.ToArray();
+                }
 
                 return bytes;
             }
@@ -340,3 +344,4 @@ namespace PixlPunkt.UI
         }
     }
 }
+

@@ -121,7 +121,7 @@ namespace PixlPunkt.UI
 
                     _ = new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "File missing",
                         Content = "That recent file can't be found anymore. I removed it from the list.",
                         CloseButtonText = "OK"
@@ -151,7 +151,7 @@ namespace PixlPunkt.UI
                 LoggingService.Error($"Failed to open recent document: {path}", ex);
                 _ = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Open failed",
                     Content = $"Could not open file.\n{ex.Message}",
                     CloseButtonText = "OK"
@@ -276,7 +276,7 @@ namespace PixlPunkt.UI
                 LoggingService.Error($"Failed to open autosave document: {path}", ex);
                 _ = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Open autosave failed",
                     Content = $"Could not open autosave.\n{ex.Message}",
                     CloseButtonText = "OK"
@@ -285,3 +285,4 @@ namespace PixlPunkt.UI
         }
     }
 }
+

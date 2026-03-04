@@ -15,6 +15,8 @@
 - [[Layer Masks|Masks]]
 - [[Layer Effects|Effects]]
 - [[Tiles]]
+- [[Voxel Workspace|Voxel-Workspace]]
+- [[Voxel Tools|Voxel-Tools]]
 
 **<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_16.png" width="16"> Animation**
 - [[Canvas Animation|Canvas-Animation]]

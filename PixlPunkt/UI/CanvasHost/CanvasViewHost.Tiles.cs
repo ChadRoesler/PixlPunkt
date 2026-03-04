@@ -1355,6 +1355,29 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         /// <summary>
+        /// Begins tile write-through capture when the active layer has tile mapping data.
+        /// </summary>
+        /// <returns>
+        /// <c>true</c> when tile write-through is active for this operation;
+        /// otherwise <c>false</c>.
+        /// </returns>
+        internal bool BeginTileWriteThroughIfMapped()
+        {
+            if (Document?.ActiveLayer is not RasterLayer rl)
+            {
+                return false;
+            }
+
+            bool hasTileMapping = rl.TileMapping != null && Document.TileSet != null;
+            if (hasTileMapping)
+            {
+                BeginLiveTilePropagation();
+            }
+
+            return hasTileMapping;
+        }
+
+        /// <summary>
         /// Called during painting to propagate changes to all mapped tiles in real-time.
         /// This should be called after each stamp/line operation.
         /// </summary>
@@ -1384,108 +1407,68 @@ namespace PixlPunkt.UI.CanvasHost
             var tileSet = Document.TileSet;
             if (mapping == null || tileSet == null)
                 return;
+            bool changed = TileWriteThroughPropagator.Apply(
+                rl.Surface.Pixels,
+                rl.Surface.Width,
+                rl.Surface.Height,
+                mapping,
+                tileSet,
+                affectedMinX,
+                affectedMinY,
+                affectedMaxX,
+                affectedMaxY);
 
-            int tileW = tileSet.TileWidth;
-            int tileH = tileSet.TileHeight;
-
-            // Find tiles that intersect the affected area
-            int startTileX = Math.Max(0, affectedMinX / tileW);
-            int startTileY = Math.Max(0, affectedMinY / tileH);
-            int endTileX = Math.Min(mapping.Width - 1, affectedMaxX / tileW);
-            int endTileY = Math.Min(mapping.Height - 1, affectedMaxY / tileH);
-
-            // Collect affected tile IDs
-            var affectedTileIds = new HashSet<int>();
-            for (int ty = startTileY; ty <= endTileY; ty++)
-            {
-                for (int tx = startTileX; tx <= endTileX; tx++)
-                {
-                    int tileId = mapping.GetTileId(tx, ty);
-                    if (tileId >= 0)
-                    {
-                        affectedTileIds.Add(tileId);
-                    }
-                }
-            }
-
-            if (affectedTileIds.Count == 0)
+            if (!changed)
                 return;
 
-            // For each affected tile, extract current state and propagate
-            foreach (var tileId in affectedTileIds)
-            {
-                // Find all positions with this tile
-                var positions = new List<(int tx, int ty)>();
-                for (int ty = 0; ty < mapping.Height; ty++)
-                {
-                    for (int tx = 0; tx < mapping.Width; tx++)
-                    {
-                        if (mapping.GetTileId(tx, ty) == tileId)
-                        {
-                            positions.Add((tx, ty));
-                        }
-                    }
-                }
-
-                if (positions.Count == 0)
-                    continue;
-
-                // Merge changes from all affected positions into the tile definition
-                byte[] mergedPixels = (byte[])tileSet.GetTilePixels(tileId)!.Clone();
-
-                // For each position of this tile that was in the affected area, extract pixels
-                foreach (var (tx, ty) in positions)
-                {
-                    int tileDocX = tx * tileW;
-                    int tileDocY = ty * tileH;
-
-                    // Check if this position intersects the affected area
-                    if (tileDocX + tileW <= affectedMinX || tileDocX > affectedMaxX ||
-                        tileDocY + tileH <= affectedMinY || tileDocY > affectedMaxY)
-                        continue;
-
-                    // Extract the layer pixels at this tile position
-                    byte[] layerPixels = rl.Surface.Pixels;
-                    int layerW = rl.Surface.Width;
-
-                    for (int py = 0; py < tileH; py++)
-                    {
-                        int docY = tileDocY + py;
-                        if (docY < affectedMinY || docY > affectedMaxY)
-                            continue;
-
-                        for (int px = 0; px < tileW; px++)
-                        {
-                            int docX = tileDocX + px;
-                            if (docX < affectedMinX || docX > affectedMaxX)
-                                continue;
-
-                            int srcIdx = (docY * layerW + docX) * 4;
-                            int dstIdx = (py * tileW + px) * 4;
-
-                            mergedPixels[dstIdx] = layerPixels[srcIdx];
-                            mergedPixels[dstIdx + 1] = layerPixels[srcIdx + 1];
-                            mergedPixels[dstIdx + 2] = layerPixels[srcIdx + 2];
-                            mergedPixels[dstIdx + 3] = layerPixels[srcIdx + 3];
-                        }
-                    }
-                }
-
-                // Update the tile definition
-                tileSet.UpdateTilePixels(tileId, mergedPixels);
-
-                // Propagate to all instances
-                foreach (var (tx, ty) in positions)
-                {
-                    int dstDocX = tx * tileW;
-                    int dstDocY = ty * tileH;
-                    WriteLayerRectWithoutRefresh(dstDocX, dstDocY, tileW, tileH, mergedPixels);
-                }
-            }
-
-            // Refresh display
             Document.CompositeTo(Document.Surface);
             InvalidateMainCanvas();
+        }
+
+        /// <summary>
+        /// Expands live tile write-through bounds from a pixel-history result, when available.
+        /// </summary>
+        /// <param name="result">Tool render result.</param>
+        internal bool PropagateLiveTileChangesFromResult(IRenderResult? result)
+        {
+            if (result is not PixelChangeItem pixelItem)
+            {
+                return false;
+            }
+
+            var bounds = pixelItem.GetBoundingRect();
+            if (!bounds.HasValue)
+            {
+                return false;
+            }
+
+            var b = bounds.Value;
+            PropagateLiveTileChanges(b.minX, b.minY, b.maxX, b.maxY);
+            return true;
+        }
+
+        /// <summary>
+        /// Finalizes tile write-through history from a render result.
+        /// </summary>
+        /// <param name="result">Tool render result.</param>
+        /// <param name="fallbackDescription">Description used when result is null.</param>
+        /// <param name="fallbackBounds">
+        /// Optional fallback bounds used when the render result does not include pixel bounds.
+        /// </param>
+        /// <returns>A tile-aware history item, or null if no mapped tile changes were detected.</returns>
+        internal TileMappedPixelChangeItem? FinalizeTileWriteThrough(
+            IRenderResult? result,
+            string fallbackDescription,
+            (int minX, int minY, int maxX, int maxY)? fallbackBounds = null)
+        {
+            bool hadResultBounds = PropagateLiveTileChangesFromResult(result);
+            if (!hadResultBounds && fallbackBounds.HasValue)
+            {
+                var b = fallbackBounds.Value;
+                PropagateLiveTileChanges(b.minX, b.minY, b.maxX, b.maxY);
+            }
+
+            return EndLiveTilePropagation(result?.Description ?? fallbackDescription);
         }
 
         /// <summary>

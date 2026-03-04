@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using PixlPunkt.Core.Coloring.Helpers;
 using PixlPunkt.Core.Document;
@@ -32,8 +31,7 @@ namespace PixlPunkt.Core.Palette.Helpers;
 /// <para><strong>Performance Considerations:</strong></para>
 /// <para>
 /// Uses <see cref="HashSet{T}"/> for efficient uniqueness tracking. Surface and document extraction use
-/// direct byte array access for speed. File extraction uses <see cref="Bitmap.GetPixel"/> for simplicity;
-/// for very large images, consider BitmapData locking if performance becomes an issue.
+/// direct byte array access for speed. File extraction decodes to BGRA bytes first, then performs a linear pixel scan.
 /// </para>
 /// </remarks>
 /// <seealso cref="ColorUtil"/>
@@ -154,7 +152,7 @@ public static class PaletteExtractor
     /// <summary>
     /// Extracts unique colors from an image file on disk.
     /// </summary>
-    /// <param name="path">Path to an image file (PNG, BMP, JPEG, GIF, etc.) loadable by <see cref="Bitmap"/>.</param>
+    /// <param name="path">Path to an image file (PNG, BMP, JPEG, GIF, etc.).</param>
     /// <param name="ignoreAlpha">
     /// If true, treats all pixels as fully opaque (alpha=255) for uniqueness.
     /// This merges colors differing only by alpha channel.
@@ -167,14 +165,12 @@ public static class PaletteExtractor
     /// <remarks>
     /// <para><strong>Implementation:</strong></para>
     /// <para>
-    /// Uses <see cref="Bitmap.GetPixel"/> for simplicity and compatibility with all GDI+ supported formats.
-    /// This approach is sufficient for one-off palette extraction and import operations.
+    /// Uses SkiaSharp decoding for cross-platform compatibility.
     /// </para>
     /// <para><strong>Performance Note:</strong></para>
     /// <para>
-    /// For very large images (megapixels), GetPixel can be slow. If performance becomes critical,
-    /// consider using <see cref="Bitmap.LockBits(System.Drawing.Rectangle, System.Drawing.Imaging.ImageLockMode, System.Drawing.Imaging.PixelFormat)"/> with <see cref="System.Drawing.Imaging.BitmapData"/>
-    /// for direct memory access (similar to <see cref="ExtractUniqueColorsFromSurface"/>).
+    /// For very large images (megapixels), this still traverses all pixels; extraction cost scales
+    /// linearly with image size.
     /// </para>
     /// <para><strong>Use Cases:</strong></para>
     /// <para>
@@ -189,21 +185,25 @@ public static class PaletteExtractor
         bool ignoreAlpha = true,
         bool includeFullyTransparent = false)
     {
-        using var bmp = new Bitmap(path);
         var unique = new HashSet<uint>();
+        var (pixels, width, height) = SkiaImageEncoder.Decode(path);
 
-        for (int y = 0; y < bmp.Height; y++)
+        for (int y = 0; y < height; y++)
         {
-            for (int x = 0; x < bmp.Width; x++)
+            for (int x = 0; x < width; x++)
             {
-                var c = bmp.GetPixel(x, y);
+                int idx = (y * width + x) * 4;
+                byte b = pixels[idx + 0];
+                byte g = pixels[idx + 1];
+                byte r = pixels[idx + 2];
+                byte a = pixels[idx + 3];
 
-                if (!includeFullyTransparent && c.A == 0)
+                if (!includeFullyTransparent && a == 0)
                     continue;
 
                 uint packed = ignoreAlpha
-                    ? ColorUtil.PackBGRA(c.B, c.G, c.R, 255)
-                    : ColorUtil.PackBGRA(c.B, c.G, c.R, c.A);
+                    ? ColorUtil.PackBGRA(b, g, r, 255)
+                    : ColorUtil.PackBGRA(b, g, r, a);
 
                 unique.Add(packed);
             }

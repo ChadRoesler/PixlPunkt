@@ -640,6 +640,12 @@
                                             HorizontalAlignment="Left"
                                             IsEnabled="False"
                                             Click="ExportButton_Click"/>
+                                    <Button x:Name="ExportModelButton"
+                                            Content="Export Model…"
+                                            Width="220"
+                                            HorizontalAlignment="Left"
+                                            IsEnabled="False"
+                                            Click="ExportModelButton_Click"/>
                             </StackPanel>
                         </ctrl:SectionCard.CustomControl>
                     </ctrl:SectionCard>

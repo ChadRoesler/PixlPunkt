@@ -152,7 +152,7 @@ namespace PixlPunkt.UI
 
         private async void DocsTab_AddTabButtonClick(TabView sender, object args)
         {
-            var dlg = new NewCanvasDialog { XamlRoot = Content.XamlRoot };
+            var dlg = new NewCanvasDialog { XamlRoot = MainXamlRoot };
             var res = await ShowDialogGuardedAsync(dlg);
             if (res == ContentDialogResult.Primary)
             {
@@ -321,7 +321,7 @@ namespace PixlPunkt.UI
         {
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Unsaved Changes",
                 Content = $"\"{doc.Name ?? "Untitled"}\" has unsaved changes.\n\nDo you want to save before closing?",
                 PrimaryButtonText = "Save",
@@ -631,3 +631,4 @@ namespace PixlPunkt.UI
             => DocsTab.SelectedItem is TabViewItem tab ? GetDocumentWorkspaceHost(tab) : null;
     }
 }
+

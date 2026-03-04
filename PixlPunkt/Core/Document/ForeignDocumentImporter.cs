@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
@@ -87,8 +88,9 @@ namespace PixlPunkt.Core.Document
                 {
                     ".pyxel" => ImportPyxel(filePath),
                     ".ase" or ".aseprite" => ImportAseprite(filePath),
-                    ".ico" => ImportIconAsDocument(filePath),
-                    ".cur" => ImportCursorAsDocument(filePath),
+                    ".ico" when OperatingSystem.IsWindows() => ImportIconAsDocument(filePath),
+                    ".cur" when OperatingSystem.IsWindows() => ImportCursorAsDocument(filePath),
+                    ".ico" or ".cur" => throw new PlatformNotSupportedException("Icon and cursor import are currently supported on Windows only."),
                     ".tmx" => ImportTmx(filePath),
                     ".tsx" => ImportTsx(filePath),
                     _ => throw new NotSupportedException(
@@ -292,49 +294,14 @@ namespace PixlPunkt.Core.Document
         /// <param name="entry">ZIP entry containing PNG image data.</param>
         /// <returns>A <see cref="PixelSurface"/> with pixels in BGRA format.</returns>
         /// <remarks>
-        /// <para>
-        /// Reads PNG data using <see cref="System.Drawing.Bitmap"/>, locks bits as Format32bppArgb,
-        /// and copies to <see cref="PixelSurface.Pixels"/> byte array. Assumes premultiplied alpha
-        /// and BGRA/ARGB memory layout matching PixlPunkt's internal format.
-        /// </para>
-        /// <para>
-        /// <strong>Performance:</strong> Uses unsafe pointer copy via <see cref="System.Runtime.InteropServices.Marshal.Copy(nint, byte[], int, int)"/>
-        /// for direct memory transfer without per-pixel iteration.
-        /// </para>
+        /// Decodes PNG using SkiaSharp for cross-platform support and copies BGRA bytes into a new surface.
         /// </remarks>
         private static PixelSurface LoadSurfaceFromPng(ZipArchiveEntry entry)
         {
-            using var es = entry.Open();
-            using var ms = new MemoryStream();
-            es.CopyTo(ms);
-            ms.Position = 0;
-
-            using var bmp = new System.Drawing.Bitmap(ms);
-            int w = bmp.Width;
-            int h = bmp.Height;
-
+            using var stream = entry.Open();
+            var (pixels, w, h) = SkiaImageEncoder.DecodeFromStream(stream);
             var surf = new PixelSurface(w, h);
-
-            var rect = new System.Drawing.Rectangle(0, 0, w, h);
-            var data = bmp.LockBits(
-                rect,
-                System.Drawing.Imaging.ImageLockMode.ReadOnly,
-                System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-
-            try
-            {
-                int byteCount = w * h * 4;
-                System.Runtime.InteropServices.Marshal.Copy(
-                    data.Scan0,
-                    surf.Pixels,
-                    0,
-                    byteCount);
-            }
-            finally
-            {
-                bmp.UnlockBits(data);
-            }
-
+            Buffer.BlockCopy(pixels, 0, surf.Pixels, 0, Math.Min(pixels.Length, surf.Pixels.Length));
             return surf;
         }
 
@@ -933,29 +900,18 @@ namespace PixlPunkt.Core.Document
                 return null;
             }
 
-            using var bmp = new Bitmap(imagePath);
+            var (imagePixels, imageWidth, imageHeight) = SkiaImageEncoder.Decode(imagePath);
             var tileset = new TmxTileset
             {
                 FirstGid = firstGid,
                 TileWidth = tileWidth,
                 TileHeight = tileHeight,
                 TileCount = tileCount,
-                Columns = columns > 0 ? columns : Math.Max(1, bmp.Width / tileWidth),
-                ImageWidth = bmp.Width,
-                ImageHeight = bmp.Height
+                Columns = columns > 0 ? columns : Math.Max(1, imageWidth / tileWidth),
+                ImageWidth = imageWidth,
+                ImageHeight = imageHeight,
+                ImagePixels = imagePixels
             };
-
-            var rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
-            var data = bmp.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-            try
-            {
-                tileset.ImagePixels = new byte[bmp.Width * bmp.Height * 4];
-                System.Runtime.InteropServices.Marshal.Copy(data.Scan0, tileset.ImagePixels, 0, tileset.ImagePixels.Length);
-            }
-            finally
-            {
-                bmp.UnlockBits(data);
-            }
 
             return tileset;
         }
@@ -1173,9 +1129,7 @@ namespace PixlPunkt.Core.Document
                 filePath, tileWidth, tileHeight, tileCount, columns);
 
             // Load the image
-            using var bmp = new Bitmap(imagePath);
-            int width = bmp.Width;
-            int height = bmp.Height;
+            var (imagePixels, width, height) = SkiaImageEncoder.Decode(imagePath);
 
             int tilesX = columns > 0 ? columns : Math.Max(1, width / tileWidth);
             int tilesY = tileCount > 0 && columns > 0 ? (tileCount + columns - 1) / columns : Math.Max(1, height / tileHeight);
@@ -1197,7 +1151,7 @@ namespace PixlPunkt.Core.Document
             if (canvasDoc.Layers[layerIdx] is not RasterLayer rl)
                 throw new InvalidDataException("Failed to create RasterLayer for TSX import.");
 
-            CopyBitmapToSurface(bmp, rl.Surface);
+            CopyBgraToSurface(imagePixels, width, height, rl.Surface);
             rl.Visible = true;
             rl.Opacity = 255;
             rl.UpdatePreview();
@@ -1216,8 +1170,12 @@ namespace PixlPunkt.Core.Document
         /// </summary>
         /// <param name="filePath">Path to the .ico file.</param>
         /// <returns>A <see cref="CanvasDocument"/> containing the icon as a single raster layer.</returns>
+        [SupportedOSPlatform("windows")]
         public static CanvasDocument ImportIconAsDocument(string filePath)
         {
+            if (!OperatingSystem.IsWindows())
+                throw new PlatformNotSupportedException("Icon import is only supported on Windows.");
+
             if (!File.Exists(filePath))
                 throw new FileNotFoundException("Icon file not found.", filePath);
 
@@ -1265,6 +1223,7 @@ namespace PixlPunkt.Core.Document
             return doc;
         }
 
+        [SupportedOSPlatform("windows")]
         private static void GetLargestIconSize(string filePath, out int maxWidth, out int maxHeight)
         {
             maxWidth = 0;
@@ -1312,8 +1271,12 @@ namespace PixlPunkt.Core.Document
         /// </summary>
         /// <param name="filePath">Path to the .cur file.</param>
         /// <returns>A <see cref="CanvasDocument"/> containing the cursor as a single raster layer.</returns>
+        [SupportedOSPlatform("windows")]
         public static CanvasDocument ImportCursorAsDocument(string filePath)
         {
+            if (!OperatingSystem.IsWindows())
+                throw new PlatformNotSupportedException("Cursor import is only supported on Windows.");
+
             if (!File.Exists(filePath))
                 throw new FileNotFoundException("Cursor file not found.", filePath);
 
@@ -1356,8 +1319,21 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
+        /// Copies BGRA pixel bytes into a target <see cref="PixelSurface"/> of matching dimensions.
+        /// </summary>
+        private static void CopyBgraToSurface(byte[] sourcePixels, int width, int height, PixelSurface surface)
+        {
+            if (width != surface.Width || height != surface.Height)
+                throw new InvalidDataException(
+                    $"Bitmap size mismatch. Expected {surface.Width}x{surface.Height}, got {width}x{height}.");
+
+            Buffer.BlockCopy(sourcePixels, 0, surface.Pixels, 0, Math.Min(sourcePixels.Length, surface.Pixels.Length));
+        }
+
+        /// <summary>
         /// Copies pixel data from a 32bpp ARGB bitmap to a PixelSurface.
         /// </summary>
+        [SupportedOSPlatform("windows")]
         private static void CopyBitmapToSurface(Bitmap src, PixelSurface surface)
         {
             if (src.Width != surface.Width || src.Height != surface.Height)

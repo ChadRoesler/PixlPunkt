@@ -201,7 +201,7 @@ namespace PixlPunkt.UI.Palette
             // Panel menu flyout (empty area right-click)
             _panelMenuFlyout.AddFgPalette += (s, e) => { if (Service is not null) Service.AddColor(Service.Foreground); };
             _panelMenuFlyout.AddBgPalette += (s, e) => { if (Service is not null) Service.AddColor(Service.Background); };
-            _panelMenuFlyout.ClearPalette += (s, e) => Panel_Clear_Click(null, new RoutedEventArgs());
+            _panelMenuFlyout.ClearPalette += (s, e) => Panel_Clear_Click(this, new RoutedEventArgs());
 
             // Swatch flyout
             _swatchMenuFlyout.EditSwatch += Swatch_Edit_Click;
@@ -258,7 +258,7 @@ namespace PixlPunkt.UI.Palette
             win.Activate();
 
             var appW = WindowHost.ApplyChrome(win, resizable: false, alwaysOnTop: true, minimizable: false, title: "Color Picker", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
 
@@ -321,7 +321,7 @@ namespace PixlPunkt.UI.Palette
             win.Activate();
 
             var appW = WindowHost.ApplyChrome(win, resizable: false, alwaysOnTop: true, minimizable: false, title: "Gradient Swatch Maker", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
 
@@ -389,7 +389,7 @@ namespace PixlPunkt.UI.Palette
         /// <summary>
         /// Opens the color picker to edit the selected palette color.
         /// </summary>
-        private void Swatch_Edit_Click(object sender, Border? e)
+        private void Swatch_Edit_Click(object? sender, Border? e)
         {
             if (Service is null || e == null) return;
             if (!ColorUtil.TryGetBGRA(e.Tag, out uint original)) return;
@@ -439,14 +439,14 @@ namespace PixlPunkt.UI.Palette
             win.Activate();
 
             var appW = WindowHost.ApplyChrome(win, resizable: false, alwaysOnTop: true, minimizable: false, title: "Color Picker", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
 
         /// <summary>
         /// Sets the clicked swatch as the foreground color.
         /// </summary>
-        private void Swatch_SetFg_Click(object sender, Border? e)
+        private void Swatch_SetFg_Click(object? sender, Border? e)
         {
             if (Service is null || e == null) return;
             if (!ColorUtil.TryGetBGRA(e.Tag, out uint value)) return;
@@ -459,7 +459,7 @@ namespace PixlPunkt.UI.Palette
         /// <summary>
         /// Sets the clicked swatch as the background color.
         /// </summary>
-        private void Swatch_SetBg_Click(object sender, Border? e)
+        private void Swatch_SetBg_Click(object? sender, Border? e)
         {
             if (Service is null || e == null) return;
             if (!ColorUtil.TryGetBGRA(e.Tag, out uint value)) return;
@@ -472,7 +472,7 @@ namespace PixlPunkt.UI.Palette
         /// <summary>
         /// Removes the clicked swatch from the palette.
         /// </summary>
-        private void Swatch_Remove_Click(object sender, Border? e)
+        private void Swatch_Remove_Click(object? sender, Border? e)
         {
             if (Service is null || e == null) return;
             if (!ColorUtil.TryGetBGRA(e.Tag, out uint value)) return;
@@ -489,7 +489,7 @@ namespace PixlPunkt.UI.Palette
         /// <summary>
         /// Shows confirmation dialog and clears the entire palette.
         /// </summary>
-        private async void Panel_Clear_Click(object sender, RoutedEventArgs e)
+        private async void Panel_Clear_Click(object? sender, RoutedEventArgs e)
         {
             if (Service is null) return;
 
@@ -599,3 +599,4 @@ namespace PixlPunkt.UI.Palette
         }
     }
 }
+

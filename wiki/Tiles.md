@@ -146,6 +146,13 @@ Each layer can have its own tile mapping:
 3. Choose or create a tile set for that layer
 4. Each layer can use different tile sets
 
+### Live Tile Updates
+
+Tile references stay linked:
+- editing a source tile updates every mapped tile instance
+- stamped/mapped instances reflect changes after stroke commit
+- voxel source face pickers update from current tile data after reload
+
 ---
 
 ## Importing Tiles
@@ -241,6 +248,20 @@ Automatic tile selection based on neighbors:
 
 ---
 
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_16.png" width="16"> Voxel From Tiles
+
+You can build voxel models directly from tile faces:
+
+1. Open **Tiles → Voxel Preview…**
+2. Assign face tiles (3-face mirrored or full 6-face mapping)
+3. Click **Build Voxel**
+4. Edit in voxel tools (face paint/create/delete/move)
+5. Export preview image or model
+
+See [[Voxel Workspace|Voxel-Workspace]] for the full workflow.
+
+---
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -258,4 +279,5 @@ Automatic tile selection based on neighbors:
 - [[Tile Animation|Tile-Animation]] - Animated tiles
 - [[Game Art|Game-Art]] - Game development workflow
 - [[Canvas Animation|Canvas-Animation]] - Frame animation
+- [[Voxel Workspace|Voxel-Workspace]] - Voxel workflow from mapped tiles
 - [[File Formats|Formats]] - Export options

@@ -66,7 +66,7 @@ namespace PixlPunkt.UI.Dialogs.Export
         public string SelectedFormat => (FormatComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "gif";
 
         /// <summary>Gets the pixel scale factor.</summary>
-        public int Scale => (int)(ScaleNumberBox?.Value ?? 1);
+        public int ExportScale => (int)(ScaleNumberBox?.Value ?? 1);
 
         /// <summary>Gets whether animations should loop (GIF).</summary>
         public bool Loop => LoopCheckBox?.IsChecked == true;
@@ -132,7 +132,7 @@ namespace PixlPunkt.UI.Dialogs.Export
         {
             return new AnimationExportService.ExportOptions
             {
-                Scale = Scale,
+                Scale = ExportScale,
                 UseStage = false, // Tile animations don't use stage
                 SeparateLayers = false,
                 FrameDelayMs = OverrideFps ? (int)(1000.0 / Math.Max(1, Fps)) : 0
@@ -176,7 +176,12 @@ namespace PixlPunkt.UI.Dialogs.Export
 
         private void SelectAllButton_Click(object sender, RoutedEventArgs e)
         {
-            ReelsListView.SelectAll();
+            ReelsListView.SelectedItems.Clear();
+            if (ReelsListView.ItemsSource is not System.Collections.IEnumerable items) return;
+            foreach (var item in items)
+            {
+                ReelsListView.SelectedItems.Add(item);
+            }
         }
 
         private void SelectNoneButton_Click(object sender, RoutedEventArgs e)
@@ -263,7 +268,7 @@ namespace PixlPunkt.UI.Dialogs.Export
 
             int tileW = _document.TileSize.Width;
             int tileH = _document.TileSize.Height;
-            int scale = Scale;
+            int scale = ExportScale;
 
             if (SelectedFormat == "pxpr")
             {
