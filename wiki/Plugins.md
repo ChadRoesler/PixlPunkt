@@ -48,7 +48,7 @@ dotnet add package PixlPunkt.PluginSdk
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/code_16.png" width="16"> Basic Plugin Structure
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/app_generic_16.png" width="16"> Basic Plugin Structure
 
 ### Plugin Entry Point
 
@@ -338,9 +338,9 @@ Copy the DLL to:
 If your plugin has dependencies, create a folder:
 ```
 Plugins/
-??? MyPlugin/
-    ??? MyPlugin.dll
-    ??? SomeDependency.dll
+├── MyPlugin/
+│   ├── MyPlugin.dll
+│   └── SomeDependency.dll
 ```
 
 ---

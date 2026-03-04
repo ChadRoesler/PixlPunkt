@@ -10,7 +10,7 @@ A complete guide to the PixlPunkt user interface.
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/navigation_16.png" width="16"> Menu Bar
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/apps_16.png" width="16"> Menu Bar
 
 ### File
 | Menu Item | Shortcut | Description |
@@ -43,14 +43,20 @@ A complete guide to the PixlPunkt user interface.
 | Toggle Grid | `Ctrl+'` | Show/hide pixel grid |
 | Toggle Rulers | `Ctrl+R` | Show/hide rulers |
 
-### Canvas
+### Tiles
 | Menu Item | Description |
 |-----------|-------------|
-| Resize Canvas | Change canvas dimensions |
-| Crop to Selection | Crop canvas to current selection |
-| Flip Horizontal | Mirror canvas horizontally |
-| Flip Vertical | Mirror canvas vertically |
-| Rotate | Rotate canvas 90°, 180°, 270° |
+| Merge Duplicate Tiles | Consolidate duplicate tile data |
+| Remove Unused Tiles | Remove unreferenced tiles from the tile set |
+| Export Tiles… | Export tile data to `.pxpt` |
+| Import Tiles… | Import tile data from document/file |
+
+### Settings
+| Menu Item | Description |
+|-----------|-------------|
+| Configure… | Open global app settings |
+| Quick Actions… | Open data/plugin/log folders |
+| Glyph Set Editor… | Open the glyph set editor |
 
 ---
 
@@ -69,9 +75,9 @@ The vertical toolbar on the left contains all drawing tools.
 | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/select_object_16.png" width="16"> | Rectangle Select | `M` | Selection |
 | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/wand_16.png" width="16"> | Magic Wand | `W` | Selection |
 | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lasso_16.png" width="16"> | Lasso | `L` | Selection |
-| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> | Rectangle | `I` | Shapes |
-| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> | Ellipse | `P` | Shapes |
-| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> | Dropper | `D` | Utility |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> | Rectangle | `Ctrl+U` | Shapes |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> | Ellipse | `O` | Shapes |
+| <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> | Dropper | `I` | Utility |
 | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/zoom_in_16.png" width="16"> | Zoom | `Z` | Utility |
 | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/hand_left_16.png" width="16"> | Pan | `H` | Utility |
 
@@ -79,7 +85,7 @@ See [[Tools]] for detailed documentation on each tool.
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/options_16.png" width="16"> Tool Options Bar
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> Tool Options Bar
 
 Located below the canvas, shows options for the currently selected tool.
 
@@ -167,7 +173,7 @@ See [[Canvas Animation|Canvas-Animation]] for detailed animation documentation.
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/image_16.png" width="16"> Canvas Area
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/document_fit_16.png" width="16"> Canvas Area
 
 The main drawing area.
 
@@ -221,13 +227,13 @@ See [[Color Picker|Color-Picker]] for more details.
 - **Collapse** panels to icons
 
 ### Themes
-Go to **Edit → Preferences → Appearance**:
+Go to **Settings → Configure… → Appearance**:
 - Light theme
 - Dark theme (default)
 - Custom transparency stripe colors
 
 ### Keyboard Shortcuts
-Customize in **Edit → Preferences → Keyboard**
+Customize in **Settings → Configure… → Keyboard**
 
 See [[Settings]] for all customization options.
 

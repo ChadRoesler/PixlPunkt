@@ -4,7 +4,7 @@ Working with audio reference tracks in PixlPunkt animations.
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/speaker_16.png" width="16"> Overview
+## Overview
 
 PixlPunkt supports **audio reference tracks** for animation:
 
@@ -34,7 +34,7 @@ PixlPunkt supports **audio reference tracks** for animation:
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/waveform_16.png" width="16"> Waveform Display
+## Waveform Display
 
 The audio track shows a waveform visualization:
 
@@ -91,7 +91,7 @@ Whether audio loops when animation loops:
 
 ### Mute Audio
 
-- Click the speaker icon <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/speaker_16.png" width="16"> on audio track
+- Click the speaker icon on the audio track
 - Or press `M` to toggle mute
 - Useful when focusing on visuals
 

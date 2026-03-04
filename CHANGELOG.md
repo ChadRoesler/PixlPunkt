@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Core Features
-- Modern pixel art editor built with WinUI 3 for Windows 10/11
+- Modern cross-platform pixel art editor built on Uno Platform/Skia Desktop
 - Tile-based canvas system with configurable tile and canvas sizes
 - Multi-document support with tabbed interface
 - Session recovery and auto-save functionality
@@ -95,7 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Native Format** - `.pxp` with full feature preservation (layers, animation, masks, effects)
 - **Import** - PNG, BMP, JPEG, TIFF, Aseprite (.ase/.aseprite), PyxelEdit (.pyxel), ICO, CUR, Tiled (.tmx/.tsx)
 - **Export** - PNG, GIF (animated), MP4/AVI/WMV (video), BMP, JPEG, TIFF, ICO, CUR
-- **Custom Brushes** - Export and import brush definitions (.pbx)
+- **Custom Brushes** - Export and import brush definitions (.mrk)
 
 #### User Interface
 - Dockable panels (Preview, Palette, Layers, Tiles, History, Animation)

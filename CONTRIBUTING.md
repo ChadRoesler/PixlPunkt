@@ -1,6 +1,6 @@
 # Contributing to PixlPunkt
 
-First off, thank you for considering contributing to PixlPunkt! ??
+First off, thank you for considering contributing to PixlPunkt.
 
 ## Table of Contents
 - [Code of Conduct](#code-of-conduct)
@@ -59,11 +59,11 @@ Areas where we'd love help:
 ## Development Setup
 
 ### Prerequisites
-- Windows 10/11
-- Visual Studio 2022 (17.0+) with:
-  - .NET Desktop Development workload
-  - Windows App SDK
 - .NET 10 SDK
+- Git
+- One of:
+  - Visual Studio 2022 (recommended on Windows)
+  - VS Code / Rider + `dotnet` CLI (Windows, macOS, Linux)
 
 ### Getting Started
 
@@ -85,9 +85,14 @@ Areas where we'd love help:
 
 | Project | Description |
 |---------|-------------|
-| `PixlPunkt` | Main WinUI 3 application |
+| `PixlPunkt` | Main Uno/WinUI application |
 | `PixlPunkt.PluginSdk` | SDK for plugin development |
 | `PixlPunkt.ExamplePlugin` | Reference plugin implementation |
+
+Feature-area folders to know:
+- `PixlPunkt/Core/Voxel` - voxel model, renderer, editing engine
+- `PixlPunkt/UI/Voxel` - voxel workspace and viewport tooling
+- `PixlPunkt.PluginSdk/Voxel` - voxel plugin contracts
 
 ---
 
@@ -244,4 +249,4 @@ Feel free to:
 - Ask in an issue comment
 - Reach out to maintainers
 
-Thank you for contributing! ??
+Thank you for contributing.

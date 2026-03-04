@@ -42,8 +42,9 @@
 
 | Key | Tool | Icon |
 |-----|------|:----:|
-| `Shift+A` | Tile Stamper | <img src="assets/icons/table_edit_16.png" width="16"> |
-| `Ctrl+T` | Tile Modifier | <img src="assets/icons/table_cell_edit_16.png" width="16"> |
+| `Shift+T` | Tile Stamper | <img src="assets/icons/table_lightning_16.png" width="16"> |
+| `Ctrl+T` | Tile Modifier | <img src="assets/icons/table_edit_16.png" width="16"> |
+| `Shift+A` | Tile Animation | <img src="assets/icons/table_cell_edit_16.png" width="16"> |
 
 ---
 

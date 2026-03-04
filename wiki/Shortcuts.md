@@ -73,7 +73,7 @@ Complete keyboard shortcut reference for PixlPunkt.
 | `B` | Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/edit_16.png" width="16"> |
 | `E` | Eraser | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eraser_16.png" width="16"> |
 | `G` | Fill (Bucket) | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/paint_bucket_16.png" width="16"> |
-| `O` | Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> |
+| `D` | Gradient Brush | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/color_line_16.png" width="16"> |
 | `Shift+G` | Gradient Fill | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/data_sunburst_16.png" width="16"> |
 | `R` | Color Replacer | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/pen_sync_16.png" width="16"> |
 
@@ -84,7 +84,7 @@ Complete keyboard shortcut reference for PixlPunkt.
 | `M` | Rectangle Select | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/select_object_16.png" width="16"> |
 | `W` | Magic Wand | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/wand_16.png" width="16"> |
 | `L` | Lasso | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/lasso_16.png" width="16"> |
-| `Q` | Paint Selection | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_16.png" width="16"> |
+| `Shift+P` | Paint Selection | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/border_none_16.png" width="16"> |
 
 ### Effect Tools
 
@@ -98,8 +98,8 @@ Complete keyboard shortcut reference for PixlPunkt.
 
 | Shortcut | Tool | Icon |
 |----------|------|:----:|
-| `I` | Rectangle | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> |
-| `P` | Ellipse | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> |
+| `Ctrl+U` | Rectangle | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/square_16.png" width="16"> |
+| `O` | Ellipse | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/circle_16.png" width="16"> |
 
 ### Tile Tools
 
@@ -113,7 +113,7 @@ Complete keyboard shortcut reference for PixlPunkt.
 
 | Shortcut | Tool | Icon |
 |----------|------|:----:|
-| `D` | Dropper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> |
+| `I` | Dropper | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/eyedropper_16.png" width="16"> |
 | `H` | Pan (Hand) | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/hand_left_16.png" width="16"> |
 | `Z` | Zoom | <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/zoom_in_16.png" width="16"> |
 
@@ -250,7 +250,7 @@ Complete keyboard shortcut reference for PixlPunkt.
 
 ## Customizing Shortcuts
 
-1. Go to **Edit ? Preferences ? Keyboard** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/keyboard_16.png" width="16">
+1. Go to **Settings → Configure… → Keyboard** <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/keyboard_16.png" width="16">
 2. Search for the action you want to customize
 3. Click the shortcut field
 4. Press your desired key combination

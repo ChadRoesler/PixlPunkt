@@ -122,7 +122,7 @@ Full-featured animation with two modes:
 - Native `.pxp` format with full feature preservation
 - **Import**: PNG, Aseprite, PyxelEdit, ICO, CUR, Tiled
 - **Export**: PNG, GIF, MP4, AVI, WMV, BMP, JPEG, TIFF
-- Custom brush export (`.pbx`)
+- Custom brush export/import (`.mrk`)
 
 ---
 
@@ -217,7 +217,7 @@ PixlPunkt supports plugins through the **PixlPunkt.PluginSdk** NuGet package.
    }
    ```
 
-4. Build and place the `.dll` in `%AppData%\PixlPunkt\Plugins\`
+4. Build and place the `.dll` in `%LocalAppData%\PixlPunkt\Plugins\`
 
 ### Documentation
 - [Plugin SDK Developer Guide](PixlPunkt.PluginSdk/DEVELOPER_README.md)
@@ -227,17 +227,21 @@ PixlPunkt supports plugins through the **PixlPunkt.PluginSdk** NuGet package.
 
 ## Project Structure
 
+> Note: Voxel folders below are included to reflect the active voxel feature branch layout.
+
 ```
 PixlPunkt/
 ├── PixlPunkt/                 # Main application (Uno Platform)
 │   ├── Core/                  # Core logic (document, imaging, tools, animation)
 │   │   ├── Animation/         # Canvas & tile animation systems
 │   │   ├── Painting/          # Brush painters, dithering algorithms
+│   │   ├── Voxel/             # Voxel data model, rendering, and export pipeline
 │   │   └── Tools/             # Tool implementations and settings
 │   ├── UI/                    # User interface components
 │   │   ├── Animation/         # Timeline and keyframe UI
 │   │   ├── CanvasHost/        # Main canvas rendering
-│   │   └── ColorPick/         # Color picker and gradient editor
+│   │   ├── ColorPick/         # Color picker and gradient editor
+│   │   └── Voxel/             # Voxel workspace, viewport, and tool controls
 │   ├── Platforms/             # Platform-specific code
 │   │   ├── Desktop/           # Skia Desktop (Windows, Linux, macOS)
 │   │   ├── Windows/           # WinAppSdk specific
@@ -249,7 +253,8 @@ PixlPunkt/
 │   ├── Plugins/               # Plugin interfaces
 │   ├── Tools/                 # Tool abstractions
 │   ├── Effects/               # Effect system
-│   └── IO/                    # Import/export handlers
+│   ├── IO/                    # Import/export handlers
+│   └── Voxel/                 # Voxel tool contracts and context interfaces
 ├── PixlPunkt.PluginSdk.Tests/ # Plugin SDK unit tests
 ├── PixlPunkt.ExamplePlugin/   # Example plugin implementation
 └── scripts/                   # Build and installer scripts
@@ -295,7 +300,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Built with [WinUI 3](https://docs.microsoft.com/en-us/windows/apps/winui/winui3/)
+- Built with [Uno Platform](https://platform.uno/) and [WinUI](https://learn.microsoft.com/windows/apps/winui/)
 - Icons from [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons)
 - Community Toolkit for WinUI
 

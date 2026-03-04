@@ -1,6 +1,6 @@
 ﻿# PixlPunkt User Guide
 
-**PixlPunkt** is a modern pixel art editor for Windows, designed for creating sprites, tilesets, and pixel-based artwork. This guide covers all the features and tools available in the application.
+**PixlPunkt** is a modern cross-platform pixel art editor for creating sprites, tilesets, and pixel-based artwork. This guide covers all the features and tools available in the application.
 
 ---
 
@@ -69,7 +69,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ File  Edit  View  Select  Tiles  Palette  Help                  │  ← Menu Bar
+│ File  Edit  View  Palette  Tiles  Settings  Help                │  ← Menu Bar
 ├─────────────────────────────────────────────────────────────────┤
 │ [Tool] │  Tool Options Bar                                      │  ← Tool Options
 ├────────┼────────────────────────────────────────────────────────┤
@@ -124,7 +124,7 @@
 
 ### Canvas Resize
 
-1. Go to **Edit → Canvas Resize**
+1. Go to **Edit → Edit Canvas…**
 2. Adjust the tile dimensions
 3. Choose an **Anchor Point** to determine where existing content is positioned
 4. Click **Apply**
@@ -155,8 +155,9 @@
 | `Z` | Zoom | Utility |
 | `Ctrl+U` | Rectangle | Shapes |
 | `O` | Ellipse | Shapes |
-| `Shift+A` | Tile Stamper | Tiles |
+| `Shift+T` | Tile Stamper | Tiles |
 | `Ctrl+T` | Tile Modifier | Tiles |
+| `Shift+A` | Tile Animation | Tiles |
 
 ---
 
@@ -355,7 +356,7 @@ Draw filled or outlined ellipses/circles.
 
 ### Tile Tools
 
-#### Tile Stamper (Shift+A)
+#### Tile Stamper (Shift+T)
 Places tiles from your tileset onto the canvas.
 
 **Actions:**
@@ -887,7 +888,7 @@ The Tessellator helps create seamlessly tiling patterns:
 ### Tile Mapping
 
 Each layer can have independent tile mappings:
-- Use the **Tile Stamper (A)** tool to place tiles
+- Use the **Tile Stamper (Shift+T)** tool to place tiles
 - View mappings with **View → Toggle Tile Mappings**
 - Tiles store references, not copies, for efficiency
 
@@ -1248,7 +1249,7 @@ Add audio tracks to help sync your animation to music or dialogue.
 
 ## Settings
 
-Access via **Edit → Preferences** or the gear icon.
+Access via **Settings → Configure…** or the gear icon.
 
 ### General Settings
 

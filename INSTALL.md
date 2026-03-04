@@ -1,10 +1,13 @@
 # PixlPunkt Installation Guide
 
+> This file documents the Windows MSIX/sideload path.
+> For current cross-platform release packages (Windows/macOS/Linux), use `README.md` or `wiki/Installation.md`.
+
 ## Quick Installation
 
 1. Download the latest release for your platform (x64 or ARM64)
 2. Extract the ZIP file
-3. **Right-click `Install-PixlPunkt.ps1` ? "Run with PowerShell"**
+3. **Right-click `Install-PixlPunkt.ps1` -> "Run with PowerShell"**
 4. If prompted, allow running as Administrator
 5. Launch PixlPunkt from the Start Menu
 
@@ -16,10 +19,10 @@ The signing certificate must be installed before the app can be installed. This 
 
 1. Right-click on `PixlPunkt.cer`
 2. Select **"Install Certificate"**
-3. Choose **"Local Machine"** ? Click "Next"
+3. Choose **"Local Machine"** -> Click "Next"
 4. Select **"Place all certificates in the following store"**
 5. Click **"Browse"** and select **"Trusted People"**
-6. Click "Next" ? "Finish"
+6. Click "Next" -> "Finish"
 
 ### Step 2: Install the App
 
@@ -30,7 +33,7 @@ The signing certificate must be installed before the app can be installed. This 
 ## Uninstallation
 
 1. Open **Windows Settings**
-2. Go to **Apps ? Installed apps**
+2. Go to **Apps -> Installed apps**
 3. Find "PixlPunkt" and click **"Uninstall"**
 
 ## Troubleshooting
@@ -98,7 +101,7 @@ This will create:
 | `SIGNING_CERTIFICATE_BASE64` | Base64-encoded PFX file |
 | `SIGNING_CERTIFICATE_PASSWORD` | Password for the PFX file |
 
-Add these in: Repository Settings ? Secrets and variables ? Actions
+Add these in: Repository Settings -> Secrets and variables -> Actions
 
 ## Security Notice
 

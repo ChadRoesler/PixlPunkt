@@ -22,7 +22,7 @@ How to download and install PixlPunkt on your system.
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_download_16.png" width="16"> Download
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_circle_down_16.png" width="16"> Download
 
 Get the latest release from the [GitHub Releases](https://github.com/ChadRoesler/PixlPunkt/releases) page.
 
@@ -123,7 +123,7 @@ chmod +x PixlPunkt
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/code_16.png" width="16"> Build from Source
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/app_generic_16.png" width="16"> Build from Source
 
 For developers who want to build PixlPunkt themselves:
 
@@ -161,7 +161,7 @@ dotnet publish PixlPunkt/PixlPunkt.csproj -c Release -f net10.0-desktop -r osx-a
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_sync_16.png" width="16"> Updating
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/arrow_repeat_all_16.png" width="16"> Updating
 
 ### Windows Installer Version
 - Updates are automatic via Velopack

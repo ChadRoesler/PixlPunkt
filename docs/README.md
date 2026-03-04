@@ -33,8 +33,8 @@ Welcome to the PixlPunkt docs! Pick your adventure:
 | [Canvas Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Canvas-Animation) | Frame-by-frame, keyframes, onion skinning |
 | [Tile Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Tile-Animation) | Reels, sprite sheets, game-ready exports |
 | [Stage & Camera](https://github.com/ChadRoesler/PixlPunkt/wiki/Stage) | Pan, zoom, rotate - cinematic stuff |
-| [Audio Tracks](https://github.com/ChadRoesler/PixlPunkt/wiki/Audio-Tracks) | Sync animation to music |
-| [Plugin Development](https://github.com/ChadRoesler/PixlPunkt/wiki/Plugin-Development) | Make your own tools |
+| [Audio Tracks](https://github.com/ChadRoesler/PixlPunkt/wiki/Audio) | Sync animation to music |
+| [Plugin Development](https://github.com/ChadRoesler/PixlPunkt/wiki/Plugins) | Make your own tools |
 
 ---
 

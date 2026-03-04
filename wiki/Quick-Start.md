@@ -4,7 +4,7 @@ Get up and running with PixlPunkt in 5 minutes!
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/rocket_16.png" width="16"> First Launch
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/sparkle_16.png" width="16"> First Launch
 
 When you first open PixlPunkt, you'll see:
 - **Tool Rail** on the left - your drawing tools
@@ -15,7 +15,7 @@ When you first open PixlPunkt, you'll see:
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/document_16.png" width="16"> Create Your First Canvas
 
-1. Press `Ctrl+N` or go to **File → New**
+1. Press `Ctrl+N` or go to **File → New Canvas…**
 2. Choose a canvas size:
    - **16×16** - Icons, tiny sprites
    - **32×32** - Standard game sprites
@@ -60,7 +60,7 @@ When you first open PixlPunkt, you'll see:
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/save_16.png" width="16"> Save Your Work
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/document_fit_16.png" width="16"> Save Your Work
 
 ### Save as PixlPunkt Project (.pxp)
 - Press `Ctrl+S`

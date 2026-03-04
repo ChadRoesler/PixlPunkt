@@ -18,7 +18,7 @@ Tiles are fixed-size squares that can be:
 
 ### Configure Tile Size
 
-1. Go to **Canvas → Tile Settings** or open the **Tiles Panel** (`F7`)
+1. Go to **Settings → Configure… → Tiles** or open the **Tiles Panel** (`F7`)
 2. Set tile dimensions:
    - **Width:** Tile width in pixels (e.g., 16)
    - **Height:** Tile height in pixels (e.g., 16)
@@ -36,7 +36,7 @@ Tiles are fixed-size squares that can be:
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> Tile Stamper Tool
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_16.png" width="16"> Tile Stamper Tool
 
 **Shortcut:** `Shift+T`
 
@@ -57,7 +57,7 @@ Tiles are fixed-size squares that can be:
 
 ---
 
-## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_cell_edit_16.png" width="16"> Tile Modifier Tool
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_edit_16.png" width="16"> Tile Modifier Tool
 
 **Shortcut:** `Ctrl+T`
 
@@ -113,7 +113,7 @@ Create seamless repeating patterns:
 
 ### Tessellation Window
 
-1. Go to **Canvas → Tile Tessellation**
+1. In the **Tiles Panel**, click the **Tessellator** button
 2. Select a tile or area
 3. Preview shows how tile repeats
 4. Adjust to eliminate seams
@@ -173,7 +173,7 @@ PixlPunkt can import Tiled map editor files:
 
 ### Export Tile Set
 
-1. **File → Export → Tile Set**
+1. **Tiles → Export Tiles…**
 2. Options:
    - **PNG** - Single image with all tiles
    - **Individual** - Separate file per tile
