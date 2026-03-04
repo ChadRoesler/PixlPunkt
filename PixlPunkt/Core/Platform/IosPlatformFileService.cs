@@ -229,8 +229,15 @@ public class IosPlatformFileService : IPlatformFileService
                 var popover = activityController.PopoverPresentationController;
                 if (popover != null)
                 {
-                    var bounds = viewController.View.Bounds;
-                    popover.SourceView = viewController.View;
+                    var sourceView = viewController.View;
+                    if (sourceView == null)
+                    {
+                        await viewController.PresentViewControllerAsync(activityController, true);
+                        return true;
+                    }
+
+                    var bounds = sourceView.Bounds;
+                    popover.SourceView = sourceView;
                     popover.SourceRect = new CoreGraphics.CGRect(
                         bounds.X + bounds.Width / 2,
                         bounds.Y + bounds.Height / 2,
@@ -284,8 +291,15 @@ public class IosPlatformFileService : IPlatformFileService
                 var popover = activityController.PopoverPresentationController;
                 if (popover != null)
                 {
-                    var bounds = viewController.View.Bounds;
-                    popover.SourceView = viewController.View;
+                    var sourceView = viewController.View;
+                    if (sourceView == null)
+                    {
+                        await viewController.PresentViewControllerAsync(activityController, true);
+                        return true;
+                    }
+
+                    var bounds = sourceView.Bounds;
+                    popover.SourceView = sourceView;
                     popover.SourceRect = new CoreGraphics.CGRect(
                         bounds.X + bounds.Width / 2,
                         bounds.Y + bounds.Height / 2,

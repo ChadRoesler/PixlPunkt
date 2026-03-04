@@ -62,10 +62,8 @@ namespace PixlPunkt.UI
                 {
                     // Undo: Ctrl+Z
                     case VirtualKey.Z when !shift:
-                        if (CurrentHost?.CanUndo == true)
+                        if (TryUndoFromActiveWorkspace())
                         {
-                            CurrentHost.Undo();
-                            UpdateHistoryUI();
                             e.Handled = true;
                             return;
                         }
@@ -74,10 +72,8 @@ namespace PixlPunkt.UI
                     // Redo: Ctrl+Y or Ctrl+Shift+Z
                     case VirtualKey.Y:
                     case VirtualKey.Z when shift:
-                        if (CurrentHost?.CanRedo == true)
+                        if (TryRedoFromActiveWorkspace())
                         {
-                            CurrentHost.Redo();
-                            UpdateHistoryUI();
                             e.Handled = true;
                             return;
                         }
@@ -452,10 +448,8 @@ namespace PixlPunkt.UI
         {
             // Allow undo even when list controls have focus, only block for text input
             if (IsTextInputFocused()) return;
-            if (CurrentHost?.CanUndo == true)
+            if (TryUndoFromActiveWorkspace())
             {
-                CurrentHost.Undo();
-                UpdateHistoryUI();
                 args.Handled = true;
             }
         }
@@ -463,12 +457,56 @@ namespace PixlPunkt.UI
         private void RedoAccel_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
         {
             if (IsTextInputFocused()) return;
+            if (TryRedoFromActiveWorkspace())
+            {
+                args.Handled = true;
+            }
+        }
+
+        private bool TryUndoFromActiveWorkspace()
+        {
+            var workspaceHost = GetActiveDocumentWorkspaceHost();
+            var voxelWorkspace = workspaceHost?.VoxelWorkspace;
+            if (voxelWorkspace?.IsWorkspaceFocused() == true && voxelWorkspace.CanUndoVoxelEdits)
+            {
+                if (voxelWorkspace.TryUndoVoxelEdit())
+                {
+                    UpdateHistoryUI();
+                    return true;
+                }
+            }
+
+            if (CurrentHost?.CanUndo == true)
+            {
+                CurrentHost.Undo();
+                UpdateHistoryUI();
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryRedoFromActiveWorkspace()
+        {
+            var workspaceHost = GetActiveDocumentWorkspaceHost();
+            var voxelWorkspace = workspaceHost?.VoxelWorkspace;
+            if (voxelWorkspace?.IsWorkspaceFocused() == true && voxelWorkspace.CanRedoVoxelEdits)
+            {
+                if (voxelWorkspace.TryRedoVoxelEdit())
+                {
+                    UpdateHistoryUI();
+                    return true;
+                }
+            }
+
             if (CurrentHost?.CanRedo == true)
             {
                 CurrentHost.Redo();
                 UpdateHistoryUI();
-                args.Handled = true;
+                return true;
             }
+
+            return false;
         }
 
         private void CopyAccel_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)

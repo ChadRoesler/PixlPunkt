@@ -215,9 +215,10 @@ namespace PixlPunkt.UI.Layers
             win.Activate();
             var appW = WindowHost.ApplyChrome(win, resizable: true, alwaysOnTop: true, minimizable: false,
                 title: $"Reference Layer - {refLayer.Name}", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.90,
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.90,
                 minLogicalWidth: 300, minLogicalHeight: 200);
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
     }
 }
+

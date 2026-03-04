@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.Document;
+using PixlPunkt.Core.Imaging;
 using PixlPunkt.UI.CanvasHost;
 using PixlPunkt.UI.Dialogs.Import;
 using PixlPunkt.UI.Helpers;
@@ -32,12 +33,8 @@ namespace PixlPunkt.UI
 
             try
             {
-                // Load the image using Windows.Graphics.Imaging
-                using var stream = await file.OpenReadAsync();
-                var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
-
-                int width = (int)decoder.PixelWidth;
-                int height = (int)decoder.PixelHeight;
+                // Load image metadata/pixels via Skia for cross-platform compatibility.
+                var (pixels, width, height) = SkiaImageEncoder.Decode(file.Path);
 
                 if (width <= 0 || height <= 0)
                 {
@@ -45,20 +42,10 @@ namespace PixlPunkt.UI
                     return;
                 }
 
-                // Get pixel data
-                var pixelData = await decoder.GetPixelDataAsync(
-                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                    Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
-                    new Windows.Graphics.Imaging.BitmapTransform(),
-                    Windows.Graphics.Imaging.ExifOrientationMode.RespectExifOrientation,
-                    Windows.Graphics.Imaging.ColorManagementMode.DoNotColorManage);
-
-                byte[] pixels = pixelData.DetachPixelData();
-
                 // Show import dialog for tile configuration
                 var dialog = new ImageImportDialog(file.Name, width, height, pixels)
                 {
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 };
 
                 // Load preview
@@ -128,7 +115,7 @@ namespace PixlPunkt.UI
         {
             await new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Import failed",
                 Content = message,
                 CloseButtonText = "OK"
@@ -164,6 +151,13 @@ namespace PixlPunkt.UI
             StorageFile? file = await openPicker.PickSingleFileAsync();
             if (file is null)
                 return;
+
+            if (!OperatingSystem.IsWindows())
+            {
+                await ShowImportErrorAsync("Icon import is currently supported on Windows only.");
+                return;
+            }
+
             CanvasDocument doc;
             doc = ForeignDocumentImporter.ImportIconAsDocument(file.Path);
             // Register document & open it in a new tab
@@ -185,6 +179,13 @@ namespace PixlPunkt.UI
             StorageFile? file = await openPicker.PickSingleFileAsync();
             if (file is null)
                 return;
+
+            if (!OperatingSystem.IsWindows())
+            {
+                await ShowImportErrorAsync("Cursor import is currently supported on Windows only.");
+                return;
+            }
+
             CanvasDocument doc;
             doc = ForeignDocumentImporter.ImportCursorAsDocument(file.Path);
             // Register document & open it in a new tab
@@ -331,7 +332,7 @@ namespace PixlPunkt.UI
         {
             foreach (TabViewItem tab in DocsTab.TabItems.Cast<TabViewItem>())
             {
-                if (tab.Content is CanvasViewHost host &&
+                if (GetCanvasHostFromTab(tab) is CanvasViewHost host &&
                     ReferenceEquals(host.Document, doc))
                 {
                     tab.Header = MakeTabHeader(doc, tab);
@@ -392,7 +393,7 @@ namespace PixlPunkt.UI
 
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Import Warning",
                         Content = warningMessage + $"\n\nReel Info:\n" +
                                   $"  • Name: {reel.Name}\n" +
@@ -424,3 +425,4 @@ namespace PixlPunkt.UI
         }
     }
 }
+

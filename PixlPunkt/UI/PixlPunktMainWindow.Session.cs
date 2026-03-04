@@ -96,7 +96,7 @@ namespace PixlPunkt.UI
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Recover Previous Session?",
                 Content = $"PixlPunkt was not closed properly.\n\n" +
                          $"Last session ({lastUpdate}) had {recoverableCount} document(s):\n{docNames}\n\n" +
@@ -205,7 +205,7 @@ namespace PixlPunkt.UI
 
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Session Recovery",
                     Content = message,
                     CloseButtonText = "OK"
@@ -263,7 +263,7 @@ namespace PixlPunkt.UI
 
             foreach (TabViewItem tab in DocsTab.TabItems)
             {
-                if (tab.Content is CanvasViewHost host)
+                if (GetCanvasHostFromTab(tab) is CanvasViewHost host)
                 {
                     var doc = host.Document;
                     var docPath = _documentPaths.TryGetValue(doc, out var p) ? p : null;
@@ -339,3 +339,4 @@ namespace PixlPunkt.UI
         }
     }
 }
+

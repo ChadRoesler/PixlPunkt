@@ -105,6 +105,12 @@ namespace PixlPunkt.Core.Settings
         public string DefaultTileSetPath { get; set; } = string.Empty;
 
         /// <summary>
+        /// Gets or sets whether the global left tool rail should swap to voxel tools
+        /// when the voxel pane is active.
+        /// </summary>
+        public bool SwapGlobalToolRailWhenVoxelPaneActive { get; set; }
+
+        /// <summary>
         /// Minimum log level for application logging (Serilog level name).
         /// </summary>
         public string? LogLevel { get; set; } = "Information";

@@ -48,7 +48,7 @@ namespace PixlPunkt.UI
             var preview = CreatePalettePreview(preset.Colors);
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = $"Apply preset: {preset.Name}",
                 Content = preview,
                 PrimaryButtonText = "Add",
@@ -125,13 +125,17 @@ namespace PixlPunkt.UI
             Palette_Custom_Submenu.Items.Add(refreshItem);
 
             var openFolderItem = new MenuFlyoutItem { Text = "Open Palettes Folder" };
-            openFolderItem.Click += async (s, e) =>
+            openFolderItem.Click += (s, e) =>
             {
                 var dir = CustomPaletteIO.GetPalettesDirectory();
                 CustomPaletteIO.EnsureDirectoryExists();
                 try
                 {
-                    await Windows.System.Launcher.LaunchFolderPathAsync(dir);
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = dir,
+                        UseShellExecute = true
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -165,7 +169,7 @@ namespace PixlPunkt.UI
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = $"Apply custom palette: {customPalette.Name}",
                 Content = contentStack,
                 PrimaryButtonText = "Add",
@@ -365,7 +369,7 @@ namespace PixlPunkt.UI
                 var (preview, getColors) = CreatePaletteImportPreview(colors);
                 var dlg = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = $"Apply Import: {file.Name}",
                     Content = preview,
                     PrimaryButtonText = "Add",
@@ -386,7 +390,7 @@ namespace PixlPunkt.UI
                 Core.Logging.LoggingService.Debug("Failed to import palette from image '{Path}': {Error}", file.Path, ex.Message);
                 _ = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import failed",
                     Content = "Could not read image file.",
                     CloseButtonText = "OK"
@@ -403,7 +407,7 @@ namespace PixlPunkt.UI
                 {
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Import failed",
                         Content = "No active layer or document to import from.",
                         CloseButtonText = "OK"
@@ -417,7 +421,7 @@ namespace PixlPunkt.UI
                 var (preview, getColors) = CreatePaletteImportPreview(colors);
                 var dlg = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = $"Apply Import: {layer.Name}",
                     Content = preview,
                     PrimaryButtonText = "Add",
@@ -438,7 +442,7 @@ namespace PixlPunkt.UI
                 Core.Logging.LoggingService.Debug("Failed to import palette from layer: {Error}", ex.Message);
                 _ = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import failed",
                     Content = "Could not read layer.",
                     CloseButtonText = "OK"
@@ -455,7 +459,7 @@ namespace PixlPunkt.UI
                 {
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Import failed",
                         Content = "No active document to import from.",
                         CloseButtonText = "OK"
@@ -469,7 +473,7 @@ namespace PixlPunkt.UI
                 var (preview, getColors) = CreatePaletteImportPreview(colors);
                 var dlg = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = $"Apply Import: {document.Name}",
                     Content = preview,
                     PrimaryButtonText = "Add",
@@ -490,7 +494,7 @@ namespace PixlPunkt.UI
                 Core.Logging.LoggingService.Debug("Failed to import palette from document: {Error}", ex.Message);
                 _ = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import failed",
                     Content = "Could not read document.",
                     CloseButtonText = "OK"
@@ -502,7 +506,7 @@ namespace PixlPunkt.UI
         {
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Import palette (paste JSON)",
                 PrimaryButtonText = "Import",
                 CloseButtonText = "Cancel",
@@ -528,7 +532,7 @@ namespace PixlPunkt.UI
                     Core.Logging.LoggingService.Debug("Failed to import palette from JSON: {Error}", ex.Message);
                     _ = new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Import failed",
                         Content = "Invalid palette JSON.",
                         CloseButtonText = "OK"
@@ -547,7 +551,7 @@ namespace PixlPunkt.UI
             {
                 await new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Export failed",
                     Content = "No colors in palette to export.",
                     CloseButtonText = "OK"
@@ -587,7 +591,7 @@ namespace PixlPunkt.UI
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Save Custom Palette",
                 Content = contentStack,
                 PrimaryButtonText = "Save",
@@ -611,7 +615,7 @@ namespace PixlPunkt.UI
 
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Palette Saved",
                         Content = $"Palette \"{name}\" saved successfully!\n\nLocation: %AppData%\\PixlPunkt\\Palettes\\",
                         CloseButtonText = "OK"
@@ -621,7 +625,7 @@ namespace PixlPunkt.UI
                 {
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Save failed",
                         Content = $"Could not save palette: {ex.Message}",
                         CloseButtonText = "OK"
@@ -710,7 +714,7 @@ namespace PixlPunkt.UI
             {
                 await new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No palette formats available",
                     Content = "No palette import handlers are registered.",
                     CloseButtonText = "OK"
@@ -739,7 +743,7 @@ namespace PixlPunkt.UI
                 {
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Import failed",
                         Content = $"No handler found for file extension '{ext}'.",
                         CloseButtonText = "OK"
@@ -758,7 +762,7 @@ namespace PixlPunkt.UI
                     {
                         await new ContentDialog
                         {
-                            XamlRoot = Content.XamlRoot,
+                            XamlRoot = MainXamlRoot,
                             Title = "Import failed",
                             Content = paletteResult.ErrorMessage,
                             CloseButtonText = "OK"
@@ -770,7 +774,7 @@ namespace PixlPunkt.UI
                     {
                         await new ContentDialog
                         {
-                            XamlRoot = Content.XamlRoot,
+                            XamlRoot = MainXamlRoot,
                             Title = "Import failed",
                             Content = "No colors found in the file.",
                             CloseButtonText = "OK"
@@ -783,7 +787,7 @@ namespace PixlPunkt.UI
                     var preview = CreatePalettePreview(colors);
                     var dlg = new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = $"Import Palette: {paletteResult.PaletteName ?? file.Name}",
                         Content = preview,
                         PrimaryButtonText = "Add",
@@ -809,7 +813,7 @@ namespace PixlPunkt.UI
                 {
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Import failed",
                         Content = "Unexpected import result type.",
                         CloseButtonText = "OK"
@@ -820,7 +824,7 @@ namespace PixlPunkt.UI
             {
                 await new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import failed",
                     Content = $"Could not import palette file.\n{ex.Message}",
                     CloseButtonText = "OK"
@@ -841,7 +845,7 @@ namespace PixlPunkt.UI
             {
                 await new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Export failed",
                     Content = "No colors in palette to export.",
                     CloseButtonText = "OK"
@@ -855,7 +859,7 @@ namespace PixlPunkt.UI
             {
                 await new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No export formats available",
                     Content = "No palette export handlers are registered.",
                     CloseButtonText = "OK"
@@ -901,7 +905,7 @@ namespace PixlPunkt.UI
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Export Palette",
                 Content = contentStack,
                 PrimaryButtonText = "Export",
@@ -941,7 +945,7 @@ namespace PixlPunkt.UI
                 {
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Export Successful",
                         Content = $"Palette exported to:\n{saveFile.Path}",
                         CloseButtonText = "OK"
@@ -951,7 +955,7 @@ namespace PixlPunkt.UI
                 {
                     await new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Export failed",
                         Content = "The export handler reported a failure.",
                         CloseButtonText = "OK"
@@ -962,7 +966,7 @@ namespace PixlPunkt.UI
             {
                 await new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Export failed",
                     Content = $"Could not export palette.\n{ex.Message}",
                     CloseButtonText = "OK"
@@ -971,3 +975,4 @@ namespace PixlPunkt.UI
         }
     }
 }
+

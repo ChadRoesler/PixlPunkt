@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Core.Document;
+using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Tile;
 using PixlPunkt.Core.Tools;
@@ -34,6 +36,8 @@ namespace PixlPunkt.UI.Tiles
         // Cached checkerboard pattern for SkiaSharp
         private SKShader? _checkerboardShader;
         private SKBitmap? _checkerboardBitmap;
+        private DispatcherQueueTimer? _tileRefreshTimer;
+        private bool _tileRefreshPending;
 
         /// <summary>
         /// Provider for accessing all open documents (set by main window).
@@ -100,6 +104,10 @@ namespace PixlPunkt.UI.Tiles
                 TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
                 _checkerboardShader?.Dispose();
                 _checkerboardBitmap?.Dispose();
+                if (_tileRefreshTimer != null)
+                {
+                    _tileRefreshTimer.Stop();
+                }
             };
         }
 
@@ -170,25 +178,101 @@ namespace PixlPunkt.UI.Tiles
         /// </summary>
         public void RefreshTileList()
         {
-            TileIds.Clear();
-
-            if (_document?.TileSet == null) return;
-
-            foreach (var tileId in _document.TileSet.TileIds)
-                TileIds.Add(tileId);
-
-            // Select first tile if none selected
-            if (_selectedTileId < 0 && TileIds.Count > 0)
-                SelectedTileId = TileIds[0];
+            SyncTileListWithDocument();
         }
 
         private void OnTileSetChanged()
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                RefreshTileList();
-                RefreshAllTileVisuals();
+                if (RasterLayer.SuppressLivePreviewUpdates)
+                {
+                    // During active painting, defer panel redraw to avoid tile-grid greying/flicker.
+                    _tileRefreshPending = true;
+                    EnsureDeferredRefreshTimer();
+                    _tileRefreshTimer?.Start();
+                    return;
+                }
+
+                ApplyTileSetUpdateNow();
             });
+        }
+
+        private void EnsureDeferredRefreshTimer()
+        {
+            if (_tileRefreshTimer != null)
+                return;
+
+            var queue = DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (queue == null)
+                return;
+
+            _tileRefreshTimer = queue.CreateTimer();
+            _tileRefreshTimer.Interval = TimeSpan.FromMilliseconds(40);
+            _tileRefreshTimer.IsRepeating = true;
+            _tileRefreshTimer.Tick += (_, __) =>
+            {
+                if (!_tileRefreshPending)
+                {
+                    _tileRefreshTimer.Stop();
+                    return;
+                }
+
+                if (RasterLayer.SuppressLivePreviewUpdates)
+                    return;
+
+                _tileRefreshPending = false;
+                _tileRefreshTimer.Stop();
+                ApplyTileSetUpdateNow();
+            };
+        }
+
+        private void ApplyTileSetUpdateNow()
+        {
+            SyncTileListWithDocument();
+            RefreshAllTileVisuals();
+        }
+
+        private void SyncTileListWithDocument()
+        {
+            if (_document?.TileSet == null)
+            {
+                if (TileIds.Count > 0)
+                    TileIds.Clear();
+
+                if (_selectedTileId != -1)
+                    SelectedTileId = -1;
+
+                return;
+            }
+
+            var desiredIds = _document.TileSet.TileIds.ToList();
+            bool idsMatch = TileIds.Count == desiredIds.Count;
+
+            if (idsMatch)
+            {
+                for (int i = 0; i < desiredIds.Count; i++)
+                {
+                    if (TileIds[i] != desiredIds[i])
+                    {
+                        idsMatch = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!idsMatch)
+            {
+                TileIds.Clear();
+                foreach (var tileId in desiredIds)
+                    TileIds.Add(tileId);
+            }
+
+            // Keep selection valid.
+            if (_selectedTileId < 0 || !desiredIds.Contains(_selectedTileId))
+            {
+                SelectedTileId = desiredIds.Count > 0 ? desiredIds[0] : -1;
+            }
         }
 
         //////////////////////////////////////////////////////////////////

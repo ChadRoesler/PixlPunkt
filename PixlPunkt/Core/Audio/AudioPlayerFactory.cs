@@ -36,7 +36,7 @@ namespace PixlPunkt.Core.Audio
         /// Creates a new <see cref="IAudioPlayer"/> instance appropriate for the current platform.
         /// </summary>
         /// <returns>
-        /// On Windows: <see cref="WindowsAudioPlayer"/> with full functionality.
+        /// On Windows: the native Windows player with full functionality.
         /// On Linux/macOS: <see cref="CrossPlatformAudioPlayer"/> using native tools.
         /// Fallback: <see cref="StubAudioPlayer"/> with limited functionality.
         /// </returns>

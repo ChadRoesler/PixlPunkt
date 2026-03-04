@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Compositing.Effects;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Document.Layer;
+using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.UI.Converters;
 using PixlPunkt.UI.Helpers;
@@ -395,7 +396,8 @@ namespace PixlPunkt.UI.Layers
 
         private void LayersList_ContextRequested(UIElement sender, ContextRequestedEventArgs e)
         {
-            e.Handled = true;
+            _ = sender;
+            _ = e;
         }
 
         private void Add_Click(object sender, RoutedEventArgs e)
@@ -434,20 +436,7 @@ namespace PixlPunkt.UI.Layers
 
             try
             {
-                using var stream = await file.OpenReadAsync();
-                var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
-
-                var transform = new Windows.Graphics.Imaging.BitmapTransform();
-                var pixelData = await decoder.GetPixelDataAsync(
-                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                    Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
-                    transform,
-                    Windows.Graphics.Imaging.ExifOrientationMode.RespectExifOrientation,
-                    Windows.Graphics.Imaging.ColorManagementMode.DoNotColorManage);
-
-                var pixels = pixelData.DetachPixelData();
-                int width = (int)decoder.PixelWidth;
-                int height = (int)decoder.PixelHeight;
+                var (pixels, width, height) = SkiaImageEncoder.Decode(file.Path);
 
                 var name = System.IO.Path.GetFileNameWithoutExtension(file.Name);
                 _doc.AddReferenceLayer(name, pixels, width, height, file.Path);
@@ -755,9 +744,10 @@ namespace PixlPunkt.UI.Layers
             win.Activate();
             var appW = WindowHost.ApplyChrome(win, resizable: true, alwaysOnTop: true, minimizable: false,
                 title: $"Layer Settings - {layer.Name}", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.90,
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.90,
                 minLogicalWidth: 100, minLogicalHeight: 100);
             WindowHost.Place(appW, Core.Enums.WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
     }
 }
+

@@ -124,11 +124,6 @@ namespace PixlPunkt.UI.Help
                 // Wait for WebView2 runtime to initialize
                 await _webView.EnsureCoreWebView2Async();
 
-                // Disable dev tools and status bar for clean appearance
-                _webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
-                _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
-                _webView.CoreWebView2.Settings.IsZoomControlEnabled = false;
-
                 // Map the local Help folder to a virtual hostname.
                 // This allows Docsify's AJAX requests to work (file:// blocks AJAX).
                 _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(

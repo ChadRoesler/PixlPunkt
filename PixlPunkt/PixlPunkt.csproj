@@ -9,8 +9,8 @@
          -p:WithAndroid=true     (includes Android - requires UnoIcon SVGs)
   ═══════════════════════════════════════════════════════════════════════ -->
   <PropertyGroup>
-    <!-- Default: Windows + iOS/macOS (no Android - it requires UnoIcon SVGs) -->
-    <TargetFrameworks Condition="'$(DesktopOnly)' != 'true' and '$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true' and '$(WithAndroid)' != 'true'">net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+    <!-- Default: desktop-first targets (Windows + Skia desktop + shared net10.0) -->
+    <TargetFrameworks Condition="'$(DesktopOnly)' != 'true' and '$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true' and '$(WithAndroid)' != 'true'">net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
     
     <!-- WithAndroid: includes Android (requires UnoIcon with proper SVG files) -->
     <TargetFrameworks Condition="'$(WithAndroid)' == 'true'">net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
@@ -110,6 +110,8 @@
   ═══════════════════════════════════════════════════════════════════════ -->
   <PropertyGroup Condition="$(TargetFramework.Contains('desktop'))">
     <UnoSingleProjectAllowIncrementalBuilds>true</UnoSingleProjectAllowIncrementalBuilds>
+    <!-- Enable restore/build for desktop RIDs we officially support -->
+    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == ''">win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <!-- Define HAS_UNO_SKIA for Skia desktop builds -->
     <DefineConstants>$(DefineConstants);HAS_UNO_SKIA</DefineConstants>
     <!-- 
@@ -152,6 +154,9 @@
     <!-- Also keep in Assets folder for fallback access -->
     <Content Include="Assets\Icons\PixlPunkt.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Icons\Icon.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Custom icon fonts for tool glyph overrides -->
+    <Content Include="Assets\Fonts\*.ttf" CopyToOutputDirectory="PreserveNewest" Link="Assets\Fonts\%(Filename)%(Extension)" />
+    <Content Include="Assets\Fonts\*.otf" CopyToOutputDirectory="PreserveNewest" Link="Assets\Fonts\%(Filename)%(Extension)" />
     <!-- File type icons for Windows file associations -->
     <Content Include="Assets\Icons\FileTypes\*.ico" CopyToOutputDirectory="PreserveNewest" Link="Assets\Icons\FileTypes\%(Filename)%(Extension)" />
   </ItemGroup>
@@ -169,10 +174,7 @@
     <!-- Bundled icons for offline help (rewritten from GitHub URLs by docsify plugin) -->
     <Content Include="..\docs\assets\icons\*.png" CopyToOutputDirectory="PreserveNewest" Link="Help\assets\icons\%(Filename)%(Extension)" />
     <!-- Wiki markdown files — served by docsify at runtime (exclude wiki _Sidebar and README) -->
-    <Content Include="..\wiki\*.md"
-             Exclude="..\wiki\_Sidebar.md;..\wiki\README.md"
-             CopyToOutputDirectory="PreserveNewest"
-             Link="Help\%(Filename)%(Extension)" />
+    <Content Include="..\wiki\*.md" Exclude="..\wiki\_Sidebar.md;..\wiki\README.md" CopyToOutputDirectory="PreserveNewest" Link="Help\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- 
@@ -183,11 +185,7 @@
     <PropertyGroup>
       <_ManifestPath>$(IntermediateOutputPath)unoresizetizer\m\Package.appxmanifest</_ManifestPath>
     </PropertyGroup>
-    <WriteLinesToFile
-      File="$(_ManifestPath)"
-      Lines="$([System.IO.File]::ReadAllText('$(_ManifestPath)').Replace('&lt;uap:ShowNameOnTiles /&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=&quot;square150x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;square310x310Logo&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;'))"
-      Overwrite="true"
-      Condition="Exists('$(_ManifestPath)')" />
+    <WriteLinesToFile File="$(_ManifestPath)" Lines="$([System.IO.File]::ReadAllText('$(_ManifestPath)').Replace('&lt;uap:ShowNameOnTiles /&gt;', '&lt;uap:ShowNameOnTiles&gt;&lt;uap:ShowOn Tile=&quot;square150x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot;/&gt;&lt;uap:ShowOn Tile=&quot;square310x310Logo&quot;/&gt;&lt;/uap:ShowNameOnTiles&gt;'))" Overwrite="true" Condition="Exists('$(_ManifestPath)')" />
   </Target>
 
   <!--
@@ -203,12 +201,10 @@
       <_MsixVersion Condition="$(_VersionParts) == '1'">$(Version).0.0.0</_MsixVersion>
       <_MsixVersion Condition="$(_VersionParts) == '2'">$(Version).0.0</_MsixVersion>
       <_MsixVersion Condition="$(_VersionParts) == '3'">$(Version).0</_MsixVersion>
-      <_MsixVersion Condition="$(_VersionParts) >= '4'">$(Version)</_MsixVersion>
+      <_MsixVersion Condition="$(_VersionParts) &gt;= '4'">$(Version)</_MsixVersion>
     </PropertyGroup>
     <Message Text="Updating MSIX version to $(_MsixVersion)" Importance="high" />
-    <Exec 
-      Command="powershell -NoProfile -Command &quot;(Get-Content '$(_ManifestPath)') -replace 'Version=\&quot;1\.0\.0\.0\&quot;', 'Version=\&quot;$(_MsixVersion)\&quot;' | Set-Content '$(_ManifestPath)'&quot;"
-      Condition="Exists('$(_ManifestPath)')" />
+    <Exec Command="powershell -NoProfile -Command &quot;(Get-Content '$(_ManifestPath)') -replace 'Version=\&quot;1\.0\.0\.0\&quot;', 'Version=\&quot;$(_MsixVersion)\&quot;' | Set-Content '$(_ManifestPath)'&quot;" Condition="Exists('$(_ManifestPath)')" />
   </Target>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
@@ -245,6 +241,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PixlPunkt.PluginSdk\PixlPunkt.PluginSdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="UI\Voxel\VoxelPreviewWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,7 @@ using System.Numerics;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Document.Layer;
+using PixlPunkt.Core.History;
 using PixlPunkt.Core.Painting.Dithering;
 using PixlPunkt.Core.Painting.Painters;
 using PixlPunkt.Core.Rendering;
@@ -100,6 +101,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (_toolState == null) return;
 
             var settings = _toolState.GradientFill;
+            bool hasTileMapping = BeginTileWriteThroughIfMapped();
 
             // Get selection mask if any
             Func<int, int, bool>? selMask = null;
@@ -117,18 +119,31 @@ namespace PixlPunkt.UI.CanvasHost
                 _fg, _bgColor,
                 selMask);
 
+            TileMappedPixelChangeItem? tileMappedItem = null;
+            if (hasTileMapping)
+            {
+                tileMappedItem = FinalizeTileWriteThrough(historyItem, "Gradient Fill");
+            }
+
             // Push to history
-            if (historyItem != null && !historyItem.IsEmpty)
+            if (tileMappedItem != null)
+            {
+                tileMappedItem.HistoryIcon = historyItem?.HistoryIcon ?? FluentIcons.Common.Icon.CalendarPattern;
+                Document.History.Push(tileMappedItem);
+            }
+            else if (historyItem != null && !historyItem.IsEmpty)
             {
                 Document.History.Push(historyItem);
             }
 
             // Composite and update
             Document.CompositeTo(Document.Surface);
+            Document.RaiseDocumentModified();
             UpdateActiveLayerPreview();
             InvalidateMainCanvas();
             HistoryStateChanged?.Invoke();
             RaiseFrame();
+            AutoCaptureKeyframeIfNeeded();
 
             _mainCanvas.ReleasePointerCaptures();
         }

@@ -14,6 +14,7 @@ using PixlPunkt.Core.Brush;
 using PixlPunkt.Core.Canvas;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Enums;
+using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Palette;
 using PixlPunkt.Core.Plugins;
@@ -21,6 +22,7 @@ using PixlPunkt.Core.Session;
 using PixlPunkt.Core.Settings;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Updates;
+using PixlPunkt.UI.CanvasArea;
 using PixlPunkt.UI.CanvasHost;
 using PixlPunkt.UI.Dialogs;
 using PixlPunkt.UI.Helpers;
@@ -94,6 +96,15 @@ namespace PixlPunkt.UI
         // Keyboard modifier tracking
         private bool _shiftDown;
         private bool _ctrlDown;
+        private bool _swapGlobalToolRailWhenVoxelPaneActive;
+
+        /// <summary>
+        /// Gets the active XamlRoot for dialogs/flyouts owned by the main window.
+        /// Throws if the window content has not been initialized yet.
+        /// </summary>
+        private XamlRoot MainXamlRoot =>
+            (Content as FrameworkElement)?.XamlRoot
+            ?? throw new InvalidOperationException("Main window XamlRoot is unavailable.");
 
         // ─────────────────────────────────────────────────────────────
         // CONSTRUCTOR
@@ -194,6 +205,13 @@ namespace PixlPunkt.UI
                 ToolRail.NotifyBrushOpacityChanged(a);
             };
             ToolRail.RequestSetBrushColor = c => ApplyBrushColor(c);
+            if (VoxelGlobalToolRail != null)
+            {
+                VoxelGlobalToolRail.Orientation = Orientation.Vertical;
+                VoxelGlobalToolRail.ShowLabels = false;
+                VoxelGlobalToolRail.Visibility = Visibility.Collapsed;
+            }
+            SetSwapGlobalToolRailWhenVoxelActive(AppSettings.Instance.SwapGlobalToolRailWhenVoxelPaneActive);
 
             // NOTE: ForegroundPicked already subscribed above via _onForegroundPicked
             // BackgroundPicked reserved for future BG tool bindings (no-op for now)
@@ -298,7 +316,7 @@ namespace PixlPunkt.UI
         {
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Palette Not Found",
                 Content = $"The configured default palette \"{paletteName}\" could not be found.\n\n" +
                           $"This may happen if a custom palette was deleted or renamed.\n\n" +
@@ -322,7 +340,7 @@ namespace PixlPunkt.UI
 
                 if (conflicts.Count > 0)
                 {
-                    var dialog = new ShortcutConflictWarningDialog(conflicts, Content.XamlRoot);
+                    var dialog = new ShortcutConflictWarningDialog(conflicts, MainXamlRoot);
                     var openSettings = await dialog.ShowAsync();
 
                     if (openSettings)
@@ -332,7 +350,7 @@ namespace PixlPunkt.UI
                         win.InitializeWithToolState(_toolState);
                         win.Activate();
                         var appW = WindowHost.ApplyChrome(win, resizable: false, alwaysOnTop: false, minimizable: false, title: "Settings", owner: App.PixlPunktMainWindow);
-                        WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.9, minLogicalWidth: 560, minLogicalHeight: 360);
+                        WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.9, minLogicalWidth: 560, minLogicalHeight: 360);
                         WindowHost.Place(appW, WindowPlacement.CenterOnScreen, this);
                     }
 
@@ -402,7 +420,7 @@ namespace PixlPunkt.UI
 
             foreach (TabViewItem tab in DocsTab.TabItems)
             {
-                if (tab.Content is CanvasViewHost host && host.Document.IsDirty)
+                if (GetCanvasHostFromTab(tab) is CanvasViewHost host && host.Document.IsDirty)
                 {
                     dirtyDocs.Add(host.Document);
                 }
@@ -420,7 +438,7 @@ namespace PixlPunkt.UI
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Unsaved Changes",
                 Content = $"The following documents have unsaved changes:\n\n{docList}\n\nDo you want to save before closing?",
                 PrimaryButtonText = "Save All",
@@ -455,6 +473,39 @@ namespace PixlPunkt.UI
             catch (Exception ex)
             {
                 LoggingService.Debug("Failed to set palette swatch size: {Error}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Enables or disables auto-swapping of the global tool rail to voxel tools
+        /// when the active document has an active voxel pane.
+        /// </summary>
+        public void SetSwapGlobalToolRailWhenVoxelActive(bool enabled)
+        {
+            _swapGlobalToolRailWhenVoxelPaneActive = enabled;
+            UpdateGlobalToolRailMode();
+        }
+
+        private void UpdateGlobalToolRailMode()
+        {
+            if (ToolRail == null || VoxelGlobalToolRail == null)
+                return;
+
+            DocumentWorkspaceHost? workspaceHost = GetActiveDocumentWorkspaceHost();
+            bool useVoxelRail = _swapGlobalToolRailWhenVoxelPaneActive &&
+                                workspaceHost is { IsVoxelPaneActive: true };
+
+            if (useVoxelRail && workspaceHost != null)
+            {
+                VoxelGlobalToolRail.ToolState = workspaceHost.VoxelWorkspace.VoxelTools;
+                VoxelGlobalToolRail.Visibility = Visibility.Visible;
+                ToolRail.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                VoxelGlobalToolRail.ToolState = null;
+                VoxelGlobalToolRail.Visibility = Visibility.Collapsed;
+                ToolRail.Visibility = Visibility.Visible;
             }
         }
 
@@ -683,14 +734,12 @@ namespace PixlPunkt.UI
 
         private void UndoBtn_Click(object sender, RoutedEventArgs e)
         {
-            CurrentHost?.Undo();
-            UpdateHistoryUI();
+            _ = TryUndoFromActiveWorkspace();
         }
 
         private void RedoBtn_Click(object sender, RoutedEventArgs e)
         {
-            CurrentHost?.Redo();
-            UpdateHistoryUI();
+            _ = TryRedoFromActiveWorkspace();
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -726,7 +775,7 @@ namespace PixlPunkt.UI
                 return ContentDialogResult.None;
             }
 
-            dlg.XamlRoot ??= Content.XamlRoot;
+            dlg.XamlRoot ??= MainXamlRoot;
 
             // Apply the app's theme setting to the dialog
             dlg.RequestedTheme = Root.RequestedTheme;
@@ -753,7 +802,7 @@ namespace PixlPunkt.UI
         {
             if (IsTextInputFocused()) return;
 
-            var dlg = new NewCanvasDialog { XamlRoot = Content.XamlRoot };
+            var dlg = new NewCanvasDialog { XamlRoot = MainXamlRoot };
             var res = await ShowDialogGuardedAsync(dlg);
             if (res != ContentDialogResult.Primary) return;
 
@@ -789,10 +838,7 @@ namespace PixlPunkt.UI
                 }
                 else if (file.FileType.Equals(".png", StringComparison.OrdinalIgnoreCase))
                 {
-                    using var stream = await file.OpenReadAsync();
-                    var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
-                    var w = (int)decoder.PixelWidth;
-                    var h = (int)decoder.PixelHeight;
+                    var (_, w, h) = SkiaImageEncoder.Decode(file.Path);
                     doc = new CanvasDocument(file.Name, w, h, CreateSize(8, 8), CreateSize(Math.Max(1, w / 8), Math.Max(1, h / 8)));
                 }
                 else
@@ -800,7 +846,7 @@ namespace PixlPunkt.UI
                     // Unsupported format
                     _ = new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Unsupported format",
                         Content = $"Cannot open files with extension '{file.FileType}'.",
                         CloseButtonText = "OK"
@@ -835,7 +881,7 @@ namespace PixlPunkt.UI
                 LoggingService.Error($"Failed to open document: {file.Path}", ex);
                 _ = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Open failed",
                     Content = $"Could not open file.\n{ex.Message}",
                     CloseButtonText = "OK"
@@ -986,7 +1032,7 @@ namespace PixlPunkt.UI
 
             WindowHost.FitToContentAfterLayout(
                 win,
-                (FrameworkElement)win.Content,
+                win.Content,
                 maxScreenFraction: 0.90,
                 minLogicalWidth: 900,
                 minLogicalHeight: 700);
@@ -1062,7 +1108,7 @@ namespace PixlPunkt.UI
                 LoggingService.Error($"Failed to save document: {existingPath}", ex);
                 _ = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Save failed",
                     Content = "Could not save current document.",
                     CloseButtonText = "OK"
@@ -1143,7 +1189,7 @@ namespace PixlPunkt.UI
                 Title = "Brushes Refreshed",
                 Content = $"Loaded {Core.Brush.BrushDefinitionService.Instance.Count} custom brush(es) from:\n%AppData%\\PixlPunkt\\Brushes\\",
                 CloseButtonText = "OK",
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             });
 
             LoggingService.Info("Brushes refreshed from main window");
@@ -1184,21 +1230,13 @@ namespace PixlPunkt.UI
         private void Edit_Undo_Click(object sender, RoutedEventArgs e)
         {
             if (IsTextInputFocused()) return;
-            if (CurrentHost?.CanUndo == true)
-            {
-                CurrentHost.Undo();
-                UpdateHistoryUI();
-            }
+            _ = TryUndoFromActiveWorkspace();
         }
 
         private void Edit_Redo_Click(object sender, RoutedEventArgs e)
         {
             if (IsTextInputFocused()) return;
-            if (CurrentHost?.CanRedo == true)
-            {
-                CurrentHost.Redo();
-                UpdateHistoryUI();
-            }
+            _ = TryRedoFromActiveWorkspace();
         }
 
         private void Edit_EditCanvas_Click(object sender, RoutedEventArgs e)
@@ -1226,7 +1264,7 @@ namespace PixlPunkt.UI
 
             win.Activate();
             var appW = WindowHost.ApplyChrome(win, resizable: false, alwaysOnTop: false, minimizable: false, title: "Edit Canvas", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.9, minLogicalWidth: 340, minLogicalHeight: 480);
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.9, minLogicalWidth: 340, minLogicalHeight: 480);
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, this);
         }
 
@@ -1240,7 +1278,7 @@ namespace PixlPunkt.UI
             win.InitializeWithToolState(_toolState);
             win.Activate();
             var appW = WindowHost.ApplyChrome(win, resizable: false, alwaysOnTop: false, minimizable: false, title: "Settings", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.9, minLogicalWidth: 560, minLogicalHeight: 360);
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.9, minLogicalWidth: 560, minLogicalHeight: 360);
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, this);
         }
 
@@ -1450,7 +1488,7 @@ namespace PixlPunkt.UI
                     // Show "up to date" message when manually checking
                     await ShowDialogGuardedAsync(new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "You're Up to Date!",
                         Content = $"PixlPunkt v{UpdateService.GetCurrentVersionString()} is the latest version.",
                         CloseButtonText = "OK",
@@ -1466,7 +1504,7 @@ namespace PixlPunkt.UI
                 {
                     await ShowDialogGuardedAsync(new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Update Check Failed",
                         Content = "Could not connect to GitHub to check for updates.\n\nPlease check your internet connection and try again.",
                         CloseButtonText = "OK",
@@ -1483,7 +1521,7 @@ namespace PixlPunkt.UI
         {
             var dlg = new UpdateAvailableDialog(updateInfo)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             var result = await ShowDialogGuardedAsync(dlg);
@@ -1571,7 +1609,7 @@ namespace PixlPunkt.UI
         {
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "About PixlPunkt",
                 Content = new StackPanel
                 {
@@ -1657,3 +1695,5 @@ namespace PixlPunkt.UI
         }
     }
 }
+
+
