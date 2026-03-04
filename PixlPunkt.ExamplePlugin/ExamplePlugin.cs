@@ -6,6 +6,7 @@ using PixlPunkt.ExamplePlugin.Tools.Selection;
 using PixlPunkt.ExamplePlugin.Tools.Shapes;
 using PixlPunkt.ExamplePlugin.Tools.Tile;
 using PixlPunkt.ExamplePlugin.Tools.Utility;
+using PixlPunkt.ExamplePlugin.Tools.Voxel;
 using PixlPunkt.PluginSdk.Effects;
 using PixlPunkt.PluginSdk.Effects.Builders;
 using PixlPunkt.PluginSdk.IO;
@@ -13,6 +14,8 @@ using PixlPunkt.PluginSdk.IO.Builders;
 using PixlPunkt.PluginSdk.Plugins;
 using PixlPunkt.PluginSdk.Tools;
 using PixlPunkt.PluginSdk.Tools.Builders;
+using PixlPunkt.PluginSdk.Voxel.Tools.Builders;
+using SdkIVoxelToolRegistration = PixlPunkt.PluginSdk.Voxel.Tools.IVoxelToolRegistration;
 
 // Assembly-level plugin attributes (alternative to csproj properties)
 [assembly: PluginId("pixlpunkt.example")]
@@ -42,7 +45,7 @@ namespace PixlPunkt.ExamplePlugin
     /// <item>Using plugin context for logging</item>
     /// </list>
     /// </remarks>
-    public sealed class ExamplePlugin : IPlugin
+    public sealed class ExamplePlugin : IPlugin, IVoxelToolProvider
     {
         private IPluginContext? _context;
 
@@ -52,6 +55,7 @@ namespace PixlPunkt.ExamplePlugin
         private readonly EllipseSelectSettings _ellipseSelectSettings = new();
         private readonly InfoToolSettings _infoToolSettings = new();
         private readonly TileBucketFillSettings _tileBucketFillSettings = new();
+        private readonly VoxelFaceTintSettings _voxelFaceTintSettings = new();
 
         /// <inheritdoc/>
         public string Id => "pixlpunkt.example";
@@ -136,6 +140,20 @@ namespace PixlPunkt.ExamplePlugin
                 .Build();
 
             _context?.Log(PluginLogLevel.Info, "Registered 5 tools: Sparkle Brush, Star, Ellipse Select, Info Tool, Tile Bucket Fill");
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<SdkIVoxelToolRegistration> GetVoxelToolRegistrations()
+        {
+            _context?.Log(PluginLogLevel.Debug, "Registering example voxel tools...");
+
+            yield return VoxelToolBuilders.FaceTool("pixlpunkt.example.voxel.facetint")
+                .WithDisplayName("Voxel Face Tint")
+                .WithSettings(_voxelFaceTintSettings)
+                .WithHandler(ctx => new VoxelFaceTintTool(ctx, _voxelFaceTintSettings))
+                .Build();
+
+            _context?.Log(PluginLogLevel.Info, "Registered 1 voxel tool: Voxel Face Tint");
         }
 
         /// <inheritdoc/>

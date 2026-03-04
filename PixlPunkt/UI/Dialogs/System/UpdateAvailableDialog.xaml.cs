@@ -24,6 +24,7 @@ namespace PixlPunkt.UI.Dialogs
     /// <summary>
     /// Dialog shown when a new update is available.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Uno", "Uno0001", Justification = "Uses RichTextBlock/Paragraph APIs for markdown release notes rendering.")]
     public sealed partial class UpdateAvailableDialog : ContentDialog
     {
         private readonly UpdateInfo _updateInfo;

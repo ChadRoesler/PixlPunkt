@@ -54,6 +54,10 @@ namespace PixlPunkt.UI
             {
                 ToolRail.RequestedTheme = theme;
             }
+            if (VoxelGlobalToolRail != null)
+            {
+                VoxelGlobalToolRail.RequestedTheme = theme;
+            }
             if (OptionsBar != null)
             {
                 OptionsBar.RequestedTheme = theme;
@@ -115,7 +119,7 @@ namespace PixlPunkt.UI
             // Update all open tab hosts
             foreach (var item in DocsTab.TabItems)
             {
-                if (item is TabViewItem tvi && tvi.Content is CanvasHost.CanvasViewHost host)
+                if (item is TabViewItem tvi && GetCanvasHostFromTab(tvi) is CanvasHost.CanvasViewHost host)
                     host.UpdateTransparencyPatternForTheme(effectiveTheme);
             }
 

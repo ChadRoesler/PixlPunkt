@@ -93,7 +93,7 @@ namespace PixlPunkt.UI.Controls
 
             WindowHost.FitToContentAfterLayout(
                 win,
-                (FrameworkElement)win.Content,
+                win.Content,
                 maxScreenFraction: 0.90,
                 minLogicalWidth: 560,
                 minLogicalHeight: 360);
@@ -105,3 +105,4 @@ namespace PixlPunkt.UI.Controls
         }
     }
 }
+

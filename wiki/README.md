@@ -14,6 +14,8 @@ wiki/
 ??? Effects.md           # Layer effects
 ??? Canvas-Animation.md  # Frame-by-frame animation
 ??? Tile-Animation.md    # Sprite sheet animation
+??? Voxel-Workspace.md   # In-tab voxel workspace workflow
+??? Voxel-Tools.md       # Voxel tool reference
 ??? Stage.md             # Camera system
 ??? Shortcuts.md         # Keyboard reference
 ??? ... more pages

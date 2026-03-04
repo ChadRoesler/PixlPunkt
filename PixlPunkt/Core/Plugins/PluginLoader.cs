@@ -13,7 +13,7 @@ namespace PixlPunkt.Core.Plugins
 {
     public sealed class PluginLoader
     {
-        public const int CurrentApiVersion = 2;
+        public const int CurrentApiVersion = 3;
         public const string PluginExtension = ".punk";
         public const string ManifestFileName = "manifest.json";
 

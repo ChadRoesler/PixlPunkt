@@ -2,12 +2,14 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Runtime.Versioning;
 
 namespace PixlPunkt.Core.Helpers
 {
     /// <summary>
     /// Helper methods for importing Windows cursor (.cur) files.
     /// </summary>
+    [SupportedOSPlatform("windows")]
     internal static class CursorImportHelper
     {
         /// <summary>

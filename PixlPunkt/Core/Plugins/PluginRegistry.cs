@@ -6,8 +6,11 @@ using PixlPunkt.Core.IO;
 using PixlPunkt.Core.Logging;
 using PixlPunkt.Core.Settings;
 using PixlPunkt.Core.Tools;
+using PixlPunkt.Core.Voxel.Tools;
 using SdkBrushToolRegistration = PixlPunkt.PluginSdk.Tools.BrushToolRegistration;
 // SDK types
+using SdkIVoxelToolProvider = PixlPunkt.PluginSdk.Plugins.IVoxelToolProvider;
+using SdkIVoxelToolRegistration = PixlPunkt.PluginSdk.Voxel.Tools.IVoxelToolRegistration;
 using SdkIToolRegistration = PixlPunkt.PluginSdk.Tools.IToolRegistration;
 using SdkSelectionToolRegistration = PixlPunkt.PluginSdk.Tools.SelectionToolRegistration;
 using SdkShapeToolRegistration = PixlPunkt.PluginSdk.Tools.ShapeToolRegistration;
@@ -45,6 +48,7 @@ namespace PixlPunkt.Core.Plugins
         private readonly Dictionary<string, LoadedPlugin> _plugins = new();
         private readonly Dictionary<string, string> _toolToPlugin = new();
         private readonly Dictionary<string, string> _effectToPlugin = new();
+        private readonly Dictionary<string, string> _voxelToolToPlugin = new();
         private readonly Dictionary<string, string> _importToPlugin = new();
         private readonly Dictionary<string, string> _exportToPlugin = new();
         private readonly object _lock = new();
@@ -136,6 +140,7 @@ namespace PixlPunkt.Core.Plugins
 
             // Register tools, effects, and import/export handlers using adapters
             RegisterPluginTools(loadedPlugin);
+            RegisterPluginVoxelTools(loadedPlugin);
             RegisterPluginEffects(loadedPlugin);
             RegisterPluginImportExport(loadedPlugin);
 
@@ -174,6 +179,7 @@ namespace PixlPunkt.Core.Plugins
                 _plugins.Clear();
                 _toolToPlugin.Clear();
                 _effectToPlugin.Clear();
+                _voxelToolToPlugin.Clear();
                 _importToPlugin.Clear();
                 _exportToPlugin.Clear();
             }
@@ -188,6 +194,10 @@ namespace PixlPunkt.Core.Plugins
             if (ToolRegistry.Shared is ToolRegistry toolRegistry)
             {
                 toolRegistry.NotifyToolsChanged();
+            }
+            if (VoxelToolRegistry.Shared is VoxelToolRegistry voxelToolRegistry)
+            {
+                voxelToolRegistry.NotifyToolsChanged();
             }
             if (EffectRegistry.Shared is EffectRegistry effectRegistry)
             {
@@ -231,6 +241,15 @@ namespace PixlPunkt.Core.Plugins
             lock (_lock)
             {
                 return _effectToPlugin.TryGetValue(effectId, out var pluginId) ? pluginId : null;
+            }
+        }
+
+        /// <summary>Gets the plugin ID that provides a given voxel tool.</summary>
+        public string? GetPluginForVoxelTool(string voxelToolId)
+        {
+            lock (_lock)
+            {
+                return _voxelToolToPlugin.TryGetValue(voxelToolId, out var pluginId) ? pluginId : null;
             }
         }
 
@@ -323,6 +342,41 @@ namespace PixlPunkt.Core.Plugins
 
             LoggingService.Warning("Unsupported tool type {Type} for id={ToolId}", sdkTool.GetType().Name, sdkTool.Id);
             return null;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // VOXEL TOOL REGISTRATION (adapts SDK voxel types to core voxel types)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private void RegisterPluginVoxelTools(LoadedPlugin loadedPlugin)
+        {
+            if (loadedPlugin.Instance is not SdkIVoxelToolProvider voxelProvider)
+                return;
+
+            var voxelToolRegistry = VoxelToolRegistry.Shared;
+            var sdkVoxelTools = voxelProvider.GetVoxelToolRegistrations();
+
+            foreach (var sdkVoxelTool in sdkVoxelTools)
+            {
+                var adaptedTool = AdaptVoxelToolRegistration(sdkVoxelTool);
+                if (adaptedTool == null) continue;
+
+                voxelToolRegistry.Register(adaptedTool);
+
+                lock (_lock)
+                {
+                    _voxelToolToPlugin[sdkVoxelTool.Id] = loadedPlugin.Manifest.Id;
+                }
+
+                LoggingService.Info("Registered voxel tool id={ToolId} plugin={PluginId} pluginName={PluginName}",
+                    sdkVoxelTool.Id, loadedPlugin.Manifest.Id, loadedPlugin.Manifest.Name);
+            }
+        }
+
+        private static Core.Voxel.Tools.IVoxelToolRegistration? AdaptVoxelToolRegistration(SdkIVoxelToolRegistration sdkVoxelTool)
+        {
+            if (sdkVoxelTool == null) return null;
+            return new PluginVoxelToolRegistration(sdkVoxelTool);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -435,6 +489,27 @@ namespace PixlPunkt.Core.Plugins
                 LoggingService.Info("Unregistered effect id={EffectId} plugin={PluginId}", effectId, plugin.Manifest.Id);
             }
 
+            var voxelToolRegistry = VoxelToolRegistry.Shared;
+            List<string> voxelToolsToRemove;
+            lock (_lock)
+            {
+                voxelToolsToRemove = _voxelToolToPlugin
+                    .Where(kvp => kvp.Value == plugin.Manifest.Id)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var voxelToolId in voxelToolsToRemove)
+                {
+                    _voxelToolToPlugin.Remove(voxelToolId);
+                }
+            }
+
+            foreach (var voxelToolId in voxelToolsToRemove)
+            {
+                voxelToolRegistry.Unregister(voxelToolId);
+                LoggingService.Info("Unregistered voxel tool id={ToolId} plugin={PluginId}", voxelToolId, plugin.Manifest.Id);
+            }
+
             // Unregister import handlers
             List<string> importsToRemove;
             lock (_lock)
@@ -494,6 +569,7 @@ namespace PixlPunkt.Core.Plugins
                 _plugins.Clear();
                 _toolToPlugin.Clear();
                 _effectToPlugin.Clear();
+                _voxelToolToPlugin.Clear();
                 _importToPlugin.Clear();
                 _exportToPlugin.Clear();
             }

@@ -36,7 +36,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Document",
                     Content = "Open a document before importing tiles.",
                     CloseButtonText = "OK"
@@ -48,7 +48,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Tile Set",
                     Content = "The current document does not have a tile set.",
                     CloseButtonText = "OK"
@@ -63,7 +63,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Source Documents",
                     Content = "There are no other open documents with tiles to import from.",
                     CloseButtonText = "OK"
@@ -74,7 +74,7 @@ namespace PixlPunkt.UI
             // Show import dialog
             var dialog = new ImportTilesDialog(doc, allDocs)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             var result = await dialog.ShowAsync();
@@ -128,7 +128,7 @@ namespace PixlPunkt.UI
 
             await ShowDialogGuardedAsync(new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Import Complete",
                 Content = message,
                 CloseButtonText = "OK"
@@ -207,7 +207,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Document",
                     Content = "Open a document before exporting tiles.",
                     CloseButtonText = "OK"
@@ -220,7 +220,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Tiles",
                     Content = "The document has no tiles to export.",
                     CloseButtonText = "OK"
@@ -266,7 +266,7 @@ namespace PixlPunkt.UI
 
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Export Complete",
                     Content = $"Exported {exportData.Tiles.Count} tile(s) and {exportData.LayerMappings.Count} layer mapping(s).",
                     CloseButtonText = "OK"
@@ -276,7 +276,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Export Failed",
                     Content = $"Could not export tiles: {ex.Message}",
                     CloseButtonText = "OK"
@@ -298,7 +298,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Document",
                     Content = "Open a document before importing tiles.",
                     CloseButtonText = "OK"
@@ -328,7 +328,7 @@ namespace PixlPunkt.UI
                 {
                     await ShowDialogGuardedAsync(new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Dimension Mismatch",
                         Content = $"The imported tiles are {importData.TileWidth}×{importData.TileHeight} pixels, " +
                                   $"but this document uses {doc.TileSet.TileWidth}×{doc.TileSet.TileHeight} pixel tiles.\n\n" +
@@ -345,7 +345,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import Failed",
                     Content = $"Could not import tiles: {ex.Message}",
                     CloseButtonText = "OK"
@@ -367,7 +367,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Document",
                     Content = "Open a document before importing tiles.",
                     CloseButtonText = "OK"
@@ -402,7 +402,7 @@ namespace PixlPunkt.UI
                 {
                     await ShowDialogGuardedAsync(new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "No Tiles",
                         Content = "The selected project has no tiles to import.",
                         CloseButtonText = "OK"
@@ -416,7 +416,7 @@ namespace PixlPunkt.UI
                 {
                     await ShowDialogGuardedAsync(new ContentDialog
                     {
-                        XamlRoot = Content.XamlRoot,
+                        XamlRoot = MainXamlRoot,
                         Title = "Dimension Mismatch",
                         Content = $"The imported tiles are {importData.TileWidth}×{importData.TileHeight} pixels, " +
                                   $"but this document uses {doc.TileSet.TileWidth}×{doc.TileSet.TileHeight} pixel tiles.\n\n" +
@@ -433,7 +433,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import Failed",
                     Content = $"Could not import tiles from project: {ex.Message}",
                     CloseButtonText = "OK"
@@ -480,7 +480,7 @@ namespace PixlPunkt.UI
 
             var dlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Import Tiles",
                 Content = contentPanel,
                 PrimaryButtonText = "Add",
@@ -501,7 +501,7 @@ namespace PixlPunkt.UI
                 // Replace mode - show warning first
                 var warningDlg = new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Replace Tiles",
                     Content = "This will remove ALL existing tiles and tile mappings from all layers.\n\n" +
                               "The painted pixel data will remain, but tile references will be lost.\n\n" +
@@ -532,7 +532,7 @@ namespace PixlPunkt.UI
 
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import Complete",
                     Content = $"Added {tilesAdded} tile(s) to the tile set.\n\n" +
                               "Note: Layer mappings were not imported in Add mode. " +
@@ -548,7 +548,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import Failed",
                     Content = $"Could not add tiles: {ex.Message}",
                     CloseButtonText = "OK"
@@ -599,7 +599,7 @@ namespace PixlPunkt.UI
 
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import Complete",
                     Content = $"Replaced tiles with {importData.Tiles.Count} tile(s) and " +
                               $"applied {importData.LayerMappings.Count} layer mapping(s).",
@@ -614,7 +614,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "Import Failed",
                     Content = $"Could not replace tiles: {ex.Message}",
                     CloseButtonText = "OK"
@@ -636,7 +636,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Tiles",
                     Content = "No tiles to merge.",
                     CloseButtonText = "OK"
@@ -649,7 +649,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Duplicates",
                     Content = "No duplicate tiles found.",
                     CloseButtonText = "OK"
@@ -660,7 +660,7 @@ namespace PixlPunkt.UI
             int totalDuplicates = duplicateGroups.Sum(g => g.Count() - 1);
             var confirmDlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Merge Duplicates",
                 Content = $"Found {totalDuplicates} duplicate tile(s) in {duplicateGroups.Count} group(s).\n\n" +
                           "Duplicate tiles will be removed and their mappings updated to use the first tile in each group.\n\n" +
@@ -697,7 +697,7 @@ namespace PixlPunkt.UI
 
             await ShowDialogGuardedAsync(new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Merge Complete",
                 Content = $"Merged {merged} duplicate tile(s).",
                 CloseButtonText = "OK"
@@ -717,7 +717,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Tiles",
                     Content = "No tiles to check.",
                     CloseButtonText = "OK"
@@ -746,7 +746,7 @@ namespace PixlPunkt.UI
             {
                 await ShowDialogGuardedAsync(new ContentDialog
                 {
-                    XamlRoot = Content.XamlRoot,
+                    XamlRoot = MainXamlRoot,
                     Title = "No Unused Tiles",
                     Content = "All tiles are being used in layer mappings.",
                     CloseButtonText = "OK"
@@ -756,7 +756,7 @@ namespace PixlPunkt.UI
 
             var confirmDlg = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Remove Unused Tiles",
                 Content = $"Found {unusedCount} unused tile(s) out of {totalTiles} total.\n\n" +
                           "These tiles are not referenced in any layer mapping.\n\n" +
@@ -773,7 +773,7 @@ namespace PixlPunkt.UI
 
             await ShowDialogGuardedAsync(new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Removal Complete",
                 Content = $"Removed {removed} unused tile(s).",
                 CloseButtonText = "OK"
@@ -782,5 +782,53 @@ namespace PixlPunkt.UI
             TilePanel?.RefreshTiles();
             CurrentHost?.InvalidateCanvas();
         }
+
+        //////////////////////////////////////////////////////////////////
+        // VOXEL PREVIEW
+        //////////////////////////////////////////////////////////////////
+
+        /// <summary>
+        /// Opens the voxel preview window for the current document.
+        /// </summary>
+        private async void Tiles_VoxelPreview_Click(object sender, RoutedEventArgs e)
+        {
+            var doc = CurrentHost?.Document;
+            if (doc is null)
+            {
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    XamlRoot = MainXamlRoot,
+                    Title = "No Document",
+                    Content = "Open a document before using Voxel Preview.",
+                    CloseButtonText = "OK"
+                });
+                return;
+            }
+
+            var tileSet = doc.TileSet;
+            if (tileSet == null || tileSet.Count == 0)
+            {
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    XamlRoot = MainXamlRoot,
+                    Title = "No Tiles",
+                    Content = "The document has no tiles. Create tiles first to use Voxel Preview.",
+                    CloseButtonText = "OK"
+                });
+                return;
+            }
+
+            // Phase 3: prefer the in-tab voxel workspace pane.
+            var activeWorkspaceHost = GetActiveDocumentWorkspaceHost();
+            if (activeWorkspaceHost != null && ReferenceEquals(activeWorkspaceHost.Document, doc))
+            {
+                activeWorkspaceHost.ShowVoxelPane();
+                return;
+            }
+
+            // Fallback to floating host (e.g., if invoked outside a tabbed document context).
+            Voxel.VoxelPreviewWindow.Show(doc, this);
+        }
     }
 }
+

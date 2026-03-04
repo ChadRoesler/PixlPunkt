@@ -236,8 +236,9 @@ namespace PixlPunkt.UI.Palette
             win.Activate();
 
             var appW = WindowHost.ApplyChrome(win, resizable: false, alwaysOnTop: true, minimizable: false, title: "Color Picker", owner: App.PixlPunktMainWindow);
-            WindowHost.FitToContentAfterLayout(win, (FrameworkElement)win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
+            WindowHost.FitToContentAfterLayout(win, win.Content, maxScreenFraction: 0.90, minLogicalWidth: 560, minLogicalHeight: 360);
             WindowHost.Place(appW, WindowPlacement.CenterOnScreen, App.PixlPunktMainWindow);
         }
     }
 }
+

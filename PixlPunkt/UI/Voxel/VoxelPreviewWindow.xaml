@@ -1,0 +1,8 @@
+<Window
+    x:Class="PixlPunkt.UI.Voxel.VoxelPreviewWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Voxel Preview">
+
+    <Grid x:Name="Root"/>
+</Window>

@@ -18,7 +18,7 @@ namespace PixlPunkt.Core.Plugins
         /// <summary>
         /// The current plugin API version.
         /// </summary>
-        public const int CurrentApiVersion = 1;
+        public const int CurrentApiVersion = PluginLoader.CurrentApiVersion;
 
         /// <summary>
         /// The application name used for directory paths.

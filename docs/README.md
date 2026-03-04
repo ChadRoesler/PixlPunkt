@@ -30,6 +30,8 @@ Welcome to the PixlPunkt docs! Pick your adventure:
 | [Tools](https://github.com/ChadRoesler/PixlPunkt/wiki/Tools) | Every brush, eraser, and shape tool |
 | [Gradient Fill](https://github.com/ChadRoesler/PixlPunkt/wiki/Gradient-Fill) | Dithering algorithms explained (yes, even Riemersma) |
 | [Layers & Masks](https://github.com/ChadRoesler/PixlPunkt/wiki/Layers) | Layer effects, masks, blend modes |
+| [Voxel Workspace](https://github.com/ChadRoesler/PixlPunkt/wiki/Voxel-Workspace) | Build/edit voxel models from tile faces |
+| [Voxel Tools](https://github.com/ChadRoesler/PixlPunkt/wiki/Voxel-Tools) | Face paint, voxel edit, camera, and lighting workflow |
 | [Canvas Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Canvas-Animation) | Frame-by-frame, keyframes, onion skinning |
 | [Tile Animation](https://github.com/ChadRoesler/PixlPunkt/wiki/Tile-Animation) | Reels, sprite sheets, game-ready exports |
 | [Stage & Camera](https://github.com/ChadRoesler/PixlPunkt/wiki/Stage) | Pan, zoom, rotate - cinematic stuff |

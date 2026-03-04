@@ -83,6 +83,8 @@ The vertical toolbar on the left contains all drawing tools.
 
 See [[Tools]] for detailed documentation on each tool.
 
+When the Voxel pane is active, PixlPunkt can optionally swap the global rail to voxel tools (`Settings → Swap Tool Rail in Voxel`).
+
 ---
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/settings_16.png" width="16"> Tool Options Bar
@@ -151,6 +153,25 @@ Undo/redo history:
 | History List | All recorded actions |
 | Click to Jump | Click any state to revert |
 | Undo/Redo Buttons | Quick undo/redo |
+
+---
+
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/table_lightning_16.png" width="16"> Voxel Workspace Pane
+
+Open from **Tiles → Voxel Preview…**.
+
+The active document opens a split workspace:
+- left pane: regular 2D canvas
+- right pane: voxel workspace
+
+Voxel pane highlights:
+- resizable splitter between canvas and voxel panes
+- viewport voxel tool strip
+- section-card controls for lighting, face mapping, display, edit, and actions
+- axis gizmo for orientation snap
+- bottom preset strip for iso/cardinal view snaps and light shortcuts
+
+See [[Voxel Workspace|Voxel-Workspace]] for full workflow and [[Voxel Tools|Voxel-Tools]] for tool behavior.
 
 ---
 

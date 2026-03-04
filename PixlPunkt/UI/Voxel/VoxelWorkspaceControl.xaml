@@ -1,0 +1,842 @@
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+  VOXEL PREVIEW WINDOW
+═══════════════════════════════════════════════════════════════════════════════
+  Renders a 3D voxel preview from tile face selections.
+  
+  Layout:
+    Left panel:  Tile face pickers (3 or 6 faces) + mode toggle + export
+    Right panel: 3D viewport (drag to rotate, scroll to zoom) + preset buttons
+═══════════════════════════════════════════════════════════════════════════════
+-->
+<UserControl
+    x:Class="PixlPunkt.UI.Voxel.VoxelWorkspaceControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctrl="using:PixlPunkt.UI.Controls"
+    xmlns:voxeltools="using:PixlPunkt.UI.Voxel.Tools"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <Style x:Key="VoxelViewChipButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}"/>
+            <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="CornerRadius" Value="3"/>
+        </Style>
+
+        <Style x:Key="VoxelViewChipComboStyle" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="3"/>
+        </Style>
+
+        <Style x:Key="VoxelSidebarSectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{ThemeResource SystemControlForegroundBaseMediumHighBrush}"/>
+        </Style>
+
+        <Style x:Key="VoxelSidebarLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Opacity" Value="0.88"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="VoxelSidebarComboStyle" TargetType="ComboBox">
+            <Setter Property="Width" Value="220"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+
+        <Style x:Key="VoxelSidebarNumberBoxStyle" TargetType="NumberBox">
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="SpinButtonPlacementMode" Value="Compact"/>
+        </Style>
+
+        <Style x:Key="VoxelSidebarSeparatorStyle" TargetType="Border">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+            <Setter Property="Margin" Value="0,2,0,2"/>
+        </Style>
+
+    </UserControl.Resources>
+
+    <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.ColumnDefinitions>
+            <!-- Left: Controls -->
+            <ColumnDefinition Width="260"/>
+            <!-- Right: Viewport -->
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LEFT PANEL: TILE PICKERS + CONTROLS                           -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <Border Grid.Column="0"
+                BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="10,10">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="10">
+
+                    <!-- Permanent lighting controls -->
+                    <ctrl:SectionCard x:Name="LightingSectionCard"
+                                      Title="Lighting"
+                                      DisplayIcon="Lightbulb"
+                                      PanelId="VoxelLighting"
+                                      MinimizedChanged="SidebarSectionCard_MinimizedChanged">
+                        <ctrl:SectionCard.CustomControl>
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+                                <CheckBox x:Name="LightingEnabledCheckBox"
+                                          Content="Enable lighting"
+                                          IsChecked="False"
+                                          Checked="LightingControls_Changed"
+                                          Unchecked="LightingControls_Changed"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Light color" Style="{StaticResource VoxelSidebarLabelStyle}" Width="92"/>
+                                    <ctrl:ColorSwatchButton x:Name="LightingColorSwatch"
+                                                            ColorChanged="LightingColor_Changed"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Shadow color" Style="{StaticResource VoxelSidebarLabelStyle}" Width="92"/>
+                                    <ctrl:ColorSwatchButton x:Name="LightingShadowColorSwatch"
+                                                            ColorChanged="LightingShadowColor_Changed"/>
+                                </StackPanel>
+
+                                <Grid Width="220">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="72"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Shadow" Style="{StaticResource VoxelSidebarLabelStyle}" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1"
+                                            x:Name="LightingShadowStrengthSlider"
+                                            Minimum="0"
+                                            Maximum="1"
+                                            StepFrequency="0.01"
+                                            ValueChanged="LightingShadowStrengthSlider_Changed"/>
+                                    <NumberBox Grid.Column="2"
+                                               x:Name="LightingShadowStrengthBox"
+                                               Margin="8,0,0,0"
+                                               Minimum="0"
+                                               Maximum="1"
+                                               SmallChange="0.01"
+                                               Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                               ValueChanged="LightingShadowStrengthBox_Changed"/>
+                                </Grid>
+
+                                <Grid Width="220">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="72"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Intensity" Style="{StaticResource VoxelSidebarLabelStyle}" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1"
+                                            x:Name="LightingIntensitySlider"
+                                            Minimum="0"
+                                            Maximum="8"
+                                            StepFrequency="0.05"
+                                            ValueChanged="LightingIntensitySlider_Changed"/>
+                                    <NumberBox Grid.Column="2"
+                                               x:Name="LightingIntensityBox"
+                                               Margin="8,0,0,0"
+                                               Minimum="0"
+                                               Maximum="8"
+                                               SmallChange="0.05"
+                                               Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                               ValueChanged="LightingIntensityBox_Changed"/>
+                                </Grid>
+
+                                <Grid Width="220">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="72"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Falloff" Style="{StaticResource VoxelSidebarLabelStyle}" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1"
+                                            x:Name="LightingFalloffSlider"
+                                            Minimum="0"
+                                            Maximum="2"
+                                            StepFrequency="0.01"
+                                            ValueChanged="LightingFalloffSlider_Changed"/>
+                                    <NumberBox Grid.Column="2"
+                                               x:Name="LightingFalloffBox"
+                                               Margin="8,0,0,0"
+                                               Minimum="0"
+                                               Maximum="2"
+                                               SmallChange="0.01"
+                                               Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                               ValueChanged="LightingFalloffBox_Changed"/>
+                                </Grid>
+
+                                <Border Style="{StaticResource VoxelSidebarSeparatorStyle}"/>
+
+                                <Grid Width="220">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="60"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Pos X" Style="{StaticResource VoxelSidebarLabelStyle}" VerticalAlignment="Center"/>
+                                    <NumberBox Grid.Column="1"
+                                               x:Name="LightingPosXBox"
+                                               Minimum="-4096"
+                                               Maximum="4096"
+                                               SmallChange="0.25"
+                                               Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                               ValueChanged="LightingPosition_Changed"/>
+                                </Grid>
+
+                                <Grid Width="220">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="60"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Pos Y" Style="{StaticResource VoxelSidebarLabelStyle}" VerticalAlignment="Center"/>
+                                    <NumberBox Grid.Column="1"
+                                               x:Name="LightingPosYBox"
+                                               Minimum="-4096"
+                                               Maximum="4096"
+                                               SmallChange="0.25"
+                                               Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                               ValueChanged="LightingPosition_Changed"/>
+                                </Grid>
+
+                                <Grid Width="220">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="60"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Pos Z" Style="{StaticResource VoxelSidebarLabelStyle}" VerticalAlignment="Center"/>
+                                    <NumberBox Grid.Column="1"
+                                               x:Name="LightingPosZBox"
+                                               Minimum="-4096"
+                                               Maximum="4096"
+                                               SmallChange="0.25"
+                                               Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                               ValueChanged="LightingPosition_Changed"/>
+                                </Grid>
+
+                                <CheckBox x:Name="LightingCastShadowsCheckBox"
+                                          Content="Cast shadows"
+                                          IsChecked="False"
+                                          Checked="LightingControls_Changed"
+                                          Unchecked="LightingControls_Changed"/>
+                            </StackPanel>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+
+                    <!-- Face setup -->
+                    <ctrl:SectionCard x:Name="FaceMappingSectionCard"
+                                      Title="Face Mapping"
+                                      PanelId="VoxelFaceMapping"
+                                      MinimizedChanged="SidebarSectionCard_MinimizedChanged">
+                        <ctrl:SectionCard.CustomControl>
+                            <StackPanel Spacing="10" Margin="0,8,0,0">
+
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Face Mode" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                <ComboBox x:Name="FaceModeCombo"
+                                          Style="{StaticResource VoxelSidebarComboStyle}"
+                                          SelectedIndex="0"
+                                          SelectionChanged="FaceModeCombo_SelectionChanged">
+                                    <ComboBoxItem Content="3 Faces (mirrored)"/>
+                                    <ComboBoxItem Content="6 Faces (individual)"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <CheckBox x:Name="ColorLinkingCheckBox"
+                                      Content="Color Linking"
+                                      IsChecked="False"
+                                      Checked="ColorLinking_Changed"
+                                      Unchecked="ColorLinking_Changed"/>
+
+                            <StackPanel x:Name="ColorTolerancePanel"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        Visibility="Collapsed">
+                                <TextBlock Text="Tolerance" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                <NumberBox x:Name="ColorToleranceBox"
+                                           Width="80"
+                                           Minimum="0"
+                                           Maximum="255"
+                                           Value="32"
+                                           Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                           ValueChanged="ColorTolerance_Changed"/>
+                            </StackPanel>
+
+                            <Border Style="{StaticResource VoxelSidebarSeparatorStyle}"/>
+
+                            <!-- 3-face mode: Front, Side, Top -->
+                            <StackPanel x:Name="ThreeFacePanel" Spacing="8">
+                                <TextBlock Text="Tile Faces"
+                                           Style="{StaticResource VoxelSidebarSectionTitleStyle}"/>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Front / Back" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="FrontTilePicker"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Left / Right" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="SideTilePicker"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Top / Bottom" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="TopTilePicker"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- 6-face mode: All individual -->
+                            <StackPanel x:Name="SixFacePanel" Spacing="8" Visibility="Collapsed">
+                                <TextBlock Text="Tile Faces"
+                                           Style="{StaticResource VoxelSidebarSectionTitleStyle}"/>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Front" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="FrontTilePicker6"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Back" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="BackTilePicker6"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Left" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="LeftTilePicker6"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Right" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="RightTilePicker6"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Top" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="TopTilePicker6"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Bottom" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                    <ComboBox x:Name="BottomTilePicker6"
+                                              Style="{StaticResource VoxelSidebarComboStyle}"
+                                              SelectionChanged="TilePicker_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+
+                    <!-- Display -->
+                    <ctrl:SectionCard x:Name="DisplaySectionCard"
+                                      Title="Display"
+                                      PanelId="VoxelDisplay"
+                                      MinimizedChanged="SidebarSectionCard_MinimizedChanged">
+                        <ctrl:SectionCard.CustomControl>
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+
+                            <CheckBox x:Name="OutlineCheckBox"
+                                      Content="Outline"
+                                      IsChecked="False"
+                                      Checked="OutlineCheckBox_Changed"
+                                      Unchecked="OutlineCheckBox_Changed"/>
+                            <StackPanel x:Name="OutlineColorPanel"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        Margin="20,0,0,0"
+                                        Visibility="Collapsed">
+                                <TextBlock Text="Color" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                <ctrl:ColorSwatchButton x:Name="OutlineColorSwatch"
+                                                        ColorChanged="OutlineColor_Changed"/>
+                                <TextBlock Text="Size" Style="{StaticResource VoxelSidebarLabelStyle}" Margin="8,0,0,0"/>
+                                <NumberBox x:Name="OutlineSizeBox"
+                                           Width="70"
+                                           Minimum="1"
+                                           Maximum="16"
+                                           Value="1"
+                                           Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                           ValueChanged="OutlineSize_Changed"/>
+                            </StackPanel>
+
+                            <Border Style="{StaticResource VoxelSidebarSeparatorStyle}"/>
+
+                            <CheckBox x:Name="PixelPreviewCheckBox"
+                                      Content="Pixel Preview"
+                                      IsChecked="False"
+                                      Checked="PixelPreview_Changed"
+                                      Unchecked="PixelPreview_Changed"/>
+
+                            <CheckBox x:Name="PixelPreviewAntialiasCheckBox"
+                                      Content="Pixel Preview Antialiasing"
+                                      IsChecked="False"
+                                      Checked="PixelPreviewAntialias_Changed"
+                                      Unchecked="PixelPreviewAntialias_Changed"/>
+
+                            <Grid Margin="20,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="AA Strength" Style="{StaticResource VoxelSidebarLabelStyle}" Margin="0,0,8,0"/>
+                                <Slider Grid.Column="1"
+                                        x:Name="PixelPreviewAaStrengthSlider"
+                                        Width="120"
+                                        Minimum="0"
+                                        Maximum="1"
+                                        StepFrequency="0.05"
+                                        Value="0.35"
+                                        ValueChanged="PixelPreviewAaStrength_Changed"/>
+                                <TextBlock Grid.Column="2"
+                                           x:Name="PixelPreviewAaStrengthText"
+                                           Width="42"
+                                           Text="35%"
+                                           VerticalAlignment="Center"
+                                           HorizontalTextAlignment="Right"/>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="20,0,0,0">
+                                <TextBlock Text="Pixel Base" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                <NumberBox x:Name="PixelBaseSizeBox"
+                                           Width="80"
+                                           Minimum="1"
+                                           Maximum="256"
+                                           Value="16"
+                                           Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                           ValueChanged="PixelBaseSize_Changed"/>
+                            </StackPanel>
+
+                            <Border Style="{StaticResource VoxelSidebarSeparatorStyle}"/>
+
+                            <CheckBox x:Name="BackdropGridCheckBox"
+                                      Content="Backdrop Cage"
+                                      IsChecked="True"
+                                      Checked="BackdropGrid_Changed"
+                                      Unchecked="BackdropGrid_Changed"/>
+
+                            <CheckBox x:Name="BackdropProjectionTilesCheckBox"
+                                      Content="Backdrop Projection Tiles"
+                                      IsChecked="True"
+                                      Checked="BackdropProjectionTiles_Changed"
+                                      Unchecked="BackdropProjectionTiles_Changed"/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="20,0,0,0">
+                                <TextBlock Text="Cage Distance" Style="{StaticResource VoxelSidebarLabelStyle}"/>
+                                <NumberBox x:Name="BackdropCageScaleBox"
+                                           Width="90"
+                                           Minimum="1.05"
+                                           Maximum="4.0"
+                                           Value="1.6"
+                                           SmallChange="0.05"
+                                           LargeChange="0.25"
+                                           Style="{StaticResource VoxelSidebarNumberBoxStyle}"
+                                           ValueChanged="BackdropCageScale_Changed"/>
+                            </StackPanel>
+
+                                <CheckBox x:Name="SurfaceVoxelGridCheckBox"
+                                          Content="Model Voxel Grid"
+                                          IsChecked="False"
+                                          Checked="SurfaceVoxelGrid_Changed"
+                                          Unchecked="SurfaceVoxelGrid_Changed"/>
+                            </StackPanel>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+
+                    <!-- Voxel edit -->
+                    <ctrl:SectionCard x:Name="VoxelEditSectionCard"
+                                      Title="Voxel Edit"
+                                      PanelId="VoxelEdit"
+                                      MinimizedChanged="SidebarSectionCard_MinimizedChanged">
+                        <ctrl:SectionCard.CustomControl>
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+
+                            <TextBlock x:Name="VoxelSelectionStatusText"
+                                       FontSize="11"
+                                       Opacity="0.85"
+                                       TextWrapping="Wrap"
+                                       Text="Selection: 0 voxels. Use Voxel Select tool to select voxels."/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Clear Sel"
+                                        Width="104"
+                                        Click="ClearVoxelSelectionButton_Click"/>
+                                <Button Content="Expand"
+                                        Width="104"
+                                        Click="ExpandVoxelSelectionButton_Click"/>
+                            </StackPanel>
+
+                                <Grid Width="220">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Button Grid.Row="0" Grid.Column="0" Margin="0,0,4,4"
+                                        Content="-X" Click="MoveSelectionButton_Click" Tag="-1,0,0"/>
+                                <Button Grid.Row="0" Grid.Column="1" Margin="4,0,0,4"
+                                        Content="+X" Click="MoveSelectionButton_Click" Tag="1,0,0"/>
+                                <Button Grid.Row="1" Grid.Column="0" Margin="0,0,4,4"
+                                        Content="-Y" Click="MoveSelectionButton_Click" Tag="0,-1,0"/>
+                                <Button Grid.Row="1" Grid.Column="1" Margin="4,0,0,4"
+                                        Content="+Y" Click="MoveSelectionButton_Click" Tag="0,1,0"/>
+                                <Button Grid.Row="2" Grid.Column="0" Margin="0,0,4,0"
+                                        Content="-Z" Click="MoveSelectionButton_Click" Tag="0,0,-1"/>
+                                <Button Grid.Row="2" Grid.Column="1" Margin="4,0,0,0"
+                                        Content="+Z" Click="MoveSelectionButton_Click" Tag="0,0,1"/>
+                                </Grid>
+                            </StackPanel>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+
+                    <!-- Build/export -->
+                    <ctrl:SectionCard x:Name="ActionsSectionCard"
+                                      Title="Actions"
+                                      PanelId="VoxelActions"
+                                      MinimizedChanged="SidebarSectionCard_MinimizedChanged">
+                        <ctrl:SectionCard.CustomControl>
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+                                    <Grid Width="220">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="ReloadTilesButton"
+                                                Grid.Column="0"
+                                                Margin="0,0,4,0"
+                                                Content="Reload Tiles"
+                                                HorizontalAlignment="Stretch"
+                                                Click="ReloadTilesButton_Click"/>
+                                        <Button x:Name="ReloadTilesAndBuildButton"
+                                                Grid.Column="1"
+                                                Margin="4,0,0,0"
+                                                Content="Reload + Build"
+                                                HorizontalAlignment="Stretch"
+                                                Click="ReloadTilesAndBuildButton_Click"/>
+                                    </Grid>
+                                    <Button x:Name="BuildButton"
+                                            Content="Build Voxel"
+                                            Width="220"
+                                            HorizontalAlignment="Left"
+                                            Click="BuildButton_Click"/>
+                                    <Button x:Name="ExportButton"
+                                            Content="Export Image…"
+                                            Width="220"
+                                            HorizontalAlignment="Left"
+                                            IsEnabled="False"
+                                            Click="ExportButton_Click"/>
+                                    <Button x:Name="ExportModelButton"
+                                            Content="Export Model…"
+                                            Width="220"
+                                            HorizontalAlignment="Left"
+                                            IsEnabled="False"
+                                            Click="ExportModelButton_Click"/>
+                            </StackPanel>
+                        </ctrl:SectionCard.CustomControl>
+                    </ctrl:SectionCard>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- RIGHT PANEL: 3D VIEWPORT                                      -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <!-- Viewport -->
+                <RowDefinition Height="*"/>
+                <!-- Preset buttons / stats -->
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Viewport Image -->
+            <Border x:Name="ViewportHost"
+                    Grid.Row="0"
+                    Background="#FF1E1E1E"
+                    Margin="0"
+                    IsTabStop="True"
+                    GotFocus="ViewportHost_GotFocus"
+                    LostFocus="ViewportHost_LostFocus"
+                    PointerPressed="Viewport_PointerPressed"
+                    PointerMoved="Viewport_PointerMoved"
+                    PointerReleased="Viewport_PointerReleased"
+                    PointerWheelChanged="Viewport_PointerWheelChanged"
+                    KeyDown="ViewportHost_KeyDown">
+                <Grid>
+                    <Image x:Name="ViewportImage"
+                           Stretch="Uniform"/>
+
+                    <!-- Top viewport voxel tool strip -->
+                    <Border HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Margin="8,8,0,0"
+                            Padding="4"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <voxeltools:VoxelToolRail x:Name="ViewportVoxelToolRail"
+                                                  Orientation="Horizontal"
+                                                  ShowLabels="False"/>
+                    </Border>
+
+                    <!-- Draggable light source handle -->
+                    <Canvas x:Name="LightHandleLayer"
+                            IsHitTestVisible="False">
+                        <Canvas x:Name="LightHandleVisual"
+                                Width="26"
+                                Height="26"
+                                Visibility="Collapsed">
+                            <Line X1="13" Y1="0" X2="13" Y2="4" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Line X1="13" Y1="22" X2="13" Y2="26" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Line X1="0" Y1="13" X2="4" Y2="13" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Line X1="22" Y1="13" X2="26" Y2="13" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Line X1="3" Y1="3" X2="6" Y2="6" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Line X1="20" Y1="20" X2="23" Y2="23" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Line X1="20" Y1="6" X2="23" Y2="3" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Line X1="3" Y1="23" X2="6" Y2="20" Stroke="#FFF3C545" StrokeThickness="1.5"/>
+                            <Ellipse x:Name="LightHandleRing"
+                                     Width="14"
+                                     Height="14"
+                                     Canvas.Left="6"
+                                     Canvas.Top="6"
+                                     Fill="#CC1E1E1E"
+                                     Stroke="#FFF3C545"
+                                     StrokeThickness="1.5"/>
+                            <Ellipse x:Name="LightHandleCore"
+                                     Width="8"
+                                     Height="8"
+                                     Canvas.Left="9"
+                                     Canvas.Top="9"
+                                     Fill="#FFF3C545"/>
+                        </Canvas>
+                    </Canvas>
+
+                    <!-- Camera axis gizmo (Maya-style orientation tracker) -->
+                    <Canvas x:Name="AxisGizmoCanvas"
+                            Width="84"
+                            Height="84"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="10"
+                            Background="Transparent"
+                            PointerPressed="AxisGizmoCanvas_PointerPressed">
+                        <Line x:Name="AxisXLine" Stroke="#FFDB3B3B" StrokeThickness="2.5" X1="42" Y1="42" X2="66" Y2="42"/>
+                        <Line x:Name="AxisYLine" Stroke="#FF4CAF50" StrokeThickness="2.5" X1="42" Y1="42" X2="42" Y2="18"/>
+                        <Line x:Name="AxisZLine" Stroke="#FF3E78D8" StrokeThickness="2.5" X1="42" Y1="42" X2="24" Y2="56"/>
+
+                        <TextBlock x:Name="AxisXLabel" Text="X" Foreground="#FFDB3B3B" FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock x:Name="AxisYLabel" Text="Y" Foreground="#FF4CAF50" FontWeight="SemiBold" FontSize="11"/>
+                        <TextBlock x:Name="AxisZLabel" Text="Z" Foreground="#FF3E78D8" FontWeight="SemiBold" FontSize="11"/>
+                    </Canvas>
+
+                    <!-- Camera stats overlay (moved into viewport to free bottom controls width) -->
+                    <Border HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Margin="0,0,10,10"
+                            Padding="7,4"
+                            Background="#A0202020"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4">
+                        <TextBlock x:Name="CameraStatsText"
+                                   FontSize="12"
+                                   Opacity="0.9"
+                                   Text="pitch 0°  yaw 0°  zoom 100%"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Bottom view controls / camera stats (canvas-like status bar) -->
+            <Border Grid.Row="1"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,0,0"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}">
+                <Grid Padding="6,4">
+                    <ScrollViewer
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled"
+                                  ZoomMode="Disabled">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="6"
+                                    VerticalAlignment="Center">
+                            <ComboBox x:Name="IsoPresetCombo"
+                                      Style="{StaticResource VoxelViewChipComboStyle}"
+                                      Width="75"
+                                      SelectedIndex="1">
+                                <ComboBoxItem Content="S" Tag="south"/>
+                                <ComboBoxItem Content="SW" Tag="southwest"/>
+                                <ComboBoxItem Content="W" Tag="west"/>
+                                <ComboBoxItem Content="NW" Tag="northwest"/>
+                                <ComboBoxItem Content="N" Tag="north"/>
+                                <ComboBoxItem Content="NE" Tag="northeast"/>
+                                <ComboBoxItem Content="E" Tag="east"/>
+                                <ComboBoxItem Content="SE" Tag="southeast"/>
+                            </ComboBox>
+                            <Button Style="{StaticResource VoxelViewChipButtonStyle}"
+                                    Content="Go"
+                                    Click="ApplyIsoPreset_Click"/>
+
+                            <TextBlock Text="or"
+                                       VerticalAlignment="Center"
+                                       Opacity="0.8"
+                                       FontSize="11"/>
+
+                            <ComboBox x:Name="CardinalPresetCombo"
+                                      Style="{StaticResource VoxelViewChipComboStyle}"
+                                      Width="100"
+                                      SelectedIndex="0">
+                                <ComboBoxItem Content="Front" Tag="front"/>
+                                <ComboBoxItem Content="Back" Tag="back"/>
+                                <ComboBoxItem Content="Left" Tag="left"/>
+                                <ComboBoxItem Content="Right" Tag="right"/>
+                                <ComboBoxItem Content="Top" Tag="top"/>
+                                <ComboBoxItem Content="Bottom" Tag="bottom"/>
+                            </ComboBox>
+                            <Button Style="{StaticResource VoxelViewChipButtonStyle}"
+                                    Content="Go"
+                                    Click="ApplyCardinalPreset_Click"/>
+
+                            <Border Width="1" Margin="2,2"
+                                    Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+
+                            <Button Style="{StaticResource VoxelViewChipButtonStyle}"
+                                    Content="Reset"
+                                    Click="Reset_Click"/>
+
+                            <Border Width="1" Margin="2,2"
+                                    Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+
+                            <Button x:Name="FocusLightButton"
+                                    Style="{StaticResource VoxelViewChipButtonStyle}"
+                                    Content="Focus Light"
+                                    Click="FocusLightButton_Click"/>
+                            <Button x:Name="ResetLightButton"
+                                    Style="{StaticResource VoxelViewChipButtonStyle}"
+                                    Content="Reset Light"
+                                    Click="ResetLightButton_Click"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
+
+

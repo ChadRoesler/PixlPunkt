@@ -417,19 +417,36 @@ namespace PixlPunkt.UI.CanvasHost
                     SelectionMask = selectionMask
                 };
 
+                bool hasTileMapping = BeginTileWriteThroughIfMapped();
+
                 var result = fillReg.EffectiveFillPainter.FillAt(rl, fx, fy, context);
+                TileMappedPixelChangeItem? tileMappedItem = null;
+
+                if (hasTileMapping)
+                {
+                    // Finalize and build tile-aware history (if mapped tiles were touched).
+                    tileMappedItem = FinalizeTileWriteThrough(result, context.Description);
+                }
 
                 if (result != null) result.HistoryIcon = icon;
 
-                if (result is { CanPushToHistory: true } and IHistoryItem historyItem)
+                if (tileMappedItem != null)
+                {
+                    tileMappedItem.HistoryIcon = icon;
+                    Document.History.Push(tileMappedItem);
+                }
+                else if (result is { CanPushToHistory: true } and IHistoryItem historyItem)
                 {
                     Document.History.Push(historyItem);
                 }
 
+                Document.CompositeTo(Document.Surface);
+                Document.RaiseDocumentModified();
                 UpdateActiveLayerPreview();
                 InvalidateMainCanvas();
                 HistoryStateChanged?.Invoke();
                 RaiseFrame();
+                AutoCaptureKeyframeIfNeeded();
             }
         }
 
@@ -485,14 +502,14 @@ namespace PixlPunkt.UI.CanvasHost
                             {
                                 _stroke.StampAtWithPainter(drawX, drawY, _fg, _bgColor, strokeSettings);
                                 GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
-                                PropagateLiveTileChanges(drawX + minDx, drawX + maxDx, drawY + minDy, drawY + maxDy);
+                                PropagateLiveTileChanges(drawX + minDx, drawY + minDy, drawX + maxDx, drawY + maxDy);
                             }
                         }
                         else
                         {
                             _stroke.StampAtWithPainter(x, y, _fg, _bgColor, strokeSettings);
                             GetBrushBoundsFromMask(strokeSettings, out int minDx, out int minDy, out int maxDx, out int maxDy);
-                            PropagateLiveTileChanges(x + minDx, x + maxDx, y + minDy, y + maxDy);
+                            PropagateLiveTileChanges(x + minDx, y + minDy, x + maxDx, y + maxDy);
                         }
 
                         Document.CompositeTo(Document.Surface);

@@ -294,11 +294,10 @@ namespace PixlPunkt.UI.Dialogs.Export
                 (uint)w, (uint)h, 96, 96, bgra);
             await encoder.FlushAsync();
             ras.Seek(0);
-            var reader = new Windows.Storage.Streams.DataReader(ras.GetInputStreamAt(0));
-            var bytes = new byte[ras.Size];
-            await reader.LoadAsync((uint)ras.Size);
-            reader.ReadBytes(bytes);
-            return bytes;
+            using var ms = new System.IO.MemoryStream();
+            using var src = ras.AsStreamForRead();
+            await src.CopyToAsync(ms);
+            return ms.ToArray();
         }
 
         private static async Task SetImageSource(Image image, byte[] pngBytes)

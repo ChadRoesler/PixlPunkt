@@ -10,7 +10,12 @@ namespace PixlPunkt.UI.CanvasArea
         {
             InitializeComponent();
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(60) };
-            _timer.Tick += (_, __) => { _phase = (_phase + 1) % 6; R1.StrokeDashOffset = _phase; R2.StrokeDashOffset = (_phase + 3) % 6; };
+            _timer.Tick += (_, __) =>
+            {
+                _phase = (_phase + 1) % 6;
+                R1.Opacity = (_phase % 2) == 0 ? 1.0 : 0.70;
+                R2.Opacity = (_phase % 2) == 0 ? 0.70 : 1.0;
+            };
         }
 
         DispatcherTimer _timer; int _phase;

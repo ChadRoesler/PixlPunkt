@@ -109,6 +109,28 @@ Install-Package PixlPunkt.PluginSdk
       .Build();
   ```
 
+### Voxel Tool Registration (Optional)
+- Implement `IVoxelToolProvider` in addition to `IPlugin` when your plugin exposes voxel tools.
+- Use `VoxelToolBuilders` for voxel tools:
+  - `FaceTool` for per-face paint/sample workflows
+  - `EditTool` for voxel create/delete/move operations
+  - `UtilityTool` for viewport/lighting utilities
+- Voxel handlers receive `IVoxelToolContext` with face/voxel picking, selection edits, palette colors, and history transactions.
+- Example:
+  ```csharp
+  public sealed class MyPlugin : IPlugin, IVoxelToolProvider
+  {
+      public IEnumerable<IVoxelToolRegistration> GetVoxelToolRegistrations()
+      {
+          yield return VoxelToolBuilders.FaceTool("com.example.voxel.tint")
+              .WithDisplayName("Voxel Tint")
+              .WithSettings(new VoxelTintSettings())
+              .WithHandler(ctx => new VoxelTintTool(ctx))
+              .Build();
+      }
+  }
+  ```
+
 ### Effect Registration
 - Use `EffectBuilders.Effect` to register layer effects.
 - Example:
@@ -162,6 +184,7 @@ Standalone documentation for main APIs:
 - [ToolSettingsBase](./docs/ToolSettingsBase.md)
 - [EffectSettingsBase](./docs/EffectSettingsBase.md)
 - [Import/Export Builders](./docs/ImportExportBuilders.md)
+- [Voxel Tools](./docs/VoxelTools.md)
 
 ---
 

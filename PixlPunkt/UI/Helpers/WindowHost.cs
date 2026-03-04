@@ -433,6 +433,28 @@ namespace PixlPunkt.UI.Helpers
         }
 
         /// <summary>
+        /// Defers content sizing until after layout when the content root may be null.
+        /// No-op when <paramref name="rootContent"/> is not a <see cref="FrameworkElement"/>.
+        /// </summary>
+        public static void FitToContentAfterLayout(Window window, object? rootContent,
+            double maxScreenFraction = 0.90, double minWidth = 480, double minHeight = 360)
+        {
+            if (rootContent is FrameworkElement root)
+            {
+                FitToContentAfterLayout(window, root, maxScreenFraction, minWidth, minHeight);
+            }
+        }
+
+        /// <summary>
+        /// Defers content sizing until after layout when the content root may be null (compatibility overload).
+        /// </summary>
+        public static void FitToContentAfterLayout(Window window, object? rootContent,
+            double maxScreenFraction = 0.90, double minLogicalWidth = 480, double minLogicalHeight = 360, bool _compat = true)
+        {
+            FitToContentAfterLayout(window, rootContent, maxScreenFraction, minLogicalWidth, minLogicalHeight);
+        }
+
+        /// <summary>
         /// Defers content sizing until after layout (compatibility overload).
         /// </summary>
         public static void FitToContentAfterLayout(Window window, FrameworkElement root,

@@ -23,20 +23,21 @@
 9. [Reference Layers](#reference-layers)
 10. [Palette](#palette)
 11. [Tiles](#tiles)
-12. [Animation](#animation)
+12. [Voxel Workspace](#voxel-workspace)
+13. [Animation](#animation)
     - [Canvas Animation](#canvas-animation)
     - [Tile Animation](#tile-animation)
     - [Animation Sub-Routines](#animation-sub-routines)
-13. [Stage (Camera System)](#stage-camera-system)
-14. [Audio Reference Tracks](#audio-reference-tracks)
-15. [Keyboard Shortcuts](#keyboard-shortcuts)
-16. [Settings](#settings)
-17. [File Formats](#file-formats)
-18. [Advanced Topics](#advanced-topics)
+14. [Stage (Camera System)](#stage-camera-system)
+15. [Audio Reference Tracks](#audio-reference-tracks)
+16. [Keyboard Shortcuts](#keyboard-shortcuts)
+17. [Settings](#settings)
+18. [File Formats](#file-formats)
+19. [Advanced Topics](#advanced-topics)
     - [Dithering Deep Dive](#dithering-deep-dive)
     - [Animation Workflow](#animation-workflow)
     - [Tile-Based Game Art](#tile-based-game-art)
-19. [Tips & Tricks](#tips--tricks)
+20. [Tips & Tricks](#tips--tricks)
 
 ---
 
@@ -891,6 +892,97 @@ Each layer can have independent tile mappings:
 - Use the **Tile Stamper (Shift+T)** tool to place tiles
 - View mappings with **View → Toggle Tile Mappings**
 - Tiles store references, not copies, for efficiency
+
+---
+
+## Voxel Workspace
+
+PixlPunkt includes an in-tab voxel workspace that builds a voxel model from mapped tile faces and lets you edit that model directly.
+
+### Opening the Voxel Workspace
+
+1. Open a document with tiles.
+2. Go to **Tiles → Voxel Preview…**
+3. PixlPunkt opens a split workspace:
+   - Left pane: normal 2D canvas
+   - Right pane: voxel workspace
+
+### Workspace Areas
+
+| Area | Description |
+|------|-------------|
+| **Viewport Tool Rail** | Voxel tool buttons (Paint, Dropper, Erase, Create, Delete, Select, Move, Lighting) |
+| **Left Sidebar** | Section cards for Lighting, Face Mapping, Display, Voxel Edit, and Actions |
+| **Viewport** | Orbit camera render, axis gizmo, and optional draggable light handle |
+| **Bottom Camera Bar** | Iso/cardinal preset combos, Reset, Focus Light, Reset Light |
+
+### Face Mapping Modes
+
+| Mode | Description |
+|------|-------------|
+| **3 Faces (mirrored)** | One tile each for Front/Back, Left/Right, Top/Bottom |
+| **6 Faces (individual)** | Independent tile selection for all six faces |
+
+`Color Linking` can be enabled for seam-friendly face painting behavior.
+
+### Display + Rendering Options
+
+| Option | Description |
+|--------|-------------|
+| **Outline** | Silhouette outline with configurable color and voxel-size thickness |
+| **Pixel Preview** | Pixel-stable presentation mode for the voxel viewport |
+| **Pixel Preview Antialiasing** | Per-pixel AA in render space |
+| **AA Strength** | Blend strength for pixel preview AA |
+| **Pixel Base** | Base pixel scale for pixel preview density |
+| **Backdrop Cage** | 3D guide cage around the model |
+| **Backdrop Projection Tiles** | Tile projections on cage faces |
+| **Cage Distance** | Cage distance/scale from model |
+| **Model Voxel Grid** | Surface voxel-grid overlay on visible faces |
+
+### Lighting Controls (Preview-Only)
+
+Lighting is non-destructive and can be toggled at any time:
+- Light color
+- Shadow color
+- Shadow strength
+- Intensity
+- Falloff
+- Position (`X`, `Y`, `Z`)
+- Cast shadows toggle
+
+### Voxel Edit Actions
+
+| Action | Description |
+|--------|-------------|
+| **Clear Sel** | Clears current voxel selection |
+| **Expand** | Expands selection to connected voxels |
+| **±X / ±Y / ±Z** | Nudge selected voxels by one unit |
+| **Reload Tiles** | Reloads tile data for face mapping |
+| **Reload + Build** | Reloads tile data and rebuilds model |
+| **Build Voxel** | Rebuilds model from current mapping |
+| **Export Image…** | Exports WYSIWYG viewport output with scale/background/overlay toggles |
+| **Export Model…** | Exports OBJ, GLB, STL, or VOX |
+
+### Voxel Model Export Formats
+
+| Format | Includes | Best For | Notes |
+|--------|----------|----------|-------|
+| **OBJ + MTL + PNG** | Mesh + external texture atlas | DCC/editor compatibility | Writes sidecar `.mtl` and `.png` next to `.obj` |
+| **GLB** | Mesh + embedded texture atlas | Single-file glTF pipelines | Includes **Double-sided material** toggle |
+| **STL (binary)** | Geometry only | 3D print / mesh-only workflows | No textures or materials |
+| **VOX (MagicaVoxel)** | Voxel occupancy + palette | Voxel-native tools | Max `255` units per axis after transform; pivot and unit scale are ignored |
+
+### Voxel Viewport Input
+
+| Input | Action |
+|-------|--------|
+| `LMB drag` | Orbit camera |
+| Mouse wheel | Zoom |
+| Arrow keys | Move selection on X/Y (when selection exists) |
+| `PageUp` / `PageDown` | Move selection on Z |
+| `Delete` | Delete selected voxels |
+| `Ctrl+Z` / `Ctrl+Y` | Undo/redo voxel edits |
+| `Alt` + Arrow / `PageUp` / `PageDown` | Nudge light position |
 
 ---
 

@@ -753,7 +753,7 @@ namespace PixlPunkt.UI.Tools
 
             WindowHost.FitToContentAfterLayout(
                 win,
-                (FrameworkElement)win.Content,
+                win.Content,
                 maxScreenFraction: 0.90,
                 minLogicalWidth: 560,
                 minLogicalHeight: 360);
@@ -907,7 +907,7 @@ namespace PixlPunkt.UI.Tools
 
                 WindowHost.FitToContentAfterLayout(
                     win,
-                    (FrameworkElement)win.Content,
+                    win.Content,
                     maxScreenFraction: 0.90,
                     minLogicalWidth: 560,
                     minLogicalHeight: 360);
@@ -967,7 +967,7 @@ namespace PixlPunkt.UI.Tools
 
                 WindowHost.FitToContentAfterLayout(
                     win,
-                    (FrameworkElement)win.Content,
+                    win.Content,
                     maxScreenFraction: 0.90,
                     minLogicalWidth: 560,
                     minLogicalHeight: 360);
@@ -1446,7 +1446,7 @@ namespace PixlPunkt.UI.Tools
 
                 WindowHost.FitToContentAfterLayout(
                     win,
-                    (FrameworkElement)win.Content,
+                    win.Content,
                     maxScreenFraction: opt.MaxScreenFraction,
                     minLogicalWidth: opt.MinWidth,
                     minLogicalHeight: opt.MinHeight);
@@ -1545,7 +1545,7 @@ namespace PixlPunkt.UI.Tools
 
                 WindowHost.FitToContentAfterLayout(
                     win,
-                    (FrameworkElement)win.Content,
+                    win.Content,
                     maxScreenFraction: 0.90,
                     minLogicalWidth: descriptor.MinWidth,
                     minLogicalHeight: descriptor.MinHeight);
@@ -1558,3 +1558,4 @@ namespace PixlPunkt.UI.Tools
         }
     }
 }
+

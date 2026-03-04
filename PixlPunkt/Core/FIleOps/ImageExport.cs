@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Runtime.Versioning;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Export;
 using PixlPunkt.Core.Imaging;
@@ -45,16 +46,21 @@ namespace PixlPunkt.Core.FIleOps
                 switch (format)
                 {
                     case ImageFileFormat.Png:
-                        SaveWithGdi(surface, path, ImageFormat.Png);
+                        SaveWithSkia(surface, path, SkiaImageEncoder.ImageFormat.Png);
                         break;
 
                     case ImageFileFormat.Bmp:
-                        SaveWithGdi(surface, path, ImageFormat.Bmp);
+                        SaveWithSkia(surface, path, SkiaImageEncoder.ImageFormat.Bmp);
                         break;
 
                     case ImageFileFormat.Tiff:
-                        SaveWithGdi(surface, path, ImageFormat.Tiff);
-                        break;
+                        if (OperatingSystem.IsWindows())
+                        {
+                            SaveTiffWindows(surface, path);
+                            break;
+                        }
+
+                        throw new PlatformNotSupportedException("TIFF export is currently supported on Windows only.");
 
                     case ImageFileFormat.Jpeg:
                         SaveJpegFlattenWhite(surface, path);
@@ -82,30 +88,26 @@ namespace PixlPunkt.Core.FIleOps
         }
 
         /// <summary>
-        /// Saves a surface to a file using GDI+ <see cref="ImageFormat"/>.
+        /// Saves a surface to a file using SkiaSharp encoding.
         /// </summary>
-        /// <param name="surface">Source pixel surface (BGRA format).</param>
-        /// <param name="path">Output file path.</param>
-        /// <param name="format">GDI+ image format (Png, Bmp, Tiff, etc.).</param>
-        /// <remarks>
-        /// <para>
-        /// Uses unsafe memory copy to directly transfer BGRA pixels from <see cref="PixelSurface"/>
-        /// to locked <see cref="Bitmap"/> bits. Handles stride differences between source (always width × 4)
-        /// and destination (may have padding for DWORD alignment).
-        /// </para>
-        /// <para>
-        /// PixelSurface uses BGRA byte order which matches Format32bppArgb in memory on little-endian systems,
-        /// enabling efficient direct copy without per-pixel conversion.
-        /// </para>
-        /// </remarks>
-        private static void SaveWithGdi(PixelSurface surface, string path, ImageFormat format)
+        private static void SaveWithSkia(PixelSurface surface, string path, SkiaImageEncoder.ImageFormat format)
+        {
+            SkiaImageEncoder.Encode(surface.Pixels, surface.Width, surface.Height, path, format);
+            LoggingService.Info("Saved image {Path} format={Format} {W}x{H}", path, format.ToString(), surface.Width, surface.Height);
+        }
+
+        [SupportedOSPlatform("windows")]
+        private static void SaveTiffWindows(PixelSurface surface, string path) =>
+            SaveWithGdiWindows(surface, path, ImageFormat.Tiff);
+
+        [SupportedOSPlatform("windows")]
+        private static void SaveWithGdiWindows(PixelSurface surface, string path, ImageFormat format)
         {
             int w = surface.Width;
             int h = surface.Height;
-            var pixels = surface.Pixels; // BGRA
+            var pixels = surface.Pixels;
 
             using var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
-
             var rect = new Rectangle(0, 0, w, h);
             var data = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
 
@@ -127,7 +129,6 @@ namespace PixlPunkt.Core.FIleOps
 
             bmp.UnlockBits(data);
             bmp.Save(path, format);
-
             LoggingService.Info("Saved image {Path} format={Format} {W}x{H}", path, format.ToString(), w, h);
         }
 
@@ -157,78 +158,30 @@ namespace PixlPunkt.Core.FIleOps
             int h = surface.Height;
             var pixels = surface.Pixels;
 
-            using var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
-            var rect = new Rectangle(0, 0, w, h);
-            var data = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-
-            unsafe
+            var flattened = new byte[w * h * 4];
+            int totalPixels = w * h;
+            for (int i = 0; i < totalPixels; i++)
             {
-                byte* dstBase = (byte*)data.Scan0;
-                int dstStride = data.Stride;
+                int srcIndex = i * 4;
+                byte b = pixels[srcIndex + 0];
+                byte g = pixels[srcIndex + 1];
+                byte r = pixels[srcIndex + 2];
+                byte a = pixels[srcIndex + 3];
 
-                for (int y = 0; y < h; y++)
-                {
-                    byte* dstRow = dstBase + y * dstStride;
+                float af = a / 255f;
+                byte fr = (byte)(r * af + 255f * (1f - af));
+                byte fg = (byte)(g * af + 255f * (1f - af));
+                byte fb = (byte)(b * af + 255f * (1f - af));
 
-                    for (int x = 0; x < w; x++)
-                    {
-                        int srcIndex = (y * w + x) * 4;
-                        byte b = pixels[srcIndex + 0];
-                        byte g = pixels[srcIndex + 1];
-                        byte r = pixels[srcIndex + 2];
-                        byte a = pixels[srcIndex + 3];
-
-                        float af = a / 255f;
-                        // flatten over white
-                        byte fr = (byte)(r * af + 255f * (1f - af));
-                        byte fg = (byte)(g * af + 255f * (1f - af));
-                        byte fb = (byte)(b * af + 255f * (1f - af));
-
-                        int dstIndex = x * 4;
-                        dstRow[dstIndex + 0] = fb;
-                        dstRow[dstIndex + 1] = fg;
-                        dstRow[dstIndex + 2] = fr;
-                        dstRow[dstIndex + 3] = 255;
-                    }
-                }
+                flattened[srcIndex + 0] = fb;
+                flattened[srcIndex + 1] = fg;
+                flattened[srcIndex + 2] = fr;
+                flattened[srcIndex + 3] = 255;
             }
 
-            bmp.UnlockBits(data);
-
-            // Optional: set JPEG quality
-            var encoder = GetEncoder(ImageFormat.Jpeg);
-            if (encoder != null)
-            {
-                var qualityParam = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 95L);
-                var encoderParams = new EncoderParameters(1);
-                encoderParams.Param[0] = qualityParam;
-                bmp.Save(path, encoder, encoderParams);
-            }
-            else
-            {
-                bmp.Save(path, ImageFormat.Jpeg);
-            }
+            SkiaImageEncoder.Encode(flattened, w, h, path, SkiaImageEncoder.ImageFormat.Jpeg, quality: 95);
 
             LoggingService.Info("Saved JPEG {Path} {W}x{H}", path, w, h);
-        }
-
-        /// <summary>
-        /// Gets the image encoder for a specific format.
-        /// </summary>
-        /// <param name="format">Target image format.</param>
-        /// <returns>Matching <see cref="ImageCodecInfo"/> or null if not found.</returns>
-        /// <remarks>
-        /// Used to access encoder-specific parameters like JPEG quality settings.
-        /// </remarks>
-        private static ImageCodecInfo? GetEncoder(ImageFormat format)
-        {
-            var codecs = ImageCodecInfo.GetImageDecoders();
-            foreach (var c in codecs)
-            {
-                if (c.FormatID == format.Guid)
-                    return c;
-            }
-            return null;
         }
 
         /// <summary>

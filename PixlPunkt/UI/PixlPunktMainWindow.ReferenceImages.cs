@@ -67,7 +67,7 @@ namespace PixlPunkt.UI
             // Confirm with user
             var dlg = new Microsoft.UI.Xaml.Controls.ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = MainXamlRoot,
                 Title = "Clear Reference Images",
                 Content = $"Are you sure you want to remove all {refService.Count} reference image(s)?",
                 PrimaryButtonText = "Clear All",
@@ -87,3 +87,4 @@ namespace PixlPunkt.UI
         }
     }
 }
+

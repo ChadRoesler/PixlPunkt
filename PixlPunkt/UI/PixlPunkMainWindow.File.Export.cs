@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -44,7 +45,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -59,7 +60,7 @@ namespace PixlPunkt.UI
                     Content = "Not enough history steps to create a timelapse.\n\n" +
                               "Draw on your canvas to build up history, then try again.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -67,7 +68,7 @@ namespace PixlPunkt.UI
             // Show timelapse export dialog
             var dialog = new PixlPunkt.UI.Dialogs.Export.TimelapseExportDialog(doc)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             var result = await ShowDialogGuardedAsync(dialog);
@@ -119,7 +120,7 @@ namespace PixlPunkt.UI
             // Create and show progress dialog
             var progressDialog = new PixlPunkt.UI.Dialogs.Export.ExportProgressDialog
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             // Start showing the dialog (fire-and-forget, will be awaited later)
@@ -146,7 +147,7 @@ namespace PixlPunkt.UI
                         Title = "Export complete",
                         Content = $"Timelapse exported successfully!",
                         CloseButtonText = DialogMessages.ButtonOK,
-                        XamlRoot = Content.XamlRoot
+                        XamlRoot = MainXamlRoot
                     });
                 }
                 else
@@ -168,7 +169,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not export timelapse: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -264,7 +265,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -280,7 +281,7 @@ namespace PixlPunkt.UI
                     Title = "No animation",
                     Content = "No animation frames found. Create a tile animation reel or canvas animation first.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -291,7 +292,7 @@ namespace PixlPunkt.UI
             // Show animation export dialog with preferred mode
             var dialog = new PixlPunkt.UI.Dialogs.Export.AnimationExportDialog(doc, currentMode)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             await dialog.LoadPreviewAsync();
@@ -364,7 +365,7 @@ namespace PixlPunkt.UI
             // Create and show progress dialog
             var progressDialog = new PixlPunkt.UI.Dialogs.Export.ExportProgressDialog
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             // Start export in background
@@ -388,7 +389,7 @@ namespace PixlPunkt.UI
                         Title = "Export complete",
                         Content = "Animation exported successfully!",
                         CloseButtonText = DialogMessages.ButtonOK,
-                        XamlRoot = Content.XamlRoot
+                        XamlRoot = MainXamlRoot
                     });
                 }
             }
@@ -404,7 +405,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not export animation: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -531,7 +532,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -546,7 +547,7 @@ namespace PixlPunkt.UI
                     Content = "No tile animation reels with frames found.\n\n" +
                               "Create some tile animations first, then try again.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -554,7 +555,7 @@ namespace PixlPunkt.UI
             // Show batch export dialog
             var dialog = new PixlPunkt.UI.Dialogs.Export.BatchTileAnimationExportDialog(doc)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             var result = await ShowDialogGuardedAsync(dialog);
@@ -581,7 +582,7 @@ namespace PixlPunkt.UI
             // Create and show progress dialog
             var progressDialog = new PixlPunkt.UI.Dialogs.Export.ExportProgressDialog
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             // Start showing the dialog (fire-and-forget, will be awaited later)
@@ -612,7 +613,7 @@ namespace PixlPunkt.UI
                         Content = $"Successfully exported {selectedReels.Count} animation{(selectedReels.Count > 1 ? "s" : "")}!\n\n" +
                                   $"Location: {outputFolder.Path}",
                         CloseButtonText = DialogMessages.ButtonOK,
-                        XamlRoot = Content.XamlRoot
+                        XamlRoot = MainXamlRoot
                     });
                 }
                 else
@@ -634,7 +635,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not complete batch export: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -802,7 +803,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -812,7 +813,7 @@ namespace PixlPunkt.UI
             // ═══════════════════════════════════════════════════════════════
             var dialog = new PixlPunkt.UI.Dialogs.Export.BrushExportDialog(doc)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             // Analyze document and generate preview
@@ -830,7 +831,7 @@ namespace PixlPunkt.UI
                     Title = "Invalid document",
                     Content = "Document must be 16x16 pixels with content to export as a brush.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -881,7 +882,7 @@ namespace PixlPunkt.UI
                               $"Icon: {brush.IconName}\n\n" +
                               $"Place .mrk files in:\n%AppData%\\PixlPunkt\\Brushes\\",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
             catch (Exception ex)
@@ -891,7 +892,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not export brush: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -911,7 +912,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -921,7 +922,7 @@ namespace PixlPunkt.UI
             // ══════════════════════════════════════════════════════════════
             var dialog = new PixlPunkt.UI.Dialogs.Export.IconExportDialog(doc)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             // Load previews
@@ -954,7 +955,7 @@ namespace PixlPunkt.UI
                     Title = "Export complete",
                     Content = "Icon exported successfully.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
             catch (Exception ex)
@@ -964,7 +965,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not export icon: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -994,11 +995,10 @@ namespace PixlPunkt.UI
                 (uint)w, (uint)h, 96, 96, bgra);
             await encoder.FlushAsync();
             ras.Seek(0);
-            var reader = new DataReader(ras.GetInputStreamAt(0));
-            var bytes = new byte[ras.Size];
-            await reader.LoadAsync((uint)ras.Size);
-            reader.ReadBytes(bytes);
-            return bytes;
+            using var ms = new MemoryStream();
+            using var src = ras.AsStreamForRead();
+            await src.CopyToAsync(ms);
+            return ms.ToArray();
         }
 
         // Save ICO file composed of PNG images (PNG-in-ICO)
@@ -1075,7 +1075,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -1090,7 +1090,7 @@ namespace PixlPunkt.UI
                     Content = "Select a tile animation reel with frames to export as a sub-routine.\n\n" +
                               "Sub-routines are used to embed tile animations into canvas animations.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -1122,7 +1122,7 @@ namespace PixlPunkt.UI
                               $"Timing: {selectedReel.DefaultFrameTimeMs}ms per frame\n\n" +
                               $"This file contains embedded pixel data and can be imported into any document.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
             catch (Exception ex)
@@ -1132,7 +1132,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not export sub-routine: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -1153,7 +1153,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -1163,7 +1163,7 @@ namespace PixlPunkt.UI
             // ═══════════════════════════════════════════════════════════════
             var dialog = new PixlPunkt.UI.Dialogs.Export.ImageExportDialog(doc)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             // Load preview
@@ -1270,7 +1270,7 @@ namespace PixlPunkt.UI
                     Title = "Export complete",
                     Content = "Export finished successfully.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
             catch (Exception ex)
@@ -1280,7 +1280,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not export: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -1402,7 +1402,7 @@ namespace PixlPunkt.UI
                     Title = "No document",
                     Content = "Open a document before exporting.",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
                 return;
             }
@@ -1412,7 +1412,7 @@ namespace PixlPunkt.UI
             // ═══════════════════════════════════════════════════════════════
             var dialog = new PixlPunkt.UI.Dialogs.Export.CursorExportDialog(doc)
             {
-                XamlRoot = Content.XamlRoot
+                XamlRoot = MainXamlRoot
             };
 
             // Load preview
@@ -1494,7 +1494,7 @@ namespace PixlPunkt.UI
                     Title = "Export complete",
                     Content = "Cursor exported successfully!",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
             catch (Exception ex)
@@ -1504,7 +1504,7 @@ namespace PixlPunkt.UI
                     Title = "Export failed",
                     Content = $"Could not export cursor: {ex.Message}",
                     CloseButtonText = DialogMessages.ButtonOK,
-                    XamlRoot = Content.XamlRoot
+                    XamlRoot = MainXamlRoot
                 });
             }
         }
@@ -1751,3 +1751,4 @@ namespace PixlPunkt.UI
         }
     }
 }
+
