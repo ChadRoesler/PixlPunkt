@@ -14,9 +14,9 @@ namespace PixlPunkt.UI.History
     {
         private CanvasViewHost? _host;
 
-        public UnifiedHistoryStack History
+        public UnifiedHistoryStack? History
         {
-            get => (UnifiedHistoryStack)GetValue(HistoryProperty);
+            get => (UnifiedHistoryStack?)GetValue(HistoryProperty);
             set => SetValue(HistoryProperty, value);
         }
 
@@ -73,7 +73,7 @@ namespace PixlPunkt.UI.History
             }
             else
             {
-                History = null!;
+                History = null;
             }
 
             Rebuild();

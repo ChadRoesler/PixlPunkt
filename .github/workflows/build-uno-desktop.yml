@@ -14,7 +14,6 @@
 # Uses project-level properties to exclude mobile targets:
 # - SkiaOnly=true: Only builds net10.0-desktop
 # - WinAppSdkOnly=true: Only builds net10.0-windows10.0.26100
-# - DesktopOnly=true: Builds all desktop targets (no Android/iOS)
 #############################################################################
 
 name: Build Desktop
@@ -22,6 +21,8 @@ name: Build Desktop
 on:
   push:
     branches: [main, master, unoSkiaSharp]
+    tags-ignore:
+      - '**'  # release.yml handles tag-triggered builds; skip here to avoid double-build
     paths:
       - 'PixlPunkt/**'
       - 'PixlPunkt.PluginSdk/**'
@@ -106,13 +107,10 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Running Uno Tests on Windows..." -ForegroundColor Cyan
-          # Use DesktopOnly=true to avoid needing Android/iOS workloads
-          # This limits the referenced PixlPunkt project to desktop targets only
           dotnet test PixlPunkt.Tests/PixlPunkt.Tests.csproj `
             --configuration Release `
             --verbosity normal `
-            --logger "trx;LogFileName=uno-test-results.trx" `
-            -p:DesktopOnly=true
+            --logger "trx;LogFileName=uno-test-results.trx"
 
       - name: Upload Uno test results
         uses: actions/upload-artifact@v4

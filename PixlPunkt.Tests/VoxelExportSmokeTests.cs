@@ -1,6 +1,5 @@
 namespace PixlPunkt.Tests;
 
-using System.Reflection;
 using System.Text;
 using PixlPunkt.Core.Voxel;
 using PixlPunkt.UI.Voxel;
@@ -8,40 +7,25 @@ using PixlPunkt.UI.Voxel;
 [TestFixture]
 public sealed class VoxelExportSmokeTests
 {
-    private static readonly Type WorkspaceType = typeof(VoxelWorkspaceControl);
-    private static readonly Type OptionsType = WorkspaceType.GetNestedType("VoxelModelExportOptions", BindingFlags.NonPublic)!;
-    private static readonly Type FormatType = WorkspaceType.GetNestedType("ModelExportFormat", BindingFlags.NonPublic)!;
-    private static readonly Type MeshModeType = WorkspaceType.GetNestedType("ModelMeshMode", BindingFlags.NonPublic)!;
-    private static readonly Type AxisPresetType = WorkspaceType.GetNestedType("ModelAxisPreset", BindingFlags.NonPublic)!;
-    private static readonly Type PivotPresetType = WorkspaceType.GetNestedType("ModelPivotPreset", BindingFlags.NonPublic)!;
-
     [Test]
     public void ObjExport_ProducesObjMtlAndTextureData()
     {
         var volume = CreateSampleVolume();
-        var options = CreateOptions(formatName: "Obj", glbDoubleSided: true);
+        var options = CreateOptions(ModelExportFormat.Obj, glbDoubleSided: true);
 
-        var export = InvokePrivateStatic("BuildObjExport", volume, "voxel.mtl", "voxel.png", options);
-        export.Should().NotBeNull();
+        var export = VoxelModelExporter.BuildObjExport(volume, "voxel.mtl", "voxel.png", options);
 
-        var exportType = export!.GetType();
-        var objText = (string)exportType.GetProperty("ObjText")!.GetValue(export)!;
-        var mtlText = (string)exportType.GetProperty("MtlText")!.GetValue(export)!;
-        var textureWidth = (int)exportType.GetProperty("TextureWidth")!.GetValue(export)!;
-        var textureHeight = (int)exportType.GetProperty("TextureHeight")!.GetValue(export)!;
-        var texturePixels = (byte[])exportType.GetProperty("TexturePixelsBgra")!.GetValue(export)!;
+        export.ObjText.Should().Contain("mtllib voxel.mtl");
+        export.ObjText.Should().Contain("usemtl voxel_material");
+        export.ObjText.Should().Contain("\nv ");
+        export.ObjText.Should().Contain("\nf ");
 
-        objText.Should().Contain("mtllib voxel.mtl");
-        objText.Should().Contain("usemtl voxel_material");
-        objText.Should().Contain("\nv ");
-        objText.Should().Contain("\nf ");
+        export.MtlText.Should().Contain("newmtl voxel_material");
+        export.MtlText.Should().Contain("map_Kd voxel.png");
 
-        mtlText.Should().Contain("newmtl voxel_material");
-        mtlText.Should().Contain("map_Kd voxel.png");
-
-        textureWidth.Should().BeGreaterThan(0);
-        textureHeight.Should().BeGreaterThan(0);
-        texturePixels.Length.Should().Be(textureWidth * textureHeight * 4);
+        export.TextureWidth.Should().BeGreaterThan(0);
+        export.TextureHeight.Should().BeGreaterThan(0);
+        export.TexturePixelsBgra.Length.Should().Be(export.TextureWidth * export.TextureHeight * 4);
     }
 
     [Test]
@@ -49,11 +33,11 @@ public sealed class VoxelExportSmokeTests
     {
         var volume = CreateSampleVolume();
 
-        var trueOptions = CreateOptions(formatName: "Glb", glbDoubleSided: true);
-        var falseOptions = CreateOptions(formatName: "Glb", glbDoubleSided: false);
+        var trueOptions = CreateOptions(ModelExportFormat.Glb, glbDoubleSided: true);
+        var falseOptions = CreateOptions(ModelExportFormat.Glb, glbDoubleSided: false);
 
-        var glbTrue = await InvokePrivateStaticAsync("BuildGlbExportAsync", volume, trueOptions);
-        var glbFalse = await InvokePrivateStaticAsync("BuildGlbExportAsync", volume, falseOptions);
+        var glbTrue = await VoxelModelExporter.BuildGlbExportAsync(volume, trueOptions);
+        var glbFalse = await VoxelModelExporter.BuildGlbExportAsync(volume, falseOptions);
 
         var jsonTrue = ExtractGlbJsonChunk(glbTrue);
         var jsonFalse = ExtractGlbJsonChunk(glbFalse);
@@ -66,9 +50,9 @@ public sealed class VoxelExportSmokeTests
     public void StlExport_WritesExpectedBinaryLayout()
     {
         var volume = CreateSampleVolume();
-        var options = CreateOptions(formatName: "Stl", glbDoubleSided: true);
+        var options = CreateOptions(ModelExportFormat.Stl, glbDoubleSided: true);
 
-        var bytes = (byte[])InvokePrivateStatic("BuildStlExport", volume, options)!;
+        var bytes = VoxelModelExporter.BuildStlExport(volume, options);
 
         bytes.Length.Should().BeGreaterThanOrEqualTo(84);
         var headerText = Encoding.ASCII.GetString(bytes, 0, 80).TrimEnd('\0');
@@ -83,9 +67,9 @@ public sealed class VoxelExportSmokeTests
     public void VoxExport_WritesMainSizeXyziAndRgbaChunks()
     {
         var volume = CreateSampleVolume();
-        var options = CreateOptions(formatName: "Vox", glbDoubleSided: true);
+        var options = CreateOptions(ModelExportFormat.Vox, glbDoubleSided: true);
 
-        var bytes = (byte[])InvokePrivateStatic("BuildVoxExport", volume, options)!;
+        var bytes = VoxelModelExporter.BuildVoxExport(volume, options);
 
         bytes.Length.Should().BeGreaterThan(24);
         Encoding.ASCII.GetString(bytes, 0, 4).Should().Be("VOX ");
@@ -110,29 +94,8 @@ public sealed class VoxelExportSmokeTests
         return volume;
     }
 
-    private static object CreateOptions(string formatName, bool glbDoubleSided)
-    {
-        var format = Enum.Parse(FormatType, formatName);
-        var meshMode = Enum.Parse(MeshModeType, "MergeCoplanar");
-        var axisPreset = Enum.Parse(AxisPresetType, "PixlPunkt");
-        var pivotPreset = Enum.Parse(PivotPresetType, "Center");
-        return Activator.CreateInstance(
-            OptionsType,
-            [format, meshMode, axisPreset, 1f, pivotPreset, glbDoubleSided])!;
-    }
-
-    private static object? InvokePrivateStatic(string methodName, params object[] args)
-    {
-        var method = WorkspaceType.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
-        method.Should().NotBeNull();
-        return method!.Invoke(null, args);
-    }
-
-    private static async Task<byte[]> InvokePrivateStaticAsync(string methodName, params object[] args)
-    {
-        var task = (Task<byte[]>)InvokePrivateStatic(methodName, args)!;
-        return await task.ConfigureAwait(false);
-    }
+    private static VoxelModelExportOptions CreateOptions(ModelExportFormat format, bool glbDoubleSided)
+        => new(format, ModelMeshMode.MergeCoplanar, ModelAxisPreset.PixlPunkt, 1f, ModelPivotPreset.Center, glbDoubleSided);
 
     private static string ExtractGlbJsonChunk(byte[] bytes)
     {

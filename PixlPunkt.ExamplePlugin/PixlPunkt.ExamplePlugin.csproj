@@ -2,15 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    
+
     <!-- Assembly info -->
     <AssemblyName>PixlPunkt.ExamplePlugin</AssemblyName>
     <RootNamespace>PixlPunkt.ExamplePlugin</RootNamespace>
     <Version>1.0.0</Version>
-    <Authors>PixlPunkt Team</Authors>
-    <Company>PixlPunkt</Company>
     <Description>Example plugin demonstrating the PixlPunkt Plugin SDK</Description>
     
     <!-- Enable .punk packaging -->

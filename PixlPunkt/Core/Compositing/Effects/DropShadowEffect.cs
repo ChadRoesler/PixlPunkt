@@ -24,6 +24,7 @@ namespace PixlPunkt.Core.Compositing.Effects
     public sealed class DropShadowEffect : LayerEffectBase
     {
         public override string DisplayName => "Drop Shadow";
+        public override bool NeedsSnapshot => true;
 
         private int _offsetX = EffectLimits.DefaultOffset;
         public int OffsetX
@@ -106,6 +107,21 @@ namespace PixlPunkt.Core.Compositing.Effects
             if (len == 0 || pixels.Length < len) return;
 
             uint[] src = pixels.ToArray();
+            ApplyCore(pixels, src, width, height);
+        }
+
+        public override void Apply(Span<uint> pixels, ReadOnlySpan<uint> snapshot, int width, int height)
+        {
+            if (!IsEnabled) return;
+            int len = width * height;
+            if (len == 0 || pixels.Length < len) return;
+
+            ApplyCore(pixels, snapshot, width, height);
+        }
+
+        private void ApplyCore(Span<uint> pixels, ReadOnlySpan<uint> src, int width, int height)
+        {
+            int len = width * height;
             uint[] shadow = new uint[len];
 
             // Base shadow from alpha mask

@@ -319,9 +319,12 @@ namespace PixlPunkt.UI.CanvasHost
                           dstRect.X, dstRect.Y,
                           workBuf, workW, workH);
 
-            // Rebuild selection region from transformed buffer
-            RebuildSelectionRegionFromTransformedBuffer(
-                    dstRect, dstClamp, workBuf, workW, workH,
+            // Rebuild selection region as the original geometric shape transformed by the same
+            // scale + rotate + translate — preserves the original marquee bounds through all
+            // transforms instead of re-deriving the selection from the pixel alpha channel.
+            RebuildSelectionRegionAsRotatedRect(
+                    cx, cy, baseW, baseH,
+                    totalRotation, dstClamp,
                     surf.Width, surf.Height);
 
             // Capture AFTER snapshot for the destination region

@@ -8,6 +8,7 @@ namespace PixlPunkt.Core.Compositing.Effects
     public sealed class AsciiEffect : LayerEffectBase
     {
         public override string DisplayName => "ASCII";
+        public override bool NeedsSnapshot => true;
 
         // ─────────────────────────────────────────────
         // New modes for your “lost memory” implementation
@@ -236,6 +237,25 @@ namespace PixlPunkt.Core.Compositing.Effects
             int total = width * height;
             if (pixels.Length < total) return;
 
+            uint[] src = pixels.ToArray();
+            ApplyCore(pixels, src, width, height);
+        }
+
+        public override void Apply(Span<uint> pixels, ReadOnlySpan<uint> snapshot, int width, int height)
+        {
+            if (!IsEnabled) return;
+            if (width <= 0 || height <= 0) return;
+
+            int total = width * height;
+            if (pixels.Length < total) return;
+
+            ApplyCore(pixels, snapshot, width, height);
+        }
+
+        private void ApplyCore(Span<uint> pixels, ReadOnlySpan<uint> src, int width, int height)
+        {
+            int total = width * height;
+
             // Resolve glyph set
             var set = AsciiGlyphSets.Get(GlyphSetName);
             string ramp = set.Ramp;
@@ -257,8 +277,6 @@ namespace PixlPunkt.Core.Compositing.Effects
             int glyphW = hasBitmaps ? set.GlyphWidth : 0;
             int glyphH = hasBitmaps ? set.GlyphHeight : 0;
 
-            // Work on a copy of the source
-            uint[] src = pixels.ToArray();
             Span<uint> dst = pixels;
 
             // Pre-allocate histogram arrays ONCE outside the loop to avoid stack overflow
@@ -519,7 +537,7 @@ namespace PixlPunkt.Core.Compositing.Effects
         }
 
         private static ulong BuildCellBits(
-            uint[] src, int width,
+            ReadOnlySpan<uint> src, int width,
             int x0, int y0, int xMax, int yMax,
             int sigW, int sigH,
             BinarizeMode binarize,

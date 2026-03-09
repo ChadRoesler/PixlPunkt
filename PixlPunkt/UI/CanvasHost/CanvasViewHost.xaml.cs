@@ -199,12 +199,6 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - RENDERING (SKIASHARP)
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>Cached checkerboard pattern shader for transparency background.</summary>
-        private SKShader? _checkerboardShader;
-
-        /// <summary>Cached checkerboard pattern bitmap.</summary>
-        private SKBitmap? _checkerboardBitmap;
-
         private bool _showPixelGrid = false;
         private bool _showTileGrid = true;
         private bool _showTileAnimationMappings = false;
@@ -429,13 +423,9 @@ namespace PixlPunkt.UI.CanvasHost
             // Stop the continuous rendering hook and fallback timer to prevent memory leaks
             StopContinuousRendering();
             
-            // Dispose checkerboard resources
-            _checkerboardShader?.Dispose();
-            _checkerboardShader = null;
-            _checkerboardBitmap?.Dispose();
-            _checkerboardBitmap = null;
-            _checkerboardPaint?.Dispose();
-            _checkerboardPaint = null;
+            // Dispose transparency pattern paint
+            _transparencyPaint?.Dispose();
+            _transparencyPaint = null;
         }
 
         /// <summary>
@@ -549,13 +539,9 @@ namespace PixlPunkt.UI.CanvasHost
             try
             {
                 _patternService.ApplyTheme(theme);
-                // Invalidate checkerboard cache
-                _checkerboardShader?.Dispose();
-                _checkerboardShader = null;
-                _checkerboardBitmap?.Dispose();
-                _checkerboardBitmap = null;
-                _checkerboardPaint?.Dispose();
-                _checkerboardPaint = null;
+                Rendering.TransparencyPatternShader.InvalidateAll();
+                _transparencyPaint?.Dispose();
+                _transparencyPaint = null;
                 InvalidateMainCanvas();
             }
             catch (Exception ex)

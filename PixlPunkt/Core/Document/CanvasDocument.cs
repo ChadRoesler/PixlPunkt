@@ -283,7 +283,7 @@ namespace PixlPunkt.Core.Document
 
         public LayerBase DuplicateLayerTree(LayerBase src)
         {
-            if (src == null) return null!;
+            ArgumentNullException.ThrowIfNull(src);
 
             var clone = LayerCloneUtil.CloneLayerTree(src, this);
             var parent = src.Parent;

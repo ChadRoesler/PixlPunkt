@@ -19,7 +19,7 @@ namespace PixlPunkt.UI.CanvasHost
     /// - Background/surface rendering
     /// - Grid overlays (pixel, tile)
     /// - Guide overlays
-    /// - Checkerboard pattern management
+    /// - Transparency pattern management
     /// </summary>
     public sealed partial class CanvasViewHost
     {
@@ -61,8 +61,8 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>Cached paint for tile animation background.</summary>
         private SKPaint? _tileAnimBgPaint;
         
-        /// <summary>Cached paint for checkerboard rendering - reused to avoid per-frame allocation.</summary>
-        private SKPaint? _checkerboardPaint;
+        /// <summary>Cached paint for transparency pattern rendering - reused to avoid per-frame allocation.</summary>
+        private SKPaint? _transparencyPaint;
         
         /// <summary>Cached dictionary for tile animation frame positions.</summary>
         private Dictionary<(int, int), List<int>>? _cachedFramePositions;
@@ -122,7 +122,7 @@ namespace PixlPunkt.UI.CanvasHost
             renderer.Antialiasing = false;
 
             // Draw checkerboard background
-            DrawCheckerboardBackground(renderer, dest);
+            DrawTransparencyBackground(renderer, dest);
 
             // Draw reference layers below
             DrawReferenceLayers(renderer, dest, renderBelow: true);
@@ -405,100 +405,34 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ════════════════════════════════════════════════════════════════════
-        // RENDERING - CHECKERBOARD BACKGROUND
+        // RENDERING - TRANSPARENCY PATTERN BACKGROUND
         // ════════════════════════════════════════════════════════════════════
 
-        private void DrawCheckerboardBackground(ICanvasRenderer renderer, Rect dest)
+        private void DrawTransparencyBackground(ICanvasRenderer renderer, Rect dest)
         {
-            // Get theme-aware colors from the pattern service
             _patternService.SyncWith(ActualTheme);
             var (lightColor, darkColor) = _patternService.CurrentScheme;
 
-            // Calculate checkerboard square size (in screen pixels, consistent at all zoom levels)
-            int squareSize = 8; // 8px squares
-
-            // Get the underlying SKCanvas from the renderer
             if (renderer.Device is not SKCanvas canvas)
             {
-                // Fallback: just fill with light color
                 renderer.FillRectangle(dest, lightColor);
                 return;
             }
-
-            // Create or update cached checkerboard shader
-            EnsureCheckerboardShader(squareSize, lightColor, darkColor);
-
-            if (_checkerboardShader == null)
-            {
-                // Fallback: just fill with light color
-                renderer.FillRectangle(dest, lightColor);
-                return;
-            }
-
-            // Ensure cached paint exists and has correct shader
-            if (_checkerboardPaint == null)
-            {
-                _checkerboardPaint = new SKPaint
-                {
-                    IsAntialias = false
-                };
-            }
-            _checkerboardPaint.Shader = _checkerboardShader;
-
-            canvas.DrawRect(dest.ToSKRect(), _checkerboardPaint);
-        }
-
-        /// <summary>
-        /// Ensures the checkerboard shader is created and up to date.
-        /// </summary>
-        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
-        {
-            // Check if we need to rebuild the shader
-            bool needsRebuild = _checkerboardBitmap == null ||
-                                _checkerboardShader == null;
-
-            if (!needsRebuild)
-                return;
-
-            // Dispose old resources
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
-
-            // Create a small checkerboard bitmap (2x2 squares)
-            int tileSize = squareSize * 2;
-            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
 
             var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
             var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
+            var shader = Rendering.TransparencyPatternShader.GetShader(4, skLight, skDark);
 
-            // Fill the bitmap with checkerboard pattern
-            for (int y = 0; y < tileSize; y++)
+            if (shader == null)
             {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    int cx = x / squareSize;
-                    int cy = y / squareSize;
-                    bool isLight = ((cx + cy) & 1) == 0;
-                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
-                }
+                renderer.FillRectangle(dest, lightColor);
+                return;
             }
 
-            // Create tiled shader from the bitmap
-            using var image = SKImage.FromBitmap(_checkerboardBitmap);
-            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
-        }
+            _transparencyPaint ??= new SKPaint { IsAntialias = false };
+            _transparencyPaint.Shader = shader;
 
-        /// <summary>
-        /// Invalidates the checkerboard pattern cache (call when theme changes).
-        /// </summary>
-        private void InvalidateCheckerboardCache()
-        {
-            _checkerboardShader?.Dispose();
-            _checkerboardShader = null;
-            _checkerboardBitmap?.Dispose();
-            _checkerboardBitmap = null;
-            _checkerboardPaint?.Dispose();
-            _checkerboardPaint = null;
+            canvas.DrawRect(dest.ToSKRect(), _transparencyPaint);
         }
 
         // ════════════════════════════════════════════════════════════════════

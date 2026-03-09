@@ -287,13 +287,10 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Running Uno Tests on Windows..." -ForegroundColor Cyan
-          # Use DesktopOnly=true to avoid needing Android/iOS workloads
-          # This limits the referenced PixlPunkt project to desktop targets only
           dotnet test PixlPunkt.Tests/PixlPunkt.Tests.csproj `
             --configuration Release `
             --verbosity normal `
-            --logger "trx;LogFileName=uno-test-results.trx" `
-            -p:DesktopOnly=true
+            --logger "trx;LogFileName=uno-test-results.trx"
 
       - name: Upload Uno test results
         uses: actions/upload-artifact@v4

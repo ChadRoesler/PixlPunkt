@@ -12,7 +12,7 @@ on:
 
 jobs:
   publish:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout
@@ -48,7 +48,7 @@ jobs:
         run: dotnet pack PixlPunkt.PluginSdk/PixlPunkt.PluginSdk.csproj -c Release -o ./nupkgs
       
       - name: List packages
-        run: Get-ChildItem -Path ./nupkgs -Recurse
+        run: ls -la ./nupkgs/
       
       - name: Push to NuGet
         shell: bash

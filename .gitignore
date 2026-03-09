@@ -176,6 +176,11 @@ DocProject/Help/*.hhp
 DocProject/Help/Html2
 DocProject/Help/html
 
+#AnimationExamples for local testing
+AnimationExamples/
+#Incomplete iconography
+PixlPunkt/Assets/Fonts/rawSvg/ic_*
+
 # Click-Once directory
 publish/
 

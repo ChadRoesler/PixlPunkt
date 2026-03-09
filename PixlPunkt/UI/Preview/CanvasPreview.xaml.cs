@@ -41,10 +41,6 @@ namespace PixlPunkt.UI.Preview
         private byte[]? _workingBuffer;
         private int _workingBufferSize;
 
-        // Cached checkerboard pattern
-        private SKShader? _checkerboardShader;
-        private SKBitmap? _checkerboardBitmap;
-
         // Viewport from host (doc space)
         private Rect _viewport;
 
@@ -96,11 +92,9 @@ namespace PixlPunkt.UI.Preview
             // Stripe theme hookup
             ApplyStripeColors();
             TransparencyStripeMixer.ColorsChanged += OnStripeColorsChanged;
-            Unloaded += (_, __) => 
+            Unloaded += (_, __) =>
             {
                 TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
-                _checkerboardShader?.Dispose();
-                _checkerboardBitmap?.Dispose();
             };
         }
 
@@ -164,16 +158,8 @@ namespace PixlPunkt.UI.Preview
         {
             ApplyStripeColors();
             _patternService.Invalidate();
-            InvalidateCheckerboardCache();
+            Rendering.TransparencyPatternShader.InvalidateAll();
             InvalidatePreviewCanvas();
-        }
-
-        private void InvalidateCheckerboardCache()
-        {
-            _checkerboardShader?.Dispose();
-            _checkerboardShader = null;
-            _checkerboardBitmap?.Dispose();
-            _checkerboardBitmap = null;
         }
 
         private void ApplyStripeColors()
@@ -408,8 +394,8 @@ namespace PixlPunkt.UI.Preview
             float offsetY = (float)oy;
             var destRect = new SKRect(offsetX, offsetY, offsetX + canvasW, offsetY + canvasH);
 
-            // Draw checkerboard background
-            DrawCheckerboardBackground(canvas, destRect);
+            // Draw transparency background
+            DrawTransparencyBackground(canvas, destRect);
 
             // Reuse or reallocate working buffer for compositing overlays
             int requiredSize = _docWidth * _docHeight * 4;
@@ -477,15 +463,14 @@ namespace PixlPunkt.UI.Preview
             }
         }
 
-        private void DrawCheckerboardBackground(SKCanvas canvas, SKRect destRect)
+        private void DrawTransparencyBackground(SKCanvas canvas, SKRect destRect)
         {
-            // Don't call SyncWith(ActualTheme) - we use explicit colors from TransparencyStripeMixer
             var (lightColor, darkColor) = _patternService.CurrentScheme;
+            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
+            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
+            var shader = Rendering.TransparencyPatternShader.GetShader(4, skLight, skDark);
 
-            int squareSize = 8;
-            EnsureCheckerboardShader(squareSize, lightColor, darkColor);
-
-            if (_checkerboardShader == null)
+            if (shader == null)
             {
                 using var fallbackPaint = new SKPaint
                 {
@@ -497,39 +482,10 @@ namespace PixlPunkt.UI.Preview
 
             using var paint = new SKPaint
             {
-                Shader = _checkerboardShader,
+                Shader = shader,
                 IsAntialias = false
             };
             canvas.DrawRect(destRect, paint);
-        }
-
-        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
-        {
-            if (_checkerboardBitmap != null && _checkerboardShader != null)
-                return;
-
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
-
-            int tileSize = squareSize * 2;
-            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
-            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
-
-            for (int y = 0; y < tileSize; y++)
-            {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    int cx = x / squareSize;
-                    int cy = y / squareSize;
-                    bool isLight = ((cx + cy) & 1) == 0;
-                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
-                }
-            }
-
-            using var image = SKImage.FromBitmap(_checkerboardBitmap);
-            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
         }
 
         // ...existing overlay compositing methods...

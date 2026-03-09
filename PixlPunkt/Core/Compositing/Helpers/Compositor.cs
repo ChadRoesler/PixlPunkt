@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -36,6 +37,19 @@ namespace PixlPunkt.Core.Compositing.Helpers
         /// </summary>
         [ThreadStatic]
         private static PixelSurface? _fxScratch;
+
+        /// <summary>
+        /// Thread-local snapshot buffer for effects that need read-before-write.
+        /// Rented from ArrayPool and reused across compositing calls to avoid per-effect allocations.
+        /// </summary>
+        [ThreadStatic]
+        private static uint[]? _fxSnapshot;
+
+        /// <summary>
+        /// Tracks the size of the currently rented <see cref="_fxSnapshot"/> buffer.
+        /// </summary>
+        [ThreadStatic]
+        private static int _fxSnapshotSize;
 
         /// <summary>
         /// Precomputed lookup table for byte to normalized float conversion (0-255 → 0.0-1.0).
@@ -141,10 +155,39 @@ namespace PixlPunkt.Core.Compositing.Helpers
                 // Treat scratch buffer as uint[] for effect math
                 var fxSpan = MemoryMarshal.Cast<byte, uint>(fxBytes.AsSpan());
 
+                // Check if any effect in the chain needs a snapshot
+                bool anyNeedsSnapshot = false;
+                foreach (var fx in enabledEffects)
+                {
+                    if (fx.NeedsSnapshot) { anyNeedsSnapshot = true; break; }
+                }
+
+                // Ensure snapshot buffer is large enough if needed
+                int pixelCount = canvasW * canvasH;
+                if (anyNeedsSnapshot)
+                {
+                    if (_fxSnapshot == null || _fxSnapshotSize < pixelCount)
+                    {
+                        if (_fxSnapshot != null)
+                            ArrayPool<uint>.Shared.Return(_fxSnapshot);
+                        _fxSnapshot = ArrayPool<uint>.Shared.Rent(pixelCount);
+                        _fxSnapshotSize = pixelCount;
+                    }
+                }
+
                 // Run all enabled effects in order, in-place
                 foreach (var fx in enabledEffects)
                 {
-                    fx.Apply(fxSpan, canvasW, canvasH);
+                    if (fx.NeedsSnapshot)
+                    {
+                        // Copy current pixels into snapshot before this effect modifies them
+                        fxSpan.Slice(0, pixelCount).CopyTo(_fxSnapshot.AsSpan(0, pixelCount));
+                        fx.Apply(fxSpan, new ReadOnlySpan<uint>(_fxSnapshot, 0, pixelCount), canvasW, canvasH);
+                    }
+                    else
+                    {
+                        fx.Apply(fxSpan, canvasW, canvasH);
+                    }
                 }
 
                 // Now blend the scratch surface into dest

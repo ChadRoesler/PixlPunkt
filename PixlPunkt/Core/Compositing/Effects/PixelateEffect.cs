@@ -17,6 +17,7 @@ namespace PixlPunkt.Core.Compositing.Effects
     public sealed class PixelateEffect : LayerEffectBase
     {
         public override string DisplayName => "Pixelate";
+        public override bool NeedsSnapshot => true;
 
         private int _blockSize = EffectLimits.DefaultBlockSize;
         public int BlockSize
@@ -39,10 +40,23 @@ namespace PixlPunkt.Core.Compositing.Effects
             int len = width * height;
             if (len == 0 || pixels.Length < len) return;
 
+            uint[] src = pixels.ToArray();
+            ApplyCore(pixels, src, width, height);
+        }
+
+        public override void Apply(Span<uint> pixels, ReadOnlySpan<uint> snapshot, int width, int height)
+        {
+            if (!IsEnabled) return;
+            int len = width * height;
+            if (len == 0 || pixels.Length < len) return;
+
+            ApplyCore(pixels, snapshot, width, height);
+        }
+
+        private void ApplyCore(Span<uint> pixels, ReadOnlySpan<uint> src, int width, int height)
+        {
             int bs = Math.Clamp(BlockSize, EffectLimits.MinBlockSize, Math.Max(width, height));
             if (bs <= 1) return;
-
-            uint[] src = pixels.ToArray();
 
             for (int by = 0; by < height; by += bs)
             {

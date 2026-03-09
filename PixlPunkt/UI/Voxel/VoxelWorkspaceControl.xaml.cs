@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -73,40 +74,11 @@ namespace PixlPunkt.UI.Voxel
             LightHandle,
         }
 
-        private delegate bool TryGetPlaneColor(int u, int v, out uint color);
-
         private enum ToolPointerPhase
         {
             Pressed,
             Moved,
             Released,
-        }
-
-        private enum ModelMeshMode
-        {
-            MergeCoplanar = 0,
-            PerVoxel = 1,
-        }
-
-        private enum ModelAxisPreset
-        {
-            PixlPunkt = 0,
-            BlenderZUp = 1,
-        }
-
-        private enum ModelExportFormat
-        {
-            Obj = 0,
-            Glb = 1,
-            Stl = 2,
-            Vox = 3,
-        }
-
-        private enum ModelPivotPreset
-        {
-            Center = 0,
-            BottomCenter = 1,
-            Origin = 2,
         }
 
         private sealed record ViewportRenderOverrides
@@ -117,92 +89,6 @@ namespace PixlPunkt.UI.Voxel
             public bool? DrawSurfaceVoxelGrid { get; init; }
             public bool IncludeSelectionOverlay { get; init; } = true;
             public uint? ClearColor { get; init; }
-        }
-
-        private readonly record struct VoxelImageExportOptions(
-            int Scale,
-            bool TransparentBackground,
-            bool IncludeOutline,
-            bool IncludeBackdropCage,
-            bool IncludeProjectionTiles,
-            bool IncludeModelGrid,
-            bool TrimTransparentBounds,
-            int TrimPadding,
-            bool BatchExportViews,
-            bool BatchIncludeCardinalViews,
-            bool BatchIncludeDirectionalViews);
-
-        private readonly record struct VoxelModelExportOptions(
-            ModelExportFormat Format,
-            ModelMeshMode MeshMode,
-            ModelAxisPreset AxisPreset,
-            float UnitScale,
-            ModelPivotPreset PivotPreset,
-            bool GlbDoubleSided);
-
-        private readonly record struct VoxelExportPreset(
-            VoxelImageExportOptions Image,
-            VoxelModelExportOptions Model);
-
-        private sealed class VoxelExportPresetFile
-        {
-            public int Version { get; set; } = 1;
-            public VoxelImageExportPresetFile? Image { get; set; }
-            public VoxelModelExportPresetFile? Model { get; set; }
-        }
-
-        private sealed class VoxelImageExportPresetFile
-        {
-            public int Scale { get; set; } = 1;
-            public bool TransparentBackground { get; set; }
-            public bool IncludeOutline { get; set; } = true;
-            public bool IncludeBackdropCage { get; set; } = true;
-            public bool IncludeProjectionTiles { get; set; } = true;
-            public bool IncludeModelGrid { get; set; }
-            public bool TrimTransparentBounds { get; set; }
-            public int TrimPadding { get; set; } = 1;
-            public bool BatchExportViews { get; set; }
-            public bool BatchIncludeCardinalViews { get; set; } = true;
-            public bool BatchIncludeDirectionalViews { get; set; } = true;
-        }
-
-        private sealed class VoxelModelExportPresetFile
-        {
-            public int Format { get; set; }
-            public int MeshMode { get; set; }
-            public int AxisPreset { get; set; }
-            public float UnitScale { get; set; } = 1f;
-            public int PivotPreset { get; set; }
-            public bool GlbDoubleSided { get; set; } = true;
-        }
-
-        private readonly record struct ExportFaceQuad(
-            Face Face,
-            int X,
-            int Y,
-            int Z,
-            int Width,
-            int Height,
-            uint ColorBgra);
-
-        private readonly record struct ExportTriangle(
-            Vector3 A,
-            Vector3 B,
-            Vector3 C,
-            Vector3 Normal,
-            uint ColorBgra);
-
-        private readonly record struct TransformedVoxelBounds(
-            int MinX,
-            int MinY,
-            int MinZ,
-            int MaxX,
-            int MaxY,
-            int MaxZ)
-        {
-            public int SizeX => (MaxX - MinX) + 1;
-            public int SizeY => (MaxY - MinY) + 1;
-            public int SizeZ => (MaxZ - MinZ) + 1;
         }
 
         private sealed class PixelPreviewSpriteCache
@@ -2492,7 +2378,7 @@ namespace PixlPunkt.UI.Voxel
                             cageScale: cageScale);
                     }
 
-                    UpscaleNearestBgra(renderSource, renderW, renderH, displayBuffer, displayW, displayH, screenPixelSize);
+                    VoxelImageExporter.UpscaleNearestBgra(renderSource, renderW, renderH, displayBuffer, displayW, displayH, screenPixelSize);
 
                     if (renderedExactCardinal &&
                         screenPixelSize > 1 &&
@@ -2567,53 +2453,6 @@ namespace PixlPunkt.UI.Voxel
             if (_displayBuffer == null || _displayBuffer.Length != byteLength)
             {
                 _displayBuffer = new byte[byteLength];
-            }
-        }
-
-        private static void UpscaleNearestBgra(
-            byte[] source,
-            int sourceWidth,
-            int sourceHeight,
-            byte[] destination,
-            int destinationWidth,
-            int destinationHeight,
-            int scale)
-        {
-            if (source == null || destination == null)
-                return;
-            if (sourceWidth <= 0 || sourceHeight <= 0 || destinationWidth <= 0 || destinationHeight <= 0 || scale <= 0)
-                return;
-            if (source.Length < sourceWidth * sourceHeight * 4 || destination.Length < destinationWidth * destinationHeight * 4)
-                return;
-
-            for (int sy = 0; sy < sourceHeight; sy++)
-            {
-                int dstBaseY = sy * scale;
-                for (int sx = 0; sx < sourceWidth; sx++)
-                {
-                    int si = (sy * sourceWidth + sx) * 4;
-                    byte b0 = source[si];
-                    byte b1 = source[si + 1];
-                    byte b2 = source[si + 2];
-                    byte b3 = source[si + 3];
-                    int dstBaseX = sx * scale;
-
-                    for (int py = 0; py < scale; py++)
-                    {
-                        int dy = dstBaseY + py;
-                        if (dy < 0 || dy >= destinationHeight) continue;
-                        for (int px = 0; px < scale; px++)
-                        {
-                            int dx = dstBaseX + px;
-                            if (dx < 0 || dx >= destinationWidth) continue;
-                            int di = (dy * destinationWidth + dx) * 4;
-                            destination[di] = b0;
-                            destination[di + 1] = b1;
-                            destination[di + 2] = b2;
-                            destination[di + 3] = b3;
-                        }
-                    }
-                }
             }
         }
 
@@ -4605,7 +4444,8 @@ namespace PixlPunkt.UI.Voxel
             int startY = (renderH - size) / 2;
 
             bool needMask = opts.DrawOutline || opts.DrawSurfaceVoxelGrid;
-            bool[]? objectMask = needMask ? new bool[renderW * renderH] : null;
+            bool[]? objectMask = needMask ? ArrayPool<bool>.Shared.Rent(renderW * renderH) : null;
+            if (objectMask != null) Array.Clear(objectMask, 0, renderW * renderH);
 
             for (int y = 0; y < img.Height; y++)
             {
@@ -4638,6 +4478,9 @@ namespace PixlPunkt.UI.Voxel
                     buffer, objectMask, renderW, renderH,
                     opts.OutlineColor, opts.OutlineSize);
             }
+
+            if (objectMask != null)
+                ArrayPool<bool>.Shared.Return(objectMask);
 
             return true;
         }
@@ -4925,110 +4768,126 @@ namespace PixlPunkt.UI.Voxel
             }
             if (!any) return;
 
-            var exterior = new bool[pixelCount];
-            var flood = new int[pixelCount];
-            int fh = 0, ft = 0;
+            var exterior = ArrayPool<bool>.Shared.Rent(pixelCount);
+            var flood = ArrayPool<int>.Shared.Rent(pixelCount);
+            var dist = ArrayPool<int>.Shared.Rent(pixelCount);
+            var q = ArrayPool<int>.Shared.Rent(pixelCount);
 
-            void TryEnqueueExterior(int x, int y)
+            try
             {
-                if ((uint)x >= (uint)width || (uint)y >= (uint)height) return;
-                int idx = y * width + x;
-                if (objectMask[idx] || exterior[idx]) return;
-                exterior[idx] = true;
-                flood[ft++] = idx;
-            }
+                Array.Clear(exterior, 0, pixelCount);
+                Array.Clear(flood, 0, pixelCount);
+                Array.Clear(dist, 0, pixelCount);
+                Array.Clear(q, 0, pixelCount);
 
-            for (int x = 0; x < width; x++)
-            {
-                TryEnqueueExterior(x, 0);
-                TryEnqueueExterior(x, height - 1);
-            }
-            for (int y = 1; y < height - 1; y++)
-            {
-                TryEnqueueExterior(0, y);
-                TryEnqueueExterior(width - 1, y);
-            }
+                int fh = 0, ft = 0;
 
-            while (fh < ft)
-            {
-                int idx = flood[fh++];
-                int x = idx % width;
-                int y = idx / width;
+                void TryEnqueueExterior(int x, int y)
+                {
+                    if ((uint)x >= (uint)width || (uint)y >= (uint)height) return;
+                    int idx = y * width + x;
+                    if (objectMask[idx] || exterior[idx]) return;
+                    exterior[idx] = true;
+                    flood[ft++] = idx;
+                }
 
-                TryEnqueueExterior(x - 1, y);
-                TryEnqueueExterior(x + 1, y);
-                TryEnqueueExterior(x, y - 1);
-                TryEnqueueExterior(x, y + 1);
-            }
-
-            int radius = Math.Max(1, outlineSize);
-            var dist = new int[pixelCount];
-            var q = new int[pixelCount];
-            int qh = 0, qt = 0;
-
-            for (int y = 0; y < height; y++)
-            {
-                int row = y * width;
                 for (int x = 0; x < width; x++)
                 {
-                    int idx = row + x;
-                    if (!exterior[idx]) continue;
+                    TryEnqueueExterior(x, 0);
+                    TryEnqueueExterior(x, height - 1);
+                }
+                for (int y = 1; y < height - 1; y++)
+                {
+                    TryEnqueueExterior(0, y);
+                    TryEnqueueExterior(width - 1, y);
+                }
 
-                    bool nearObject = false;
-                    for (int ny = Math.Max(0, y - 1); ny <= Math.Min(height - 1, y + 1) && !nearObject; ny++)
+                while (fh < ft)
+                {
+                    int idx = flood[fh++];
+                    int x = idx % width;
+                    int y = idx / width;
+
+                    TryEnqueueExterior(x - 1, y);
+                    TryEnqueueExterior(x + 1, y);
+                    TryEnqueueExterior(x, y - 1);
+                    TryEnqueueExterior(x, y + 1);
+                }
+
+                int radius = Math.Max(1, outlineSize);
+                int qh = 0, qt = 0;
+
+                for (int y = 0; y < height; y++)
+                {
+                    int row = y * width;
+                    for (int x = 0; x < width; x++)
+                    {
+                        int idx = row + x;
+                        if (!exterior[idx]) continue;
+
+                        bool nearObject = false;
+                        for (int ny = Math.Max(0, y - 1); ny <= Math.Min(height - 1, y + 1) && !nearObject; ny++)
+                        {
+                            int nrow = ny * width;
+                            for (int nx = Math.Max(0, x - 1); nx <= Math.Min(width - 1, x + 1); nx++)
+                            {
+                                if (objectMask[nrow + nx])
+                                {
+                                    nearObject = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!nearObject) continue;
+                        dist[idx] = 1;
+                        q[qt++] = idx;
+                    }
+                }
+
+                while (qh < qt)
+                {
+                    int idx = q[qh++];
+                    int d = dist[idx];
+                    if (d >= radius) continue;
+
+                    int x = idx % width;
+                    int y = idx / width;
+                    for (int ny = Math.Max(0, y - 1); ny <= Math.Min(height - 1, y + 1); ny++)
                     {
                         int nrow = ny * width;
                         for (int nx = Math.Max(0, x - 1); nx <= Math.Min(width - 1, x + 1); nx++)
                         {
-                            if (objectMask[nrow + nx])
-                            {
-                                nearObject = true;
-                                break;
-                            }
+                            int ni = nrow + nx;
+                            if (!exterior[ni] || dist[ni] != 0) continue;
+                            dist[ni] = d + 1;
+                            q[qt++] = ni;
                         }
                     }
-
-                    if (!nearObject) continue;
-                    dist[idx] = 1;
-                    q[qt++] = idx;
                 }
-            }
 
-            while (qh < qt)
-            {
-                int idx = q[qh++];
-                int d = dist[idx];
-                if (d >= radius) continue;
+                byte b = (byte)(outlineColor & 0xFF);
+                byte g = (byte)((outlineColor >> 8) & 0xFF);
+                byte r = (byte)((outlineColor >> 16) & 0xFF);
+                byte a = (byte)((outlineColor >> 24) & 0xFF);
 
-                int x = idx % width;
-                int y = idx / width;
-                for (int ny = Math.Max(0, y - 1); ny <= Math.Min(height - 1, y + 1); ny++)
+                for (int i = 0; i < qt; i++)
                 {
-                    int nrow = ny * width;
-                    for (int nx = Math.Max(0, x - 1); nx <= Math.Min(width - 1, x + 1); nx++)
-                    {
-                        int ni = nrow + nx;
-                        if (!exterior[ni] || dist[ni] != 0) continue;
-                        dist[ni] = d + 1;
-                        q[qt++] = ni;
-                    }
+                    int idx = q[i];
+                    if (objectMask[idx]) continue;
+                    int bi = idx * 4;
+                    buffer[bi] = b;
+                    buffer[bi + 1] = g;
+                    buffer[bi + 2] = r;
+                    buffer[bi + 3] = a;
                 }
             }
-
-            byte b = (byte)(outlineColor & 0xFF);
-            byte g = (byte)((outlineColor >> 8) & 0xFF);
-            byte r = (byte)((outlineColor >> 16) & 0xFF);
-            byte a = (byte)((outlineColor >> 24) & 0xFF);
-
-            for (int i = 0; i < qt; i++)
+            finally
             {
-                int idx = q[i];
-                if (objectMask[idx]) continue;
-                int bi = idx * 4;
-                buffer[bi] = b;
-                buffer[bi + 1] = g;
-                buffer[bi + 2] = r;
-                buffer[bi + 3] = a;
+                ArrayPool<int>.Shared.Return(q);
+                ArrayPool<int>.Shared.Return(dist);
+                ArrayPool<int>.Shared.Return(flood);
+                ArrayPool<bool>.Shared.Return(exterior);
             }
         }
 
@@ -5407,7 +5266,7 @@ namespace PixlPunkt.UI.Voxel
 
                 if (!string.IsNullOrWhiteSpace(file.Path))
                 {
-                    await SaveBgraPngAsync(file.Path, exportWidth, exportHeight, exportBuffer, options.Value.TransparentBackground);
+                    await VoxelImageExporter.SaveBgraPngAsync(file.Path, exportWidth, exportHeight, exportBuffer, options.Value.TransparentBackground);
                 }
                 else
                 {
@@ -5446,7 +5305,7 @@ namespace PixlPunkt.UI.Voxel
 
                 if (options.Value.Format == ModelExportFormat.Vox)
                 {
-                    var bounds = ComputeTransformedVoxelBounds(_lastVolume, options.Value.AxisPreset);
+                    var bounds = VoxelModelExporter.ComputeTransformedVoxelBounds(_lastVolume, options.Value.AxisPreset);
                     if (bounds.HasValue)
                     {
                         var b = bounds.Value;
@@ -5475,7 +5334,7 @@ namespace PixlPunkt.UI.Voxel
                 if (ownerWindow == null)
                     return;
 
-                var extension = GetModelExportPrimaryExtension(options.Value.Format);
+                var extension = VoxelModelExporter.GetPrimaryExtension(options.Value.Format);
                 var savePicker = WindowHost.CreateFileSavePicker(ownerWindow, "voxel_model", extension);
                 savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
                 WindowHost.TrySetDefaultFileExtension(savePicker, extension);
@@ -5500,26 +5359,26 @@ namespace PixlPunkt.UI.Voxel
                 {
                     case ModelExportFormat.Glb:
                     {
-                        var glbBytes = await BuildGlbExportAsync(_lastVolume, options.Value);
+                        var glbBytes = await VoxelModelExporter.BuildGlbExportAsync(_lastVolume, options.Value);
                         await System.IO.File.WriteAllBytesAsync(outputPath, glbBytes);
                         break;
                     }
                     case ModelExportFormat.Stl:
                     {
-                        var stlBytes = BuildStlExport(_lastVolume, options.Value);
+                        var stlBytes = VoxelModelExporter.BuildStlExport(_lastVolume, options.Value);
                         await System.IO.File.WriteAllBytesAsync(outputPath, stlBytes);
                         break;
                     }
                     case ModelExportFormat.Vox:
                     {
-                        var voxBytes = BuildVoxExport(_lastVolume, options.Value);
+                        var voxBytes = VoxelModelExporter.BuildVoxExport(_lastVolume, options.Value);
                         await System.IO.File.WriteAllBytesAsync(outputPath, voxBytes);
                         break;
                     }
                     default:
                     {
                         // Keep external references OBJ/MTL-friendly (avoid spaces and odd tokens that some importers misread).
-                        var refBaseName = SanitizeFileName(baseName).Replace(' ', '_');
+                        var refBaseName = VoxelModelExporter.SanitizeFileName(baseName).Replace(' ', '_');
                         if (string.IsNullOrWhiteSpace(refBaseName))
                             refBaseName = "voxel_model";
 
@@ -5528,11 +5387,11 @@ namespace PixlPunkt.UI.Voxel
                         var mtlPath = System.IO.Path.Combine(folder, mtlFileName);
                         var texturePath = System.IO.Path.Combine(folder, textureFileName);
 
-                        var export = BuildObjExport(_lastVolume, mtlFileName, textureFileName, options.Value);
+                        var export = VoxelModelExporter.BuildObjExport(_lastVolume, mtlFileName, textureFileName, options.Value);
 
                         await System.IO.File.WriteAllTextAsync(outputPath, export.ObjText, Utf8NoBom);
                         await System.IO.File.WriteAllTextAsync(mtlPath, export.MtlText, Utf8NoBom);
-                        await SaveBgraTextureToPngAsync(texturePath, export.TextureWidth, export.TextureHeight, export.TexturePixelsBgra);
+                        await VoxelImageExporter.SaveBgraTextureToPngAsync(texturePath, export.TextureWidth, export.TextureHeight, export.TexturePixelsBgra);
                         break;
                     }
                 }
@@ -5566,7 +5425,7 @@ namespace PixlPunkt.UI.Voxel
             string? oldSnap = _camera.CurrentSnapName;
 
             string rawBaseName = string.IsNullOrWhiteSpace(_document.Name) ? "voxel_preview" : _document.Name;
-            string safeBaseName = SanitizeFileName(rawBaseName);
+            string safeBaseName = VoxelModelExporter.SanitizeFileName(rawBaseName);
 
             try
             {
@@ -5578,10 +5437,10 @@ namespace PixlPunkt.UI.Voxel
                     if (!TryBuildImageExportBuffer(options, out var exportBuffer, out int exportWidth, out int exportHeight))
                         continue;
 
-                    string safeView = SanitizeFileName(view);
+                    string safeView = VoxelModelExporter.SanitizeFileName(view);
                     string fileName = $"{safeBaseName}_{safeView}.png";
                     string path = System.IO.Path.Combine(folder.Path, fileName);
-                    await SaveBgraPngAsync(path, exportWidth, exportHeight, exportBuffer, options.TransparentBackground);
+                    await VoxelImageExporter.SaveBgraPngAsync(path, exportWidth, exportHeight, exportBuffer, options.TransparentBackground);
                 }
             }
             finally
@@ -5645,12 +5504,12 @@ namespace PixlPunkt.UI.Voxel
                 exportWidth = renderedW * scale;
                 exportHeight = renderedH * scale;
                 exportBuffer = new byte[exportWidth * exportHeight * 4];
-                UpscaleNearestBgra(rendered, renderedW, renderedH, exportBuffer, exportWidth, exportHeight, scale);
+                VoxelImageExporter.UpscaleNearestBgra(rendered, renderedW, renderedH, exportBuffer, exportWidth, exportHeight, scale);
             }
 
             if (options.TransparentBackground && options.TrimTransparentBounds)
             {
-                TrimTransparentBoundsBgra(
+                VoxelImageExporter.TrimTransparentBoundsBgra(
                     exportBuffer,
                     exportWidth,
                     exportHeight,
@@ -6101,7 +5960,7 @@ namespace PixlPunkt.UI.Voxel
                 }
 
                 var currentOptions = BuildCurrentModelOptionsFromControls();
-                var bounds = ComputeTransformedVoxelBounds(_lastVolume, currentOptions.AxisPreset);
+                var bounds = VoxelModelExporter.ComputeTransformedVoxelBounds(_lastVolume, currentOptions.AxisPreset);
                 if (!bounds.HasValue)
                 {
                     voxWarningText.Text = "VOX exports palette-indexed voxel colors only.";
@@ -6343,1129 +6202,6 @@ namespace PixlPunkt.UI.Voxel
 
             return new VoxelExportPreset(loadedImage, loadedModel);
         }
-
-        private static string SanitizeFileName(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return "voxel_export";
-
-            var invalid = System.IO.Path.GetInvalidFileNameChars();
-            var sb = new StringBuilder(value.Length);
-            for (int i = 0; i < value.Length; i++)
-            {
-                char ch = value[i];
-                sb.Append(Array.IndexOf(invalid, ch) >= 0 ? '_' : ch);
-            }
-
-            var safe = sb.ToString().Trim();
-            return string.IsNullOrWhiteSpace(safe) ? "voxel_export" : safe;
-        }
-
-        private static string GetModelExportPrimaryExtension(ModelExportFormat format)
-            => format switch
-            {
-                ModelExportFormat.Glb => ".glb",
-                ModelExportFormat.Stl => ".stl",
-                ModelExportFormat.Vox => ".vox",
-                _ => ".obj",
-            };
-
-        private static ObjExportData BuildObjExport(
-            VoxelVolume volume,
-            string mtlFileName,
-            string textureFileName,
-            VoxelModelExportOptions options)
-        {
-            int size = volume.Size;
-            float unitScale = Math.Clamp(options.UnitScale, 0.0001f, 10000f);
-            Vector3 pivotOffset = GetModelPivotOffset(size, options.PivotPreset);
-            var exportQuads = BuildExportFaceQuads(volume, options.MeshMode);
-            var colorToIndex = new Dictionary<uint, int>();
-            var colors = new List<uint>();
-            for (int i = 0; i < exportQuads.Count; i++)
-            {
-                uint color = exportQuads[i].ColorBgra;
-                if (!colorToIndex.ContainsKey(color))
-                {
-                    colorToIndex[color] = colors.Count;
-                    colors.Add(color);
-                }
-            }
-
-            int texSize = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(Math.Max(1, colors.Count))));
-            var texPixels = new byte[texSize * texSize * 4];
-            for (int i = 0; i < colors.Count; i++)
-            {
-                uint c = colors[i];
-                int tx = i % texSize;
-                int ty = i / texSize;
-                int o = (ty * texSize + tx) * 4;
-                texPixels[o + 0] = (byte)(c & 0xFF);         // B
-                texPixels[o + 1] = (byte)((c >> 8) & 0xFF);  // G
-                texPixels[o + 2] = (byte)((c >> 16) & 0xFF); // R
-                texPixels[o + 3] = (byte)((c >> 24) & 0xFF); // A
-            }
-
-            var obj = new StringBuilder(exportQuads.Count * 120 + 256);
-            var mtl = new StringBuilder(256);
-            obj.AppendLine("# PixlPunkt Voxel Export");
-            obj.Append("mtllib ").AppendLine(EncodeObjPathToken(mtlFileName));
-            obj.AppendLine("o voxel_model");
-            obj.AppendLine("usemtl voxel_material");
-
-            int vIndex = 1;
-            int vtIndex = 1;
-            foreach (var f in exportQuads)
-            {
-                GetFaceQuadVertices(
-                    f.Face,
-                    f.X + pivotOffset.X,
-                    f.Y + pivotOffset.Y,
-                    f.Z + pivotOffset.Z,
-                    f.Width,
-                    f.Height,
-                    out var p0,
-                    out var p1,
-                    out var p2,
-                    out var p3);
-                p0 *= unitScale;
-                p1 *= unitScale;
-                p2 *= unitScale;
-                p3 *= unitScale;
-                p0 = TransformExportVertex(p0, options.AxisPreset);
-                p1 = TransformExportVertex(p1, options.AxisPreset);
-                p2 = TransformExportVertex(p2, options.AxisPreset);
-                p3 = TransformExportVertex(p3, options.AxisPreset);
-                AppendVertex(obj, p0);
-                AppendVertex(obj, p1);
-                AppendVertex(obj, p2);
-                AppendVertex(obj, p3);
-
-                int ci = colorToIndex[f.ColorBgra];
-                float u = ((ci % texSize) + 0.5f) / texSize;
-                float v = 1f - (((ci / texSize) + 0.5f) / texSize);
-
-                AppendUv(obj, u, v);
-                AppendUv(obj, u, v);
-                AppendUv(obj, u, v);
-                AppendUv(obj, u, v);
-
-                obj.Append("f ")
-                   .Append(vIndex).Append('/').Append(vtIndex).Append(' ')
-                   .Append(vIndex + 1).Append('/').Append(vtIndex + 1).Append(' ')
-                   .Append(vIndex + 2).Append('/').Append(vtIndex + 2).Append(' ')
-                   .Append(vIndex + 3).Append('/').Append(vtIndex + 3).AppendLine();
-
-                vIndex += 4;
-                vtIndex += 4;
-            }
-
-            mtl.AppendLine("newmtl voxel_material");
-            mtl.AppendLine("Ka 1.000000 1.000000 1.000000");
-            mtl.AppendLine("Kd 1.000000 1.000000 1.000000");
-            mtl.AppendLine("Ks 0.000000 0.000000 0.000000");
-            mtl.AppendLine("d 1.0");
-            mtl.AppendLine("illum 1");
-            mtl.Append("map_Kd ").AppendLine(EncodeObjPathToken(textureFileName));
-
-            return new ObjExportData(obj.ToString(), mtl.ToString(), texSize, texSize, texPixels);
-        }
-
-        private static async Task<byte[]> BuildGlbExportAsync(VoxelVolume volume, VoxelModelExportOptions options)
-        {
-            int size = volume.Size;
-            var quads = BuildExportFaceQuads(volume, options.MeshMode);
-            if (quads.Count == 0)
-            {
-                const string emptyJson = "{\"asset\":{\"version\":\"2.0\",\"generator\":\"PixlPunkt\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{}]}";
-                return BuildGlbContainer(Encoding.UTF8.GetBytes(emptyJson), Array.Empty<byte>());
-            }
-
-            var colorToIndex = new Dictionary<uint, int>();
-            var colors = new List<uint>();
-            for (int i = 0; i < quads.Count; i++)
-            {
-                uint color = quads[i].ColorBgra;
-                if (!colorToIndex.ContainsKey(color))
-                {
-                    colorToIndex[color] = colors.Count;
-                    colors.Add(color);
-                }
-            }
-
-            int texSize = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(Math.Max(1, colors.Count))));
-            var texPixels = new byte[texSize * texSize * 4];
-            for (int i = 0; i < colors.Count; i++)
-            {
-                uint c = colors[i];
-                int tx = i % texSize;
-                int ty = i / texSize;
-                int o = (ty * texSize + tx) * 4;
-                texPixels[o + 0] = (byte)(c & 0xFF);
-                texPixels[o + 1] = (byte)((c >> 8) & 0xFF);
-                texPixels[o + 2] = (byte)((c >> 16) & 0xFF);
-                texPixels[o + 3] = (byte)((c >> 24) & 0xFF);
-            }
-            byte[] texturePng = await EncodeBgraPngBytesAsync(texSize, texSize, texPixels, transparentBackground: true);
-
-            int vertexCount = quads.Count * 6; // two triangles per quad, no index buffer
-            var binStream = new MemoryStream(Math.Max(2048, vertexCount * 32));
-            using var binWriter = new BinaryWriter(binStream, Utf8NoBom, leaveOpen: true);
-
-            float minX = float.PositiveInfinity, minY = float.PositiveInfinity, minZ = float.PositiveInfinity;
-            float maxX = float.NegativeInfinity, maxY = float.NegativeInfinity, maxZ = float.NegativeInfinity;
-
-            static void UpdateMinMax(Vector3 p, ref float minX, ref float minY, ref float minZ, ref float maxX, ref float maxY, ref float maxZ)
-            {
-                if (p.X < minX) minX = p.X;
-                if (p.Y < minY) minY = p.Y;
-                if (p.Z < minZ) minZ = p.Z;
-                if (p.X > maxX) maxX = p.X;
-                if (p.Y > maxY) maxY = p.Y;
-                if (p.Z > maxZ) maxZ = p.Z;
-            }
-
-            static void PadTo4(BinaryWriter writer, MemoryStream stream)
-            {
-                while ((stream.Position & 3) != 0)
-                    writer.Write((byte)0);
-            }
-
-            int posOffset = (int)binStream.Position;
-            for (int i = 0; i < quads.Count; i++)
-            {
-                GetTransformedFaceVertices(quads[i], size, options, out var p0, out var p1, out var p2, out var p3);
-                binWriter.Write(p0.X); binWriter.Write(p0.Y); binWriter.Write(p0.Z);
-                binWriter.Write(p1.X); binWriter.Write(p1.Y); binWriter.Write(p1.Z);
-                binWriter.Write(p2.X); binWriter.Write(p2.Y); binWriter.Write(p2.Z);
-                binWriter.Write(p0.X); binWriter.Write(p0.Y); binWriter.Write(p0.Z);
-                binWriter.Write(p2.X); binWriter.Write(p2.Y); binWriter.Write(p2.Z);
-                binWriter.Write(p3.X); binWriter.Write(p3.Y); binWriter.Write(p3.Z);
-
-                UpdateMinMax(p0, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
-                UpdateMinMax(p1, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
-                UpdateMinMax(p2, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
-                UpdateMinMax(p3, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
-            }
-            int posLength = (int)binStream.Position - posOffset;
-
-            PadTo4(binWriter, binStream);
-            int normalOffset = (int)binStream.Position;
-            for (int i = 0; i < quads.Count; i++)
-            {
-                GetTransformedFaceVertices(quads[i], size, options, out var p0, out var p1, out var p2, out _);
-                var n = Vector3.Cross(p1 - p0, p2 - p0);
-                if (n.LengthSquared() > 1e-12f)
-                    n = Vector3.Normalize(n);
-                else
-                    n = Vector3.UnitY;
-
-                for (int v = 0; v < 6; v++)
-                {
-                    binWriter.Write(n.X);
-                    binWriter.Write(n.Y);
-                    binWriter.Write(n.Z);
-                }
-            }
-            int normalLength = (int)binStream.Position - normalOffset;
-
-            PadTo4(binWriter, binStream);
-            int uvOffset = (int)binStream.Position;
-            for (int i = 0; i < quads.Count; i++)
-            {
-                int colorIndex = colorToIndex[quads[i].ColorBgra];
-                float u = ((colorIndex % texSize) + 0.5f) / texSize;
-                float v = 1f - (((colorIndex / texSize) + 0.5f) / texSize);
-                for (int vt = 0; vt < 6; vt++)
-                {
-                    binWriter.Write(u);
-                    binWriter.Write(v);
-                }
-            }
-            int uvLength = (int)binStream.Position - uvOffset;
-
-            PadTo4(binWriter, binStream);
-            int imageOffset = (int)binStream.Position;
-            binWriter.Write(texturePng);
-            int imageLength = texturePng.Length;
-
-            var bin = binStream.ToArray();
-            string F(float value) => value.ToString("0.######", CultureInfo.InvariantCulture);
-
-            var json = new StringBuilder(1400);
-            string glbDoubleSided = options.GlbDoubleSided ? "true" : "false";
-            json.Append('{')
-                .Append("\"asset\":{\"version\":\"2.0\",\"generator\":\"PixlPunkt\"},")
-                .Append("\"scene\":0,")
-                .Append("\"scenes\":[{\"nodes\":[0]}],")
-                .Append("\"nodes\":[{\"mesh\":0}],")
-                .Append("\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0,\"NORMAL\":1,\"TEXCOORD_0\":2},\"material\":0,\"mode\":4}]}],")
-                .Append("\"materials\":[{\"pbrMetallicRoughness\":{\"baseColorTexture\":{\"index\":0},\"metallicFactor\":0,\"roughnessFactor\":1},\"doubleSided\":")
-                .Append(glbDoubleSided)
-                .Append(",\"alphaMode\":\"BLEND\"}],")
-                .Append("\"textures\":[{\"sampler\":0,\"source\":0}],")
-                .Append("\"samplers\":[{\"magFilter\":9728,\"minFilter\":9728,\"wrapS\":33071,\"wrapT\":33071}],")
-                .Append("\"images\":[{\"bufferView\":3,\"mimeType\":\"image/png\"}],")
-                .Append("\"buffers\":[{\"byteLength\":").Append(bin.Length).Append("}],")
-                .Append("\"bufferViews\":[")
-                .Append("{\"buffer\":0,\"byteOffset\":").Append(posOffset).Append(",\"byteLength\":").Append(posLength).Append(",\"target\":34962},")
-                .Append("{\"buffer\":0,\"byteOffset\":").Append(normalOffset).Append(",\"byteLength\":").Append(normalLength).Append(",\"target\":34962},")
-                .Append("{\"buffer\":0,\"byteOffset\":").Append(uvOffset).Append(",\"byteLength\":").Append(uvLength).Append(",\"target\":34962},")
-                .Append("{\"buffer\":0,\"byteOffset\":").Append(imageOffset).Append(",\"byteLength\":").Append(imageLength).Append("}")
-                .Append("],")
-                .Append("\"accessors\":[")
-                .Append("{\"bufferView\":0,\"componentType\":5126,\"count\":").Append(vertexCount).Append(",\"type\":\"VEC3\",\"min\":[")
-                .Append(F(minX)).Append(',').Append(F(minY)).Append(',').Append(F(minZ)).Append("],\"max\":[")
-                .Append(F(maxX)).Append(',').Append(F(maxY)).Append(',').Append(F(maxZ)).Append("]},")
-                .Append("{\"bufferView\":1,\"componentType\":5126,\"count\":").Append(vertexCount).Append(",\"type\":\"VEC3\"},")
-                .Append("{\"bufferView\":2,\"componentType\":5126,\"count\":").Append(vertexCount).Append(",\"type\":\"VEC2\"}")
-                .Append("]")
-                .Append('}');
-
-            return BuildGlbContainer(Encoding.UTF8.GetBytes(json.ToString()), bin);
-        }
-
-        private static byte[] BuildGlbContainer(byte[] jsonUtf8, byte[] bin)
-        {
-            jsonUtf8 ??= Array.Empty<byte>();
-            bin ??= Array.Empty<byte>();
-
-            int jsonPaddedLength = (jsonUtf8.Length + 3) & ~3;
-            int binPaddedLength = (bin.Length + 3) & ~3;
-            int totalLength = 12 + 8 + jsonPaddedLength + 8 + binPaddedLength;
-
-            using var stream = new MemoryStream(totalLength);
-            using var writer = new BinaryWriter(stream, Utf8NoBom, leaveOpen: true);
-
-            writer.Write(0x46546C67); // glTF
-            writer.Write(2);          // version
-            writer.Write(totalLength);
-
-            writer.Write(jsonPaddedLength);
-            writer.Write(0x4E4F534A); // JSON
-            writer.Write(jsonUtf8);
-            for (int i = jsonUtf8.Length; i < jsonPaddedLength; i++)
-                writer.Write((byte)0x20);
-
-            writer.Write(binPaddedLength);
-            writer.Write(0x004E4942); // BIN
-            writer.Write(bin);
-            for (int i = bin.Length; i < binPaddedLength; i++)
-                writer.Write((byte)0x00);
-
-            return stream.ToArray();
-        }
-
-        private static byte[] BuildStlExport(VoxelVolume volume, VoxelModelExportOptions options)
-        {
-            var triangles = BuildExportTriangles(volume, options);
-            uint triangleCount = (uint)triangles.Count;
-
-            using var stream = new MemoryStream(84 + (int)triangleCount * 50);
-            using var writer = new BinaryWriter(stream, Utf8NoBom, leaveOpen: true);
-
-            var header = new byte[80];
-            var headerText = Encoding.ASCII.GetBytes("PixlPunkt Voxel STL");
-            Buffer.BlockCopy(headerText, 0, header, 0, Math.Min(headerText.Length, header.Length));
-            writer.Write(header);
-            writer.Write(triangleCount);
-
-            for (int i = 0; i < triangles.Count; i++)
-            {
-                var t = triangles[i];
-                writer.Write(t.Normal.X);
-                writer.Write(t.Normal.Y);
-                writer.Write(t.Normal.Z);
-
-                writer.Write(t.A.X); writer.Write(t.A.Y); writer.Write(t.A.Z);
-                writer.Write(t.B.X); writer.Write(t.B.Y); writer.Write(t.B.Z);
-                writer.Write(t.C.X); writer.Write(t.C.Y); writer.Write(t.C.Z);
-                writer.Write((ushort)0);
-            }
-
-            return stream.ToArray();
-        }
-
-        private static byte[] BuildVoxExport(VoxelVolume volume, VoxelModelExportOptions options)
-        {
-            var voxels = new List<(int X, int Y, int Z, byte PaletteIndex)>(Math.Max(1, volume.OccupiedCount));
-            var palette = new List<uint>(255);
-            var paletteLookup = new Dictionary<uint, byte>();
-            int size = volume.Size;
-
-            var bounds = ComputeTransformedVoxelBounds(volume, options.AxisPreset);
-            int minX = bounds?.MinX ?? 0;
-            int minY = bounds?.MinY ?? 0;
-            int minZ = bounds?.MinZ ?? 0;
-            int sizeX = bounds?.SizeX ?? 1;
-            int sizeY = bounds?.SizeY ?? 1;
-            int sizeZ = bounds?.SizeZ ?? 1;
-
-            for (int z = 0; z < size; z++)
-            {
-                for (int y = 0; y < size; y++)
-                {
-                    for (int x = 0; x < size; x++)
-                    {
-                        if (!volume.IsOccupied(x, y, z))
-                            continue;
-
-                        var tc = TransformVoxelCoordinate(x, y, z, options.AxisPreset);
-
-                        uint color = GetRepresentativeVoxelColor(volume, x, y, z);
-                        byte paletteIndex = ResolveVoxPaletteIndex(color, palette, paletteLookup);
-                        voxels.Add((tc.X, tc.Y, tc.Z, paletteIndex));
-                    }
-                }
-            }
-            if (sizeX > 255 || sizeY > 255 || sizeZ > 255)
-            {
-                throw new InvalidOperationException(
-                    $"VOX export supports <=255 units per axis. Current transformed size is {sizeX}x{sizeY}x{sizeZ}.");
-            }
-
-            using var childrenStream = new MemoryStream();
-            using var childrenWriter = new BinaryWriter(childrenStream, Utf8NoBom, leaveOpen: true);
-
-            WriteChunk(childrenWriter, "SIZE", contentWriter =>
-            {
-                contentWriter.Write(sizeX);
-                contentWriter.Write(sizeY);
-                contentWriter.Write(sizeZ);
-            });
-
-            WriteChunk(childrenWriter, "XYZI", contentWriter =>
-            {
-                contentWriter.Write(voxels.Count);
-                for (int i = 0; i < voxels.Count; i++)
-                {
-                    var v = voxels[i];
-                    contentWriter.Write((byte)(v.X - minX));
-                    contentWriter.Write((byte)(v.Y - minY));
-                    contentWriter.Write((byte)(v.Z - minZ));
-                    contentWriter.Write(v.PaletteIndex);
-                }
-            });
-
-            WriteChunk(childrenWriter, "RGBA", contentWriter =>
-            {
-                for (int i = 0; i < 256; i++)
-                {
-                    uint rgba = i == 0 || i > palette.Count ? 0u : BgraToRgba(palette[i - 1]);
-                    contentWriter.Write((byte)(rgba & 0xFF));
-                    contentWriter.Write((byte)((rgba >> 8) & 0xFF));
-                    contentWriter.Write((byte)((rgba >> 16) & 0xFF));
-                    contentWriter.Write((byte)((rgba >> 24) & 0xFF));
-                }
-            });
-
-            byte[] childrenBytes = childrenStream.ToArray();
-            using var outStream = new MemoryStream(32 + childrenBytes.Length);
-            using var writer = new BinaryWriter(outStream, Utf8NoBom, leaveOpen: true);
-            writer.Write(Encoding.ASCII.GetBytes("VOX "));
-            writer.Write(150); // VOX version
-            writer.Write(Encoding.ASCII.GetBytes("MAIN"));
-            writer.Write(0); // main content size
-            writer.Write(childrenBytes.Length); // child chunks size
-            writer.Write(childrenBytes);
-
-            return outStream.ToArray();
-        }
-
-        private static TransformedVoxelBounds? ComputeTransformedVoxelBounds(VoxelVolume? volume, ModelAxisPreset axisPreset)
-        {
-            if (volume == null || volume.OccupiedCount <= 0)
-                return null;
-
-            int minX = int.MaxValue;
-            int minY = int.MaxValue;
-            int minZ = int.MaxValue;
-            int maxX = int.MinValue;
-            int maxY = int.MinValue;
-            int maxZ = int.MinValue;
-            int size = volume.Size;
-
-            for (int z = 0; z < size; z++)
-            {
-                for (int y = 0; y < size; y++)
-                {
-                    for (int x = 0; x < size; x++)
-                    {
-                        if (!volume.IsOccupied(x, y, z))
-                            continue;
-
-                        var tc = TransformVoxelCoordinate(x, y, z, axisPreset);
-                        if (tc.X < minX) minX = tc.X;
-                        if (tc.Y < minY) minY = tc.Y;
-                        if (tc.Z < minZ) minZ = tc.Z;
-                        if (tc.X > maxX) maxX = tc.X;
-                        if (tc.Y > maxY) maxY = tc.Y;
-                        if (tc.Z > maxZ) maxZ = tc.Z;
-                    }
-                }
-            }
-
-            if (minX == int.MaxValue)
-                return null;
-
-            return new TransformedVoxelBounds(minX, minY, minZ, maxX, maxY, maxZ);
-        }
-
-        private static void WriteChunk(BinaryWriter writer, string id, Action<BinaryWriter> writeContent)
-        {
-            using var contentStream = new MemoryStream();
-            using (var contentWriter = new BinaryWriter(contentStream, Utf8NoBom, leaveOpen: true))
-            {
-                writeContent(contentWriter);
-            }
-
-            byte[] contentBytes = contentStream.ToArray();
-            writer.Write(Encoding.ASCII.GetBytes(id));
-            writer.Write(contentBytes.Length);
-            writer.Write(0); // no nested children
-            writer.Write(contentBytes);
-        }
-
-        private static uint GetRepresentativeVoxelColor(VoxelVolume volume, int x, int y, int z)
-        {
-            int sumR = 0, sumG = 0, sumB = 0, count = 0;
-            foreach (Face face in Enum.GetValues(typeof(Face)))
-            {
-                var c = volume.GetFaceColor(x, y, z, face);
-                if (c.A == 0)
-                    continue;
-                sumR += c.R;
-                sumG += c.G;
-                sumB += c.B;
-                count++;
-            }
-
-            if (count <= 0)
-            {
-                var fallback = volume.GetFaceColor(x, y, z, Face.Front);
-                return ToBgra(fallback);
-            }
-
-            byte r = (byte)(sumR / count);
-            byte g = (byte)(sumG / count);
-            byte b = (byte)(sumB / count);
-            return (0xFFu << 24) | ((uint)r << 16) | ((uint)g << 8) | b;
-        }
-
-        private static byte ResolveVoxPaletteIndex(uint color, List<uint> palette, Dictionary<uint, byte> lookup)
-        {
-            if (lookup.TryGetValue(color, out byte existing))
-                return existing;
-
-            if (palette.Count < 255)
-            {
-                byte next = (byte)(palette.Count + 1);
-                palette.Add(color);
-                lookup[color] = next;
-                return next;
-            }
-
-            byte nearest = FindNearestPaletteIndex(color, palette);
-            lookup[color] = nearest;
-            return nearest;
-        }
-
-        private static byte FindNearestPaletteIndex(uint color, List<uint> palette)
-        {
-            int r = (int)((color >> 16) & 0xFF);
-            int g = (int)((color >> 8) & 0xFF);
-            int b = (int)(color & 0xFF);
-            int bestScore = int.MaxValue;
-            byte bestIndex = 1;
-
-            for (int i = 0; i < palette.Count; i++)
-            {
-                uint c = palette[i];
-                int dr = r - (int)((c >> 16) & 0xFF);
-                int dg = g - (int)((c >> 8) & 0xFF);
-                int db = b - (int)(c & 0xFF);
-                int score = (dr * dr) + (dg * dg) + (db * db);
-                if (score < bestScore)
-                {
-                    bestScore = score;
-                    bestIndex = (byte)(i + 1);
-                }
-            }
-
-            return bestIndex;
-        }
-
-        private static uint BgraToRgba(uint bgra)
-        {
-            byte b = (byte)(bgra & 0xFF);
-            byte g = (byte)((bgra >> 8) & 0xFF);
-            byte r = (byte)((bgra >> 16) & 0xFF);
-            byte a = (byte)((bgra >> 24) & 0xFF);
-            return ((uint)r) | ((uint)g << 8) | ((uint)b << 16) | ((uint)a << 24);
-        }
-
-        private static (int X, int Y, int Z) TransformVoxelCoordinate(int x, int y, int z, ModelAxisPreset axisPreset)
-            => axisPreset switch
-            {
-                ModelAxisPreset.BlenderZUp => (x, z, -y),
-                _ => (x, y, z),
-            };
-
-        private static List<ExportTriangle> BuildExportTriangles(VoxelVolume volume, VoxelModelExportOptions options)
-        {
-            int size = volume.Size;
-            var quads = BuildExportFaceQuads(volume, options.MeshMode);
-            var triangles = new List<ExportTriangle>(Math.Max(1, quads.Count * 2));
-
-            for (int i = 0; i < quads.Count; i++)
-            {
-                GetTransformedFaceVertices(quads[i], size, options, out var p0, out var p1, out var p2, out var p3);
-
-                var n = Vector3.Cross(p1 - p0, p2 - p0);
-                if (n.LengthSquared() <= 1e-12f)
-                    continue;
-                n = Vector3.Normalize(n);
-
-                triangles.Add(new ExportTriangle(p0, p1, p2, n, quads[i].ColorBgra));
-                triangles.Add(new ExportTriangle(p0, p2, p3, n, quads[i].ColorBgra));
-            }
-
-            return triangles;
-        }
-
-        private static void GetTransformedFaceVertices(
-            ExportFaceQuad faceQuad,
-            int volumeSize,
-            VoxelModelExportOptions options,
-            out Vector3 p0,
-            out Vector3 p1,
-            out Vector3 p2,
-            out Vector3 p3)
-        {
-            float unitScale = Math.Clamp(options.UnitScale, 0.0001f, 10000f);
-            Vector3 pivotOffset = GetModelPivotOffset(volumeSize, options.PivotPreset);
-
-            GetFaceQuadVertices(
-                faceQuad.Face,
-                faceQuad.X + pivotOffset.X,
-                faceQuad.Y + pivotOffset.Y,
-                faceQuad.Z + pivotOffset.Z,
-                faceQuad.Width,
-                faceQuad.Height,
-                out p0,
-                out p1,
-                out p2,
-                out p3);
-
-            p0 *= unitScale;
-            p1 *= unitScale;
-            p2 *= unitScale;
-            p3 *= unitScale;
-
-            p0 = TransformExportVertex(p0, options.AxisPreset);
-            p1 = TransformExportVertex(p1, options.AxisPreset);
-            p2 = TransformExportVertex(p2, options.AxisPreset);
-            p3 = TransformExportVertex(p3, options.AxisPreset);
-        }
-
-        private static List<ExportFaceQuad> BuildExportFaceQuads(VoxelVolume volume, ModelMeshMode mode)
-            => mode == ModelMeshMode.MergeCoplanar
-                ? BuildMergedExportFaceQuads(volume)
-                : BuildPerVoxelExportFaceQuads(volume);
-
-        private static List<ExportFaceQuad> BuildPerVoxelExportFaceQuads(VoxelVolume volume)
-        {
-            int size = volume.Size;
-            var quads = new List<ExportFaceQuad>(Math.Max(128, volume.OccupiedCount * 3));
-
-            for (int z = 0; z < size; z++)
-            {
-                for (int y = 0; y < size; y++)
-                {
-                    for (int x = 0; x < size; x++)
-                    {
-                        if (!volume.IsOccupied(x, y, z))
-                            continue;
-
-                        TryAddFace(Face.Front, x, y, z, 0, 0, -1);
-                        TryAddFace(Face.Back, x, y, z, 0, 0, 1);
-                        TryAddFace(Face.Left, x, y, z, -1, 0, 0);
-                        TryAddFace(Face.Right, x, y, z, 1, 0, 0);
-                        TryAddFace(Face.Top, x, y, z, 0, 1, 0);
-                        TryAddFace(Face.Bottom, x, y, z, 0, -1, 0);
-                    }
-                }
-            }
-
-            return quads;
-
-            void TryAddFace(Face face, int x, int y, int z, int nx, int ny, int nz)
-            {
-                if (volume.IsOccupied(x + nx, y + ny, z + nz))
-                    return;
-                quads.Add(new ExportFaceQuad(face, x, y, z, 1, 1, ToBgra(volume.GetFaceColor(x, y, z, face))));
-            }
-        }
-
-        private static List<ExportFaceQuad> BuildMergedExportFaceQuads(VoxelVolume volume)
-        {
-            int size = volume.Size;
-            var quads = new List<ExportFaceQuad>(Math.Max(64, volume.OccupiedCount));
-
-            // Front/back faces (planes across Z; merged over X/Y).
-            for (int z = 0; z < size; z++)
-            {
-                BuildPlaneQuads(
-                    width: size,
-                    height: size,
-                    tryGetColor: (int u, int v, out uint color) =>
-                    {
-                        int x = u;
-                        int y = v;
-                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y, z - 1))
-                        {
-                            color = 0;
-                            return false;
-                        }
-
-                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Front));
-                        return true;
-                    },
-                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Front, u, v, z, w, h, color)));
-
-                BuildPlaneQuads(
-                    width: size,
-                    height: size,
-                    tryGetColor: (int u, int v, out uint color) =>
-                    {
-                        int x = u;
-                        int y = v;
-                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y, z + 1))
-                        {
-                            color = 0;
-                            return false;
-                        }
-
-                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Back));
-                        return true;
-                    },
-                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Back, u, v, z, w, h, color)));
-            }
-
-            // Left/right faces (planes across X; merged over Z/Y).
-            for (int x = 0; x < size; x++)
-            {
-                BuildPlaneQuads(
-                    width: size,
-                    height: size,
-                    tryGetColor: (int u, int v, out uint color) =>
-                    {
-                        int z = u;
-                        int y = v;
-                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x - 1, y, z))
-                        {
-                            color = 0;
-                            return false;
-                        }
-
-                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Left));
-                        return true;
-                    },
-                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Left, x, v, u, w, h, color)));
-
-                BuildPlaneQuads(
-                    width: size,
-                    height: size,
-                    tryGetColor: (int u, int v, out uint color) =>
-                    {
-                        int z = u;
-                        int y = v;
-                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x + 1, y, z))
-                        {
-                            color = 0;
-                            return false;
-                        }
-
-                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Right));
-                        return true;
-                    },
-                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Right, x, v, u, w, h, color)));
-            }
-
-            // Top/bottom faces (planes across Y; merged over X/Z).
-            for (int y = 0; y < size; y++)
-            {
-                BuildPlaneQuads(
-                    width: size,
-                    height: size,
-                    tryGetColor: (int u, int v, out uint color) =>
-                    {
-                        int x = u;
-                        int z = v;
-                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y + 1, z))
-                        {
-                            color = 0;
-                            return false;
-                        }
-
-                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Top));
-                        return true;
-                    },
-                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Top, u, y, v, w, h, color)));
-
-                BuildPlaneQuads(
-                    width: size,
-                    height: size,
-                    tryGetColor: (int u, int v, out uint color) =>
-                    {
-                        int x = u;
-                        int z = v;
-                        if (!volume.IsOccupied(x, y, z) || volume.IsOccupied(x, y - 1, z))
-                        {
-                            color = 0;
-                            return false;
-                        }
-
-                        color = ToBgra(volume.GetFaceColor(x, y, z, Face.Bottom));
-                        return true;
-                    },
-                    emit: (u, v, w, h, color) => quads.Add(new ExportFaceQuad(Face.Bottom, u, y, v, w, h, color)));
-            }
-
-            return quads;
-        }
-
-        private static void BuildPlaneQuads(
-            int width,
-            int height,
-            TryGetPlaneColor tryGetColor,
-            Action<int, int, int, int, uint> emit)
-        {
-            var colors = new uint[width * height];
-            var mask = new bool[width * height];
-
-            for (int v = 0; v < height; v++)
-            {
-                for (int u = 0; u < width; u++)
-                {
-                    int idx = (v * width) + u;
-                    if (!tryGetColor(u, v, out uint color))
-                        continue;
-                    mask[idx] = true;
-                    colors[idx] = color;
-                }
-            }
-
-            var visited = new bool[width * height];
-            for (int v = 0; v < height; v++)
-            {
-                for (int u = 0; u < width; u++)
-                {
-                    int idx = (v * width) + u;
-                    if (!mask[idx] || visited[idx])
-                        continue;
-
-                    uint color = colors[idx];
-                    int quadW = 1;
-                    while ((u + quadW) < width)
-                    {
-                        int n = (v * width) + (u + quadW);
-                        if (!mask[n] || visited[n] || colors[n] != color)
-                            break;
-                        quadW++;
-                    }
-
-                    int quadH = 1;
-                    while ((v + quadH) < height)
-                    {
-                        bool rowOk = true;
-                        for (int ux = 0; ux < quadW; ux++)
-                        {
-                            int n = ((v + quadH) * width) + (u + ux);
-                            if (!mask[n] || visited[n] || colors[n] != color)
-                            {
-                                rowOk = false;
-                                break;
-                            }
-                        }
-
-                        if (!rowOk)
-                            break;
-                        quadH++;
-                    }
-
-                    for (int vy = 0; vy < quadH; vy++)
-                    {
-                        for (int ux = 0; ux < quadW; ux++)
-                        {
-                            visited[((v + vy) * width) + (u + ux)] = true;
-                        }
-                    }
-
-                    emit(u, v, quadW, quadH, color);
-                }
-            }
-        }
-
-        private static uint ToBgra(Rgba32 c)
-            => ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
-
-        private static string EncodeObjPathToken(string fileName)
-            => (fileName ?? string.Empty)
-                .Replace('\\', '/')
-                .Replace(" ", "\\ ");
-
-        private static Vector3 GetModelPivotOffset(int size, ModelPivotPreset pivotPreset)
-        {
-            float half = MathF.Max(1f, size) * 0.5f;
-            return pivotPreset switch
-            {
-                ModelPivotPreset.BottomCenter => new Vector3(-half, 0f, -half),
-                ModelPivotPreset.Origin => Vector3.Zero,
-                _ => new Vector3(-half, -half, -half),
-            };
-        }
-
-        private static Vector3 TransformExportVertex(Vector3 p, ModelAxisPreset axisPreset)
-            => axisPreset switch
-            {
-                ModelAxisPreset.BlenderZUp => new Vector3(p.X, p.Z, -p.Y),
-                _ => p,
-            };
-
-        private static void AppendVertex(StringBuilder sb, Vector3 p)
-        {
-            sb.Append("v ")
-              .Append(p.X.ToString("0.######", CultureInfo.InvariantCulture)).Append(' ')
-              .Append(p.Y.ToString("0.######", CultureInfo.InvariantCulture)).Append(' ')
-              .Append(p.Z.ToString("0.######", CultureInfo.InvariantCulture)).AppendLine();
-        }
-
-        private static void AppendUv(StringBuilder sb, float u, float v)
-        {
-            sb.Append("vt ")
-              .Append(u.ToString("0.######", CultureInfo.InvariantCulture)).Append(' ')
-              .Append(v.ToString("0.######", CultureInfo.InvariantCulture)).AppendLine();
-        }
-
-        private static void GetFaceQuadVertices(
-            Face face,
-            float x,
-            float y,
-            float z,
-            int width,
-            int height,
-            out Vector3 p0,
-            out Vector3 p1,
-            out Vector3 p2,
-            out Vector3 p3)
-        {
-            // Local voxel corners in [0,1] space; matches renderer face orientation.
-            width = Math.Max(1, width);
-            height = Math.Max(1, height);
-            float w = width;
-            float h = height;
-
-            switch (face)
-            {
-                case Face.Back:
-                    p0 = new Vector3(x + 0f, y + 0f, z + 1f);
-                    p1 = new Vector3(x + w, y + 0f, z + 1f);
-                    p2 = new Vector3(x + w, y + h, z + 1f);
-                    p3 = new Vector3(x + 0f, y + h, z + 1f);
-                    break;
-                case Face.Front:
-                    p0 = new Vector3(x + w, y + 0f, z + 0f);
-                    p1 = new Vector3(x + 0f, y + 0f, z + 0f);
-                    p2 = new Vector3(x + 0f, y + h, z + 0f);
-                    p3 = new Vector3(x + w, y + h, z + 0f);
-                    break;
-                case Face.Left:
-                    p0 = new Vector3(x + 0f, y + 0f, z + 0f);
-                    p1 = new Vector3(x + 0f, y + 0f, z + w);
-                    p2 = new Vector3(x + 0f, y + h, z + w);
-                    p3 = new Vector3(x + 0f, y + h, z + 0f);
-                    break;
-                case Face.Right:
-                    p0 = new Vector3(x + 1f, y + 0f, z + w);
-                    p1 = new Vector3(x + 1f, y + 0f, z + 0f);
-                    p2 = new Vector3(x + 1f, y + h, z + 0f);
-                    p3 = new Vector3(x + 1f, y + h, z + w);
-                    break;
-                case Face.Top:
-                    p0 = new Vector3(x + 0f, y + 1f, z + h);
-                    p1 = new Vector3(x + w, y + 1f, z + h);
-                    p2 = new Vector3(x + w, y + 1f, z + 0f);
-                    p3 = new Vector3(x + 0f, y + 1f, z + 0f);
-                    break;
-                default:
-                    p0 = new Vector3(x + 0f, y + 0f, z + 0f);
-                    p1 = new Vector3(x + w, y + 0f, z + 0f);
-                    p2 = new Vector3(x + w, y + 0f, z + h);
-                    p3 = new Vector3(x + 0f, y + 0f, z + h);
-                    break;
-            }
-        }
-
-        private static void TrimTransparentBoundsBgra(
-            byte[] source,
-            int sourceWidth,
-            int sourceHeight,
-            int padding,
-            out byte[] trimmed,
-            out int trimmedWidth,
-            out int trimmedHeight)
-        {
-            trimmed = Array.Empty<byte>();
-            trimmedWidth = 1;
-            trimmedHeight = 1;
-
-            if (source == null || sourceWidth <= 0 || sourceHeight <= 0 || source.Length < sourceWidth * sourceHeight * 4)
-            {
-                trimmed = new byte[4];
-                return;
-            }
-
-            int minX = sourceWidth;
-            int minY = sourceHeight;
-            int maxX = -1;
-            int maxY = -1;
-
-            for (int y = 0; y < sourceHeight; y++)
-            {
-                int row = y * sourceWidth;
-                for (int x = 0; x < sourceWidth; x++)
-                {
-                    int a = source[((row + x) * 4) + 3];
-                    if (a == 0)
-                        continue;
-
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                }
-            }
-
-            if (maxX < minX || maxY < minY)
-            {
-                trimmed = new byte[4];
-                return;
-            }
-
-            padding = Math.Clamp(padding, 0, 128);
-            minX = Math.Max(0, minX - padding);
-            minY = Math.Max(0, minY - padding);
-            maxX = Math.Min(sourceWidth - 1, maxX + padding);
-            maxY = Math.Min(sourceHeight - 1, maxY + padding);
-
-            trimmedWidth = Math.Max(1, (maxX - minX) + 1);
-            trimmedHeight = Math.Max(1, (maxY - minY) + 1);
-            trimmed = new byte[trimmedWidth * trimmedHeight * 4];
-
-            for (int y = 0; y < trimmedHeight; y++)
-            {
-                int srcY = minY + y;
-                int srcOffset = ((srcY * sourceWidth) + minX) * 4;
-                int dstOffset = y * trimmedWidth * 4;
-                Buffer.BlockCopy(source, srcOffset, trimmed, dstOffset, trimmedWidth * 4);
-            }
-        }
-
-        private static async Task<byte[]> EncodeBgraPngBytesAsync(
-            int width,
-            int height,
-            byte[] pixels,
-            bool transparentBackground)
-        {
-            try
-            {
-                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-                var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
-                    Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId,
-                    stream);
-
-                encoder.SetPixelData(
-                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                    transparentBackground
-                        ? Windows.Graphics.Imaging.BitmapAlphaMode.Straight
-                        : Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
-                    (uint)Math.Max(1, width),
-                    (uint)Math.Max(1, height),
-                    96,
-                    96,
-                    pixels ?? Array.Empty<byte>());
-
-                await encoder.FlushAsync();
-                stream.Seek(0);
-
-                using var ms = new MemoryStream();
-                using var src = stream.AsStreamForRead();
-                await src.CopyToAsync(ms);
-                return ms.ToArray();
-            }
-            catch (NotImplementedException)
-            {
-                return await Task.Run(() =>
-                    SkiaImageEncoder.EncodeToBytes(
-                        pixels ?? Array.Empty<byte>(),
-                        Math.Max(1, width),
-                        Math.Max(1, height),
-                        SkiaImageEncoder.ImageFormat.Png));
-            }
-        }
-
-        private static async Task SaveBgraPngAsync(
-            string filePath,
-            int width,
-            int height,
-            byte[] pixels,
-            bool transparentBackground)
-        {
-            if (!System.IO.File.Exists(filePath))
-            {
-                await System.IO.File.WriteAllBytesAsync(filePath, Array.Empty<byte>());
-            }
-
-            try
-            {
-                var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(filePath);
-                using var stream = await storageFile.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite);
-                var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
-                    Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, stream);
-
-                encoder.SetPixelData(
-                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                    transparentBackground
-                        ? Windows.Graphics.Imaging.BitmapAlphaMode.Straight
-                        : Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
-                    (uint)Math.Max(1, width), (uint)Math.Max(1, height),
-                    96, 96,
-                    pixels);
-
-                await encoder.FlushAsync();
-            }
-            catch (NotImplementedException)
-            {
-                await Task.Run(() =>
-                    SkiaImageEncoder.Encode(
-                        pixels,
-                        Math.Max(1, width),
-                        Math.Max(1, height),
-                        filePath,
-                        SkiaImageEncoder.ImageFormat.Png));
-            }
-        }
-
-        private static async Task SaveBgraTextureToPngAsync(string filePath, int width, int height, byte[] pixels)
-            => await SaveBgraPngAsync(filePath, width, height, pixels, transparentBackground: false);
-
-        private readonly record struct ObjExportData(
-            string ObjText,
-            string MtlText,
-            int TextureWidth,
-            int TextureHeight,
-            byte[] TexturePixelsBgra);
 
         // ════════════════════════════════════════════════════════════════════
         // TILE PICKER ITEM

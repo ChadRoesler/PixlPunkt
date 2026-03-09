@@ -80,8 +80,6 @@ namespace PixlPunkt.UI.Tiles
         // ====================================================================
 
         private readonly PatternBackgroundService _pattern = new();
-        private SKShader? _checkerboardShader;
-        private SKBitmap? _checkerboardBitmap;
 
         // ====================================================================
         // CONSTRUCTION
@@ -137,9 +135,7 @@ namespace PixlPunkt.UI.Tiles
             // Auto-commit changes on close (no history needed - already tracked)
             CommitToTileSet();
 
-            // Dispose SkiaSharp resources
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
+            // Dispose SkiaSharp resources (shader cache managed by TransparencyPatternShader)
         }
 
         private void Root_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -164,7 +160,7 @@ namespace PixlPunkt.UI.Tiles
         {
             ApplyStripeColors();
             _pattern.Invalidate();
-            InvalidateCheckerboardCache();
+            Rendering.TransparencyPatternShader.InvalidateAll();
             TessellationCanvas?.Invalidate();
         }
 
@@ -185,14 +181,6 @@ namespace PixlPunkt.UI.Tiles
                 _pattern.LightColor = light;
                 _pattern.DarkColor = dark;
             }
-        }
-
-        private void InvalidateCheckerboardCache()
-        {
-            _checkerboardShader?.Dispose();
-            _checkerboardShader = null;
-            _checkerboardBitmap?.Dispose();
-            _checkerboardBitmap = null;
         }
 
         // ====================================================================
@@ -680,13 +668,15 @@ namespace PixlPunkt.UI.Tiles
             int canvasWidth = _tileWidth * _gridSize * _zoom;
             int canvasHeight = _tileHeight * _gridSize * _zoom;
 
-            // Draw transparency checkerboard background
+            // Draw transparency background
             var (lightColor, darkColor) = _pattern.CurrentScheme;
-            EnsureCheckerboardShader(8, lightColor, darkColor);
+            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
+            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
+            var bgShader = Rendering.TransparencyPatternShader.GetShader(4, skLight, skDark);
 
-            if (_checkerboardShader != null)
+            if (bgShader != null)
             {
-                using var bgPaint = new SKPaint { Shader = _checkerboardShader, IsAntialias = false };
+                using var bgPaint = new SKPaint { Shader = bgShader, IsAntialias = false };
                 canvas.DrawRect(0, 0, canvasWidth, canvasHeight, bgPaint);
             }
 
@@ -753,35 +743,6 @@ namespace PixlPunkt.UI.Tiles
             {
                 DrawBrushCursor(canvas);
             }
-        }
-
-        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
-        {
-            if (_checkerboardBitmap != null && _checkerboardShader != null)
-                return;
-
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
-
-            int tileSize = squareSize * 2;
-            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
-            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
-
-            for (int y = 0; y < tileSize; y++)
-            {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    int cx = x / squareSize;
-                    int cy = y / squareSize;
-                    bool isLight = ((cx + cy) & 1) == 0;
-                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
-                }
-            }
-
-            using var image = SKImage.FromBitmap(_checkerboardBitmap);
-            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
         }
 
         private void DrawBrushCursor(SKCanvas canvas)

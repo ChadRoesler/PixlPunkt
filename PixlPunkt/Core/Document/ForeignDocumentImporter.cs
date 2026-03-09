@@ -51,6 +51,48 @@ namespace PixlPunkt.Core.Document
     public static class ForeignDocumentImporter
     {
         // ──────────────────────────────────────────────────────────────────
+        // SHARED HELPERS
+        // ──────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Creates a <see cref="CanvasDocument"/> with a single named raster layer,
+        /// removing the default layer that <see cref="CanvasDocument"/> creates automatically.
+        /// </summary>
+        private static (CanvasDocument Doc, RasterLayer Layer) CreateSingleLayerDocument(
+            string name,
+            int width,
+            int height,
+            SizeInt32 tileSize,
+            SizeInt32 tileCounts,
+            string layerName)
+        {
+            var doc = new CanvasDocument(name, width, height, tileSize, tileCounts);
+
+#pragma warning disable IDE0150 // Prefer 'null' check over type check
+            if (doc.Layers.Count == 1 && doc.Layers[0] is RasterLayer)
+                doc.RemoveLayer(0);
+#pragma warning restore IDE0150
+
+            int idx = doc.AddLayer(layerName);
+            if (doc.Layers[idx] is not RasterLayer rl)
+                throw new InvalidDataException($"Failed to create RasterLayer for {layerName} import.");
+
+            return (doc, rl);
+        }
+
+        /// <summary>
+        /// Applies standard finalization to an imported layer and composites the document.
+        /// </summary>
+        private static void FinalizeImportedLayer(CanvasDocument doc, RasterLayer layer, BlendMode blend = BlendMode.Normal)
+        {
+            layer.Visible = true;
+            layer.Opacity = 255;
+            layer.Blend = blend;
+            layer.UpdatePreview();
+            doc.CompositeTo(doc.Surface);
+        }
+
+        // ──────────────────────────────────────────────────────────────────
         // PUBLIC DISPATCH
         // ──────────────────────────────────────────────────────────────────
 
@@ -1134,29 +1176,14 @@ namespace PixlPunkt.Core.Document
             int tilesX = columns > 0 ? columns : Math.Max(1, width / tileWidth);
             int tilesY = tileCount > 0 && columns > 0 ? (tileCount + columns - 1) / columns : Math.Max(1, height / tileHeight);
 
-            var canvasDoc = new CanvasDocument(
-                name,
-                width,
-                height,
+            var (canvasDoc, rl) = CreateSingleLayerDocument(
+                name, width, height,
                 CreateSize(tileWidth, tileHeight),
-                CreateSize(tilesX, tilesY));
-
-            // Remove default layer and add our tileset layer
-#pragma warning disable IDE0150 // Prefer 'null' check over type check
-            if (canvasDoc.Layers.Count == 1 && canvasDoc.Layers[0] is RasterLayer)
-                canvasDoc.RemoveLayer(0);
-#pragma warning restore IDE0150 // Prefer 'null' check over type check
-
-            int layerIdx = canvasDoc.AddLayer("Tileset");
-            if (canvasDoc.Layers[layerIdx] is not RasterLayer rl)
-                throw new InvalidDataException("Failed to create RasterLayer for TSX import.");
+                CreateSize(tilesX, tilesY),
+                "Tileset");
 
             CopyBgraToSurface(imagePixels, width, height, rl.Surface);
-            rl.Visible = true;
-            rl.Opacity = 255;
-            rl.UpdatePreview();
-
-            canvasDoc.CompositeTo(canvasDoc.Surface);
+            FinalizeImportedLayer(canvasDoc, rl);
             LoggingService.Info("TSX import complete for {FilePath}", filePath);
             return canvasDoc;
         }
@@ -1197,29 +1224,14 @@ namespace PixlPunkt.Core.Document
 
             string name = Path.GetFileNameWithoutExtension(filePath);
 
-            var doc = new CanvasDocument(
-                name,
-                width,
-                height,
+            var (doc, rl) = CreateSingleLayerDocument(
+                name, width, height,
                 CreateSize(tileW, tileH),
-                CreateSize(tilesX, tilesY));
-
-#pragma warning disable IDE0150 // Prefer 'null' check over type check
-            if (doc.Layers.Count == 1 && doc.Layers[0] is RasterLayer)
-                doc.RemoveLayer(0);
-#pragma warning restore IDE0150 // Prefer 'null' check over type check
-
-            int layerIndex = doc.AddLayer("Icon");
-            if (doc.Layers[layerIndex] is not RasterLayer rl)
-                throw new InvalidDataException("Failed to create RasterLayer for icon import.");
+                CreateSize(tilesX, tilesY),
+                "Icon");
 
             CopyBitmapToSurface(srcBmp, rl.Surface);
-            rl.Visible = true;
-            rl.Opacity = 255;
-            rl.Blend = BlendMode.Normal;
-            rl.UpdatePreview();
-
-            doc.CompositeTo(doc.Surface);
+            FinalizeImportedLayer(doc, rl);
             return doc;
         }
 
@@ -1292,29 +1304,14 @@ namespace PixlPunkt.Core.Document
 
             string name = Path.GetFileNameWithoutExtension(filePath);
 
-            var doc = new CanvasDocument(
-                name,
-                width,
-                height,
+            var (doc, rl) = CreateSingleLayerDocument(
+                name, width, height,
                 CreateSize(tileW, tileH),
-                CreateSize(tilesX, tilesY));
-
-#pragma warning disable IDE0150 // Prefer 'null' check over type check
-            if (doc.Layers.Count == 1 && doc.Layers[0] is RasterLayer)
-                doc.RemoveLayer(0);
-#pragma warning restore IDE0150 // Prefer 'null' check over type check
-
-            int layerIndex = doc.AddLayer("Cursor");
-            if (doc.Layers[layerIndex] is not RasterLayer rl)
-                throw new InvalidDataException("Failed to create RasterLayer for cursor import.");
+                CreateSize(tilesX, tilesY),
+                "Cursor");
 
             CopyBitmapToSurface(srcBmp, rl.Surface);
-            rl.Visible = true;
-            rl.Opacity = 255;
-            rl.Blend = BlendMode.Normal;
-            rl.UpdatePreview();
-
-            doc.CompositeTo(doc.Surface);
+            FinalizeImportedLayer(doc, rl);
             return doc;
         }
 

@@ -21,14 +21,14 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- 
-    Pass through SkiaOnly/WinAppSdkOnly/DesktopOnly properties to the referenced project.
+  <!--
+    Pass through SkiaOnly/WinAppSdkOnly properties to the referenced project.
     This ensures that when building/testing on CI runners without mobile workloads,
     we don't try to restore Android/iOS target frameworks.
   -->
   <ItemGroup>
     <ProjectReference Include="..\PixlPunkt\PixlPunkt.csproj">
-      <AdditionalProperties>SkiaOnly=$(SkiaOnly);WinAppSdkOnly=$(WinAppSdkOnly);DesktopOnly=$(DesktopOnly)</AdditionalProperties>
+      <AdditionalProperties>SkiaOnly=$(SkiaOnly);WinAppSdkOnly=$(WinAppSdkOnly)</AdditionalProperties>
     </ProjectReference>
   </ItemGroup>
 </Project>

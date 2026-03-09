@@ -1,26 +1,22 @@
 <Project Sdk="Uno.Sdk">
   <!-- ═══════════════════════════════════════════════════════════════════════
        TARGET FRAMEWORKS
-       
+
        For CI builds that don't have mobile workloads installed, pass:
-         -p:DesktopOnly=true     (builds desktop + windows + wasm)
          -p:SkiaOnly=true        (builds only net10.0-desktop)
          -p:WinAppSdkOnly=true   (builds only net10.0-windows10.0.26100)
          -p:WithAndroid=true     (includes Android - requires UnoIcon SVGs)
   ═══════════════════════════════════════════════════════════════════════ -->
   <PropertyGroup>
     <!-- Default: desktop-first targets (Windows + Skia desktop + shared net10.0) -->
-    <TargetFrameworks Condition="'$(DesktopOnly)' != 'true' and '$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true' and '$(WithAndroid)' != 'true'">net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
-    
+    <TargetFrameworks Condition="'$(SkiaOnly)' != 'true' and '$(WinAppSdkOnly)' != 'true' and '$(WithAndroid)' != 'true'">net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
+
     <!-- WithAndroid: includes Android (requires UnoIcon with proper SVG files) -->
     <TargetFrameworks Condition="'$(WithAndroid)' == 'true'">net10.0-android;net10.0-ios;net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
-    
-    <!-- DesktopOnly: excludes Android and iOS -->
-    <TargetFrameworks Condition="'$(DesktopOnly)' == 'true'">net10.0-windows10.0.26100;net10.0-desktop;net10.0</TargetFrameworks>
-    
+
     <!-- SkiaOnly: only Skia Desktop (for Linux/macOS CI) -->
     <TargetFrameworks Condition="'$(SkiaOnly)' == 'true'">net10.0-desktop</TargetFrameworks>
-    
+
     <!-- WinAppSdkOnly: only WinAppSdk (for Windows native builds) -->
     <TargetFrameworks Condition="'$(WinAppSdkOnly)' == 'true'">net10.0-windows10.0.26100</TargetFrameworks>
   </PropertyGroup>
@@ -68,6 +64,10 @@
     </UnoFeatures>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="PixlPunkt.Tests" />
+  </ItemGroup>
+
   <!-- ═══════════════════════════════════════════════════════════════════════
        BUILD CONFIGURATION
   ═══════════════════════════════════════════════════════════════════════ -->
@@ -76,8 +76,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DocumentationFile>$(OutputPath)PixlPunkt.xml</DocumentationFile>
     
-    <!-- Suppress warnings -->
-    <NoWarn>$(NoWarn);CS1591;CS0169;CS0414;CS0649;CS0067;CS0618;CS0253;CS8601;CS8604;CS8629;WMC1506</NoWarn>
+    <!-- Suppress warnings: CS1591=missing XML docs (GenerateDocumentationFile is on), WMC1506=Uno analyzer -->
+    <NoWarn>$(NoWarn);CS1591;WMC1506</NoWarn>
     
     <!-- Publishing - disabled by default, enable per-platform where supported -->
     <PublishReadyToRun>False</PublishReadyToRun>

@@ -5730,6 +5730,17 @@
             Each thread gets its own scratch buffer to ensure thread safety.
             </summary>
         </member>
+        <member name="F:PixlPunkt.Core.Compositing.Helpers.Compositor._fxSnapshot">
+            <summary>
+            Thread-local snapshot buffer for effects that need read-before-write.
+            Rented from ArrayPool and reused across compositing calls to avoid per-effect allocations.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.Compositing.Helpers.Compositor._fxSnapshotSize">
+            <summary>
+            Tracks the size of the currently rented <see cref="F:PixlPunkt.Core.Compositing.Helpers.Compositor._fxSnapshot"/> buffer.
+            </summary>
+        </member>
         <member name="F:PixlPunkt.Core.Compositing.Helpers.Compositor.ByteToFloat">
             <summary>
             Precomputed lookup table for byte to normalized float conversion (0-255 → 0.0-1.0).
@@ -6669,6 +6680,17 @@
             </remarks>
             <seealso cref="T:PixlPunkt.Core.Document.CanvasDocument"/>
             <seealso cref="T:PixlPunkt.Core.Document.DocumentIO"/>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.ForeignDocumentImporter.CreateSingleLayerDocument(System.String,System.Int32,System.Int32,Windows.Graphics.SizeInt32,Windows.Graphics.SizeInt32,System.String)">
+            <summary>
+            Creates a <see cref="T:PixlPunkt.Core.Document.CanvasDocument"/> with a single named raster layer,
+            removing the default layer that <see cref="T:PixlPunkt.Core.Document.CanvasDocument"/> creates automatically.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.ForeignDocumentImporter.FinalizeImportedLayer(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Document.Layer.RasterLayer,PixlPunkt.Core.Enums.BlendMode)">
+            <summary>
+            Applies standard finalization to an imported layer and composites the document.
+            </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.ForeignDocumentImporter.ImportFromFile(System.String)">
             <summary>
@@ -28190,126 +28212,6 @@
             getting the corresponding pixel coordinate for editing operations.
             </remarks>
         </member>
-        <member name="T:PixlPunkt.Core.Voxel.ArcballCamera">
-            <summary>
-            Arcball camera for free rotation around a 3D voxel object.
-            </summary>
-            <remarks>
-            <para>
-            Implements Ken Shoemake's arcball rotation model. The user conceptually
-            grabs a virtual sphere surrounding the object — dragging maps to a
-            rotation quaternion with no gimbal lock or axis constraints.
-            </para>
-            <para>
-            Usage: call <see cref="M:PixlPunkt.Core.Voxel.ArcballCamera.BeginDrag(System.Single,System.Single)"/> on pointer down, <see cref="M:PixlPunkt.Core.Voxel.ArcballCamera.UpdateDrag(System.Single,System.Single)"/>
-            on pointer move, and <see cref="M:PixlPunkt.Core.Voxel.ArcballCamera.EndDrag"/> on pointer up. The resulting
-            <see cref="P:PixlPunkt.Core.Voxel.ArcballCamera.ViewMatrix"/> transforms world-space geometry for rendering.
-            </para>
-            <para>
-            All coordinates use the <c>System.Numerics</c> right-hand coordinate system.
-            The default view looks from +Z toward the origin.
-            </para>
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.Core.Voxel.ArcballCamera.Distance">
-            <summary>
-            Distance from the camera to the object center.
-            Controls zoom level.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.Voxel.ArcballCamera.MinDistance">
-            <summary>
-            Minimum zoom distance.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.Voxel.ArcballCamera.MaxDistance">
-            <summary>
-            Maximum zoom distance.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.Voxel.ArcballCamera.Rotation">
-            <summary>
-            Gets the current rotation as a quaternion.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.Voxel.ArcballCamera.IsDragging">
-            <summary>
-            Gets whether a drag operation is in progress.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.Voxel.ArcballCamera.ViewMatrix">
-            <summary>
-            Computes the view matrix for rendering.
-            </summary>
-            <remarks>
-            The camera orbits around the origin at <see cref="P:PixlPunkt.Core.Voxel.ArcballCamera.Distance"/>,
-            always looking at (0, 0, 0). The default (identity rotation) position
-            is at (0, 0, <see cref="P:PixlPunkt.Core.Voxel.ArcballCamera.Distance"/>) looking toward −Z.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.GetViewProjection(System.Single,System.Single,System.Single,System.Single)">
-            <summary>
-            Computes a combined view-projection matrix for a perspective camera.
-            </summary>
-            <param name="aspectRatio">Viewport width / height.</param>
-            <param name="fovRadians">Vertical field of view in radians. Default is 45°.</param>
-            <param name="nearPlane">Near clipping plane distance.</param>
-            <param name="farPlane">Far clipping plane distance.</param>
-            <returns>Combined view × projection matrix.</returns>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.BeginDrag(System.Single,System.Single)">
-            <summary>
-            Begins a drag rotation from normalized viewport coordinates.
-            </summary>
-            <param name="viewportX">X in [−1, 1] range (left to right).</param>
-            <param name="viewportY">Y in [−1, 1] range (bottom to top).</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.UpdateDrag(System.Single,System.Single)">
-            <summary>
-            Updates the rotation during a drag operation.
-            </summary>
-            <param name="viewportX">Current X in [−1, 1].</param>
-            <param name="viewportY">Current Y in [−1, 1].</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.EndDrag">
-            <summary>
-            Ends the drag operation, locking in the current rotation.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.Zoom(System.Single,System.Single)">
-            <summary>
-            Adjusts zoom distance by a scroll delta.
-            </summary>
-            <param name="delta">Positive = zoom in, negative = zoom out.</param>
-            <param name="sensitivity">Zoom speed multiplier.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.Reset">
-            <summary>
-            Resets rotation to the default front-facing view and default zoom.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.SetView(PixlPunkt.Core.Voxel.PresetView)">
-            <summary>
-            Snaps to a preset orthographic view angle.
-            </summary>
-            <param name="view">The preset view direction.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.MapToSphere(System.Single,System.Single)">
-            <summary>
-            Maps 2D viewport coordinates to a point on the virtual arcball sphere.
-            </summary>
-            <remarks>
-            Points inside the sphere project directly onto its surface.
-            Points outside the sphere (near viewport edges) are projected onto the
-            equator, providing smooth rotation even when dragging beyond the boundary.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Voxel.ArcballCamera.RotationBetween(System.Numerics.Vector3,System.Numerics.Vector3)">
-            <summary>
-            Computes the shortest rotation quaternion that maps vector
-            <paramref name="from"/> to vector <paramref name="to"/> on the unit sphere.
-            </summary>
-        </member>
         <member name="T:PixlPunkt.Core.Voxel.ColoredQuad">
             <summary>
             A flat-colored quad in 3D space, representing one visible face of a voxel.
@@ -30358,7 +30260,7 @@
             - Background/surface rendering
             - Grid overlays (pixel, tile)
             - Guide overlays
-            - Checkerboard pattern management
+            - Transparency pattern management
             </summary>
             <summary>
             Ruler and guide management for CanvasViewHost.
@@ -30904,8 +30806,8 @@
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._tileAnimBgPaint">
             <summary>Cached paint for tile animation background.</summary>
         </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._checkerboardPaint">
-            <summary>Cached paint for checkerboard rendering - reused to avoid per-frame allocation.</summary>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._transparencyPaint">
+            <summary>Cached paint for transparency pattern rendering - reused to avoid per-frame allocation.</summary>
         </member>
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._cachedFramePositions">
             <summary>Cached dictionary for tile animation frame positions.</summary>
@@ -30921,16 +30823,6 @@
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._cachedMaskOverlayBuffer">
             <summary>
             Cached buffer for mask overlay rendering to avoid per-frame allocation.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.EnsureCheckerboardShader(System.Int32,Windows.UI.Color,Windows.UI.Color)">
-            <summary>
-            Ensures the checkerboard shader is created and up to date.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.InvalidateCheckerboardCache">
-            <summary>
-            Invalidates the checkerboard pattern cache (call when theme changes).
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.DrawTileAnimationLabel(PixlPunkt.Core.Rendering.ICanvasRenderer,System.Single,System.Single,System.Single,System.Collections.Generic.List{System.Int32},System.Boolean)">
@@ -31429,12 +31321,6 @@
             <summary>
             Symmetry service for live stroke mirroring.
             </summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._checkerboardShader">
-            <summary>Cached checkerboard pattern shader for transparency background.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._checkerboardBitmap">
-            <summary>Cached checkerboard pattern bitmap.</summary>
         </member>
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._isActivePainting">
             <summary>
@@ -32200,7 +32086,7 @@
             <summary>Marching ants gap length.</summary>
         </member>
         <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ANTS_SPEED">
-            <summary>Marching ants animation speed (pixels per frame).</summary>
+            <summary>Marching ants animation speed (pixels per second).</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Active">
             <summary>Gets or sets whether a selection is active.</summary>
@@ -32340,6 +32226,9 @@
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.AntsPhase">
             <summary>Gets or sets the marching ants animation phase.</summary>
         </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem._antsTimer">
+            <summary>Tracks real elapsed time for frame-rate-independent ant animation.</summary>
+        </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PendingCs">
             <summary>Gets or sets the pending pixel change item for history.</summary>
         </member>
@@ -32448,7 +32337,8 @@
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.AdvanceAnts">
             <summary>
-            Updates the marching ants animation phase.
+            Updates the marching ants animation phase based on real elapsed time,
+            so speed is consistent regardless of render/invalidation frequency.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.NotifyToolState">
@@ -36924,6 +36814,25 @@
         <member name="M:PixlPunkt.UI.Rendering.PatternBackgroundService.Invalidate">
             <summary>Force consumers to rebuild their pattern resources.</summary>
         </member>
+        <member name="T:PixlPunkt.UI.Rendering.TransparencyPatternShader">
+            <summary>
+            Centralized factory for diagonal-stripe transparency pattern shaders.
+            Replaces the previously-duplicated checkerboard shader code that was
+            copy-pasted across six UI control files.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Rendering.TransparencyPatternShader.GetShader(System.Int32,SkiaSharp.SKColor,SkiaSharp.SKColor)">
+            <summary>
+            Returns a cached diagonal-stripe <see cref="T:SkiaSharp.SKShader"/> for the given
+            band size and colours.  Creates the shader on first call for a given
+            key; returns the cached instance thereafter.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Rendering.TransparencyPatternShader.InvalidateAll">
+            <summary>
+            Disposes all cached shaders.  Call when theme colours change.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Settings.BrushListItem">
             <summary>
             View model for displaying a brush in the settings list.
@@ -37419,6 +37328,18 @@
         <member name="P:PixlPunkt.UI.Voxel.Tools.VoxelToolRail.ShowLabels">
             <summary>
             Gets or sets whether labels are shown next to icons.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Voxel.VoxelImageExporter">
+            <summary>
+            Pure-static helpers for image export operations (PNG encoding, trimming,
+            upscaling). Extracted from <c>VoxelWorkspaceControl</c>.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Voxel.VoxelModelExporter">
+            <summary>
+            Pure-static helpers that build 3D model export data (OBJ, GLB, STL, VOX)
+            from a <see cref="T:PixlPunkt.Core.Voxel.VoxelVolume"/>. Extracted from <c>VoxelWorkspaceControl</c>.
             </summary>
         </member>
         <member name="T:PixlPunkt.UI.Voxel.VoxelPreviewWindow">

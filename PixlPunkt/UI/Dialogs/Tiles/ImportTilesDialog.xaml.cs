@@ -79,13 +79,7 @@ namespace PixlPunkt.UI.Dialogs
     /// </summary>
     public sealed class ImportDocumentItem
     {
-        private CanvasDocument _document = null!;
-
-        public CanvasDocument Document
-        {
-            get => _document;
-            set => _document = value;
-        }
+        public CanvasDocument? Document { get; set; }
 
         public string Name => Document?.Name ?? "Untitled";
         public string TileCountText => Document?.TileSet != null

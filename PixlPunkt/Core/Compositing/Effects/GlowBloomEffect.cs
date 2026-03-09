@@ -43,6 +43,7 @@ namespace PixlPunkt.Core.Compositing.Effects
     public sealed class GlowBloomEffect : LayerEffectBase
     {
         public override string DisplayName => "Glow / Bloom";
+        public override bool NeedsSnapshot => true;
 
         private double _threshold = 0.7; // 0..1 brightness
         public double Threshold
@@ -96,6 +97,21 @@ namespace PixlPunkt.Core.Compositing.Effects
             if (len == 0 || pixels.Length < len) return;
 
             uint[] src = pixels.ToArray();
+            ApplyCore(pixels, src, width, height);
+        }
+
+        public override void Apply(Span<uint> pixels, ReadOnlySpan<uint> snapshot, int width, int height)
+        {
+            if (!IsEnabled) return;
+            int len = width * height;
+            if (len == 0 || pixels.Length < len) return;
+
+            ApplyCore(pixels, snapshot, width, height);
+        }
+
+        private void ApplyCore(Span<uint> pixels, ReadOnlySpan<uint> src, int width, int height)
+        {
+            int len = width * height;
             float[] glowR = new float[len];
             float[] glowG = new float[len];
             float[] glowB = new float[len];

@@ -424,19 +424,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             {
                 if (hasTransform)
                 {
-                    if (_state.PreviewBuf != null && _state.PreviewW > 0 && _state.PreviewH > 0)
-                    {
-                        float pivotX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.BufferWidth / 2f);
-                        float pivotY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.BufferHeight / 2f);
-                        float cx = (float)(dest.X + pivotX * scale);
-                        float cy = (float)(dest.Y + pivotY * scale);
-                        float bufferLeft = cx - (float)(_state.PreviewW * scale / 2.0);
-                        float bufferTop = cy - (float)(_state.PreviewH * scale / 2.0);
-
-                        DrawAntsFromBuffer(renderer, _state.PreviewBuf, _state.PreviewW, _state.PreviewH,
-                            bufferLeft, bufferTop, (float)scale, animated);
-                    }
-                    else if (_state.BufferFlipped && !hasRotation && !hasScale)
+                    if (_state.BufferFlipped && !hasRotation && !hasScale)
                     {
                         float x = (float)(dest.X + _state.FloatX * scale);
                         float y = (float)(dest.Y + _state.FloatY * scale);
@@ -480,10 +468,13 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                 }
                 else
                 {
-                    float x = (float)(dest.X + _state.FloatX * scale);
-                    float y = (float)(dest.Y + _state.FloatY * scale);
-                    DrawAntsFromBuffer(renderer, _state.Buffer!, _state.BufferWidth, _state.BufferHeight,
-                        x, y, (float)scale, animated);
+                    // No transform (move only): use _selRegion which is kept in sync by
+                    // OffsetSelectionRegion(), preserving the original geometric marquee shape
+                    // regardless of pixel alpha in the floating buffer.
+                    if (animated)
+                        _state.Region.DrawAnts(renderer, dest, scale, _state.AntsPhase, ANTS_ON, ANTS_OFF, ANTS_THICKNESS);
+                    else
+                        DrawSolidOutline(renderer, dest, scale);
                 }
             }
             else if (hasRotation)

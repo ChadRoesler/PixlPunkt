@@ -34,8 +34,6 @@ namespace PixlPunkt.UI.Tiles
         private readonly PatternBackgroundService _pattern = new();
 
         // Cached checkerboard pattern for SkiaSharp
-        private SKShader? _checkerboardShader;
-        private SKBitmap? _checkerboardBitmap;
         private DispatcherQueueTimer? _tileRefreshTimer;
         private bool _tileRefreshPending;
 
@@ -102,8 +100,6 @@ namespace PixlPunkt.UI.Tiles
             Unloaded += (_, __) =>
             {
                 TransparencyStripeMixer.ColorsChanged -= OnStripeColorsChanged;
-                _checkerboardShader?.Dispose();
-                _checkerboardBitmap?.Dispose();
                 if (_tileRefreshTimer != null)
                 {
                     _tileRefreshTimer.Stop();
@@ -115,7 +111,7 @@ namespace PixlPunkt.UI.Tiles
         {
             ApplyStripeColors();
             _pattern.Invalidate();
-            InvalidateCheckerboardCache();
+            Rendering.TransparencyPatternShader.InvalidateAll();
             RefreshAllTileVisuals();
         }
 
@@ -129,14 +125,6 @@ namespace PixlPunkt.UI.Tiles
                 _pattern.LightColor = light;
                 _pattern.DarkColor = dark;
             }
-        }
-
-        private void InvalidateCheckerboardCache()
-        {
-            _checkerboardShader?.Dispose();
-            _checkerboardShader = null;
-            _checkerboardBitmap?.Dispose();
-            _checkerboardBitmap = null;
         }
 
         /// <summary>
@@ -483,47 +471,19 @@ namespace PixlPunkt.UI.Tiles
         private void DrawPatternBackground(SKCanvas canvas, float w, float h)
         {
             var (lightColor, darkColor) = _pattern.CurrentScheme;
+            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
+            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
+            var shader = Rendering.TransparencyPatternShader.GetShader(2, skLight, skDark);
 
-            int squareSize = 4;
-            EnsureCheckerboardShader(squareSize, lightColor, darkColor);
-
-            if (_checkerboardShader != null)
+            if (shader != null)
             {
-                using var paint = new SKPaint { Shader = _checkerboardShader, IsAntialias = false };
+                using var paint = new SKPaint { Shader = shader, IsAntialias = false };
                 canvas.DrawRect(0, 0, w, h, paint);
             }
             else
             {
                 canvas.Clear(new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A));
             }
-        }
-
-        private void EnsureCheckerboardShader(int squareSize, Color lightColor, Color darkColor)
-        {
-            if (_checkerboardBitmap != null && _checkerboardShader != null) return;
-
-            _checkerboardShader?.Dispose();
-            _checkerboardBitmap?.Dispose();
-
-            int tileSize = squareSize * 2;
-            _checkerboardBitmap = new SKBitmap(tileSize, tileSize, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-            var skLight = new SKColor(lightColor.R, lightColor.G, lightColor.B, lightColor.A);
-            var skDark = new SKColor(darkColor.R, darkColor.G, darkColor.B, darkColor.A);
-
-            for (int y = 0; y < tileSize; y++)
-            {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    int cx = x / squareSize;
-                    int cy = y / squareSize;
-                    bool isLight = ((cx + cy) & 1) == 0;
-                    _checkerboardBitmap.SetPixel(x, y, isLight ? skLight : skDark);
-                }
-            }
-
-            using var image = SKImage.FromBitmap(_checkerboardBitmap);
-            _checkerboardShader = image.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
         }
 
         //////////////////////////////////////////////////////////////////

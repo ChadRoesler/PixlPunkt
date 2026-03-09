@@ -36,6 +36,7 @@ namespace PixlPunkt.Core.Compositing.Effects
     public sealed class ChromaticAberrationEffect : LayerEffectBase
     {
         public override string DisplayName => "Chromatic Aberration";
+        public override bool NeedsSnapshot => true;
 
         private double _offsetPixels = 1.0; // 0..8 px
         private double _strength = 1.0;     // 0..1 mix between original and shifted
@@ -72,8 +73,23 @@ namespace PixlPunkt.Core.Compositing.Effects
             if (pixels.Length < total) return;
             if (OffsetPixels <= 0.0 || Strength <= 0.0) return;
 
-            // Work from a copy so we don't smear as we read
             uint[] src = pixels.ToArray();
+            ApplyCore(pixels, src, width, height);
+        }
+
+        public override void Apply(Span<uint> pixels, ReadOnlySpan<uint> snapshot, int width, int height)
+        {
+            if (!IsEnabled) return;
+            if (width <= 0 || height <= 0) return;
+            int total = width * height;
+            if (pixels.Length < total) return;
+            if (OffsetPixels <= 0.0 || Strength <= 0.0) return;
+
+            ApplyCore(pixels, snapshot, width, height);
+        }
+
+        private void ApplyCore(Span<uint> pixels, ReadOnlySpan<uint> src, int width, int height)
+        {
 
             double cx = (width - 1) * 0.5;
             double cy = (height - 1) * 0.5;

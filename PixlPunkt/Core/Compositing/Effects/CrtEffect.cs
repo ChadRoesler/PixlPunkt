@@ -16,6 +16,7 @@ namespace PixlPunkt.Core.Compositing.Effects
     public sealed class CrtEffect : LayerEffectBase
     {
         public override string DisplayName => "CRT";
+        public override bool NeedsSnapshot => true;
 
         // Strength = 0..1 → how much we push towards the tint at the edges
         private double _strength = 0.6;
@@ -81,8 +82,24 @@ namespace PixlPunkt.Core.Compositing.Effects
             int total = width * height;
             if (pixels.Length < total) return;
 
-            // Copy source so we never read from what we're writing into
             uint[] src = pixels.ToArray();
+            ApplyCore(pixels, src, width, height);
+        }
+
+        public override void Apply(Span<uint> pixels, ReadOnlySpan<uint> snapshot, int width, int height)
+        {
+            if (!IsEnabled) return;
+            if (width <= 0 || height <= 0) return;
+
+            int total = width * height;
+            if (pixels.Length < total) return;
+
+            ApplyCore(pixels, snapshot, width, height);
+        }
+
+        private void ApplyCore(Span<uint> pixels, ReadOnlySpan<uint> src, int width, int height)
+        {
+            int total = width * height;
             Span<uint> dst = pixels;
 
             // Clear destination (outside CRT mask stays transparent)

@@ -15,9 +15,9 @@ namespace PixlPunkt.UI.ColorPick
     {
         private const int LADDER_UPDATE_DELAY_MS = 50;
 
-        public Func<Color> GetCurrent { get; set; } = null!;
-        public Action<Color> SetLive { get; set; } = null!;
-        public Action<Color> Commit { get; set; } = null!;
+        public Func<Color>? GetCurrent { get; set; }
+        public Action<Color>? SetLive { get; set; }
+        public Action<Color>? Commit { get; set; }
 
         /// <summary>
         /// Event raised when the dropper button is toggled on, requesting canvas pick mode.

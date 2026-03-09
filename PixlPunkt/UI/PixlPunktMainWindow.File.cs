@@ -124,17 +124,10 @@ namespace PixlPunkt.UI
 
         // ------------- Open -------------
 
-        private async void File_Import_PyxelEdit(object sender, RoutedEventArgs e)
+        private void RegisterAndOpenImportedDocument(CanvasDocument doc)
         {
-            var openPicker = WindowHost.CreateFileOpenPicker(this, ".pyxel");
-            StorageFile? file = await openPicker.PickSingleFileAsync();
-            if (file is null)
-                return;
-            CanvasDocument doc;
-            doc = ForeignDocumentImporter.ImportPyxel(file.Path);
-            // Register document & open it in a new tab
             _workspace.Add(doc);
-            _documentPaths[doc] = string.Empty; // no path yet
+            _documentPaths[doc] = string.Empty;
             _autoSave.RegisterDocument(doc);
             var tab = MakeTab(doc);
             DocsTab.TabItems.Add(tab);
@@ -143,6 +136,24 @@ namespace PixlPunkt.UI
             {
                 DocsTab.SelectedItem = tab;
             });
+        }
+
+        private async void File_Import_PyxelEdit(object sender, RoutedEventArgs e)
+        {
+            var openPicker = WindowHost.CreateFileOpenPicker(this, ".pyxel");
+            StorageFile? file = await openPicker.PickSingleFileAsync();
+            if (file is null)
+                return;
+
+            try
+            {
+                var doc = ForeignDocumentImporter.ImportPyxel(file.Path);
+                RegisterAndOpenImportedDocument(doc);
+            }
+            catch (Exception ex)
+            {
+                await ShowImportErrorAsync($"Could not import PyxelEdit file.\n{ex.Message}");
+            }
         }
 
         private async void File_Import_Icon(object sender, RoutedEventArgs e)
@@ -158,19 +169,15 @@ namespace PixlPunkt.UI
                 return;
             }
 
-            CanvasDocument doc;
-            doc = ForeignDocumentImporter.ImportIconAsDocument(file.Path);
-            // Register document & open it in a new tab
-            _workspace.Add(doc);
-            _documentPaths[doc] = string.Empty; // no path yet
-            _autoSave.RegisterDocument(doc);
-            var tab = MakeTab(doc);
-            DocsTab.TabItems.Add(tab);
-            // Defer selection to ensure tab is fully in visual tree (fixes Release build timing issue)
-            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            try
             {
-                DocsTab.SelectedItem = tab;
-            });
+                var doc = ForeignDocumentImporter.ImportIconAsDocument(file.Path);
+                RegisterAndOpenImportedDocument(doc);
+            }
+            catch (Exception ex)
+            {
+                await ShowImportErrorAsync($"Could not import icon file.\n{ex.Message}");
+            }
         }
 
         private async void File_Import_Cursor(object sender, RoutedEventArgs e)
@@ -186,19 +193,15 @@ namespace PixlPunkt.UI
                 return;
             }
 
-            CanvasDocument doc;
-            doc = ForeignDocumentImporter.ImportCursorAsDocument(file.Path);
-            // Register document & open it in a new tab
-            _workspace.Add(doc);
-            _documentPaths[doc] = string.Empty; // no path yet
-            _autoSave.RegisterDocument(doc);
-            var tab = MakeTab(doc);
-            DocsTab.TabItems.Add(tab);
-            // Defer selection to ensure tab is fully in visual tree (fixes Release build timing issue)
-            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            try
             {
-                DocsTab.SelectedItem = tab;
-            });
+                var doc = ForeignDocumentImporter.ImportCursorAsDocument(file.Path);
+                RegisterAndOpenImportedDocument(doc);
+            }
+            catch (Exception ex)
+            {
+                await ShowImportErrorAsync($"Could not import cursor file.\n{ex.Message}");
+            }
         }
 
         private async void File_Import_Aseprite(object sender, RoutedEventArgs e)
@@ -211,18 +214,7 @@ namespace PixlPunkt.UI
             try
             {
                 var doc = ForeignDocumentImporter.ImportAseprite(file.Path);
-
-                // Register document & open it in a new tab
-                _workspace.Add(doc);
-                _documentPaths[doc] = string.Empty; // no path yet
-                _autoSave.RegisterDocument(doc);
-                var tab = MakeTab(doc);
-                DocsTab.TabItems.Add(tab);
-                // Defer selection to ensure tab is fully in visual tree (fixes Release build timing issue)
-                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-                {
-                    DocsTab.SelectedItem = tab;
-                });
+                RegisterAndOpenImportedDocument(doc);
             }
             catch (Exception ex)
             {
@@ -240,18 +232,7 @@ namespace PixlPunkt.UI
             try
             {
                 var doc = ForeignDocumentImporter.ImportTmx(file.Path);
-
-                // Register document & open it in a new tab
-                _workspace.Add(doc);
-                _documentPaths[doc] = string.Empty; // no path yet
-                _autoSave.RegisterDocument(doc);
-                var tab = MakeTab(doc);
-                DocsTab.TabItems.Add(tab);
-                // Defer selection to ensure tab is fully in visual tree (fixes Release build timing issue)
-                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-                {
-                    DocsTab.SelectedItem = tab;
-                });
+                RegisterAndOpenImportedDocument(doc);
             }
             catch (Exception ex)
             {
@@ -269,18 +250,7 @@ namespace PixlPunkt.UI
             try
             {
                 var doc = ForeignDocumentImporter.ImportTsx(file.Path);
-
-                // Register document & open it in a new tab
-                _workspace.Add(doc);
-                _documentPaths[doc] = string.Empty; // no path yet
-                _autoSave.RegisterDocument(doc);
-                var tab = MakeTab(doc);
-                DocsTab.TabItems.Add(tab);
-                // Defer selection to ensure tab is fully in visual tree (fixes Release build timing issue)
-                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-                {
-                    DocsTab.SelectedItem = tab;
-                });
+                RegisterAndOpenImportedDocument(doc);
             }
             catch (Exception ex)
             {

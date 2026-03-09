@@ -2,9 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    
+
     <!-- Package metadata -->
     <PackageId>PixlPunkt.PluginSdk</PackageId>
     <Product>PixlPunkt Plugin SDK</Product>

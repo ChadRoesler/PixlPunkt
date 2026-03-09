@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.History;
 using PixlPunkt.Core.Selection;
@@ -91,8 +92,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         public const float ANTS_ON = 4.0f;
         /// <summary>Marching ants gap length.</summary>
         public const float ANTS_OFF = 4.0f;
-        /// <summary>Marching ants animation speed (pixels per frame).</summary>
-        public const float ANTS_SPEED = 0.5f;
+        /// <summary>Marching ants animation speed (pixels per second).</summary>
+        public const float ANTS_SPEED = 30f;
 
         // ════════════════════════════════════════════════════════════════════
         // SELECTION STATE
@@ -255,6 +256,9 @@ namespace PixlPunkt.UI.CanvasHost.Selection
 
         /// <summary>Gets or sets the marching ants animation phase.</summary>
         public float AntsPhase { get; set; }
+
+        /// <summary>Tracks real elapsed time for frame-rate-independent ant animation.</summary>
+        private readonly Stopwatch _antsTimer = Stopwatch.StartNew();
 
         // ════════════════════════════════════════════════════════════════════
         // HISTORY STATE
@@ -486,13 +490,15 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         }
 
         /// <summary>
-        /// Updates the marching ants animation phase.
+        /// Updates the marching ants animation phase based on real elapsed time,
+        /// so speed is consistent regardless of render/invalidation frequency.
         /// </summary>
         public void AdvanceAnts()
         {
-            AntsPhase += ANTS_SPEED;
-            if (AntsPhase >= ANTS_ON + ANTS_OFF)
-                AntsPhase -= ANTS_ON + ANTS_OFF;
+            float elapsed = (float)_antsTimer.Elapsed.TotalSeconds;
+            _antsTimer.Restart();
+            float period = ANTS_ON + ANTS_OFF;
+            AntsPhase = (AntsPhase + ANTS_SPEED * elapsed) % period;
         }
 
         /// <summary>

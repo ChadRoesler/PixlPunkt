@@ -1029,19 +1029,16 @@ namespace PixlPunkt.UI.CanvasHost
 
             _selState.PreviewBuf = null;
 
-            // Rebuild selection region from the buffer
-            // IMPORTANT: Use the buffer dimensions, not document dimensions, because the
-            // selection may extend beyond the document bounds when scaled/dragged outside
-            int regionW = Math.Max(Document.PixelWidth, _selState.BufferWidth);
-            int regionH = Math.Max(Document.PixelHeight, _selState.BufferHeight);
-            _selRegion.EnsureSize(regionW, regionH);
-            _selRegion.Clear();
-            _selRegion.SetOffset(_selState.FloatX, _selState.FloatY);
-
-            for (int y = 0; y < _selState.BufferHeight; y++)
-                for (int x = 0; x < _selState.BufferWidth; x++)
-                    if (_selState.Buffer[(y * _selState.BufferWidth + x) * 4 + 3] > 0)
-                        _selRegion.AddRect(CreateRect(x, y, 1, 1));
+            // Rebuild selection region as the original geometric shape transformed by the
+            // baked scale + cumulative rotation — preserves the marquee bounds through all
+            // transforms instead of re-deriving the selection from pixel alpha.
+            var docClamp = CreateRect(0, 0, Document.PixelWidth, Document.PixelHeight);
+            RebuildSelectionRegionAsRotatedRect(
+                centerX, centerY,
+                _selState.BufferWidth, _selState.BufferHeight,
+                _selState.CumulativeAngleDeg,
+                docClamp,
+                Document.PixelWidth, Document.PixelHeight);
 
             _selState.Rect = _selRegion.Bounds;
             _toolState?.SetSelectionScale(100.0, 100.0, _selState.ScaleLink);
