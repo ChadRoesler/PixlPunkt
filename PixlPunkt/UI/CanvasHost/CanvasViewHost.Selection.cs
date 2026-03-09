@@ -413,24 +413,41 @@ namespace PixlPunkt.UI.CanvasHost
 
             _selState.ApplyTransformSnapshot(snapshot);
 
-            // Rebuild the selection region from the buffer if we have one
-            if (snapshot.Buffer != null && snapshot.BufferWidth > 0 && snapshot.BufferHeight > 0)
+            // TransformItems are only pushed while the selection is floating, so always restore that state.
+            _selState.Floating = true;
+            _selState.Active = true;
+            _selState.State = SelectionState.Armed;
+
+            // Rebuild the region from the current buffer (restored by ApplyTransformSnapshot for
+            // scale/rotate items, or unchanged for move items — buffer content never changes on a
+            // pure move, only position does). Using _selState.Buffer instead of snapshot.Buffer
+            // means the move case is handled correctly: the mask is rebuilt in LOCAL space at the
+            // restored FloatX/FloatY, avoiding the world-space double-shift that SetOffset alone caused.
+            var buf = _selState.Buffer;
+            int bw = _selState.BufferWidth, bh = _selState.BufferHeight;
+
+            if (buf != null && bw > 0 && bh > 0)
             {
-                // Rebuild selection region from buffer's alpha
-                int regionW = Math.Max(Document.PixelWidth, snapshot.BufferWidth + Math.Abs(snapshot.FloatX));
-                int regionH = Math.Max(Document.PixelHeight, snapshot.BufferHeight + Math.Abs(snapshot.FloatY));
+                int regionW = Math.Max(Document.PixelWidth, bw + Math.Abs(snapshot.FloatX));
+                int regionH = Math.Max(Document.PixelHeight, bh + Math.Abs(snapshot.FloatY));
                 _selRegion.EnsureSize(regionW, regionH);
                 _selRegion.Clear();
                 _selRegion.SetOffset(snapshot.FloatX, snapshot.FloatY);
 
-                for (int y = 0; y < snapshot.BufferHeight; y++)
-                    for (int x = 0; x < snapshot.BufferWidth; x++)
-                        if (snapshot.Buffer[(y * snapshot.BufferWidth + x) * 4 + 3] > 0)
+                for (int y = 0; y < bh; y++)
+                    for (int x = 0; x < bw; x++)
+                        if (buf[(y * bw + x) * 4 + 3] > 0)
                             _selRegion.AddRect(CreateRect(x, y, 1, 1));
+
+                // Re-derive RegionNonRectangular from the buffer alpha.
+                bool isRect = true;
+                for (int ry = 0; ry < bh && isRect; ry++)
+                    for (int rx = 0; rx < bw && isRect; rx++)
+                        if (buf[(ry * bw + rx) * 4 + 3] == 0) isRect = false;
+                _selState.RegionNonRectangular = !isRect;
             }
             else
             {
-                // No buffer - just update the offset
                 _selRegion.SetOffset(snapshot.FloatX, snapshot.FloatY);
             }
 
@@ -1029,16 +1046,34 @@ namespace PixlPunkt.UI.CanvasHost
 
             _selState.PreviewBuf = null;
 
-            // Rebuild selection region as the original geometric shape transformed by the
-            // baked scale + cumulative rotation — preserves the marquee bounds through all
-            // transforms instead of re-deriving the selection from pixel alpha.
-            var docClamp = CreateRect(0, 0, Document.PixelWidth, Document.PixelHeight);
-            RebuildSelectionRegionAsRotatedRect(
-                centerX, centerY,
-                _selState.BufferWidth, _selState.BufferHeight,
-                _selState.CumulativeAngleDeg,
-                docClamp,
-                Document.PixelWidth, Document.PixelHeight);
+            if (_selState.RegionNonRectangular)
+            {
+                // Non-rectangular selections (polygon, wand, paint): rebuild the region from the
+                // freshly scaled buffer's alpha channel after a scale bake. Rotation is NEVER
+                // baked into the region — it lives only in CumulativeAngleDeg and is applied
+                // at display time so the true shape is preserved through all transforms.
+                if (hasScale)
+                {
+                    var floatRect = CreateRect(_selState.FloatX, _selState.FloatY, _selState.BufferWidth, _selState.BufferHeight);
+                    var dstClamp = ClampToSurface(floatRect, Document.PixelWidth, Document.PixelHeight);
+                    RebuildSelectionRegionFromTransformedBuffer(
+                        floatRect, dstClamp, _selState.Buffer!,
+                        _selState.BufferWidth, _selState.BufferHeight,
+                        Document.PixelWidth, Document.PixelHeight);
+                }
+                // Rotation only: region unchanged — CumulativeAngleDeg carries the rotation.
+            }
+            else
+            {
+                // Rectangular selections: rebuild as a rotated rectangle using the cumulative angle.
+                var docClamp = CreateRect(0, 0, Document.PixelWidth, Document.PixelHeight);
+                RebuildSelectionRegionAsRotatedRect(
+                    centerX, centerY,
+                    _selState.BufferWidth, _selState.BufferHeight,
+                    _selState.CumulativeAngleDeg,
+                    docClamp,
+                    Document.PixelWidth, Document.PixelHeight);
+            }
 
             _selState.Rect = _selRegion.Bounds;
             _toolState?.SetSelectionScale(100.0, 100.0, _selState.ScaleLink);

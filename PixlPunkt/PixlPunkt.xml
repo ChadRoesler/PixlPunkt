@@ -11377,7 +11377,7 @@
         <member name="P:PixlPunkt.Core.History.SelectionCommitItem.Description">
             <inheritdoc/>
         </member>
-        <member name="M:PixlPunkt.Core.History.SelectionCommitItem.#ctor(PixlPunkt.Core.Document.Layer.RasterLayer,Windows.Graphics.RectInt32,System.Byte[],System.Byte[],PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot,PixlPunkt.Core.Selection.SelectionRegion,System.Action{PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot},System.Action,System.Action{PixlPunkt.Core.Document.Layer.RasterLayer,Windows.Graphics.RectInt32,System.Byte[]})">
+        <member name="M:PixlPunkt.Core.History.SelectionCommitItem.#ctor(PixlPunkt.Core.Document.Layer.RasterLayer,Windows.Graphics.RectInt32,System.Byte[],System.Byte[],PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot,System.Action{PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot},System.Action,System.Action{PixlPunkt.Core.Document.Layer.RasterLayer,Windows.Graphics.RectInt32,System.Byte[]})">
             <summary>
             Creates a new selection commit history item.
             </summary>
@@ -11386,7 +11386,6 @@
             <param name="pixelsBefore">Pixel data before the commit.</param>
             <param name="pixelsAfter">Pixel data after the commit.</param>
             <param name="floatingBefore">The floating selection state before commit.</param>
-            <param name="regionAfter">The selection region after commit (may be empty).</param>
             <param name="restoreFloating">Callback to restore floating selection state.</param>
             <param name="clearFloating">Callback to clear floating selection state.</param>
             <param name="applyPixels">Callback to apply pixel data to layer.</param>
@@ -30492,6 +30491,21 @@
             Runs a mutator over a clamped rectangle and pushes to unified history.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.RestoreFloatingPixelsToCanvas">
+            <summary>
+            Blits the floating buffer back to the canvas at its current position, reversing
+            the lift operation without touching history. Called before undoing a
+            SelectionChangeItem when the selection is still floating, so the canvas hole
+            left by the lift is filled before the floating state is discarded.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.LiftSelectionSilently">
+            <summary>
+            Lifts the current selection to a floating buffer without recording any history.
+            Mirror of LiftSelectionWithHistory used when redoing a SelectionChangeItem whose
+            paired undo previously blitted the floating pixels back via RestoreFloatingPixelsToCanvas.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Undo">
             <summary>
             Undoes the last operation from the unified history stack.
@@ -32273,6 +32287,9 @@
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.BufferFlipped">
             <summary>Gets or sets whether the buffer has been flipped (requires buffer-based ant drawing).</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RegionNonRectangular">
+            <summary>Gets or sets whether the selection region is non-rectangular (polygon, wand, or paint selection).</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.CombineMode">
             <summary>Gets or sets the selection combine mode.</summary>

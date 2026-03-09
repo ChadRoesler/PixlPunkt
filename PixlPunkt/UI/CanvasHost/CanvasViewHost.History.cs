@@ -85,6 +85,18 @@ namespace PixlPunkt.UI.CanvasHost
 
             if (bounds.Width == 0 || bounds.Height == 0) return;
 
+            // Detect if the selection region is non-rectangular (polygon, wand, or paint
+            // selections do not fill the entire bounding box, unlike rect marquee).
+            if (_selState != null && !_selRegion.IsEmpty)
+            {
+                var rb = _selRegion.Bounds;
+                bool isRect = true;
+                for (int ry = rb.Y; ry < rb.Y + rb.Height && isRect; ry++)
+                    for (int rx = rb.X; rx < rb.X + rb.Width && isRect; rx++)
+                        if (!_selRegion.Contains(rx, ry)) isRect = false;
+                _selState.RegionNonRectangular = !isRect;
+            }
+
             var surf = rl.Surface;
             int sw = surf.Width, sh = surf.Height;
             int bw = bounds.Width, bh = bounds.Height;
@@ -246,7 +258,8 @@ namespace PixlPunkt.UI.CanvasHost
                 _selOrigCenterX, _selOrigCenterY,
                 _selScaleX, _selScaleY,
                 _selAngleDeg, _selCumulativeAngleDeg,
-                _selRegion.Clone()
+                _selRegion.Clone(),
+                _selState?.RegionNonRectangular ?? false
             );
 
             // 1) Scale
@@ -330,9 +343,6 @@ namespace PixlPunkt.UI.CanvasHost
             // Capture AFTER snapshot for the destination region
             var afterCombined = CopyRectBytes(surf.Pixels, surf.Width, surf.Height, dstClamp);
 
-            // Capture the region after commit
-            var regionAfter = _selRegion.Clone();
-
             // Create history item using SelectionCommitItem for proper undo/redo
             var commitItem = new SelectionCommitItem(
                 rl,
@@ -340,7 +350,6 @@ namespace PixlPunkt.UI.CanvasHost
                 beforeCombined,
                 afterCombined,
                 floatingBefore,
-                regionAfter,
                 RestoreFloatingSelection,
                 ClearFloatingSelection,
                 ApplyPixelsToLayer
@@ -420,6 +429,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             // Restore the selection region
             _selRegion.CopyFrom(snapshot.Region);
+            _selState.RegionNonRectangular = snapshot.RegionNonRectangular;
 
             // Set state to floating/armed
             _selState.Floating = true;
@@ -755,6 +765,139 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         // ────────────────────────────────────────────────────────────────────
+        // LIFT CANCELLATION
+        // ────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Blits the floating buffer back to the canvas at its current position, reversing
+        /// the lift operation without touching history. Called before undoing a
+        /// SelectionChangeItem when the selection is still floating, so the canvas hole
+        /// left by the lift is filled before the floating state is discarded.
+        /// </summary>
+        private void RestoreFloatingPixelsToCanvas()
+        {
+            if (_selState?.Buffer == null) return;
+            if (Document.ActiveLayer is not RasterLayer rl) return;
+
+            var surf = rl.Surface;
+            int sw = surf.Width, sh = surf.Height;
+            int bw = _selState.BufferWidth, bh = _selState.BufferHeight;
+            int fx = _selState.FloatX, fy = _selState.FloatY;
+            int stride = sw * 4;
+
+            for (int y = 0; y < bh; y++)
+            {
+                int dy = fy + y;
+                if (dy < 0 || dy >= sh) continue;
+                for (int x = 0; x < bw; x++)
+                {
+                    int dx = fx + x;
+                    if (dx < 0 || dx >= sw) continue;
+                    int bi = (y * bw + x) * 4;
+                    if (_selState.Buffer[bi + 3] == 0) continue; // transparent — leave canvas pixel intact
+                    int si = dy * stride + dx * 4;
+                    surf.Pixels[si]     = _selState.Buffer[bi];
+                    surf.Pixels[si + 1] = _selState.Buffer[bi + 1];
+                    surf.Pixels[si + 2] = _selState.Buffer[bi + 2];
+                    surf.Pixels[si + 3] = _selState.Buffer[bi + 3];
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lifts the current selection to a floating buffer without recording any history.
+        /// Mirror of LiftSelectionWithHistory used when redoing a SelectionChangeItem whose
+        /// paired undo previously blitted the floating pixels back via RestoreFloatingPixelsToCanvas.
+        /// </summary>
+        private void LiftSelectionSilently()
+        {
+            if (Document.ActiveLayer is not RasterLayer rl) return;
+
+            _selRegion.EnsureSize(Document.PixelWidth, Document.PixelHeight);
+
+            var bounds = !_selRegion.IsEmpty
+                ? ClampToSurface(_selRegion.Bounds, rl.Surface.Width, rl.Surface.Height)
+                : ClampToSurface(Normalize(_selRect), rl.Surface.Width, rl.Surface.Height);
+
+            if (bounds.Width == 0 || bounds.Height == 0) return;
+
+            // Detect non-rectangularity
+            if (_selState != null && !_selRegion.IsEmpty)
+            {
+                var rb = _selRegion.Bounds;
+                bool isRectShape = true;
+                for (int ry = rb.Y; ry < rb.Y + rb.Height && isRectShape; ry++)
+                    for (int rx = rb.X; rx < rb.X + rb.Width && isRectShape; rx++)
+                        if (!_selRegion.Contains(rx, ry)) isRectShape = false;
+                _selState.RegionNonRectangular = !isRectShape;
+            }
+
+            var surf = rl.Surface;
+            int sw = surf.Width, sh = surf.Height;
+            int bw = bounds.Width, bh = bounds.Height;
+            var sel = new byte[bw * bh * 4];
+            int surfStride = sw * 4;
+            int boxStride = bw * 4;
+
+            for (int y = 0; y < bh; y++)
+            {
+                int sy = bounds.Y + y;
+                int srcRow = sy * surfStride + bounds.X * 4;
+                int bRow = y * boxStride;
+
+                for (int x = 0; x < bw; x++)
+                {
+                    int sx = bounds.X + x;
+                    int si = srcRow + x * 4;
+                    int di = bRow + x * 4;
+                    bool inside = !_selRegion.IsEmpty && _selRegion.Contains(sx, sy);
+                    if (inside)
+                    {
+                        sel[di]     = surf.Pixels[si];
+                        sel[di + 1] = surf.Pixels[si + 1];
+                        sel[di + 2] = surf.Pixels[si + 2];
+                        sel[di + 3] = surf.Pixels[si + 3];
+                        surf.Pixels[si]     = 0;
+                        surf.Pixels[si + 1] = 0;
+                        surf.Pixels[si + 2] = 0;
+                        surf.Pixels[si + 3] = 0;
+                    }
+                }
+            }
+
+            // Propagate cleared pixels to mapped tiles if needed
+            if (rl.TileMapping != null && Document.TileSet != null)
+                PropagateSelectionChangesToMappedTiles(bounds);
+
+            _selBuf = sel;
+            _selBW = bw;
+            _selBH = bh;
+            _selOrigW = bw;
+            _selOrigH = bh;
+            _selOrigCenterX = bounds.X + bw / 2;
+            _selOrigCenterY = bounds.Y + bh / 2;
+            _selFX = bounds.X;
+            _selFY = bounds.Y;
+            _selFloating = true;
+            _selActive = true;
+            _selectionState = SelectionState.Armed;
+            _selScaleX = _selScaleY = 1.0;
+            _selScaleLink = false;
+            _selAngleDeg = 0.0;
+            _selCumulativeAngleDeg = 0.0;
+
+            Document.CompositeTo(Document.Surface);
+            UpdateActiveLayerPreview();
+            Document.RaiseStructureChanged();
+            InvalidateMainCanvas();
+            HistoryStateChanged?.Invoke();
+
+            _toolState?.SetSelectionPresence(active: true, floating: true);
+            _toolState?.SetSelectionScale(100.0, 100.0, _selScaleLink);
+            _toolState?.SetRotationAngle(0.0);
+        }
+
+        // ────────────────────────────────────────────────────────────────────
         // UNDO / REDO
         // ────────────────────────────────────────────────────────────────────
 
@@ -770,6 +913,14 @@ namespace PixlPunkt.UI.CanvasHost
             bool isStructural = nextItem is CanvasResizeItem or LayerAddItem or LayerRemoveItem or LayerReorderItem;
             bool isSelectionTransform = nextItem is SelectionTransformItem;
             bool isSelectionCommit = nextItem is SelectionCommitItem;
+            bool isSelectionChange = nextItem is SelectionChangeItem;
+
+            // If about to undo the marquee-creation item while a floating selection is active,
+            // the canvas has a lift-hole (pixels were cleared when the selection was lifted).
+            // Blit the floating pixels back first so the canvas is clean when the floating
+            // state is discarded by ApplySelectionRegionFromHistory.
+            if (isSelectionChange && _selState is { Floating: true, Buffer: not null })
+                RestoreFloatingPixelsToCanvas();
 
             Document.History.Undo();
 
@@ -812,8 +963,20 @@ namespace PixlPunkt.UI.CanvasHost
             bool isStructural = nextItem is CanvasResizeItem or LayerAddItem or LayerRemoveItem or LayerReorderItem;
             bool isSelectionTransform = nextItem is SelectionTransformItem;
             bool isSelectionCommit = nextItem is SelectionCommitItem;
+            bool isSelectionChange = nextItem is SelectionChangeItem;
 
             Document.History.Redo();
+
+            // After redoing a SelectionChangeItem, if the next redo is a TransformItem the
+            // selection needs to be re-lifted so the floating state exists for the transform.
+            // Our Undo() fix (RestoreFloatingPixelsToCanvas) put the pixels back on the canvas,
+            // so we silently lift them again here to mirror that undo operation.
+            if (isSelectionChange && _selState is { Active: true } &&
+                Document.History.CanRedo && Document.History.PeekRedo() is SelectionTransformItem)
+            {
+                LiftSelectionSilently();
+                return; // canvas recomposite handled inside LiftSelectionSilently
+            }
 
             // Re-sync after structural changes
             if (isStructural)

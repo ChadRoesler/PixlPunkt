@@ -431,6 +431,20 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                         DrawAntsFromBuffer(renderer, _state.Buffer!, _state.BufferWidth, _state.BufferHeight,
                             x, y, (float)scale, animated);
                     }
+                    else if (_state.RegionNonRectangular && _state.PreviewBuf != null)
+                    {
+                        // Non-rectangular selection (polygon, wand, paint): trace the actual
+                        // pixel boundary of the transformed preview buffer so the marquee follows
+                        // the true shape through scale and rotation.
+                        float pivotDocX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.BufferWidth / 2f);
+                        float pivotDocY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.BufferHeight / 2f);
+                        float pivotViewX = (float)(dest.X + pivotDocX * scale);
+                        float pivotViewY = (float)(dest.Y + pivotDocY * scale);
+                        float bufLeft = pivotViewX - (float)(_state.PreviewW * scale / 2.0);
+                        float bufTop = pivotViewY - (float)(_state.PreviewH * scale / 2.0);
+                        DrawAntsFromBuffer(renderer, _state.PreviewBuf, _state.PreviewW, _state.PreviewH,
+                            bufLeft, bufTop, (float)scale, animated);
+                    }
                     else
                     {
                         int scaledW = Math.Max(1, (int)Math.Round((_state.OrigW > 0 ? _state.OrigW : _state.BufferWidth) * _state.ScaleX));

@@ -41,6 +41,7 @@ namespace PixlPunkt.Core.History
             public readonly double AngleDeg;
             public readonly double CumulativeAngleDeg;
             public readonly SelectionRegion Region;
+            public readonly bool RegionNonRectangular;
 
             public FloatingSnapshot(
                 byte[] buffer, int bufferWidth, int bufferHeight,
@@ -49,7 +50,8 @@ namespace PixlPunkt.Core.History
                 int origCenterX, int origCenterY,
                 double scaleX, double scaleY,
                 double angleDeg, double cumulativeAngleDeg,
-                SelectionRegion region)
+                SelectionRegion region,
+                bool regionNonRectangular = false)
             {
                 Buffer = buffer;
                 BufferWidth = bufferWidth;
@@ -65,6 +67,7 @@ namespace PixlPunkt.Core.History
                 AngleDeg = angleDeg;
                 CumulativeAngleDeg = cumulativeAngleDeg;
                 Region = region;
+                RegionNonRectangular = regionNonRectangular;
             }
         }
 
@@ -73,7 +76,6 @@ namespace PixlPunkt.Core.History
         private readonly byte[] _pixelsBefore;
         private readonly byte[] _pixelsAfter;
         private readonly FloatingSnapshot _floatingBefore;
-        private readonly SelectionRegion _regionAfter;
         private readonly Action<FloatingSnapshot> _restoreFloating;
         private readonly Action _clearFloating;
         private readonly Action<RasterLayer, RectInt32, byte[]> _applyPixels;
@@ -92,7 +94,6 @@ namespace PixlPunkt.Core.History
         /// <param name="pixelsBefore">Pixel data before the commit.</param>
         /// <param name="pixelsAfter">Pixel data after the commit.</param>
         /// <param name="floatingBefore">The floating selection state before commit.</param>
-        /// <param name="regionAfter">The selection region after commit (may be empty).</param>
         /// <param name="restoreFloating">Callback to restore floating selection state.</param>
         /// <param name="clearFloating">Callback to clear floating selection state.</param>
         /// <param name="applyPixels">Callback to apply pixel data to layer.</param>
@@ -102,7 +103,6 @@ namespace PixlPunkt.Core.History
             byte[] pixelsBefore,
             byte[] pixelsAfter,
             FloatingSnapshot floatingBefore,
-            SelectionRegion regionAfter,
             Action<FloatingSnapshot> restoreFloating,
             Action clearFloating,
             Action<RasterLayer, RectInt32, byte[]> applyPixels)
@@ -112,7 +112,6 @@ namespace PixlPunkt.Core.History
             _pixelsBefore = pixelsBefore ?? throw new ArgumentNullException(nameof(pixelsBefore));
             _pixelsAfter = pixelsAfter ?? throw new ArgumentNullException(nameof(pixelsAfter));
             _floatingBefore = floatingBefore;
-            _regionAfter = regionAfter?.Clone() ?? new SelectionRegion();
             _restoreFloating = restoreFloating ?? throw new ArgumentNullException(nameof(restoreFloating));
             _clearFloating = clearFloating ?? throw new ArgumentNullException(nameof(clearFloating));
             _applyPixels = applyPixels ?? throw new ArgumentNullException(nameof(applyPixels));

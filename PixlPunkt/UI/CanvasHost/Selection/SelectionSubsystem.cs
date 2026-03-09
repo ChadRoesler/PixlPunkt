@@ -313,6 +313,9 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// <summary>Gets or sets whether the buffer has been flipped (requires buffer-based ant drawing).</summary>
         public bool BufferFlipped { get; set; }
 
+        /// <summary>Gets or sets whether the selection region is non-rectangular (polygon, wand, or paint selection).</summary>
+        public bool RegionNonRectangular { get; set; }
+
         // ════════════════════════════════════════════════════════════════════
         // COMBINE MODE STATE
         // ════════════════════════════════════════════════════════════════════
