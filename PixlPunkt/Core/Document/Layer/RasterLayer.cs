@@ -43,7 +43,11 @@ namespace PixlPunkt.Core.Document.Layer
         private byte _opacity = DefaultOpacity;
         private BlendMode _blend = DefaultBlend;
 
-        private WriteableBitmap _previewBitmap;
+        // Created on first access to Preview rather than in the constructor: WriteableBitmap
+        // needs a UI dispatcher, and the document model must be constructible without one
+        // (importers, document IO and every unit test run without a UI thread).
+        private WriteableBitmap? _previewBitmap;
+        private bool _previewDirty = true;
 
         private bool _updatingPreview;
 
@@ -71,16 +75,12 @@ namespace PixlPunkt.Core.Document.Layer
             Surface = new PixelSurface(w, h);
             Name = name;
 
-            _previewBitmap = new WriteableBitmap(w, h);
-
             // Populate effects from the registry (built-in + plugins)
             SyncEffectsFromRegistry();
 
             // Subscribe to registry changes for plugin effect support
             EffectRegistry.Shared.EffectRegistered += OnEffectRegistered;
             EffectRegistry.Shared.EffectUnregistered += OnEffectUnregistered;
-
-            UpdatePreview(); // initial (blank over pattern)
 
             Surface.PixelsChanged += OnSurfacePixelsChanged;
         }
@@ -312,7 +312,15 @@ namespace PixlPunkt.Core.Document.Layer
         /// The preview is automatically updated whenever <see cref="Surface"/> pixels change.
         /// Effects are not applied to the preview; it shows raw pixel data only.
         /// </remarks>
-        public ImageSource Preview => _previewBitmap;
+        public ImageSource Preview
+        {
+            get
+            {
+                if (_previewBitmap == null || _previewDirty)
+                    RebuildPreviewBitmap();
+                return _previewBitmap!;
+            }
+        }
 
         /// <summary>
         /// Gets the bounding rectangle of the layer in canvas coordinates.
@@ -512,6 +520,18 @@ namespace PixlPunkt.Core.Document.Layer
         /// </remarks>
         public void UpdatePreview()
         {
+            _previewDirty = true;
+
+            // Only rebuild eagerly if some UI has already asked for the preview; until then
+            // there is nothing bound to it and the first Preview read will build it.
+            if (_previewBitmap != null)
+                RebuildPreviewBitmap();
+
+            OnPropertyChanged(nameof(Preview));
+        }
+
+        private void RebuildPreviewBitmap()
+        {
             if (_updatingPreview) return;
             _updatingPreview = true;
             try
@@ -530,13 +550,13 @@ namespace PixlPunkt.Core.Document.Layer
 
                 // Write all pixels in one operation (faster than row-by-row)
                 stream.Write(src, 0, src.Length);
+
+                _previewDirty = false;
             }
             finally
             {
                 _updatingPreview = false;
             }
-
-            OnPropertyChanged(nameof(Preview));
         }
 
         /// <summary>

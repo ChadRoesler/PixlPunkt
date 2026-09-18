@@ -106,6 +106,19 @@ namespace PixlPunkt.UI
             (Content as FrameworkElement)?.XamlRoot
             ?? throw new InvalidOperationException("Main window XamlRoot is unavailable.");
 
+        /// <summary>
+        /// Like <see cref="MainXamlRoot"/> but never throws: returns null before the content
+        /// exists and after the window has closed. Focus events still arrive during teardown,
+        /// and <c>Window.Content</c> throws <c>COMException 0x800710DD</c> once the native
+        /// window is gone.
+        /// </summary>
+        private XamlRoot? TryGetMainXamlRoot()
+        {
+            if (_closingHandled) return null;
+            try { return (Content as FrameworkElement)?.XamlRoot; }
+            catch (Exception) { return null; }
+        }
+
         // ─────────────────────────────────────────────────────────────
         // CONSTRUCTOR
         // ─────────────────────────────────────────────────────────────
@@ -374,6 +387,14 @@ namespace PixlPunkt.UI
             // Prevent re-entrancy
             if (_closingHandled) return;
             _closingHandled = true;
+
+            // Focus events keep firing while the tree tears down; they must not touch the window.
+            try
+            {
+                Root.GotFocus -= OnAnyGotFocus;
+                Root.LostFocus -= OnAnyLostFocus;
+            }
+            catch (Exception) { }
 
             // Stop and dispose auto-save service
             _autoSave.Dispose();
@@ -667,9 +688,9 @@ namespace PixlPunkt.UI
         /// <summary>
         /// Checks if a text input control currently has focus.
         /// </summary>
-        private static bool IsTextInputFocused()
+        private bool IsTextInputFocused()
         {
-            var focused = FocusManager.GetFocusedElement();
+            var focused = TryGetMainXamlRoot() is { } focusRoot ? FocusManager.GetFocusedElement(focusRoot) : null;
             return focused switch
             {
                 TextBox => true,
@@ -684,9 +705,9 @@ namespace PixlPunkt.UI
         /// <summary>
         /// Checks if a control that might intercept keyboard shortcuts has focus.
         /// </summary>
-        private static bool IsKeyboardCapturingControlFocused()
+        private bool IsKeyboardCapturingControlFocused()
         {
-            var focused = FocusManager.GetFocusedElement();
+            var focused = TryGetMainXamlRoot() is { } focusRoot ? FocusManager.GetFocusedElement(focusRoot) : null;
             return focused switch
             {
                 TextBox => true,
@@ -1402,16 +1423,9 @@ namespace PixlPunkt.UI
                         // For now, return null - full implementation would query SelectionSubsystem
                         return null;
                     },
-                    isPointSelected: (x, y) =>
-                    {
-                        // Default to true (all points selected) when no selection
-                        return !(CurrentHost?.HasSelection ?? false) || true;
-                    },
-                    getSelectionMask: (x, y) =>
-                    {
-                        // Default to 255 (fully selected) when no selection
-                        return 255;
-                    }
+                    // With no constraining selection every point is selected (mask 255).
+                    isPointSelected: (x, y) => CurrentHost?.IsPointSelected(x, y) ?? true,
+                    getSelectionMask: (x, y) => (CurrentHost?.IsPointSelected(x, y) ?? true) ? (byte)255 : (byte)0
                 );
             };
         }

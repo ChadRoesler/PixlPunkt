@@ -41,7 +41,10 @@ namespace PixlPunkt.Core.Document.Layer
         // FIELDS
         // ====================================================================
 
-        private WriteableBitmap _previewBitmap;
+        // Created on first access to Preview; see RasterLayer for why the model must not
+        // touch WriteableBitmap in its constructor.
+        private WriteableBitmap? _previewBitmap;
+        private bool _previewDirty = true;
         private bool _updatingPreview;
         private bool _isEnabled = true;
         private bool _isInverted;
@@ -161,7 +164,15 @@ namespace PixlPunkt.Core.Document.Layer
         /// <summary>
         /// Gets the preview image for the mask (grayscale representation).
         /// </summary>
-        public ImageSource Preview => _previewBitmap;
+        public ImageSource Preview
+        {
+            get
+            {
+                if (_previewBitmap == null || _previewDirty)
+                    RebuildPreviewBitmap();
+                return _previewBitmap!;
+            }
+        }
 
         // ====================================================================
         // EVENTS
@@ -188,7 +199,6 @@ namespace PixlPunkt.Core.Document.Layer
         public LayerMask(int width, int height)
         {
             Surface = new PixelSurface(width, height);
-            _previewBitmap = new WriteableBitmap(width, height);
 
             // Initialize to white (fully visible)
             Fill(255);
@@ -209,7 +219,6 @@ namespace PixlPunkt.Core.Document.Layer
                 throw new ArgumentException("Mask data length doesn't match dimensions", nameof(maskData));
 
             Surface = new PixelSurface(width, height);
-            _previewBitmap = new WriteableBitmap(width, height);
 
             // Convert grayscale to BGRA
             var pixels = Surface.Pixels;
@@ -362,6 +371,17 @@ namespace PixlPunkt.Core.Document.Layer
         /// </summary>
         public void UpdatePreview()
         {
+            _previewDirty = true;
+
+            // Only rebuild eagerly once some UI has asked for the preview.
+            if (_previewBitmap != null)
+                RebuildPreviewBitmap();
+
+            OnPropertyChanged(nameof(Preview));
+        }
+
+        private void RebuildPreviewBitmap()
+        {
             if (_updatingPreview) return;
             _updatingPreview = true;
             try
@@ -370,8 +390,8 @@ namespace PixlPunkt.Core.Document.Layer
                 int h = Height;
                 var src = Surface.Pixels;
 
-                // Recreate preview bitmap if dimensions changed
-                if (_previewBitmap.PixelWidth != w || _previewBitmap.PixelHeight != h)
+                // (Re)create the bitmap when missing or when dimensions changed
+                if (_previewBitmap == null || _previewBitmap.PixelWidth != w || _previewBitmap.PixelHeight != h)
                 {
                     _previewBitmap = new WriteableBitmap(w, h);
                 }
@@ -381,13 +401,13 @@ namespace PixlPunkt.Core.Document.Layer
 
                 // Copy surface pixels directly (already in correct format)
                 stream.Write(src, 0, src.Length);
+
+                _previewDirty = false;
             }
             finally
             {
                 _updatingPreview = false;
             }
-
-            OnPropertyChanged(nameof(Preview));
         }
 
         /// <summary>
@@ -406,7 +426,7 @@ namespace PixlPunkt.Core.Document.Layer
             // Create new pixel buffer
             var newPixels = new byte[newWidth * newHeight * 4];
             Surface.Resize(newWidth, newHeight, newPixels);
-            _previewBitmap = new WriteableBitmap(newWidth, newHeight);
+            _previewDirty = true; // the next Preview read rebuilds at the new size
 
             // Fill with white (visible) first
             Fill(255);

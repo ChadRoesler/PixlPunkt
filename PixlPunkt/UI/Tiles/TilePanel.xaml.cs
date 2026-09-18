@@ -464,7 +464,7 @@ namespace PixlPunkt.UI.Tiles
             var destRect = new SKRect(destX, destY, destX + destW, destY + destH);
             var srcRect = new SKRect(0, 0, tileW, tileH);
 
-            using var paint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
+            using var paint = new SKPaint { IsAntialias = false };
             canvas.DrawBitmap(bitmap, srcRect, destRect, paint);
         }
 

@@ -432,7 +432,6 @@ namespace PixlPunkt.UI.Preview
 
             using var paint = new SKPaint
             {
-                FilterQuality = SKFilterQuality.None,
                 IsAntialias = false
             };
             canvas.DrawBitmap(compositeBmp, new SKRect(0, 0, _docWidth, _docHeight), destRect, paint);

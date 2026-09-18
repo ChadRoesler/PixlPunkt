@@ -84,7 +84,7 @@ namespace PixlPunkt.UI.Converters
                         return uint.TryParse(token, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u) ? (uint?)u : null;
                     })
                     .Where(u => u.HasValue)
-                    .Select(u => u.Value)
+                    .Select(u => u!.Value)
                     .ToArray();
                 return list;
             }

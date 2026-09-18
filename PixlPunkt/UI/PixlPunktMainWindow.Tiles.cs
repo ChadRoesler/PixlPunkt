@@ -708,6 +708,42 @@ namespace PixlPunkt.UI
         }
 
         /// <summary>
+        /// Renumbers the tile ids 1..N so deletions don't leave gaps like 1, 3, 45, 56, 90.
+        /// Every layer mapping and voxel side-tile reference follows; one undo step.
+        /// </summary>
+        private async void Tiles_Renumber_Click(object sender, RoutedEventArgs e)
+        {
+            var doc = CurrentHost?.Document;
+            if (doc is null || doc.TileSet.Count == 0)
+            {
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    XamlRoot = MainXamlRoot,
+                    Title = "No Tiles",
+                    Content = "No tiles to renumber.",
+                    CloseButtonText = "OK"
+                });
+                return;
+            }
+
+            int changed = doc.RenumberTiles();
+
+            TilePanel?.RefreshTiles();
+            CurrentHost?.InvalidateCanvas();
+            UpdateHistoryUI();
+
+            await ShowDialogGuardedAsync(new ContentDialog
+            {
+                XamlRoot = MainXamlRoot,
+                Title = changed == 0 ? "Already Sequential" : "Renumber Complete",
+                Content = changed == 0
+                    ? $"Tile ids already run 1–{doc.TileSet.Count}."
+                    : $"Renumbered {changed} tile(s); ids now run 1–{doc.TileSet.Count}.",
+                CloseButtonText = "OK"
+            });
+        }
+
+        /// <summary>
         /// Removes tiles that are not used in any layer mapping.
         /// </summary>
         private async void Tiles_RemoveUnused_Click(object sender, RoutedEventArgs e)

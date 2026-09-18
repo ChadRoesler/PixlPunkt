@@ -252,7 +252,7 @@ namespace PixlPunkt.Core.Animation
                 {
                     var reel = Load(stream);
                     LoggingService.Info("Loaded tile animation reel: {Name} from {Path} (v{Version}, embedded={HasPixels})", 
-                        reel?.Name, filePath, reel?.HasEmbeddedPixels == true ? "2" : "1", reel?.HasEmbeddedPixels);
+                        reel?.Name ?? "(unnamed)", filePath, reel?.HasEmbeddedPixels == true ? "2" : "1", reel?.HasEmbeddedPixels ?? false);
                     return reel;
                 }
             }

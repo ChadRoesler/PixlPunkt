@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using PixlPunkt.Core.Document;
+using PixlPunkt.Core.History;
 using PixlPunkt.PluginSdk.Voxel;
 
 namespace PixlPunkt.Core.Voxel.Editing
@@ -12,11 +13,16 @@ namespace PixlPunkt.Core.Voxel.Editing
     {
         private readonly VoxelModelDocumentState _model;
 
-        public VoxelEditEngine(VoxelModelDocumentState model)
+        /// <param name="model">The voxel model to edit.</param>
+        /// <param name="history">
+        /// The stack voxel edits are recorded on. Pass the document's so the canvas and the voxel
+        /// workspace share one undo timeline; null gives the engine a private stack (tests).
+        /// </param>
+        public VoxelEditEngine(VoxelModelDocumentState model, UnifiedHistoryStack? history = null)
         {
             _model = model ?? throw new ArgumentNullException(nameof(model));
             Selection = new VoxelSelectionService();
-            History = new VoxelCommandHistory();
+            History = new VoxelCommandHistory(history);
 
             Selection.SelectionChanged += () => SelectionChanged?.Invoke();
             History.HistoryChanged += () => HistoryChanged?.Invoke();

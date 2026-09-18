@@ -34,11 +34,23 @@ namespace PixlPunkt.Core.History
         private bool _suppressChanged;
         private HistoryMemoryManager? _memoryManager;
 
+        // An open group collects pushes until EndGroup; nesting depth lets callers compose.
+        private HistoryGroupItem? _openGroup;
+        private int _groupDepth;
+
         /// <summary>
-        /// Tracks the undo stack count at the last save point.
-        /// -1 indicates the document has never been saved (always dirty if any changes exist).
+        /// The item that sat on top of the undo stack at the last save point, and the depth it
+        /// sat at. Depth alone is not enough: undoing and then making a new edit returns the
+        /// stack to the same depth via a completely different item.
         /// </summary>
-        private int _savedUndoCount = 0;
+        private IHistoryItem? _savedItem;
+        private int _savedDepth;
+
+        /// <summary>
+        /// False once the save point can no longer be returned to, which happens when a push
+        /// discards a redo stack that still held it.
+        /// </summary>
+        private bool _savePointReachable = true;
 
         /// <summary>
         /// Gets a value indicating whether undo is available.
@@ -93,14 +105,15 @@ namespace PixlPunkt.Core.History
         /// Gets a value indicating whether the document has unsaved changes.
         /// </summary>
         /// <remarks>
-        /// The document is considered dirty if the current undo stack count differs from
-        /// the count at the last save point. This correctly handles undo/redo operations
-        /// that might return the document to a saved state.
+        /// The document is clean only when the history cursor sits exactly on the save point.
+        /// Comparing stack depth alone is not sufficient - saving, undoing once and then making
+        /// a fresh edit returns the stack to the saved depth while holding entirely different
+        /// work, so the identity of the item on top is checked too.
         /// </remarks>
         public bool IsDirty =>
-            _savedUndoCount < 0
-                ? _undo.Count > 0
-                : _undo.Count != _savedUndoCount;
+            !_savePointReachable ||
+            _undo.Count != _savedDepth ||
+            !ReferenceEquals(PeekUndo(), _savedItem);
 
         /// <summary>
         /// Fired when the history state changes (after push, undo, or redo).
@@ -153,6 +166,44 @@ namespace PixlPunkt.Core.History
         }
 
         /// <summary>
+        /// Starts a group: every push until the matching <see cref="EndGroup"/> becomes one undo
+        /// step named <paramref name="description"/>. Groups nest; only the outermost is pushed.
+        /// </summary>
+        /// <param name="description">The name shown for the undo step.</param>
+        public void BeginGroup(string description)
+        {
+            if (_groupDepth++ == 0)
+                _openGroup = new HistoryGroupItem(description);
+        }
+
+        /// <summary>Closes the current group and pushes it (a single-item group pushes just that item).</summary>
+        public void EndGroup()
+        {
+            if (_groupDepth == 0) return;
+            if (--_groupDepth > 0) return;
+
+            var group = _openGroup!;
+            _openGroup = null;
+            if (group.Count == 1) PushCore(group.Items[0]);
+            else if (group.Count > 1) PushCore(group);
+        }
+
+        /// <summary>Abandons the current group, undoing whatever it had collected.</summary>
+        public void CancelGroup()
+        {
+            if (_groupDepth == 0) return;
+            _groupDepth = 0;
+            var group = _openGroup;
+            _openGroup = null;
+            if (group == null) return;
+            group.Undo();
+            group.Dispose();
+        }
+
+        /// <summary>Whether a group is currently open.</summary>
+        public bool IsGroupOpen => _groupDepth > 0;
+
+        /// <summary>
         /// Pushes a new history item onto the undo stack.
         /// </summary>
         /// <param name="item">The history item to push.</param>
@@ -166,6 +217,30 @@ namespace PixlPunkt.Core.History
 
             // Skip empty pixel changes
             if (item is PixelChangeItem pci && pci.IsEmpty) return;
+
+            if (_openGroup != null)
+            {
+                _openGroup.Add(item);
+                return;
+            }
+
+            // Consecutive items of a kind that coalesces (a run of nudges) collapse into the
+            // previous one, so the user gets one undo step per gesture rather than per tick.
+            if (_redo.Count == 0 && _undo.Count > 0 && _undo.Peek() is ICoalescingHistoryItem prev && prev.TryAbsorb(item))
+            {
+                RaiseChanged();
+                return;
+            }
+
+            PushCore(item);
+        }
+
+        private void PushCore(IHistoryItem item)
+        {
+            // If the cursor is behind the save point, that point lives in the redo stack we are
+            // about to discard, so it can never be returned to again.
+            if (_undo.Count < _savedDepth)
+                _savePointReachable = false;
 
             // Dispose redo items that support it
             foreach (var redoItem in _redo)
@@ -204,7 +279,16 @@ namespace PixlPunkt.Core.History
             // Ensure item is loaded if it was offloaded
             _memoryManager?.EnsureLoaded(item);
 
-            item.Undo();
+            try
+            {
+                item.Undo();
+            }
+            catch
+            {
+                // Put it back where it was so the timeline stays intact; the caller sees the error.
+                _undo.Push(item);
+                throw;
+            }
             _redo.Push(item);
             LoggingService.Info("History undo item={Item} undoCount={UndoCount} redoCount={RedoCount}", item.Description, _undo.Count, _redo.Count);
             if (raise) RaiseChanged();
@@ -224,7 +308,15 @@ namespace PixlPunkt.Core.History
             // Ensure item is loaded if it was offloaded
             _memoryManager?.EnsureLoaded(item);
 
-            item.Redo();
+            try
+            {
+                item.Redo();
+            }
+            catch
+            {
+                _redo.Push(item);
+                throw;
+            }
             _undo.Push(item);
             LoggingService.Info("History redo item={Item} undoCount={UndoCount} redoCount={RedoCount}", item.Description, _undo.Count, _redo.Count);
             if (raise) RaiseChanged();
@@ -248,10 +340,16 @@ namespace PixlPunkt.Core.History
                     disposable.Dispose();
             }
 
+            // Clearing discards the save point either way; preserve the dirty flag it implied.
+            bool wasDirty = IsDirty;
+
             _undo.Clear();
             _redo.Clear();
             LoggingService.Info("History cleared");
-            if (resetSaveState) _savedUndoCount = 0;
+
+            _savedItem = null;
+            _savedDepth = 0;
+            _savePointReachable = resetSaveState || !wasDirty;
             RaiseChanged();
         }
 
@@ -265,8 +363,10 @@ namespace PixlPunkt.Core.History
         /// </remarks>
         public void MarkSaved()
         {
-            _savedUndoCount = _undo.Count;
-            LoggingService.Info("History marked saved at undoCount={UndoCount}", _savedUndoCount);
+            _savedItem = PeekUndo();
+            _savedDepth = _undo.Count;
+            _savePointReachable = true;
+            LoggingService.Info("History marked saved at undoCount={UndoCount}", _savedDepth);
             RaiseChanged();
         }
 

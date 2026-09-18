@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.UI;
 using PixlPunkt.Core.Rendering;
 using Windows.Foundation;
@@ -13,7 +14,7 @@ namespace PixlPunkt.Core.Selection
     /// <remarks>
     /// <para>
     /// SelectionRegion provides a lightweight pixel mask for rectangular selection operations with
-    /// efficient add/subtract operations and tight bounds tracking. Unlike <see cref="SelectionMask"/>, 
+    /// efficient add/subtract operations and tight bounds tracking. Unlike <c>SelectionMask</c>, 
     /// this class focuses on simple rectangle-based operations and includes rendering support for
     /// animated marching-ants outlines.
     /// </para>
@@ -38,12 +39,15 @@ namespace PixlPunkt.Core.Selection
     /// bounds recomputation to tighten after potential holes. Point containment is O(1) with bounds culling.
     /// </para>
     /// </remarks>
-    /// <seealso cref="SelectionMask"/>
-    /// <seealso cref="SelectionEngine"/>
     public sealed class SelectionRegion
     {
         private int _w, _h;
         private byte[] _m = Array.Empty<byte>();
+
+        /// <summary>Bumped on every mask mutation; consumers (the ants edge cache) key on it.</summary>
+        private int _version;
+        /// <summary>Gets a number that changes whenever the mask changes.</summary>
+        public int Version => _version;
         private RectInt32 _bounds; // tight bounds of any 1s; (0,0,0,0) == empty
 
         // NEW: Origin offset - allows the region to be positioned anywhere in world space
@@ -125,6 +129,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         public void EnsureSize(int w, int h)
         {
+            _version++;
             if (w <= 0 || h <= 0)
             {
                 _w = _h = 0;
@@ -151,6 +156,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         public void Clear()
         {
+            _version++;
             if (_m.Length > 0) Array.Clear(_m, 0, _m.Length);
             _bounds = CreateRect(0, 0, 0, 0);
             _offsetX = 0;
@@ -206,116 +212,98 @@ namespace PixlPunkt.Core.Selection
             return _m[localY * _w + localX] != 0;
         }
 
+        // Edge runs in local mask coordinates, rebuilt only when the mask changes. Drawing the
+        // ants every frame used to re-scan the whole bounds four times per frame.
+        private readonly List<(int x0, int yEdge, int x1, bool invert)> _antsH = new();
+        private readonly List<(int xEdge, int y0, int y1, bool invert)> _antsV = new();
+        private int _antsCacheVersion = -1;
+
         /// <summary>
-        /// Renders animated marching-ants outline along the outer boundary of the selection.
+        /// Renders the animated marching-ants outline. Edge runs are computed once per mask
+        /// version and cached; each frame only draws them at the current phase.
         /// </summary>
-        /// <param name="renderer">Canvas renderer for rendering.</param>
-        /// <param name="dest">Destination rectangle in view space.</param>
-        /// <param name="scale">Zoom scale factor (document pixels → view pixels).</param>
-        /// <param name="phase">Animation phase offset in pixels. Increment over time to animate.</param>
-        /// <param name="antsOn">Length of white segments in pixels.</param>
-        /// <param name="antsOff">Length of black segments in pixels.</param>
-        /// <param name="antsThickness">Line thickness in pixels.</param>
-        /// <remarks>
-        /// <para><strong>Edge Detection Algorithm:</strong></para>
-        /// <para>
-        /// Scans the selection bounds to identify edge pixels (selected with unselected neighbor).
-        /// Four passes detect top, bottom, left, and right edges separately. Consecutive edge pixels
-        /// are coalesced into line segments for efficient rendering.
-        /// </para>
-        /// <para><strong>Pattern Alternation:</strong></para>
-        /// <para>
-        /// Horizontal edges use normal phase; vertical edges use inverted phase (offset by antsOn).
-        /// This creates a checkerboard pattern at corners where edges meet, ensuring seamless animation.
-        /// </para>
-        /// <para><strong>Performance:</strong></para>
-        /// <para>
-        /// Complexity is O(boundsArea), only scanning tight bounds rather than full mask. Segment
-        /// coalescing minimizes draw calls for continuous edges.
-        /// </para>
-        /// </remarks>
         public void DrawAnts(ICanvasRenderer renderer, Rect dest, double scale, float phase,
                              float antsOn, float antsOff, float antsThickness)
         {
             if (IsEmpty) return;
 
+            if (_antsCacheVersion != _version)
+                RebuildAntsEdges();
+
             // convert mask-space -> view-space, accounting for world-space offset
             float ox = (float)(dest.X + _offsetX * scale);
             float oy = (float)(dest.Y + _offsetY * scale);
             float s = (float)scale;
+
+            foreach (var (x0, yEdge, x1, invert) in _antsH)
+                DrawAntsH(renderer, ox + x0 * s, oy + yEdge * s, (x1 - x0) * s, phase, antsOn, antsOff, antsThickness, invert);
+            foreach (var (xEdge, y0, y1, invert) in _antsV)
+                DrawAntsV(renderer, ox + xEdge * s, oy + y0 * s, (y1 - y0) * s, phase, antsOn, antsOff, antsThickness, invert);
+        }
+
+        private void RebuildAntsEdges()
+        {
+            _antsH.Clear();
+            _antsV.Clear();
+            _antsCacheVersion = _version;
             var b = _bounds; // local bounds (not including offset)
 
-            // Horizontal "top" edges: cell=1 and above=0
+            // Top edges: cell=1 and above=0
             for (int y = b.Y; y < b.Y + b.Height; y++)
             {
                 int runX0 = -1;
                 for (int x = b.X; x <= b.X + b.Width; x++)
                 {
-                    bool edge = (At(x, y) == 1) && (At(x, y - 1) == 0);
+                    bool edge = At(x, y) == 1 && At(x, y - 1) == 0;
                     if (edge && runX0 < 0) runX0 = x;
                     if ((!edge || x == b.X + b.Width) && runX0 >= 0)
                     {
-                        float ex = ox + runX0 * s;
-                        float ey = oy + y * s;
-                        float len = (x - runX0) * s;
-                        DrawAntsH(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: false);
+                        _antsH.Add((runX0, y, x, false));
                         runX0 = -1;
                     }
                 }
             }
-
-            // Bottom edges: cell=1 and below=0 (invert pattern so corners alternate)
+            // Bottom edges: cell=1 and below=0 (inverted pattern so corners alternate)
             for (int y = b.Y; y < b.Y + b.Height; y++)
             {
                 int runX0 = -1;
                 for (int x = b.X; x <= b.X + b.Width; x++)
                 {
-                    bool edge = (At(x, y) == 1) && (At(x, y + 1) == 0);
+                    bool edge = At(x, y) == 1 && At(x, y + 1) == 0;
                     if (edge && runX0 < 0) runX0 = x;
                     if ((!edge || x == b.X + b.Width) && runX0 >= 0)
                     {
-                        float ex = ox + runX0 * s;
-                        float ey = oy + (y + 1) * s;
-                        float len = (x - runX0) * s;
-                        DrawAntsH(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: true);
+                        _antsH.Add((runX0, y + 1, x, true));
                         runX0 = -1;
                     }
                 }
             }
-
             // Left edges: cell=1 and left=0
             for (int x = b.X; x < b.X + b.Width; x++)
             {
                 int runY0 = -1;
                 for (int y = b.Y; y <= b.Y + b.Height; y++)
                 {
-                    bool edge = (At(x, y) == 1) && (At(x - 1, y) == 0);
+                    bool edge = At(x, y) == 1 && At(x - 1, y) == 0;
                     if (edge && runY0 < 0) runY0 = y;
                     if ((!edge || y == b.Y + b.Height) && runY0 >= 0)
                     {
-                        float ex = ox + x * s;
-                        float ey = oy + runY0 * s;
-                        float len = (y - runY0) * s;
-                        DrawAntsV(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: false);
+                        _antsV.Add((x, runY0, y, false));
                         runY0 = -1;
                     }
                 }
             }
-
-            // Right edges: cell=1 and right=0 (invert)
+            // Right edges: cell=1 and right=0 (inverted)
             for (int x = b.X; x < b.X + b.Width; x++)
             {
                 int runY0 = -1;
                 for (int y = b.Y; y <= b.Y + b.Height; y++)
                 {
-                    bool edge = (At(x, y) == 1) && (At(x + 1, y) == 0);
+                    bool edge = At(x, y) == 1 && At(x + 1, y) == 0;
                     if (edge && runY0 < 0) runY0 = y;
                     if ((!edge || y == b.Y + b.Height) && runY0 >= 0)
                     {
-                        float ex = ox + (x + 1) * s;
-                        float ey = oy + runY0 * s;
-                        float len = (y - runY0) * s;
-                        DrawAntsV(renderer, ex, ey, len, phase, antsOn, antsOff, antsThickness, invert: true);
+                        _antsV.Add((x + 1, runY0, y, true));
                         runY0 = -1;
                     }
                 }
@@ -376,6 +364,7 @@ namespace PixlPunkt.Core.Selection
         /// </summary>
         private void Fill(RectInt32 r, bool modeAdd)
         {
+            _version++;
             if (_w == 0 || _h == 0) return;
 
             int x0 = Math.Clamp(r.X, 0, _w);
@@ -420,6 +409,10 @@ namespace PixlPunkt.Core.Selection
         /// <returns>A new <see cref="SelectionRegion"/> with identical mask, bounds, and offset.</returns>
         public SelectionRegion Clone()
         {
+            // SubtractPixelFast defers bounds recomputation; settle it before copying so the
+            // clone (which is what undo snapshots hold) never records stale bounds as valid.
+            RecomputeBoundsIfNeeded();
+
             var r = new SelectionRegion();
             r._w = _w;
             r._h = _h;
@@ -428,6 +421,28 @@ namespace PixlPunkt.Core.Selection
             r._offsetX = _offsetX;
             r._offsetY = _offsetY;
             return r;
+        }
+
+        /// <summary>Returns a copy of the raw mask with its geometry, for encoding.</summary>
+        public (int Width, int Height, int OffsetX, int OffsetY, byte[] Mask) ExportMask()
+        {
+            RecomputeBoundsIfNeeded();
+            return (_w, _h, _offsetX, _offsetY, (byte[])_m.Clone());
+        }
+
+        /// <summary>Replaces the mask and geometry wholesale (the decoded form of <see cref="ExportMask"/>).</summary>
+        public void ImportMask(int width, int height, int offsetX, int offsetY, byte[] mask)
+        {
+            _version++;
+            if (width < 0 || height < 0 || mask.Length != width * height)
+                throw new ArgumentException("Mask does not match the given dimensions.", nameof(mask));
+            _w = width;
+            _h = height;
+            _m = mask;
+            _offsetX = offsetX;
+            _offsetY = offsetY;
+            _boundsInvalid = false;
+            RecomputeBounds();
         }
 
         /// <summary>
@@ -440,6 +455,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         public void CopyFrom(SelectionRegion other)
         {
+            _version++;
             _w = other._w;
             _h = other._h;
             _m = other._m.Length > 0 ? (byte[])other._m.Clone() : Array.Empty<byte>();
@@ -459,6 +475,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         public void AddRegion(SelectionRegion other)
         {
+            _version++;
             if (other._w != _w || other._h != _h)
                 throw new InvalidOperationException("SelectionRegion size mismatch");
 
@@ -491,6 +508,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         public void IntersectRegion(SelectionRegion other)
         {
+            _version++;
             if (other._w != _w || other._h != _h)
                 throw new InvalidOperationException("SelectionRegion size mismatch");
 
@@ -512,6 +530,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         public void SubtractRegion(SelectionRegion other)
         {
+            _version++;
             if (other._w != _w || other._h != _h)
                 throw new InvalidOperationException("SelectionRegion size mismatch");
 
@@ -571,8 +590,36 @@ namespace PixlPunkt.Core.Selection
         /// This is a performance optimization for batch subtract operations (e.g., paint selection tool).
         /// After calling this multiple times, you MUST call <see cref="RecomputeBoundsIfNeeded"/> to update bounds.
         /// </remarks>
+        /// <summary>
+        /// Selects a single pixel in local buffer coordinates. Equivalent to
+        /// <c>AddRect(new RectInt32(x, y, 1, 1))</c> without the rectangle clipping and
+        /// struct construction, for callers that visit pixels one at a time (flood fills).
+        /// Bounds expansion is O(1), so no deferred recomputation is needed.
+        /// </summary>
+        public void AddPixel(int x, int y)
+        {
+            _version++;
+            if ((uint)x >= (uint)_w || (uint)y >= (uint)_h) return;
+
+            _m[y * _w + x] = 1;
+
+            if (IsEmpty)
+            {
+                _bounds = CreateRect(x, y, 1, 1);
+                return;
+            }
+
+            int bx0 = Math.Min(_bounds.X, x);
+            int by0 = Math.Min(_bounds.Y, y);
+            int bx1 = Math.Max(_bounds.X + _bounds.Width, x + 1);
+            int by1 = Math.Max(_bounds.Y + _bounds.Height, y + 1);
+            if (bx0 != _bounds.X || by0 != _bounds.Y || bx1 != _bounds.X + _bounds.Width || by1 != _bounds.Y + _bounds.Height)
+                _bounds = CreateRect(bx0, by0, bx1 - bx0, by1 - by0);
+        }
+
         public void SubtractPixelFast(int x, int y)
         {
+            _version++;
             if (_w == 0 || _h == 0) return;
             if ((uint)x >= (uint)_w || (uint)y >= (uint)_h) return;
 
@@ -613,6 +660,7 @@ namespace PixlPunkt.Core.Selection
         /// </remarks>
         public void Invert(int docWidth, int docHeight)
         {
+            _version++;
             if (docWidth <= 0 || docHeight <= 0) return;
 
             // Ensure buffer is sized for the full document

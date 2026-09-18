@@ -117,10 +117,9 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
             using var textPaint = new SKPaint
             {
                 Color = ToSKColor(LabelColor),
-                IsAntialias = true,
-                TextSize = 9,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI")
+                IsAntialias = true
             };
+            using var textFont = new SKFont(SKTypeface.FromFamilyName("Segoe UI"), 9);
 
             // Draw tick marks
             for (int docX = 0; docX <= docWidth; docX++)
@@ -148,7 +147,7 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
                 // Draw label for large ticks
                 if (tickType == TickType.Large && drawLabels && docX > 0)
                 {
-                    canvas.DrawText(docX.ToString(), screenX + 2, 11, textPaint);
+                    canvas.DrawText(docX.ToString(), screenX + 2, 11, SKTextAlign.Left, textFont, textPaint);
                 }
             }
         }
@@ -208,10 +207,9 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
             using var textPaint = new SKPaint
             {
                 Color = ToSKColor(LabelColor),
-                IsAntialias = true,
-                TextSize = 8,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI")
+                IsAntialias = true
             };
+            using var textFont = new SKFont(SKTypeface.FromFamilyName("Segoe UI"), 8);
 
             // Draw tick marks
             for (int docY = 0; docY <= docHeight; docY++)
@@ -243,7 +241,7 @@ namespace PixlPunkt.UI.CanvasHost.Rulers
                     float charY = screenY + 10;
                     foreach (char c in text)
                     {
-                        canvas.DrawText(c.ToString(), 3, charY, textPaint);
+                        canvas.DrawText(c.ToString(), 3, charY, SKTextAlign.Left, textFont, textPaint);
                         charY += 8;
                     }
                 }

@@ -210,8 +210,8 @@ namespace PixlPunkt.UI.CanvasHost
                     snapIndicator.Background = bgBrush as Microsoft.UI.Xaml.Media.Brush;
                 if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var fgBrush))
                 {
-                    snapIcon.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush;
-                    snapText.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush;
+                    snapIcon.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush ?? snapIcon.Foreground;
+                    snapText.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush ?? snapText.Foreground;
                 }
             }
         }
@@ -242,8 +242,8 @@ namespace PixlPunkt.UI.CanvasHost
                 lockIcon.Icon = FluentIcons.Common.Icon.LockOpen;
                 if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var fgBrush))
                 {
-                    lockIcon.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush;
-                    lockText.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush;
+                    lockIcon.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush ?? lockIcon.Foreground;
+                    lockText.Foreground = fgBrush as Microsoft.UI.Xaml.Media.Brush ?? lockText.Foreground;
                 }
             }
         }

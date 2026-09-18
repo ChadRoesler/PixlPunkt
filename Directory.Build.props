@@ -7,6 +7,8 @@
   <PropertyGroup>
     <!-- Enable Central Package Management (CPM) - uses Directory.Packages.props -->
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Lets Directory.Packages.props pin transitive packages (used to lift vulnerable ones). -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     
     <!-- MinVer configuration - shared across all projects -->
     <MinVerTagPrefix>v</MinVerTagPrefix>

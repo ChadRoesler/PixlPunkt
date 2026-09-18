@@ -385,6 +385,19 @@ namespace PixlPunkt.UI.Settings
 
         private async void UpdateBrushPanelInfo()
         {
+            // An unhandled exception in an async void kills the process; keep it contained.
+            try
+            {
+                await UpdateBrushPanelInfoAsync();
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Error("Failed to refresh the brushes panel", ex);
+            }
+        }
+
+        private async Task UpdateBrushPanelInfoAsync()
+        {
             BrushPathBox.Text = BrushMarkIO.GetBrushDirectory();
 
             CustomBrushes.Clear();

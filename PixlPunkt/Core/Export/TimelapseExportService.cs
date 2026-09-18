@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using PixlPunkt.Core.Document;
@@ -123,9 +124,21 @@ namespace PixlPunkt.Core.Export
                 int frameIndex = 0;
                 byte[]? previousFrame = null;
 
+                // This loop runs on the UI thread (it drives the live document's history), so
+                // without yielding the progress dialog never repaints and Cancel is unclickable.
+                // Yield roughly once per frame interval rather than every step.
+                var yieldClock = Stopwatch.StartNew();
+
                 for (int step = rangeStart; step <= rangeEnd; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+
+                    if (yieldClock.ElapsedMilliseconds >= 16)
+                    {
+                        await Task.Yield();
+                        cancellationToken.ThrowIfCancellationRequested();
+                        yieldClock.Restart();
+                    }
 
                     // Jump to this history position (automatically reloads offloaded items)
                     history.JumpTo(step);

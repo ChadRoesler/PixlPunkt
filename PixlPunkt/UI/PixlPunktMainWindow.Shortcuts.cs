@@ -467,13 +467,12 @@ namespace PixlPunkt.UI
         {
             var workspaceHost = GetActiveDocumentWorkspaceHost();
             var voxelWorkspace = workspaceHost?.VoxelWorkspace;
-            if (voxelWorkspace?.IsWorkspaceFocused() == true && voxelWorkspace.CanUndoVoxelEdits)
+            // One stack: the workspace steps it only when the top item is a voxel edit,
+            // otherwise the canvas host does (it knows how to refresh after a canvas item).
+            if (voxelWorkspace?.IsWorkspaceFocused() == true && voxelWorkspace.TryUndoVoxelEdit())
             {
-                if (voxelWorkspace.TryUndoVoxelEdit())
-                {
-                    UpdateHistoryUI();
-                    return true;
-                }
+                UpdateHistoryUI();
+                return true;
             }
 
             if (CurrentHost?.CanUndo == true)
@@ -490,13 +489,10 @@ namespace PixlPunkt.UI
         {
             var workspaceHost = GetActiveDocumentWorkspaceHost();
             var voxelWorkspace = workspaceHost?.VoxelWorkspace;
-            if (voxelWorkspace?.IsWorkspaceFocused() == true && voxelWorkspace.CanRedoVoxelEdits)
+            if (voxelWorkspace?.IsWorkspaceFocused() == true && voxelWorkspace.TryRedoVoxelEdit())
             {
-                if (voxelWorkspace.TryRedoVoxelEdit())
-                {
-                    UpdateHistoryUI();
-                    return true;
-                }
+                UpdateHistoryUI();
+                return true;
             }
 
             if (CurrentHost?.CanRedo == true)

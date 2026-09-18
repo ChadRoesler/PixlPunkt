@@ -14,7 +14,7 @@ namespace PixlPunkt.Core.History
     /// Undo re-adds the layer at its original position; Redo removes it again.
     /// The layer's pixel data is preserved in memory for restoration.
     /// </remarks>
-    public sealed class LayerRemoveItem : IHistoryItem
+    public sealed class LayerRemoveItem : OffloadableHistoryItemBase
     {
         private readonly CanvasDocument _document;
         private readonly RasterLayer _layer;
@@ -24,12 +24,15 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Gets a quick reference icon of the opperation (for UI display).
         /// </summary>
-        public Icon HistoryIcon { get; set; } = Icon.DeleteLines;
+        public override Icon HistoryIcon { get; set; } = Icon.DeleteLines;
 
         /// <summary>
         /// Gets a human-readable description of the action.
         /// </summary>
-        public string Description => $"Remove Layer \"{_layerName}\"";
+        public override string Description => $"Remove Layer \"{_layerName}\"";
+
+        // The removed layer is held live so undo can re-insert the same object; count its surface.
+        protected override long PayloadBytes => _layer.Surface.Pixels.Length;
 
         /// <summary>
         /// Creates a new layer remove history item.
@@ -48,7 +51,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Undoes the layer removal by re-adding the layer.
         /// </summary>
-        public void Undo()
+        public override void Undo()
         {
             _document.AddLayerWithoutHistory(_layer, _originalIndex);
             LoggingService.Info("Undo layer remove document={Doc} layer={Layer} index={Index}", _document.Name ?? "(doc)", _layerName, _originalIndex);
@@ -57,7 +60,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Redoes the layer removal by removing the layer again.
         /// </summary>
-        public void Redo()
+        public override void Redo()
         {
             // Pass allowRemoveLast=true since the original remove was allowed
             _document.RemoveLayerWithoutHistory(_layer, allowRemoveLast: true);

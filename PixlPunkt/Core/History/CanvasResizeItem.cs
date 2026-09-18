@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using FluentIcons.Common;
 using PixlPunkt.Core.Document;
@@ -22,7 +23,7 @@ namespace PixlPunkt.Core.History
     /// relatively rare and the simplicity of full snapshots ensures correctness.
     /// </para>
     /// </remarks>
-    public sealed class CanvasResizeItem : IHistoryItem
+    public sealed class CanvasResizeItem : OffloadableHistoryItemBase
     {
         private readonly CanvasDocument _document;
 
@@ -41,7 +42,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Gets a human-readable description of the action.
         /// </summary>
-        public string Description => $"Resize Canvas ({_beforeWidth}×{_beforeHeight} → {_afterWidth}x{_afterHeight})";
+        public override string Description => $"Resize Canvas ({_beforeWidth}×{_beforeHeight} → {_afterWidth}x{_afterHeight})";
 
         /// <summary>
         /// Snapshot of a single layer's pixel data.
@@ -51,7 +52,7 @@ namespace PixlPunkt.Core.History
             public RasterLayer Layer { get; }
             public int Width { get; }
             public int Height { get; }
-            public byte[] Pixels { get; }
+            public byte[] Pixels { get; set; }
 
             public LayerSnapshot(RasterLayer layer)
             {
@@ -66,7 +67,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Gets or sets the icon representing this history item.
         /// </summary>
-        public Icon HistoryIcon { get; set; } = Icon.Resize;
+        public override Icon HistoryIcon { get; set; } = Icon.Resize;
 
         /// <summary>
         /// Creates a new canvas resize item, capturing the BEFORE state.
@@ -95,6 +96,64 @@ namespace PixlPunkt.Core.History
             _afterSnapshots = CaptureAllLayers();
         }
 
+        // ── memory budget ──────────────────────────────────────────────
+
+        protected override long PayloadBytes
+        {
+            get
+            {
+                long total = 0;
+                foreach (var s in _beforeSnapshots) total += s.Pixels.Length;
+                if (_afterSnapshots != null) foreach (var s in _afterSnapshots) total += s.Pixels.Length;
+                return total;
+            }
+        }
+
+        protected override byte[]? SerializePayload()
+        {
+            using var ms = new MemoryStream();
+            using var bw = new BinaryWriter(ms);
+            WriteSnapshots(bw, _beforeSnapshots);
+            WriteSnapshots(bw, _afterSnapshots);
+            return ms.ToArray();
+
+            static void WriteSnapshots(BinaryWriter w, List<LayerSnapshot>? list)
+            {
+                w.Write(list?.Count ?? -1);
+                if (list == null) return;
+                foreach (var s in list)
+                {
+                    w.Write(s.Pixels.Length);
+                    w.Write(s.Pixels);
+                }
+            }
+        }
+
+        protected override void DeserializePayload(byte[] data)
+        {
+            using var ms = new MemoryStream(data);
+            using var br = new BinaryReader(ms);
+            ReadSnapshots(br, _beforeSnapshots);
+            ReadSnapshots(br, _afterSnapshots);
+
+            static void ReadSnapshots(BinaryReader r, List<LayerSnapshot>? list)
+            {
+                int count = r.ReadInt32();
+                if (count < 0 || list == null) return;
+                for (int i = 0; i < count && i < list.Count; i++)
+                {
+                    int len = r.ReadInt32();
+                    list[i].Pixels = r.ReadBytes(len);
+                }
+            }
+        }
+
+        protected override void ReleasePayload()
+        {
+            foreach (var s in _beforeSnapshots) s.Pixels = Array.Empty<byte>();
+            if (_afterSnapshots != null) foreach (var s in _afterSnapshots) s.Pixels = Array.Empty<byte>();
+        }
+
         private List<LayerSnapshot> CaptureAllLayers()
         {
             var snapshots = new List<LayerSnapshot>();
@@ -108,7 +167,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Undoes the resize, restoring the document to its previous dimensions and layer content.
         /// </summary>
-        public void Undo()
+        public override void Undo()
         {
             RestoreState(_beforeWidth, _beforeHeight, _beforeTileCounts, _beforeSnapshots);
         }
@@ -116,7 +175,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Redoes the resize, re-applying the dimension change and content.
         /// </summary>
-        public void Redo()
+        public override void Redo()
         {
             if (_afterSnapshots == null)
                 throw new InvalidOperationException("CaptureAfterState must be called before Redo.");
@@ -126,7 +185,6 @@ namespace PixlPunkt.Core.History
 
         private void RestoreState(int width, int height, SizeInt32 tileCounts, List<LayerSnapshot> snapshots)
         {
-            _document.RaiseBeforeStructureChanged();
 
             // Restore document dimensions
             _document.RestoreDimensions(width, height, tileCounts);

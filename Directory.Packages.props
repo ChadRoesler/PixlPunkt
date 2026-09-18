@@ -31,5 +31,12 @@
     <PackageVersion Include="NetCoreAudio" Version="2.0.1" />
     <!-- Velopack for auto-updates on Windows Desktop -->
     <PackageVersion Include="Velopack" Version="0.0.1298" />
+    <!--
+      Transitive pins (see CentralPackageTransitivePinningEnabled in Directory.Build.props).
+      Kiota.Abstractions comes via the HttpKiota UnoFeature: GHSA-7j59-v9qr-6fq9, patched in 1.22.0.
+      Tmds.DBus.Protocol comes via Uno.WinUI.Runtime.Skia.X11: GHSA-xrw6-gwf8-vvr9, patched in 0.21.3.
+    -->
+    <PackageVersion Include="Microsoft.Kiota.Abstractions" Version="1.22.2" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.21.3" />
   </ItemGroup>
 </Project>

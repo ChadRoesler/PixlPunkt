@@ -3746,6 +3746,13 @@
             Timer callback - checks and saves documents that have exceeded their interval.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Core.AutoSave.AutoSaveService.SerializeOnDocumentThread(PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Runs <see cref="M:PixlPunkt.Core.Document.DocumentIO.SaveToBytes(PixlPunkt.Core.Document.CanvasDocument)"/> on the thread that owns the document.
+            Uses Post rather than Send because the WinUI dispatcher synchronization context does
+            not support Send; the calling pool thread simply blocks until the UI thread is done.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Core.AutoSave.AutoSaveService.SaveDocument(PixlPunkt.Core.Document.CanvasDocument)">
             <summary>
             Saves a single document to the auto-save location with timestamp.
@@ -6022,6 +6029,18 @@
             will return false until further changes are made.
             </remarks>
         </member>
+        <member name="P:PixlPunkt.Core.Document.CanvasDocument.Selection">
+            <summary>The selection mask. History items, painting masks, plugins and the view all read this one object.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.CanvasDocument.Floating">
+            <summary>
+            Pixels currently lifted off a layer, or null. Bound to the layer they came from; see
+            <see cref="T:PixlPunkt.Core.Selection.FloatingSelection"/>. Only <c>FloatingSelectionOps</c> and history items set this.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.Core.Document.CanvasDocument.SelectionChanged">
+            <summary>Raised when <see cref="P:PixlPunkt.Core.Document.CanvasDocument.Selection"/> or <see cref="P:PixlPunkt.Core.Document.CanvasDocument.Floating"/> changed. Not a structure change.</summary>
+        </member>
         <member name="P:PixlPunkt.Core.Document.CanvasDocument.TileSet">
             <summary>
             Gets the tile set containing all unique tiles for this document.
@@ -6041,6 +6060,25 @@
             <remarks>
             Used during document loading to restore the tile set from a saved file.
             </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.OnTileRemoved(System.Int32)">
+            <summary>
+            A deleted tile must not leave dangling ids behind: every mapping cell that pointed
+            at it becomes unmapped, and the voxel side-tile slots that used it are cleared.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.RenumberTiles">
+            <summary>
+            Renumbers the tiles 1..N in ascending id order (so {1, 3, 45, 56, 90} becomes
+            {1, 2, 3, 4, 5}) and rewrites every reference. Undoable as one step.
+            </summary>
+            <returns>How many tile ids changed; 0 when they were already sequential.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.ApplyTileIdMap(System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Int32})">
+            <summary>
+            Applies an old-id → new-id map to the tile set, every layer mapping and the voxel
+            side-tile references in one pass. Shared by <see cref="M:PixlPunkt.Core.Document.CanvasDocument.RenumberTiles"/> and its undo.
+            </summary>
         </member>
         <member name="E:PixlPunkt.Core.Document.CanvasDocument.TileSetChanged">
             <summary>
@@ -6084,10 +6122,13 @@
             Adds a layer without pushing to history (used by undo/redo).
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Document.CanvasDocument.AddFolder(System.String,System.Nullable{System.Int32})">
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.AddFolder(System.String,System.Nullable{System.Int32},PixlPunkt.Core.Document.Layer.LayerFolder)">
             <summary>
-            Creates a new folder. If the active layer is inside a folder, the new folder
-            is created inside that same parent folder. Otherwise, creates at root level.
+            Creates a new folder. With <paramref name="into"/> the folder goes inside that
+            folder (the one selected in the layers panel); otherwise, if the active layer is
+            inside a folder, the new folder is created inside that same parent folder, and
+            otherwise at root level. Within the parent it lands just above the active layer when
+            that layer is a direct child, else on top.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.CanvasDocument.AddFolderAtRootWithoutHistory(System.String,System.Int32)">
@@ -6106,6 +6147,13 @@
             <param name="layer">The layer to move.</param>
             <param name="targetFolder">The target folder, or null to move to root.</param>
             <param name="targetIndex">Optional target index within the folder or root. If null, appends to the end.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.WouldCreateCycle(PixlPunkt.Core.Document.Layer.LayerBase,PixlPunkt.Core.Document.Layer.LayerFolder)">
+            <summary>
+            True when <paramref name="target"/> is <paramref name="item"/> itself or sits anywhere
+            beneath it. Inserting there would make the tree cyclic, and every recursive walk
+            (<see cref="M:PixlPunkt.Core.Document.CanvasDocument.GetFlattenedLayers"/>, compositing) would then overflow the stack.
+            </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.CanvasDocument.MoveLayerToFolderWithoutHistory(PixlPunkt.Core.Document.Layer.LayerBase,PixlPunkt.Core.Document.Layer.LayerFolder,System.Int32)">
             <summary>
@@ -6385,12 +6433,34 @@
             <param name="doc">The document to save.</param>
             <param name="filePath">The target file path (.pxp extension recommended).</param>
         </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.SaveToBytes(PixlPunkt.Core.Document.CanvasDocument)">
+            <summary>
+            Serializes a document to an in-memory buffer without touching any file. This is the
+            step that reads live document state, so it must run on the thread that owns the
+            document; the resulting bytes can then be written from any thread.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteFileAtomically(System.String,System.Byte[])">
+            <summary>
+            Writes <paramref name="bytes"/> to a sibling temp file and moves it over
+            <paramref name="filePath"/> only once everything is on disk. The previous file is
+            therefore never truncated early, so a failure part-way (disk full, crash) cannot
+            destroy the last good save.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Core.Document.DocumentIO.Save(PixlPunkt.Core.Document.CanvasDocument,System.IO.Stream)">
             <summary>
             Saves a document to the specified stream in native .pxp format.
             </summary>
             <param name="doc">The document to save.</param>
             <param name="stream">The target stream (must support writing).</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.DocumentIO.ReadExactBytes(System.IO.BinaryReader,System.Int32,System.String)">
+            <summary>
+            Reads exactly <paramref name="count"/> bytes. <see cref="M:System.IO.BinaryReader.ReadBytes(System.Int32)"/>
+            silently returns fewer at end of stream, which is how a truncated file would
+            otherwise turn into an ArgumentException deep inside a buffer copy.
+            </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.DocumentIO.WriteCanvasAnimationState(System.IO.BinaryWriter,PixlPunkt.Core.Animation.CanvasAnimationState)">
             <summary>
@@ -6748,15 +6818,20 @@
             </para>
             <para><strong>Current Limitations:</strong></para>
             <list type="bullet">
-            <item>Layer groups/folders are ignored (only flat layer list)</item>
-            <item>Tileset mapping and animation data not imported</item>
-            <item>All layers must match canvas dimensions (no offset/partial layers)</item>
+            <item>Tile reference transforms (rotation/flip) are currently ignored</item>
+            <item>All raster layers must match canvas dimensions (no offset/partial layers)</item>
             </list>
             </remarks>
         </member>
         <member name="F:PixlPunkt.Core.Document.ForeignDocumentImporter.PyxelJsonOptions">
             <summary>
             JSON deserialization options for PyxelEdit metadata.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.ForeignDocumentImporter.ReadIntAttribute(System.Xml.Linq.XElement,System.String,System.Int32)">
+            <summary>
+            Reads an integer attribute from a Tiled element. A missing attribute yields
+            <paramref name="fallback"/>; a present but non-numeric one is a malformed file.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Document.ForeignDocumentImporter.MapPyxelBlend(System.String)">
@@ -10474,6 +10549,39 @@
             Gets a quick reference icon of the opperation (for UI display).
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.History.HistoryBlobs">
+            <summary>Length-prefixed blob helpers shared by the selection history items.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.FloatingSelectionItemBase">
+            <summary>
+            Shared machinery for the items that move pixels between a layer and a floating
+            selection (lift, commit, discard). Each holds: a rectangle of layer pixels before/after,
+            the tiles that rectangle touched before/after (tile-mapped layers), the selection mask
+            before/after, and a snapshot of the floating selection. Subclasses decide which side of
+            each pair undo and redo apply.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.SelectionLiftItem">
+            <summary>
+            Pixels lifted off a layer into a floating selection (or a paste, which lifts nothing).
+            Undo puts the pixels back and drops the floating selection; redo clears them again and
+            re-creates it. Because this is a real history item, "undo past the lift" no longer needs
+            any special handling anywhere.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.SelectionCommitItem">
+            <summary>
+            A floating selection rasterized back onto its layer. Undo restores the destination
+            pixels and brings the floating selection back exactly as it was.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.SelectionDiscardItem">
+            <summary>
+            A floating selection dropped without being committed: Escape (which puts the lifted pixels
+            back where they came from) or Delete (which leaves the hole). Undo brings the floating
+            selection back.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.History.FolderAddItem">
             <summary>
             History item for folder add operations.
@@ -10548,6 +10656,25 @@
         <member name="M:PixlPunkt.Core.History.FolderReorderItem.Redo">
             <summary>
             Redoes the reorder by moving the folder to its new position.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.ICoalescingHistoryItem">
+            <summary>
+            An item that can absorb the item pushed immediately after it, so a burst of small
+            operations (arrow-key nudges, repeated scale drags) becomes one undo step.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.ICoalescingHistoryItem.TryAbsorb(PixlPunkt.Core.History.IHistoryItem)">
+            <summary>
+            Try to fold <paramref name="next"/> into this item. Return true if this item now
+            represents both and <paramref name="next"/> should not be pushed.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.HistoryGroupItem">
+            <summary>
+            Several history items that undo and redo as one user-level step, e.g. "Delete Selection"
+            = clear the pixels + clear the mask. Created by
+            <see cref="M:PixlPunkt.Core.History.UnifiedHistoryStack.BeginGroup(System.String)"/> / <see cref="M:PixlPunkt.Core.History.UnifiedHistoryStack.EndGroup"/>.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.History.HistoryMemoryManager">
@@ -11092,6 +11219,75 @@
             Gets a quick reference icon of the opperation (for UI display).
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.History.OffloadableHistoryItemBase">
+            <summary>
+            Base class for history items that hold sizeable payloads (pixel buffers, live layers)
+            and therefore must take part in the history memory budget.
+            </summary>
+            <remarks>
+            <para>
+            <see cref="T:PixlPunkt.Core.History.HistoryMemoryManager"/> only tracks items implementing
+            <see cref="T:PixlPunkt.Core.History.IDisposableHistoryItem"/>. Before this base existed only the two pixel-change
+            items did, so canvas resizes, selection commits, removed layers and tile stamps - the
+            heaviest items in the stack - were invisible to the 256 MB limit, never offloaded to
+            disk and never released when discarded.
+            </para>
+            <para>
+            Derived items report <see cref="P:PixlPunkt.Core.History.OffloadableHistoryItemBase.PayloadBytes"/>. Items whose payload is plain bytes
+            also override <see cref="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.SerializePayload"/>, <see cref="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.DeserializePayload(System.Byte[])"/> and
+            <see cref="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.ReleasePayload"/> to become offloadable; items that hold live objects
+            (a removed <c>RasterLayer</c>) leave <see cref="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.SerializePayload"/> returning
+            <c>null</c> and are counted but kept in memory.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.Core.History.OffloadableHistoryItemBase.HistoryIcon">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.History.OffloadableHistoryItemBase.Description">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.Undo">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.Redo">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.History.OffloadableHistoryItemBase.PayloadBytes">
+            <summary>
+            Bytes currently held in memory by this item's payload (buffers, layer surfaces).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.SerializePayload">
+            <summary>
+            Serializes the payload for offloading, or returns <c>null</c> if this item cannot
+            be offloaded (its payload is a live object rather than bytes).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.DeserializePayload(System.Byte[])">
+            <summary>Restores the payload from bytes produced by <see cref="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.SerializePayload"/>.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.ReleasePayload">
+            <summary>Drops the in-memory payload after it has been offloaded or the item discarded.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.OffloadableHistoryItemBase.EstimatedMemoryBytes">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.History.OffloadableHistoryItemBase.IsOffloaded">
+            <inheritdoc/>
+        </member>
+        <member name="P:PixlPunkt.Core.History.OffloadableHistoryItemBase.OffloadId">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.Offload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.Reload(PixlPunkt.Core.History.IHistoryOffloadService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PixlPunkt.Core.History.OffloadableHistoryItemBase.Dispose">
+            <inheritdoc/>
+        </member>
         <member name="T:PixlPunkt.Core.History.PixelChangeItem">
             <summary>
             History item for pixel-level changes on a single layer.
@@ -11271,200 +11467,35 @@
         </member>
         <member name="T:PixlPunkt.Core.History.SelectionChangeItem">
             <summary>
-            History item for selection region changes (create, add, subtract, select all, invert).
-            </summary>
-            <remarks>
-            <para>
-            Captures the before and after state of the selection region mask.
-            Undo restores the previous selection; Redo re-applies the new selection.
-            </para>
-            <para>
-            This only tracks the selection region itself, not floating selection pixel data
-            or transforms (those are handled by <see cref="T:PixlPunkt.Core.History.SelectionTransformItem"/>).
-            </para>
-            </remarks>
-        </member>
-        <member name="T:PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind">
-            <summary>
-            Describes the kind of selection change.
-            </summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind.Create">
-            <summary>A new selection was created (replace mode).</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind.Add">
-            <summary>Selection was added to (shift+select).</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind.Subtract">
-            <summary>Selection was subtracted from (alt+select).</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind.SelectAll">
-            <summary>Entire document was selected.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind.Invert">
-            <summary>Selection was inverted.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind.Clear">
-            <summary>Selection was cleared/deselected.</summary>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionChangeItem.HistoryIcon">
-            <summary>
-            Gets a quick reference icon of the operation (for UI display).
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionChangeItem.Description">
-            <summary>
-            Gets a human-readable description of the action.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionChangeItem.Kind">
-            <summary>
-            Gets the kind of selection change.
+            A change to the selection mask (create, add, subtract, select all, invert, clear).
+            Applies directly to <see cref="P:PixlPunkt.Core.Document.CanvasDocument.Selection"/>. Masks are stored run-length
+            encoded and the item takes part in the history memory budget.
             </summary>
         </member>
         <member name="P:PixlPunkt.Core.History.SelectionChangeItem.HasChanges">
-            <summary>
-            Gets whether this item represents an actual change (before != after).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionChangeItem.#ctor(PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind,PixlPunkt.Core.Selection.SelectionRegion,PixlPunkt.Core.Selection.SelectionRegion,System.Action{PixlPunkt.Core.Selection.SelectionRegion})">
-            <summary>
-            Creates a new selection change history item.
-            </summary>
-            <param name="kind">The kind of selection change.</param>
-            <param name="beforeRegion">Clone of the selection region before the change.</param>
-            <param name="afterRegion">Clone of the selection region after the change.</param>
-            <param name="applyRegion">Action to apply a region snapshot to the current selection.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionChangeItem.Undo">
-            <summary>
-            Undoes the selection change by restoring the before region.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionChangeItem.Redo">
-            <summary>
-            Redoes the selection change by applying the after region.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionChangeItem.RegionsEqual(PixlPunkt.Core.Selection.SelectionRegion,PixlPunkt.Core.Selection.SelectionRegion)">
-            <summary>
-            Compares two selection regions for equality.
-            </summary>
-        </member>
-        <member name="T:PixlPunkt.Core.History.SelectionCommitItem">
-            <summary>
-            History item for committing a floating selection to the canvas.
-            </summary>
-            <remarks>
-            <para>
-            This item captures both the pixel changes (for canvas restoration) and the
-            floating selection state (for restoring the selection with marquee on undo).
-            </para>
-            <para>
-            On <strong>Undo</strong>: Restores the canvas pixels AND restores the floating selection state.
-            On <strong>Redo</strong>: Commits the selection again (applies pixel changes, clears floating state).
-            </para>
-            </remarks>
-        </member>
-        <member name="T:PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot">
-            <summary>
-            Snapshot of the floating selection state before commit.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionCommitItem.HistoryIcon">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionCommitItem.Description">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionCommitItem.#ctor(PixlPunkt.Core.Document.Layer.RasterLayer,Windows.Graphics.RectInt32,System.Byte[],System.Byte[],PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot,System.Action{PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot},System.Action,System.Action{PixlPunkt.Core.Document.Layer.RasterLayer,Windows.Graphics.RectInt32,System.Byte[]})">
-            <summary>
-            Creates a new selection commit history item.
-            </summary>
-            <param name="layer">The layer being modified.</param>
-            <param name="pixelBounds">The bounds of the pixel region affected.</param>
-            <param name="pixelsBefore">Pixel data before the commit.</param>
-            <param name="pixelsAfter">Pixel data after the commit.</param>
-            <param name="floatingBefore">The floating selection state before commit.</param>
-            <param name="restoreFloating">Callback to restore floating selection state.</param>
-            <param name="clearFloating">Callback to clear floating selection state.</param>
-            <param name="applyPixels">Callback to apply pixel data to layer.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionCommitItem.Undo">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionCommitItem.Redo">
-            <inheritdoc/>
+            <summary>Whether before and after differ; callers skip pushing when false.</summary>
         </member>
         <member name="T:PixlPunkt.Core.History.SelectionTransformItem">
             <summary>
-            History item that captures a selection transform operation (move, scale, or rotate).
+            A change to a floating selection's transform (move, scale, rotate, pivot). Applies to
+            <see cref="P:PixlPunkt.Core.Document.CanvasDocument.Floating"/>; the lift item below it in the stack guarantees one
+            exists whenever this item is undone or redone.
             </summary>
-            <remarks>
-            <para>
-            SelectionTransformItem allows undo/redo of individual transform operations on floating selections
-            without committing the selection back to the layer. This enables granular undo for:
-            - Move operations (translation changes)
-            - Scale operations (scale factor changes)
-            - Rotate operations (rotation angle changes)
-            </para>
-            <para>
-            For scale and rotate operations, the buffer state is also captured because these operations
-            "bake" the transform into the buffer on release. Without capturing the buffer, undo would
-            apply the old transform parameters to the already-transformed buffer.
-            </para>
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionTransformItem.HistoryIcon">
-            <summary>
-            Gets a quick reference icon of the operation (for UI display).
-            </summary>
-        </member>
-        <member name="T:PixlPunkt.Core.History.SelectionTransformItem.TransformKind">
-            <summary>
-            Describes what kind of transform this item represents.
-            </summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionTransformItem.TransformKind.Move">
-            <summary>Translation/position change.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionTransformItem.TransformKind.Scale">
-            <summary>Scale factor change.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.History.SelectionTransformItem.TransformKind.Rotate">
-            <summary>Rotation angle change.</summary>
         </member>
         <member name="T:PixlPunkt.Core.History.SelectionTransformItem.TransformSnapshot">
+            <summary>The transform state of a floating selection, plus its pixels when a bake changed them.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.SelectionTransformItem.Capture(PixlPunkt.Core.Selection.FloatingSelection,System.Boolean)">
+            <summary>Captures the transform of <paramref name="f"/>; include the buffer when the operation bakes pixels (scale/rotate).</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.SelectionTransformItem.ApplyTo(PixlPunkt.Core.Selection.FloatingSelection,PixlPunkt.Core.History.SelectionTransformItem.TransformSnapshot@)">
+            <summary>Applies a snapshot to <paramref name="f"/> (restoring the buffer if the snapshot carries one).</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.SelectionTransformItem.TryAbsorb(PixlPunkt.Core.History.IHistoryItem)">
             <summary>
-            Snapshot of selection transform state.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionTransformItem.Description">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionTransformItem.Kind">
-            <summary>
-            Gets the kind of transform this item represents.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionTransformItem.#ctor(PixlPunkt.Core.History.SelectionTransformItem.TransformKind,PixlPunkt.Core.History.SelectionTransformItem.TransformSnapshot,PixlPunkt.Core.History.SelectionTransformItem.TransformSnapshot,System.Action{PixlPunkt.Core.History.SelectionTransformItem.TransformSnapshot})">
-            <summary>
-            Creates a new selection transform history item.
-            </summary>
-            <param name="kind">The type of transform operation.</param>
-            <param name="before">State before the transform.</param>
-            <param name="after">State after the transform.</param>
-            <param name="applySnapshot">Callback to apply a snapshot to the selection state.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionTransformItem.Undo">
-            <inheritdoc/>
-        </member>
-        <member name="M:PixlPunkt.Core.History.SelectionTransformItem.Redo">
-            <inheritdoc/>
-        </member>
-        <member name="P:PixlPunkt.Core.History.SelectionTransformItem.HasChanges">
-            <summary>
-            Checks if this transform actually changed anything (before != after).
+            A transform of the same kind on the same document pushed right after this one is the
+            continuation of the same gesture (nudge, nudge, nudge): keep this item's <c>before</c>
+            and take the newcomer's <c>after</c>.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.History.TileAwarePixelChangeItem">
@@ -11690,6 +11721,15 @@
             Redoes all changes - both non-tile pixels and all tile propagations.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.History.TileRenumberItem">
+            <summary>
+            Tile ids renumbered 1..N. Holds the forward map and its inverse; both directions go
+            through <see cref="M:PixlPunkt.Core.Document.CanvasDocument.ApplyTileIdMap(System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Int32})"/> so the tile set, every layer mapping
+            and the voxel side-tile references move together. Because this is an ordinary history
+            item, older items that remember tile ids stay valid: undoing past this point restores
+            the ids they were recorded against.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.History.TileStampHistoryItem">
             <summary>
             History item for tile stamp operations.
@@ -11774,10 +11814,17 @@
             </para>
             </remarks>
         </member>
-        <member name="F:PixlPunkt.Core.History.UnifiedHistoryStack._savedUndoCount">
+        <member name="F:PixlPunkt.Core.History.UnifiedHistoryStack._savedItem">
             <summary>
-            Tracks the undo stack count at the last save point.
-            -1 indicates the document has never been saved (always dirty if any changes exist).
+            The item that sat on top of the undo stack at the last save point, and the depth it
+            sat at. Depth alone is not enough: undoing and then making a new edit returns the
+            stack to the same depth via a completely different item.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.Core.History.UnifiedHistoryStack._savePointReachable">
+            <summary>
+            False once the save point can no longer be returned to, which happens when a push
+            discards a redo stack that still held it.
             </summary>
         </member>
         <member name="P:PixlPunkt.Core.History.UnifiedHistoryStack.CanUndo">
@@ -11830,9 +11877,10 @@
             Gets a value indicating whether the document has unsaved changes.
             </summary>
             <remarks>
-            The document is considered dirty if the current undo stack count differs from
-            the count at the last save point. This correctly handles undo/redo operations
-            that might return the document to a saved state.
+            The document is clean only when the history cursor sits exactly on the save point.
+            Comparing stack depth alone is not sufficient - saving, undoing once and then making
+            a fresh edit returns the stack to the saved depth while holding entirely different
+            work, so the identity of the item on top is checked too.
             </remarks>
         </member>
         <member name="E:PixlPunkt.Core.History.UnifiedHistoryStack.HistoryChanged">
@@ -11857,6 +11905,22 @@
             <summary>
             Disables memory management.
             </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.BeginGroup(System.String)">
+            <summary>
+            Starts a group: every push until the matching <see cref="M:PixlPunkt.Core.History.UnifiedHistoryStack.EndGroup"/> becomes one undo
+            step named <paramref name="description"/>. Groups nest; only the outermost is pushed.
+            </summary>
+            <param name="description">The name shown for the undo step.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.EndGroup">
+            <summary>Closes the current group and pushes it (a single-item group pushes just that item).</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.CancelGroup">
+            <summary>Abandons the current group, undoing whatever it had collected.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.History.UnifiedHistoryStack.IsGroupOpen">
+            <summary>Whether a group is currently open.</summary>
         </member>
         <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.Push(PixlPunkt.Core.History.IHistoryItem)">
             <summary>
@@ -12077,6 +12141,23 @@
             <summary>
             Converts a premultiplied alpha buffer to straight alpha in-place.
             </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Imaging.PixelRectOps">
+            <summary>
+            Rectangle-level BGRA buffer operations shared by the selection subsystem.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Imaging.PixelRectOps.CopyRect(System.Byte[],System.Int32,System.Int32,Windows.Graphics.RectInt32)">
+            <summary>Copies the pixels of <paramref name="r"/> (clamped to the surface) into a new tightly packed buffer.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Imaging.PixelRectOps.Blit(System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],System.Int32,System.Int32)">
+            <summary>Copies a packed buffer into the surface at (dx, dy), clipping to the surface. No blending.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Imaging.PixelRectOps.ClearRect(System.Byte[],System.Int32,System.Int32,Windows.Graphics.RectInt32)">
+            <summary>Zeroes the pixels of <paramref name="r"/> (clamped to the surface).</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Imaging.PixelRectOps.BlitAlphaOver(System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],System.Int32,System.Int32)">
+            <summary>Porter-Duff source-over of a straight-alpha packed buffer onto the surface at (dx, dy).</summary>
         </member>
         <member name="T:PixlPunkt.Core.Imaging.PixelSurface">
             <summary>
@@ -17584,6 +17665,15 @@
             Creates a new SKBitmap with the specified dimensions.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Core.Rendering.SkiaCanvasRenderer.DrawBitmapSampled(SkiaSharp.SKBitmap,SkiaSharp.SKRect,SkiaSharp.SKRect,PixlPunkt.Core.Rendering.ImageInterpolation,SkiaSharp.SKSamplingOptions)">
+            <summary>
+            Draws a bitmap with the requested sampling. This SkiaSharp exposes sampling options only
+            on <see cref="M:SkiaSharp.SKCanvas.DrawImage(SkiaSharp.SKImage,SkiaSharp.SKRect,SkiaSharp.SKRect,SkiaSharp.SKSamplingOptions,SkiaSharp.SKPaint)"/>,
+            so non-nearest draws (reference layers) go through a transient <see cref="T:SkiaSharp.SKImage"/>;
+            nearest-neighbour draws - every cached pixel-art bitmap - stay on the direct path, where
+            nearest is already the default and no conversion is paid.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Rendering.SkiaCanvasBitmap">
             <summary>
             SkiaSharp implementation of <see cref="T:PixlPunkt.Core.Rendering.ICanvasBitmap"/>.
@@ -17609,750 +17699,130 @@
             Extension methods for converting between Windows and SkiaSharp types.
             </summary>
         </member>
-        <member name="T:PixlPunkt.Core.Selection.PixelSelection">
+        <member name="T:PixlPunkt.Core.Selection.FloatingSelection">
             <summary>
-            Represents a geometric selection with pixel mask, polygon outline, and transform state.
+            Pixels that have been lifted off a layer and are being moved/transformed before being
+            committed back. This is <em>document</em> state, owned by <c>CanvasDocument.Floating</c>,
+            and it is bound to the layer it came from: no matter which layer becomes active later,
+            commit, cancel and undo all operate on <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Layer"/>.
             </summary>
             <remarks>
             <para>
-            PixelSelection combines a boolean pixel mask (<see cref="T:PixlPunkt.Core.Selection.SelectionMask"/>) with a vector polygon
-            outline and 2D transform state (translation, rotation, scale). This hybrid approach enables both
-            pixel-accurate operations (magic wand, lasso) and smooth geometric transformations.
-            </para>
-            <para><strong>Dual Representation:</strong></para>
-            <list type="bullet">
-            <item><strong>Mask</strong>: Authoritative for hit-testing, compositing, and tool operations.
-            Defines which pixels are "inside" the selection.</item>
-            <item><strong>Poly</strong>: Geometric outline for rendering handles, marching ants, and transform UI.
-            Derived from mask via <see cref="T:PixlPunkt.Core.Selection.SelectionOutlineBuilder"/> or from rect operations.</item>
-            </list>
-            <para><strong>State Machine:</strong></para>
-            <list type="bullet">
-            <item><strong>Inactive</strong>: <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Active"/> = false, no selection exists.</item>
-            <item><strong>Active</strong>: Selection defined but not floating. Mask and poly populated.</item>
-            <item><strong>Armed</strong>: Selection ready for transform operations (handles visible).</item>
-            <item><strong>Floating</strong>: Selection lifted to buffer, can be moved/transformed independently.</item>
-            </list>
-            <para><strong>Transform Workflow:</strong></para>
-            <code>
-            1. Create selection (mask + poly)
-            2. User drags handles → Transform state updated
-            3. GetTransformMatrix() → Preview transformed poly
-            4. Commit → Rasterize transformed poly back to mask
-            </code>
-            <para><strong>Floating Buffer:</strong></para>
-            <para>
-            When <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Floating"/> is true, <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Buffer"/> contains a snapshot of selected pixels
-            that can be moved and transformed independently of the document. Buffer uses BGRA byte format
-            (4 bytes per pixel) with dimensions (<see cref="P:PixlPunkt.Core.Selection.PixelSelection.BufW"/>, <see cref="P:PixlPunkt.Core.Selection.PixelSelection.BufH"/>).
-            </para>
-            </remarks>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionMask"/>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionTransform"/>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionEngine"/>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.Active">
-            <summary>
-            Gets or sets a value indicating whether a selection exists.
-            </summary>
-            <value>
-            <c>true</c> if selection is defined (mask non-empty); otherwise, <c>false</c>.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.Floating">
-            <summary>
-            Gets or sets a value indicating whether the selection is floating (lifted from document).
-            </summary>
-            <value>
-            <c>true</c> if selection is in <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Buffer"/>; <c>false</c> if pixels remain in place.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.Armed">
-            <summary>
-            Gets or sets a value indicating whether the selection is armed for transform operations.
-            </summary>
-            <value>
-            <c>true</c> if transform handles should be visible/interactive; otherwise, <c>false</c>.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.Mask">
-            <summary>
-            Gets the pixel-accurate selection mask.
-            </summary>
-            <value>
-            Boolean mask defining which pixels are selected. Used for hit-testing, magic wand flood fill,
-            and compositing operations.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.Poly">
-            <summary>
-            Gets the polygon outline vertices.
-            </summary>
-            <value>
-            List of vertices in document pixel space, always pixel-snapped. Used for rendering
-            marching ants, transform handles, and geometric operations.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.Buffer">
-            <summary>
-            Gets or sets the floating pixel buffer (BGRA byte format).
-            </summary>
-            <value>
-            Byte array containing BGRA pixels (4 bytes per pixel), or null if not floating.
-            Length = <see cref="P:PixlPunkt.Core.Selection.PixelSelection.BufW"/> × <see cref="P:PixlPunkt.Core.Selection.PixelSelection.BufH"/> × 4.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.BufW">
-            <summary>
-            Gets or sets the width of the floating buffer in pixels.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.BufH">
-            <summary>
-            Gets or sets the height of the floating buffer in pixels.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.RotationDeg">
-            <summary>
-            Gets or sets the rotation angle in degrees (clockwise positive).
-            </summary>
-            <value>
-            Rotation angle, typically normalized to -180°..180° range. Default is 0 (no rotation).
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.ScaleX">
-            <summary>
-            Gets or sets the horizontal scale factor.
-            </summary>
-            <value>
-            Scale multiplier along X axis. 1.0 = 100% (original size), 0.5 = 50%, 2.0 = 200%.
-            Default is 1.0.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.ScaleY">
-            <summary>
-            Gets or sets the vertical scale factor.
-            </summary>
-            <value>
-            Scale multiplier along Y axis. 1.0 = 100% (original size), 0.5 = 50%, 2.0 = 200%.
-            Default is 1.0.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.PixelSelection.Translation">
-            <summary>
-            Gets or sets the translation offset in pixel space.
-            </summary>
-            <value>
-            X and Y offset from original position. Default is <see cref="P:System.Numerics.Vector2.Zero"/>.
-            </value>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.PixelSelection.#ctor(System.Int32,System.Int32)">
-            <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.Core.Selection.PixelSelection"/> class.
-            </summary>
-            <param name="docWidth">Document width in pixels (mask dimensions).</param>
-            <param name="docHeight">Document height in pixels (mask dimensions).</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.PixelSelection.Clear">
-            <summary>
-            Clears the selection and resets all state to defaults.
-            </summary>
-            <remarks>
-            Clears mask, polygon, buffer, and transform state. Sets all flags to false.
-            Does not deallocate the mask buffer, only clears its contents.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.PixelSelection.SetRect(System.Int32,System.Int32,System.Int32,System.Int32)">
-            <summary>
-            Sets the selection to an axis-aligned rectangle.
-            </summary>
-            <param name="x">Left edge in document pixels.</param>
-            <param name="y">Top edge in document pixels.</param>
-            <param name="w">Width in pixels.</param>
-            <param name="h">Height in pixels.</param>
-            <remarks>
-            <para>
-            Clears existing mask and creates new rectangular selection. Polygon is set to a 4-vertex
-            rectangle with corners at pixel edges. Transform state is reset to identity.
+            Everything the view needs to draw and hit-test the floating pixels lives here, so the
+            history items, the save path and the view all see one object. The view's
+            <c>SelectionSubsystem</c> forwards its floating/transform properties to this object.
             </para>
             <para>
-            Used for marquee tool, Select All command, and rectangular mask operations.
-            Sets <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Active"/> and <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Armed"/> to true.
+            <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.SourceBounds"/> / <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.SourcePixelsBefore"/> remember what was under the
+            selection before it was lifted so that cancelling (or undoing a discard) can put it back
+            without consulting history. A pasted selection has no source.
             </para>
             </remarks>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.PixelSelection.GetTransformMatrix">
-            <summary>
-            Computes the transform matrix from current transform state.
-            </summary>
-            <returns>3×2 affine transform matrix in SRT order (Scale → Rotate → Translate).</returns>
-            <remarks>
-            <para><strong>Transform Order:</strong></para>
-            <list type="number">
-            <item>Scale around origin: (<see cref="P:PixlPunkt.Core.Selection.PixelSelection.ScaleX"/>, <see cref="P:PixlPunkt.Core.Selection.PixelSelection.ScaleY"/>)</item>
-            <item>Rotate around origin: <see cref="P:PixlPunkt.Core.Selection.PixelSelection.RotationDeg"/> (degrees → radians)</item>
-            <item>Translate: <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Translation"/></item>
-            </list>
-            <para>
-            This order ensures scaling happens before rotation, and translation moves the entire
-            transformed shape without affecting rotation/scale pivots.
-            </para>
-            </remarks>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.Layer">
+            <summary>The layer the pixels were lifted from and will be committed to.</summary>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.PixelSelection.TransformPoint(System.Numerics.Vector2)">
-            <summary>
-            Transforms a point using the current transform matrix.
-            </summary>
-            <param name="p">Point in original (pre-transform) coordinates.</param>
-            <returns>Transformed point.</returns>
-            <remarks>
-            Convenience wrapper for <see cref="M:System.Numerics.Vector2.Transform(System.Numerics.Vector2,System.Numerics.Matrix3x2)"/> using
-            <see cref="M:PixlPunkt.Core.Selection.PixelSelection.GetTransformMatrix"/>. Useful for transforming individual polygon vertices
-            or hit-test points.
-            </remarks>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.Pixels">
+            <summary>BGRA pixel buffer, <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Width"/> × <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Height"/> × 4. Scale is baked into it on release; rotation is not.</summary>
         </member>
-        <member name="T:PixlPunkt.Core.Selection.SelectionEngine">
-            <summary>
-            Manages interactive pixel-based selections with polygon boundaries, transform operations, and floating buffers.
-            </summary>
-            <remarks>
-            <para>
-            SelectionEngine is the core controller for all selection-related operations in PixlPunkt. It coordinates:
-            - Selection creation (rectangular marquee, magic wand integration points)
-            - Floating selection buffers (lift pixel data from layer)
-            - Transform operations (move, rotate, scale) with visual feedback
-            - Hit testing for interactive handles (corners, edges, rotation handles)
-            - Integration with undo/redo via <see cref="P:PixlPunkt.Core.Selection.SelectionEngine.PushHistory"/>
-            - Rendering callbacks for UI updates
-            </para>
-            <para>
-            **Architecture**: This class is UI-framework-agnostic. It receives pointer events and coordinate
-            transformations from the canvas host but contains no UI framework dependencies. All rendering
-            is delegated via callbacks.
-            </para>
-            <para>
-            **Usage Flow**:
-            1. Create engine with layer/document providers
-            2. Wire up coordinate transformation functions (ViewToDoc, ViewToDocClamped)
-            3. Forward pointer events: PointerPressed → PointerMoved → PointerReleased
-            4. Call Draw() during render pass to visualize selection
-            5. Selection operations (LiftToFloating, CommitFloating, ClearSelection, SelectAll)
-            </para>
-            <para>
-            **Transform Model**: Supports "sticky transforms" where rotation/scale state persists across
-            multiple operations until committed, allowing incremental adjustments.
-            </para>
-            </remarks>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.X">
+            <summary>Top-left of the (unrotated, unscaled) buffer in document coordinates. May be off-canvas.</summary>
         </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionEngine.Sel">
-            <summary>
-            Gets the current pixel selection state (mask, buffer, flags).
-            </summary>
-            <value>
-            The <see cref="T:PixlPunkt.Core.Selection.PixelSelection"/> containing mask data, floating buffer, and active/floating/armed flags.
-            </value>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.AngleDeg">
+            <summary>Rotation of the drag in progress, in degrees.</summary>
         </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionEngine.Transform">
-            <summary>
-            Gets the transform controller for move/rotate/scale operations.
-            </summary>
-            <value>
-            A <see cref="T:PixlPunkt.Core.Selection.SelectionTransform"/> that manages transformation matrices and handle positions.
-            </value>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.CumulativeAngleDeg">
+            <summary>Rotation already applied by previous drags, in degrees. Only baked into pixels at commit.</summary>
         </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionEngine.HasActiveSelection">
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW">
             <summary>
-            Gets a value indicating whether a selection is currently active (has defined region).
+            Handle-frame size: the buffer size at the last bake. Invariant: <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW"/>,
+            <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigH"/>, <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigCenterX"/> and <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigCenterY"/> are always
+            valid. They are set in the constructor, every move shifts the centre with the float,
+            and a bake re-centres and resizes them. Readers use them directly; there is no
+            fallback to derive from X/Y or the buffer size.
             </summary>
         </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionEngine.IsFloating">
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.OrigCenterX">
+            <summary>Handle-frame centre in document coordinates; the pivot orbits around this.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.RegionNonRectangular">
+            <summary>True when the lifted shape is not a plain rectangle (lasso, wand, paint).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.BufferFlipped">
+            <summary>True once the buffer has been flipped, so the marquee must be traced from buffer alpha.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.SourceBounds">
+            <summary>Where on the layer the pixels were lifted from (empty for a paste).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.SourcePixelsBefore">
+            <summary>The layer pixels under <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.SourceBounds"/> before the lift cleared them (empty for a paste).</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.HasSource">
+            <summary>False for pasted selections, which have nothing to restore on cancel.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.ScaledW">
+            <summary>Width after the current (unbaked) scale.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.ScaledH">
+            <summary>Height after the current (unbaked) scale.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelection.Clone">
+            <summary>Deep copy, used for history snapshots.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelection.CopyTransformFrom(PixlPunkt.Core.Selection.FloatingSelection)">
+            <summary>Copies the non-pixel transform state from another instance (pixels are shared by reference).</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Selection.FloatingSelectionOps">
             <summary>
-            Gets a value indicating whether the selection is floating (lifted from layer with transform buffer).
+            The floating-selection lifecycle on a document: lift, commit, cancel, discard, paste.
+            Each operation mutates the document and returns the history item that undoes it; the
+            caller pushes the item. Nothing here touches the view, so history, save and tests all use
+            the same code the UI does.
             </summary>
         </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionEngine.PushHistory">
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelectionOps.Lift(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Document.Layer.RasterLayer)">
             <summary>
-            Gets or sets the callback for pushing undo history entries.
-            </summary>
-            <value>
-            An action that receives a <see cref="T:PixlPunkt.Core.History.PixelChangeItem"/> to push onto the undo stack.
-            Set by the canvas host to integrate with document history.
-            </value>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionEngine.ViewToDoc">
-            <summary>
-            Gets or sets the function to convert view coordinates to document coordinates (unbounded).
-            </summary>
-            <value>
-            A function mapping <see cref="T:Windows.Foundation.Point"/> (view space) to <see cref="T:System.Numerics.Vector2"/> (document space).
-            Set by the canvas host based on current zoom/pan.
-            </value>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionEngine.ViewToDocClamped">
-            <summary>
-            Gets or sets the function to convert view coordinates to document coordinates (clamped to canvas bounds).
-            </summary>
-            <value>
-            A function mapping <see cref="T:Windows.Foundation.Point"/> (view space) to <see cref="T:System.Numerics.Vector2"/> (document space, clamped).
-            Used for operations that must stay within canvas boundaries.
-            </value>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionEngine.RequestRedraw">
-            <summary>
-            Gets or sets the callback to trigger a canvas redraw.
-            </summary>
-            <value>
-            An action invoked whenever visual state changes (selection modified, transform updated).
-            The canvas host should respond by calling <see cref="M:PixlPunkt.Core.Selection.SelectionEngine.Draw(System.Action{System.Collections.Generic.List{System.Numerics.Vector2},System.Boolean,System.Boolean,System.Boolean},System.Action{System.Byte[],System.Int32,System.Int32,System.Numerics.Matrix3x2})"/> during its next render pass.
-            </value>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionEngine.HandleSizePx">
-            <summary>
-            Gets or sets the hit-test radius for transform handles in pixels.
-            </summary>
-            <value>
-            Size of clickable area around handles. Default is 12 pixels.
-            </value>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.#ctor(System.Func{PixlPunkt.Core.Document.Layer.RasterLayer},System.Func{System.ValueTuple{System.Int32,System.Int32}},System.Action,System.Action)">
-            <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.Core.Selection.SelectionEngine"/> class.
-            </summary>
-            <param name="activeLayerProvider">
-            Function that returns the currently active <see cref="T:PixlPunkt.Core.Document.Layer.RasterLayer"/> or null if none.
-            </param>
-            <param name="docSizeProvider">
-            Function that returns the document dimensions (width, height).
-            </param>
-            <param name="liftCallback">
-            Callback invoked when selection buffer needs to be lifted from the layer.
-            </param>
-            <param name="commitCallback">
-            Callback invoked when floating selection needs to be committed back to the layer.
-            </param>
-            <remarks>
-            The engine is initialized with a <see cref="T:PixlPunkt.Core.Selection.PixelSelection"/> and <see cref="T:PixlPunkt.Core.Selection.SelectionTransform"/>
-            sized to match the document. Callbacks are stored for deferred operations that require
-            host coordination (lifting pixels, committing changes).
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.ClearSelection">
-            <summary>
-            Clears the current selection (deselects everything).
-            </summary>
-            <remarks>
-            Resets the selection to inactive state and triggers a redraw.
-            If a floating selection exists, it is discarded.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.SelectAll">
-            <summary>
-            Selects the entire canvas.
-            </summary>
-            <remarks>
-            Creates a rectangular selection covering the full document bounds and triggers a redraw.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.LiftToFloating(System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32)">
-            <summary>
-            Lifts pixel data into a floating selection buffer with specified position.
-            </summary>
-            <param name="buf">BGRA pixel data (byte array).</param>
-            <param name="w">Width of the buffer in pixels.</param>
-            <param name="h">Height of the buffer in pixels.</param>
-            <param name="fx">X coordinate of buffer origin in document space.</param>
-            <param name="fy">Y coordinate of buffer origin in document space.</param>
-            <remarks>
-            <para>
-            Creates a floating selection that can be transformed (moved, rotated, scaled) independently
-            of the layer. The selection becomes active and floating, with transform state initialized
-            to identity (scale=1, rotation=0).
-            </para>
-            <para>
-            This is typically called after the user begins dragging a selection or performs a "float"
-            command. The buffer should contain the pixels from the selection region, and the layer's
-            corresponding pixels should be cleared or preserved depending on the operation mode.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.CommitFloating">
-            <summary>
-            Commits the floating selection back to the layer, applying all accumulated transforms.
-            </summary>
-            <remarks>
-            <para>
-            Applies rotation, scaling, and translation to the floating buffer, stamps it back into
-            the active layer, rebuilds the selection mask from the transformed result, and pushes
-            a history entry for undo/redo.
-            </para>
-            <para>
-            After commit, the selection remains active with a polygon outline matching the new
-            pixel footprint. If sticky transforms are enabled, transform state persists for
-            subsequent operations.
-            </para>
-            <para>
-            No-op if no floating selection exists or no active layer is available.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.PointerPressed(Windows.Foundation.Point,System.Boolean,System.Boolean,System.Boolean)">
-            <summary>
-            Handles pointer press events (typically left mouse button or touch down).
-            </summary>
-            <param name="viewPos">The pointer position in view coordinates.</param>
-            <param name="left">Whether this is a left button press (right button ignored).</param>
-            <param name="shift">Whether Shift key is held (for add-to-selection).</param>
-            <param name="alt">Whether Alt key is held (for subtract-from-selection).</param>
-            <returns><c>true</c> if the event was handled; <c>false</c> to pass through to other tools.</returns>
-            <remarks>
-            <para>
-            Determines interaction mode based on context:
-            - Shift/Alt: Begin marquee for boolean combine (add/subtract)
-            - Hit rotation handle: Begin rotation drag
-            - Hit scale handle: Begin scale drag
-            - Hit inside selection: Begin move drag (lifts selection if not already floating)
-            - Hit outside selection: Clear if unarmed, or de-arm if armed
-            - No selection: Begin new marquee selection
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.PointerMoved(Windows.Foundation.Point,System.Boolean)">
-            <summary>
-            Handles pointer move events during drag operations.
-            </summary>
-            <param name="viewPos">The pointer position in view coordinates.</param>
-            <param name="leftIsDown">Whether the left button is currently held.</param>
-            <returns><c>true</c> if the event was handled; otherwise, <c>false</c>.</returns>
-            <remarks>
-            Updates the active drag operation (move, rotate, scale, or marquee) and triggers redraw.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.PointerReleased(Windows.Foundation.Point)">
-            <summary>
-            Handles pointer release events (button up or touch release).
-            </summary>
-            <param name="viewPos">The pointer position in view coordinates.</param>
-            <returns><c>true</c> if the event was handled; otherwise, <c>false</c>.</returns>
-            <remarks>
-            <para>
-            Finalizes the drag operation:
-            - Transform operations (move/rotate/scale): Commit history step, preserve sticky transform state
-            - Marquee operations: Finalize selection mask from marquee rectangle
-            - Selection becomes "armed" (ready for next interaction)
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.Draw(System.Action{System.Collections.Generic.List{System.Numerics.Vector2},System.Boolean,System.Boolean,System.Boolean},System.Action{System.Byte[],System.Int32,System.Int32,System.Numerics.Matrix3x2})">
-            <summary>
-            Renders the current selection state using provided drawing callbacks.
-            </summary>
-            <param name="drawPoly">
-            Callback to draw the selection polygon outline: (points, armed, floating, showHandles).
-            </param>
-            <param name="drawFloatingBuffer">
-            Callback to draw the floating buffer with transform: (buffer, width, height, transformMatrix).
-            </param>
-            <remarks>
-            <para>
-            This method should be called during the canvas render pass. It delegates actual drawing
-            to the provided callbacks, keeping the engine UI-framework-agnostic.
-            </para>
-            <para>
-            The polygon outline is drawn with marching ants, and transform handles are shown when
-            the selection is armed. The floating buffer (if present) is drawn with applied transforms.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.BuildMaskFromRotatedBuffer(System.Byte[],System.Int32,System.Int32)">
-            <summary>
-            Builds a selection mask from a rotated/transformed buffer by detecting non-transparent pixels.
+            Lifts the selected pixels of <paramref name="layer"/> into a floating selection, clearing
+            them on the layer. Returns null when there is nothing to lift.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.HitTestRotationHandle(Windows.Foundation.Point,System.Collections.Generic.List{System.Numerics.Vector2})">
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelectionOps.Paste(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Document.Layer.RasterLayer,System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32)">
             <summary>
-            Hit-tests rotation handles positioned around the selection polygon.
+            Creates a floating selection from pasted pixels. Nothing is lifted from the layer; the
+            returned item's undo simply removes the floating selection and restores the old mask.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.HitTestScaleHandle(Windows.Foundation.Point,System.Collections.Generic.List{System.Numerics.Vector2})">
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelectionOps.Commit(PixlPunkt.Core.Document.CanvasDocument)">
             <summary>
-            Hit-tests scale handles (corners and edge midpoints) on the selection polygon.
+            Rasterizes the floating selection (scale, then rotation) onto its layer and rebuilds the
+            selection mask as the transformed marquee. Returns null when nothing is floating.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.PointInsidePolygon(System.Numerics.Vector2,System.Collections.Generic.List{System.Numerics.Vector2})">
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelectionOps.Cancel(PixlPunkt.Core.Document.CanvasDocument)">
             <summary>
-            Tests if a point is inside a polygon using ray-casting algorithm.
+            Cancels the floating selection: the lifted pixels go back where they came from
+            (untransformed) and the selection is cleared. Returns null when nothing is floating.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionEngine.FinalizeMarquee(System.Numerics.Vector2)">
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelectionOps.Discard(PixlPunkt.Core.Document.CanvasDocument)">
             <summary>
-            Finalizes a marquee selection by converting the dragged rectangle into a selection mask.
+            Deletes the floating selection: the pixels are discarded and the hole they left stays.
+            Returns null when nothing is floating.
             </summary>
         </member>
-        <member name="T:PixlPunkt.Core.Selection.SelectionMask">
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelectionOps.RasterizeOnto(System.Byte[],System.Int32,System.Int32,PixlPunkt.Core.Selection.FloatingSelection)">
             <summary>
-            Represents a 2D boolean mask for pixel-level selection tracking.
+            Draws the floating selection onto a <em>copy</em> of layer pixels, for serialization.
+            The document is not modified, so a save (or autosave) while floating writes what the
+            user sees without committing anything.
             </summary>
-            <remarks>
-            <para>
-            SelectionMask provides a simple boolean grid where each pixel can be either selected (true)
-            or not selected (false). It serves as the authoritative hit-test data for selection operations
-            like flood fill, magic wand, and lasso tools.
-            </para>
-            <para>
-            Key features:
-            - Fixed dimensions matching document size
-            - Rectangle-based modification (AddRect for marquee selection)
-            - Point containment testing
-            - Enumeration of all selected pixels (for outline generation after transforms)
-            </para>
-            <para>
-            The mask uses a 2D boolean array indexed as [x, y] for efficient access. For large documents,
-            consider using a more memory-efficient sparse representation if only a small percentage of
-            pixels are typically selected.
-            </para>
-            </remarks>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionMask.#ctor(System.Int32,System.Int32)">
+        <member name="T:PixlPunkt.Core.Selection.SelectionBufferOps">
             <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.Core.Selection.SelectionMask"/> class with specified dimensions.
+            Scale and rotate operations on a floating selection's pixel buffer. Used identically by
+            the on-screen preview and by the commit path so both produce the same pixels.
             </summary>
-            <param name="w">The width of the mask in pixels (must match document width).</param>
-            <param name="h">The height of the mask in pixels (must match document height).</param>
-            <remarks>
-            Creates an empty mask (all pixels unselected). The dimensions are fixed at construction
-            and cannot be changed. If document dimensions change, a new mask must be created.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionMask.Clear">
-            <summary>
-            Clears the entire mask (deselects all pixels).
-            </summary>
-            <remarks>
-            Sets all elements in the mask to false. This is faster than creating a new mask instance.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionMask.AddRect(System.Int32,System.Int32,System.Int32,System.Int32)">
-            <summary>
-            Adds a rectangular region to the selection (marks pixels as selected).
-            </summary>
-            <param name="x">The X coordinate of the rectangle's top-left corner.</param>
-            <param name="y">The Y coordinate of the rectangle's top-left corner.</param>
-            <param name="w">The width of the rectangle in pixels.</param>
-            <param name="h">The height of the rectangle in pixels.</param>
-            <remarks>
-            <para>
-            Sets all pixels within the specified rectangle to true (selected). Coordinates are
-            automatically clamped to mask bounds; out-of-bounds pixels are ignored.
-            </para>
-            <para>
-            This method is typically used for marquee (rectangular) selection or for building
-            up complex selections by combining multiple rectangles.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionMask.Contains(System.Int32,System.Int32)">
-            <summary>
-            Determines whether the specified pixel is selected.
-            </summary>
-            <param name="x">The X coordinate of the pixel.</param>
-            <param name="y">The Y coordinate of the pixel.</param>
-            <returns>
-            <c>true</c> if the pixel at (x, y) is selected; otherwise, <c>false</c>.
-            Returns false for out-of-bounds coordinates.
-            </returns>
-            <remarks>
-            This is the primary hit-test method used to determine if drawing operations should
-            affect a specific pixel. Out-of-bounds checks are performed for safety.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionMask.EnumerateFilledPixels">
-            <summary>
-            Enumerates all selected pixels in the mask.
-            </summary>
-            <returns>
-            An enumerable of (x, y) coordinate tuples for all pixels where the mask is true.
-            Pixels are enumerated in row-major order (top-to-bottom, left-to-right).
-            </returns>
-            <remarks>
-            <para>
-            This method is used after transform operations (rotate, scale) to rebuild the
-            selection polygon outline from the transformed pixel footprint.
-            </para>
-            <para>
-            For large selections, this can produce many coordinates. Consider using the selection
-            outline polygon (<see cref="P:PixlPunkt.Core.Selection.PixelSelection.Poly"/>) for visual representation instead
-            of iterating all pixels.
-            </para>
-            </remarks>
-        </member>
-        <member name="T:PixlPunkt.Core.Selection.SelectionOutlineBuilder">
-            <summary>
-            Builds polygon outlines from <see cref="T:PixlPunkt.Core.Selection.SelectionMask"/> using convex hull or exact pixel tracing.
-            </summary>
-            <remarks>
-            <para>
-            SelectionOutlineBuilder converts boolean pixel masks into vector polygons suitable for rendering
-            and transform operations. Two algorithms are provided to balance simplicity vs. accuracy:
-            </para>
-            <para><strong>Algorithm Comparison:</strong></para>
-            <list type="table">
-            <listheader>
-            <term>Algorithm</term>
-            <description>Characteristics</description>
-            </listheader>
-            <item>
-            <term>Convex Hull</term>
-            <description>Fast Graham scan (O(N log N)). Produces minimal polygon that encloses all selected
-            pixels. Loses concave features and holes. Ideal for simple shape transforms.</description>
-            </item>
-            <item>
-            <term>Exact Pixel Trace</term>
-            <description>Marching squares perimeter walk (O(perimeter)). Follows exact pixel boundaries,
-            preserving concave regions and details. Required for accurate lasso and magic wand results.</description>
-            </item>
-            </list>
-            <para><strong>Output Format:</strong></para>
-            <para>
-            All polygons are returned with vertices snapped to pixel corners (integer coordinates).
-            Exact trace mode includes polygon simplification to remove collinear points, reducing
-            vertex count without losing shape fidelity.
-            </para>
-            </remarks>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionMask"/>
-            <seealso cref="T:PixlPunkt.Core.Selection.PixelSelection"/>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.BuildOutline(PixlPunkt.Core.Selection.SelectionMask,System.Boolean)">
-            <summary>
-            Builds a polygon outline from a selection mask.
-            </summary>
-            <param name="mask">Source selection mask to trace.</param>
-            <param name="useExactTrace">If true, uses pixel-accurate tracing (marching squares).
-            If false, uses fast convex hull approximation.</param>
-            <returns>List of polygon vertices in document pixel space, or empty list if mask is empty.</returns>
-            <remarks>
-            <para>
-            Vertices are snapped to pixel corners for clean rendering. Exact trace mode produces
-            polygons that perfectly follow the mask boundary. Convex hull mode produces simpler
-            polygons at the cost of losing concave features.
-            </para>
-            <para><strong>Performance:</strong></para>
-            <para>
-            - Convex hull: O(N log N) where N = number of selected pixels
-            <br/>- Exact trace: O(perimeter) where perimeter = outline edge count
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.BuildConvexHull(System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32}})">
-            <summary>
-            Builds a convex hull outline using Graham scan algorithm.
-            </summary>
-            <param name="pts">List of selected pixel coordinates.</param>
-            <returns>Minimal convex polygon containing all points.</returns>
-            <remarks>
-            <para><strong>Algorithm Steps:</strong></para>
-            <list type="number">
-            <item>Convert pixel coords to center points (x+0.5, y+0.5)</item>
-            <item>Find lowest Y point (bottom-most, then left-most) as pivot</item>
-            <item>Sort remaining points by polar angle from pivot</item>
-            <item>Graham scan: iteratively build hull by removing right turns</item>
-            <item>Snap final vertices to pixel corners</item>
-            </list>
-            <para>
-            Cross product test determines turn direction: positive = left turn (keep),
-            negative/zero = right turn or collinear (remove). Results in CCW-oriented polygon.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.Cross(System.Numerics.Vector2,System.Numerics.Vector2,System.Numerics.Vector2)">
-            <summary>
-            Computes 2D cross product (Z component) for turn direction test.
-            </summary>
-            <param name="a">First point.</param>
-            <param name="b">Second point (turn vertex).</param>
-            <param name="c">Third point.</param>
-            <returns>Positive = left turn, negative = right turn, zero = collinear.</returns>
-            <remarks>
-            Formula: (b.X - a.X) × (c.Y - a.Y) - (b.Y - a.Y) × (c.X - a.X).
-            Used by Graham scan to determine if point C is left or right of line AB.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.BuildExactPixelOutline(System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32}})">
-            <summary>
-            Builds exact pixel outline using marching squares perimeter tracing.
-            </summary>
-            <param name="pixels">List of selected pixel coordinates.</param>
-            <returns>Polygon following exact pixel boundaries.</returns>
-            <remarks>
-            <para><strong>Marching Squares Algorithm:</strong></para>
-            <list type="number">
-            <item>Find starting pixel (lowest Y, then leftmost X)</item>
-            <item>Begin at pixel's bottom-left corner, facing right</item>
-            <item>At each step:
-            <list type="bullet">
-            <item>Try turning right (follow outer edge)</item>
-            <item>If blocked, continue forward</item>
-            <item>If blocked again, turn left (inner corner)</item>
-            </list>
-            </item>
-            <item>Record corner positions until returning to start</item>
-            <item>Simplify polygon to remove collinear points</item>
-            </list>
-            <para>
-            This "wall-following" approach produces a CCW-oriented polygon that traces the selection's
-            outer perimeter. Works correctly for concave shapes and preserves pixel-accurate boundaries.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.Neighbor(System.ValueTuple{System.Int32,System.Int32},System.Int32)">
-            <summary>
-            Gets neighboring pixel in specified direction.
-            </summary>
-            <param name="p">Current pixel coordinates.</param>
-            <param name="d">Direction index (0=right, 1=down, 2=left, 3=up).</param>
-            <returns>Neighbor pixel coordinates.</returns>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.SnapToPixel(System.Numerics.Vector2)">
-            <summary>
-            Snaps a vector to nearest integer pixel corner coordinates.
-            </summary>
-            <param name="v">Input vector (may have fractional components).</param>
-            <returns>Vector with X and Y rounded to nearest integer.</returns>
-            <remarks>
-            Ensures polygon vertices align with pixel grid for clean rendering and consistent
-            hit-testing. Uses <see cref="M:System.Math.Round(System.Double)"/> for banker's rounding.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.Simplify(System.Collections.Generic.List{System.Numerics.Vector2})">
-            <summary>
-            Removes collinear points from polygon to reduce vertex count.
-            </summary>
-            <param name="pts">Input polygon vertices.</param>
-            <returns>Simplified polygon with collinear points removed.</returns>
-            <remarks>
-            <para>
-            Tests each triple of consecutive points using cross product. If points are nearly
-            collinear (area &lt; 0.001), the middle point is removed. This reduces polygon
-            complexity without losing shape accuracy.
-            </para>
-            <para>
-            Essential for marching squares output which can produce many redundant vertices
-            along straight edges.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionOutlineBuilder.IsCollinear(System.Numerics.Vector2,System.Numerics.Vector2,System.Numerics.Vector2,System.Single)">
-            <summary>
-            Tests if three points are approximately collinear.
-            </summary>
-            <param name="a">First point.</param>
-            <param name="b">Second point (tested for removal).</param>
-            <param name="c">Third point.</param>
-            <param name="eps">Epsilon threshold for area test. Default is 0.001.</param>
-            <returns><c>true</c> if triangle ABC has negligible area; otherwise, <c>false</c>.</returns>
-            <remarks>
-            Computes triangle area via cross product. If area is below epsilon, points are
-            considered collinear and B can be safely removed.
-            </remarks>
         </member>
         <member name="T:PixlPunkt.Core.Selection.SelectionRegion">
             <summary>
@@ -18361,7 +17831,7 @@
             <remarks>
             <para>
             SelectionRegion provides a lightweight pixel mask for rectangular selection operations with
-            efficient add/subtract operations and tight bounds tracking. Unlike <see cref="T:PixlPunkt.Core.Selection.SelectionMask"/>, 
+            efficient add/subtract operations and tight bounds tracking. Unlike <c>SelectionMask</c>, 
             this class focuses on simple rectangle-based operations and includes rendering support for
             animated marching-ants outlines.
             </para>
@@ -18386,8 +17856,12 @@
             bounds recomputation to tighten after potential holes. Point containment is O(1) with bounds culling.
             </para>
             </remarks>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionMask"/>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionEngine"/>
+        </member>
+        <member name="F:PixlPunkt.Core.Selection.SelectionRegion._version">
+            <summary>Bumped on every mask mutation; consumers (the ants edge cache) key on it.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Selection.SelectionRegion.Version">
+            <summary>Gets a number that changes whenever the mask changes.</summary>
         </member>
         <member name="P:PixlPunkt.Core.Selection.SelectionRegion.Width">
             <summary>
@@ -18492,33 +17966,9 @@
         </member>
         <member name="M:PixlPunkt.Core.Selection.SelectionRegion.DrawAnts(PixlPunkt.Core.Rendering.ICanvasRenderer,Windows.Foundation.Rect,System.Double,System.Single,System.Single,System.Single,System.Single)">
             <summary>
-            Renders animated marching-ants outline along the outer boundary of the selection.
+            Renders the animated marching-ants outline. Edge runs are computed once per mask
+            version and cached; each frame only draws them at the current phase.
             </summary>
-            <param name="renderer">Canvas renderer for rendering.</param>
-            <param name="dest">Destination rectangle in view space.</param>
-            <param name="scale">Zoom scale factor (document pixels → view pixels).</param>
-            <param name="phase">Animation phase offset in pixels. Increment over time to animate.</param>
-            <param name="antsOn">Length of white segments in pixels.</param>
-            <param name="antsOff">Length of black segments in pixels.</param>
-            <param name="antsThickness">Line thickness in pixels.</param>
-            <remarks>
-            <para><strong>Edge Detection Algorithm:</strong></para>
-            <para>
-            Scans the selection bounds to identify edge pixels (selected with unselected neighbor).
-            Four passes detect top, bottom, left, and right edges separately. Consecutive edge pixels
-            are coalesced into line segments for efficient rendering.
-            </para>
-            <para><strong>Pattern Alternation:</strong></para>
-            <para>
-            Horizontal edges use normal phase; vertical edges use inverted phase (offset by antsOn).
-            This creates a checkerboard pattern at corners where edges meet, ensuring seamless animation.
-            </para>
-            <para><strong>Performance:</strong></para>
-            <para>
-            Complexity is O(boundsArea), only scanning tight bounds rather than full mask. Segment
-            coalescing minimizes draw calls for continuous edges.
-            </para>
-            </remarks>
         </member>
         <member name="M:PixlPunkt.Core.Selection.SelectionRegion.Fill(Windows.Graphics.RectInt32,System.Boolean)">
             <summary>
@@ -18530,6 +17980,12 @@
             Creates a deep copy of this selection region.
             </summary>
             <returns>A new <see cref="T:PixlPunkt.Core.Selection.SelectionRegion"/> with identical mask, bounds, and offset.</returns>
+        </member>
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegion.ExportMask">
+            <summary>Returns a copy of the raw mask with its geometry, for encoding.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegion.ImportMask(System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[])">
+            <summary>Replaces the mask and geometry wholesale (the decoded form of <see cref="M:PixlPunkt.Core.Selection.SelectionRegion.ExportMask"/>).</summary>
         </member>
         <member name="M:PixlPunkt.Core.Selection.SelectionRegion.CopyFrom(PixlPunkt.Core.Selection.SelectionRegion)">
             <summary>
@@ -18586,7 +18042,7 @@
             Safely reads a mask pixel, returning 0 for out-of-bounds coordinates.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionRegion.SubtractPixelFast(System.Int32,System.Int32)">
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegion.AddPixel(System.Int32,System.Int32)">
             <summary>
             Clears a single pixel in the mask without triggering bounds recomputation.
             </summary>
@@ -18596,6 +18052,12 @@
             This is a performance optimization for batch subtract operations (e.g., paint selection tool).
             After calling this multiple times, you MUST call <see cref="M:PixlPunkt.Core.Selection.SelectionRegion.RecomputeBoundsIfNeeded"/> to update bounds.
             </remarks>
+            <summary>
+            Selects a single pixel in local buffer coordinates. Equivalent to
+            <c>AddRect(new RectInt32(x, y, 1, 1))</c> without the rectangle clipping and
+            struct construction, for callers that visit pixels one at a time (flood fills).
+            Bounds expansion is O(1), so no deferred recomputation is needed.
+            </summary>
         </member>
         <member name="M:PixlPunkt.Core.Selection.SelectionRegion.RecomputeBoundsIfNeeded">
             <summary>
@@ -18621,442 +18083,43 @@
             </para>
             </remarks>
         </member>
-        <member name="T:PixlPunkt.Core.Selection.SelectionState">
+        <member name="T:PixlPunkt.Core.Selection.SelectionRegionBuilders">
             <summary>
-            Manages selection state for "floating" selection operations with cut/paste semantics.
-            </summary>
-            <remarks>
-            <para>
-            SelectionState implements the classic image editor pattern where a rectangular selection can be
-            "lifted" from the canvas into a floating buffer, moved around, and either committed back or canceled.
-            This enables non-destructive repositioning of selected content.
-            </para>
-            <para><strong>State Machine:</strong></para>
-            <list type="bullet">
-            <item><strong>Inactive</strong>: No selection exists (<see cref="P:PixlPunkt.Core.Selection.SelectionState.Active"/> = false).</item>
-            <item><strong>Active</strong>: Rectangle selected but not floating. Pixels remain in place.</item>
-            <item><strong>Floating</strong>: Selection lifted to buffer. Original pixels cleared. Can be moved freely.</item>
-            </list>
-            <para><strong>Workflow:</strong></para>
-            <code>
-            1. Begin(rect)      → Active, not floating
-            2. Lift(pixels)     → Floating (copies pixels, clears original)
-            3. MoveTo(x, y)     → Updates float position
-            4. Commit(pixels)   → Blits back to new position, Active
-               OR Cancel(pixels) → Restores original position, clears state
-            </code>
-            <para><strong>Use Cases:</strong></para>
-            <para>
-            - Marquee selection with drag-to-move
-            <br/>- Cut and reposition operations
-            <br/>- Temporary layer-like manipulation of regions
-            <br/>- Undo-friendly pixel transforms (backup preserved until commit)
-            </para>
-            <para><strong>Backup System:</strong></para>
-            <para>
-            When <see cref="M:PixlPunkt.Core.Selection.SelectionState.Lift(System.UInt32[],System.Int32,System.Int32)"/> is called, original pixels are copied to internal backup before clearing.
-            This enables <see cref="M:PixlPunkt.Core.Selection.SelectionState.Cancel(System.UInt32[],System.Int32,System.Int32)"/> to restore the original state if the operation is aborted.
-            </para>
-            </remarks>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionEngine"/>
-            <seealso cref="T:PixlPunkt.Core.Imaging.PixelOps"/>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.Active">
-            <summary>
-            Gets a value indicating whether a selection exists.
-            </summary>
-            <value>
-            <c>true</c> if a selection rectangle is defined; otherwise, <c>false</c>.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.Rect">
-            <summary>
-            Gets the current selection rectangle in document pixel coordinates.
-            </summary>
-            <value>
-            Normalized rectangle (non-negative width/height) defining the selection bounds.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.IsFloating">
-            <summary>
-            Gets a value indicating whether the selection is floating (lifted from document).
-            </summary>
-            <value>
-            <c>true</c> if selection is in floating buffer; <c>false</c> if pixels remain in place.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.FloatX">
-            <summary>
-            Gets the X coordinate of the floating buffer's top-left corner.
-            </summary>
-            <value>
-            Document pixel X position. Only valid when <see cref="P:PixlPunkt.Core.Selection.SelectionState.IsFloating"/> is true.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.FloatY">
-            <summary>
-            Gets the Y coordinate of the floating buffer's top-left corner.
-            </summary>
-            <value>
-            Document pixel Y position. Only valid when <see cref="P:PixlPunkt.Core.Selection.SelectionState.IsFloating"/> is true.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.FloatPixels">
-            <summary>
-            Gets the floating pixel buffer (BGRA format).
-            </summary>
-            <value>
-            Array of packed BGRA pixels, or null if not floating. Length = <see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatW"/> × <see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatH"/> × 4.
-            </value>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.FloatW">
-            <summary>
-            Gets the width of the floating buffer in pixels.
+            Ways of rebuilding the document's selection mask from a floating selection. These used
+            to live in the view (duplicated); history items need them, so they live in Core.
             </summary>
         </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionState.FloatH">
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildAsRotatedRect(PixlPunkt.Core.Selection.SelectionRegion,System.Int32,System.Int32,System.Int32,System.Int32,System.Double,Windows.Graphics.RectInt32,System.Int32,System.Int32)">
             <summary>
-            Gets the height of the floating buffer in pixels.
+            Rebuilds the mask as the original marquee rectangle scaled to (baseW, baseH) and
+            rotated by <paramref name="angleDeg"/> about (centerX, centerY), clipped to
+            <paramref name="dstClamp"/>. Used at commit so the marquee keeps its geometric shape.
             </summary>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Begin(Windows.Graphics.RectInt32)">
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildFromTransformedBuffer(PixlPunkt.Core.Selection.SelectionRegion,Windows.Graphics.RectInt32,Windows.Graphics.RectInt32,System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32)">
             <summary>
-            Begins a new selection with the specified rectangle.
+            Rebuilds the mask from the alpha channel of a (transformed) buffer placed at
+            <paramref name="dstRect"/>, clipped to <paramref name="dstClamp"/>. Used after a scale
+            bake on non-rectangular selections so the marquee follows the true shape.
             </summary>
-            <param name="r">Selection rectangle (will be normalized to positive width/height).</param>
-            <remarks>
-            Sets <see cref="P:PixlPunkt.Core.Selection.SelectionState.Active"/> to true and <see cref="P:PixlPunkt.Core.Selection.SelectionState.IsFloating"/> to false.
-            Rectangle dimensions are normalized to ensure non-negative width/height.
-            </remarks>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Update(Windows.Graphics.RectInt32)">
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildFromFloating(PixlPunkt.Core.Selection.SelectionRegion,PixlPunkt.Core.Selection.FloatingSelection,System.Int32,System.Int32)">
             <summary>
-            Updates the selection rectangle (e.g., during interactive drag).
+            Rebuilds the mask from a floating selection's buffer alpha at its current position.
+            The mask is kept document-sized; parts of the float that are off-canvas are simply not
+            in the mask (they cannot be painted anyway, and hit-testing a floating selection uses
+            the buffer directly). Also refreshes <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.RegionNonRectangular"/>.
             </summary>
-            <param name="r">New rectangle (will be normalized).</param>
-            <remarks>
-            Only updates <see cref="P:PixlPunkt.Core.Selection.SelectionState.Rect"/>. Does not affect floating state or buffers.
-            Useful for live-updating marquee selection during drag operations.
-            </remarks>
         </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Clear">
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.IsRectangular(PixlPunkt.Core.Selection.SelectionRegion,Windows.Graphics.RectInt32)">
+            <summary>True when every pixel inside <paramref name="bounds"/> is selected.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Selection.SelectionRegionCodec">
             <summary>
-            Clears the selection and discards all state.
+            Run-length encoding of a <see cref="T:PixlPunkt.Core.Selection.SelectionRegion"/> mask. Selection masks are large
+            (one byte per canvas pixel) and almost entirely runs, so history snapshots of them are
+            stored in this form instead of as raw copies.
             </summary>
-            <remarks>
-            Resets <see cref="P:PixlPunkt.Core.Selection.SelectionState.Active"/> and <see cref="P:PixlPunkt.Core.Selection.SelectionState.IsFloating"/> to false.
-            Releases floating buffer and backup references. No pixels are modified.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Lift(System.UInt32[],System.Int32,System.Int32)">
-            <summary>
-            Lifts the selected rectangle from the layer into a floating buffer.
-            </summary>
-            <param name="layer">Source layer pixel array (BGRA packed uint).</param>
-            <param name="lw">Layer width in pixels.</param>
-            <param name="lh">Layer height in pixels.</param>
-            <remarks>
-            <para><strong>Operation:</strong></para>
-            <list type="number">
-            <item>Copies pixels from <paramref name="layer"/> within <see cref="P:PixlPunkt.Core.Selection.SelectionState.Rect"/> to internal backup</item>
-            <item>Clears the original rectangle (replaces with transparent pixels)</item>
-            <item>Sets <see cref="P:PixlPunkt.Core.Selection.SelectionState.IsFloating"/> to true and populates <see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatPixels"/></item>
-            <item>Initializes float position to original <see cref="P:PixlPunkt.Core.Selection.SelectionState.Rect"/> location</item>
-            </list>
-            <para>
-            Does nothing if already floating or not active. The backup enables <see cref="M:PixlPunkt.Core.Selection.SelectionState.Cancel(System.UInt32[],System.Int32,System.Int32)"/>
-            to restore original pixels if the operation is aborted.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.MoveTo(System.Int32,System.Int32)">
-            <summary>
-            Moves the floating buffer to a new position.
-            </summary>
-            <param name="x">New X coordinate for top-left corner.</param>
-            <param name="y">New Y coordinate for top-left corner.</param>
-            <remarks>
-            Updates <see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatX"/> and <see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatY"/>. Only affects position;
-            pixel content is unchanged. Does nothing if not floating.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Commit(System.UInt32[],System.Int32,System.Int32)">
-            <summary>
-            Commits the floating buffer back to the layer at its current position.
-            </summary>
-            <param name="layer">Target layer pixel array (BGRA packed uint).</param>
-            <param name="lw">Layer width in pixels.</param>
-            <param name="lh">Layer height in pixels.</param>
-            <remarks>
-            <para><strong>Operation:</strong></para>
-            <list type="number">
-            <item>Blits <see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatPixels"/> to <paramref name="layer"/> at (<see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatX"/>, <see cref="P:PixlPunkt.Core.Selection.SelectionState.FloatY"/>)</item>
-            <item>Sets <see cref="P:PixlPunkt.Core.Selection.SelectionState.IsFloating"/> to false</item>
-            <item>Updates <see cref="P:PixlPunkt.Core.Selection.SelectionState.Rect"/> to new position/size</item>
-            <item>Releases floating buffer and backup references</item>
-            </list>
-            <para>
-            Selection remains active after commit but is no longer floating. Does nothing if not floating.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Cancel(System.UInt32[],System.Int32,System.Int32)">
-            <summary>
-            Cancels the floating operation and restores original pixels.
-            </summary>
-            <param name="layer">Target layer pixel array (BGRA packed uint).</param>
-            <param name="lw">Layer width in pixels.</param>
-            <param name="lh">Layer height in pixels.</param>
-            <remarks>
-            <para>
-            If floating, restores backup pixels to original <see cref="P:PixlPunkt.Core.Selection.SelectionState.Rect"/> position and calls <see cref="M:PixlPunkt.Core.Selection.SelectionState.Clear"/>.
-            If not floating, simply clears the selection. This enables undo-like behavior for lift operations.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Delete(System.UInt32[],System.Int32,System.Int32)">
-            <summary>
-            Deletes the selected content (clears pixels to transparent).
-            </summary>
-            <param name="layer">Target layer pixel array (BGRA packed uint).</param>
-            <param name="lw">Layer width in pixels.</param>
-            <param name="lh">Layer height in pixels.</param>
-            <remarks>
-            <para>
-            If floating, discards the floating buffer. Clears the rectangle at <see cref="P:PixlPunkt.Core.Selection.SelectionState.Rect"/> position
-            and sets <see cref="P:PixlPunkt.Core.Selection.SelectionState.Active"/> to false. Equivalent to pressing Delete key on selection.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionState.Normalize(Windows.Graphics.RectInt32)">
-            <summary>
-            Normalizes a rectangle to have non-negative width and height.
-            </summary>
-            <param name="r">Input rectangle (may have negative dimensions).</param>
-            <returns>Rectangle with positive width/height, adjusting X/Y if necessary.</returns>
-            <remarks>
-            Converts rectangles created by dragging bottom-left to top-right (negative dimensions)
-            into standard top-left anchored form. Essential for consistent rect operations.
-            </remarks>
-        </member>
-        <member name="T:PixlPunkt.Core.Selection.SelectionTransform">
-            <summary>
-            Handles 2D transform operations (move, rotate, scale) on selection polygons.
-            </summary>
-            <remarks>
-            <para>
-            SelectionTransform provides interactive transformation of <see cref="T:PixlPunkt.Core.Selection.PixelSelection"/> polygons
-            without modifying the underlying pixel mask until commit. All transforms operate in document
-            pixel space with snap-to-grid behavior for precise positioning.
-            </para>
-            <para><strong>Transform Operations:</strong></para>
-            <list type="bullet">
-            <item><strong>Move</strong>: Translates selection by dragging. Snaps to pixel grid for alignment.</item>
-            <item><strong>Rotate</strong>: Rotates around polygon center. Supports angle snapping (e.g., 15° increments).</item>
-            <item><strong>Scale</strong>: Resizes via 8 corner/edge handles. Supports uniform and non-uniform scaling.</item>
-            </list>
-            <para><strong>Interaction Pattern:</strong></para>
-            <code>
-            1. BeginMove/Rotate/Scale(pointerDoc)   → Captures initial state
-            2. UpdateMove/Rotate/Scale(pointerDoc)  → Applies delta from start
-            3. Commit transform                     → Selection updates its state
-            </code>
-            <para><strong>Transform Order:</strong></para>
-            <para>
-            Transforms are applied in SRT order: Scale → Rotate → Translate. This ensures scaling happens
-            around the origin before rotation, and translation moves the fully-transformed shape.
-            </para>
-            <para><strong>Snapping Behavior:</strong></para>
-            <para>
-            - Move: Snaps delta to nearest pixel (Math.Round)
-            <br/>- Rotate: Optional angle snap (default 1°, can use 15° for coarse snapping)
-            <br/>- Scale: Snaps to 0.01 increments (1% precision), clamped to minimum 0.01
-            </para>
-            </remarks>
-            <seealso cref="T:PixlPunkt.Core.Selection.PixelSelection"/>
-            <seealso cref="T:PixlPunkt.Core.Selection.SelectionEngine"/>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.#ctor(PixlPunkt.Core.Selection.PixelSelection)">
-            <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.Core.Selection.SelectionTransform"/> class.
-            </summary>
-            <param name="sel">The pixel selection to transform.</param>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.BeginMove(System.Numerics.Vector2)">
-            <summary>
-            Begins a move operation by capturing the current translation and pointer position.
-            </summary>
-            <param name="pointerDoc">Initial pointer position in document pixel coordinates.</param>
-            <remarks>
-            Call this when user presses mouse button to start dragging the selection.
-            Stores current translation state for delta calculation.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.UpdateMove(System.Numerics.Vector2)">
-            <summary>
-            Updates the move operation by calculating and applying pixel-snapped translation delta.
-            </summary>
-            <param name="pointerDoc">Current pointer position in document pixel coordinates.</param>
-            <remarks>
-            Calculates delta from <see cref="M:PixlPunkt.Core.Selection.SelectionTransform.BeginMove(System.Numerics.Vector2)"/> position, snaps to pixel grid, and updates
-            selection's <see cref="P:PixlPunkt.Core.Selection.PixelSelection.Translation"/>. Called repeatedly during drag.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.BeginRotate(System.Numerics.Vector2)">
-            <summary>
-            Begins a rotation operation by capturing the initial angle and pointer's angular position.
-            </summary>
-            <param name="pointerDoc">Initial pointer position in document pixel coordinates.</param>
-            <remarks>
-            <para>
-            Computes pointer's angle relative to polygon center using <see cref="M:System.Math.Atan2(System.Double,System.Double)"/>.
-            This anchor angle is used to calculate rotation delta during <see cref="M:PixlPunkt.Core.Selection.SelectionTransform.UpdateRotate(System.Numerics.Vector2,System.Single)"/>.
-            </para>
-            <para>
-            Rotation always occurs around the polygon's centroid, computed via <see cref="M:PixlPunkt.Core.Selection.SelectionTransform.ComputePolyCenter(System.Collections.Generic.List{System.Numerics.Vector2})"/>.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.UpdateRotate(System.Numerics.Vector2,System.Single)">
-            <summary>
-            Updates the rotation by calculating angular delta and applying snap-to-grid.
-            </summary>
-            <param name="pointerDoc">Current pointer position in document pixel coordinates.</param>
-            <param name="snapStep">Angle snapping granularity in degrees. Default is 1° (fine).
-            Use 15° for coarse snapping.</param>
-            <remarks>
-            <para><strong>Algorithm:</strong></para>
-            <list type="number">
-            <item>Compute current pointer angle from polygon center</item>
-            <item>Calculate delta from anchor angle stored in <see cref="M:PixlPunkt.Core.Selection.SelectionTransform.BeginRotate(System.Numerics.Vector2)"/></item>
-            <item>Apply delta to starting rotation angle</item>
-            <item>Normalize to -180°..180° range</item>
-            <item>Snap to <paramref name="snapStep"/> increments</item>
-            </list>
-            <para>
-            Negative angles represent clockwise rotation. Snapping helps users achieve precise
-            alignments (0°, 45°, 90°, etc.) without manual entry.
-            </para>
-            </remarks>
-        </member>
-        <member name="T:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle">
-            <summary>
-            Defines the 8 scale handle positions plus None.
-            </summary>
-            <remarks>
-            <para>
-            Corner handles (NW, NE, SE, SW) typically scale both axes uniformly.
-            Edge handles (N, E, S, W) scale single axis or both depending on <c>uniformLink</c> flag.
-            </para>
-            </remarks>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.None">
-            <summary>No handle selected.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.NW">
-            <summary>Northwest corner handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.N">
-            <summary>North edge handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.NE">
-            <summary>Northeast corner handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.E">
-            <summary>East edge handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.SE">
-            <summary>Southeast corner handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.S">
-            <summary>South edge handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.SW">
-            <summary>Southwest corner handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.W">
-            <summary>West edge handle.</summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.BeginScale(PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle,System.Numerics.Vector2)">
-            <summary>
-            Begins a scale operation by capturing initial state and active handle.
-            </summary>
-            <param name="h">Which handle is being dragged.</param>
-            <param name="pointerDoc">Initial pointer position in document pixel coordinates.</param>
-            <remarks>
-            Stores starting scale factors, translation, and pointer position for delta calculation.
-            Sets <see cref="P:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandleActive"/> to track which handle is driving the transform.
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandleActive">
-            <summary>
-            Gets the currently active scale handle.
-            </summary>
-            <value>
-            The <see cref="T:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle"/> being dragged, or <see cref="F:PixlPunkt.Core.Selection.SelectionTransform.ScaleHandle.None"/> if not scaling.
-            </value>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.UpdateScale(System.Numerics.Vector2,System.Boolean)">
-            <summary>
-            Updates the scale by calculating distance ratio from polygon center.
-            </summary>
-            <param name="pointerDoc">Current pointer position in document pixel coordinates.</param>
-            <param name="uniformLink">If true, scales both axes equally. If false, applies axis-specific
-            scaling based on handle type.</param>
-            <remarks>
-            <para><strong>Algorithm:</strong></para>
-            <list type="number">
-            <item>Compute distance from polygon center to start pointer</item>
-            <item>Compute distance from polygon center to current pointer</item>
-            <item>Calculate scale factor = currentDist / startDist</item>
-            <item>Snap scale to 0.01 increments (1% precision)</item>
-            <item>Apply to X, Y, or both axes based on handle and uniform flag</item>
-            <item>Snap translation to pixel grid</item>
-            </list>
-            <para><strong>Handle Behavior:</strong></para>
-            <para>
-            - <strong>Corners</strong> (NW, NE, SE, SW): Scale both axes
-            <br/>- <strong>Vertical edges</strong> (N, S): Scale Y only (unless uniform)
-            <br/>- <strong>Horizontal edges</strong> (E, W): Scale X only (unless uniform)
-            </para>
-            <para>
-            Minimum scale is clamped to 0.01 (1%) to prevent division by zero and invisibility.
-            </para>
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.ComputePolyCenter(System.Collections.Generic.List{System.Numerics.Vector2})">
-            <summary>
-            Computes the centroid (average position) of a polygon.
-            </summary>
-            <param name="poly">List of polygon vertices.</param>
-            <returns>Centroid as a <see cref="T:System.Numerics.Vector2"/>. Returns <see cref="P:System.Numerics.Vector2.Zero"/> if polygon is empty.</returns>
-            <remarks>
-            Simple arithmetic mean of all vertices. Used as the pivot point for rotation and scaling.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.GetTransformedPoly">
-            <summary>
-            Transforms the selection's polygon using current transform state.
-            </summary>
-            <returns>A new list of transformed vertices.</returns>
-            <remarks>
-            Applies the selection's transform matrix (from <see cref="M:PixlPunkt.Core.Selection.PixelSelection.GetTransformMatrix"/>)
-            to each vertex. Used for preview rendering and hit-testing against transformed bounds.
-            </remarks>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionTransform.HitTestPoint(Windows.Foundation.Point,System.Single,System.Single,System.Single)">
-            <summary>
-            Tests whether a point falls within a square handle region.
-            </summary>
-            <param name="v">Point to test in view space.</param>
-            <param name="hx">Handle center X coordinate.</param>
-            <param name="hy">Handle center Y coordinate.</param>
-            <param name="half">Half-size of the handle square (e.g., 5 pixels for 10×10 handle).</param>
-            <returns><c>true</c> if point is inside handle bounds; otherwise, <c>false</c>.</returns>
-            <remarks>
-            Axis-aligned bounding box test. Used by UI layer (CanvasViewHost) to determine which
-            handle the pointer is hovering over or clicked on.
-            </remarks>
         </member>
         <member name="T:PixlPunkt.Core.Serialization.SessionJsonContext">
             <summary>
@@ -20579,10 +19642,8 @@
         <member name="F:PixlPunkt.Core.Structs.BrushOverlaySnapshot.HoverY">
             <summary>Integer Y coordinate of cursor hover position (document space).</summary>
         </member>
-        <member name="F:PixlPunkt.Core.Structs.BrushOverlaySnapshot.Center">
-            <summary>Legacy float-based center position. Use HoverX/HoverY for precise coordinates.</summary>
-        </member>
         <member name="F:PixlPunkt.Core.Structs.BrushOverlaySnapshot.Radius">
+            <summary>Legacy float-based center position. Use HoverX/HoverY for precise coordinates.</summary>
             <summary>Brush radius for circular preview.</summary>
         </member>
         <member name="F:PixlPunkt.Core.Structs.BrushOverlaySnapshot.Mask">
@@ -20953,12 +20014,16 @@
             <param name="pixels">New BGRA pixel data (must match tile dimensions).</param>
             <exception cref="T:System.ArgumentException">If pixel array size doesn't match dimensions.</exception>
         </member>
-        <member name="M:PixlPunkt.Core.Tile.TileDefinition.Clone(System.Int32)">
+        <member name="M:PixlPunkt.Core.Tile.TileDefinition.WithId(System.Int32)">
             <summary>
             Creates a deep copy of this tile with a new ID.
             </summary>
             <param name="newId">The ID for the cloned tile.</param>
             <returns>A new tile with copied pixel data.</returns>
+            <summary>
+            The same tile (same pixel buffer, thumbnail and name) under a different id. Used when
+            the tile set is renumbered; nothing is copied.
+            </summary>
         </member>
         <member name="M:PixlPunkt.Core.Tile.TileDefinition.IsEmpty">
             <summary>
@@ -21138,6 +20203,37 @@
             <param name="data">The imported tile data.</param>
             <param name="tileSet">The target tile set to replace.</param>
         </member>
+        <member name="T:PixlPunkt.Core.Tile.TileLayerPropagation">
+            <summary>
+            Tile-set bookkeeping around edits to a tile-mapped layer: which tiles a rectangle touches,
+            snapshotting and restoring their definitions, and pushing layer pixels back through the
+            mapping. History items use this so undo/redo restores tiles as well as layer pixels.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tile.TileLayerPropagation.AffectedTileIds(PixlPunkt.Core.Document.Layer.RasterLayer,PixlPunkt.Core.Tile.TileSet,Windows.Graphics.RectInt32)">
+            <summary>Tile ids whose mapped cells intersect <paramref name="bounds"/> on <paramref name="layer"/>.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tile.TileLayerPropagation.CaptureTileStates(PixlPunkt.Core.Tile.TileSet,System.Collections.Generic.IEnumerable{System.Int32})">
+            <summary>Clones the pixel definitions of the given tiles.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tile.TileLayerPropagation.CaptureAffectedTiles(PixlPunkt.Core.Document.Layer.RasterLayer,PixlPunkt.Core.Tile.TileSet,Windows.Graphics.RectInt32)">
+            <summary>
+            Snapshots only the tiles that <paramref name="bounds"/> touches, or null when the layer
+            is not tile-mapped. This is what every selection history item captures.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tile.TileLayerPropagation.PropagateFromLayer(PixlPunkt.Core.Document.Layer.RasterLayer,PixlPunkt.Core.Tile.TileSet,Windows.Graphics.RectInt32)">
+            <summary>
+            Writes changed layer pixels in <paramref name="bounds"/> into the tiles mapped there and
+            into every other cell that uses those tiles.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tile.TileLayerPropagation.RestoreTileStates(PixlPunkt.Core.Document.Layer.RasterLayer,PixlPunkt.Core.Tile.TileSet,System.Collections.Generic.Dictionary{System.Int32,System.Byte[]})">
+            <summary>
+            Restores tile definitions and writes each restored tile back into every cell of the
+            layer that maps to it.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Tile.TileMapping">
             <summary>
             Stores tile mappings for a layer - which tile is placed at each grid position.
@@ -21241,6 +20337,13 @@
             <param name="tileId">The tile ID to remove.</param>
             <returns>Number of positions cleared.</returns>
         </member>
+        <member name="M:PixlPunkt.Core.Tile.TileMapping.RemapTileIds(System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Int32})">
+            <summary>
+            Rewrites every cell through <paramref name="idMap"/> in a single pass, so overlapping
+            renumberings (3→2 and 2→1) cannot chain. Ids absent from the map are left alone.
+            </summary>
+            <returns>Number of cells changed.</returns>
+        </member>
         <member name="M:PixlPunkt.Core.Tile.TileMapping.Resize(System.Int32,System.Int32)">
             <summary>
             Resizes the mapping grid, preserving existing mappings where possible.
@@ -21325,6 +20428,12 @@
         <member name="E:PixlPunkt.Core.Tile.TileSet.TileSetCleared">
             <summary>
             Occurs when the tile set is cleared.
+            </summary>
+        </member>
+        <member name="E:PixlPunkt.Core.Tile.TileSet.TilesRenumbered">
+            <summary>
+            Raised after <see cref="M:PixlPunkt.Core.Tile.TileSet.ApplyIdMap(System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Int32})"/> re-keyed the tiles. The argument maps old id
+            to new id for every tile whose id changed.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Tile.TileSet.#ctor(System.Int32,System.Int32)">
@@ -21413,6 +20522,21 @@
         <member name="M:PixlPunkt.Core.Tile.TileSet.ComputePixelHash(System.Byte[])">
             <summary>
             Computes a simple hash of pixel data for duplicate detection.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tile.TileSet.BuildRenumberMap">
+            <summary>
+            Computes the map that renumbers the tiles 1..Count in ascending id order, e.g.
+            {1, 3, 45, 56, 90} → {1, 2, 3, 4, 5}. Only ids that change are included, so an empty
+            map means the set is already sequential. Apply it with
+            <see cref="M:PixlPunkt.Core.Tile.TileSet.ApplyIdMap(System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Int32})"/> (the document does this for every mapping too).
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Tile.TileSet.ApplyIdMap(System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Int32})">
+            <summary>
+            Re-keys the tiles through <paramref name="idMap"/> (old id → new id) in one pass.
+            The map must be a bijection on the ids it contains; callers are responsible for
+            updating every <see cref="T:PixlPunkt.Core.Tile.TileMapping"/> and other id holders.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Tile.TileSet.RemoveUnusedTiles(System.Collections.Generic.ISet{System.Int32})">
@@ -23501,6 +22625,9 @@
             Used by paint selection tool to determine which pixels to select based on brush shape.
             Returns empty collection if no brush configuration is available.
             </remarks>
+        </member>
+        <member name="T:PixlPunkt.Core.Tools.Selection.SelectionToolDrawing">
+            <summary>Marching-ants style line drawing shared by the selection tools' previews.</summary>
         </member>
         <member name="T:PixlPunkt.Core.Tools.Selection.WandSelectionTool">
             <summary>
@@ -28341,13 +27468,45 @@
         </member>
         <member name="T:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory">
             <summary>
-            Lightweight undo/redo stack for voxel workspace operations.
+            The voxel editor's view of a <see cref="T:PixlPunkt.Core.History.UnifiedHistoryStack"/>. Voxel commands are pushed
+            as <see cref="T:PixlPunkt.Core.Voxel.Editing.VoxelHistoryItem"/>s and transactions are history groups, so when the stack
+            is the document's the canvas and the voxel workspace share one undo timeline, one dirty
+            flag and one memory budget. Undo/redo here only step items this class pushed; anything
+            else on top is left for the canvas host, which knows how to refresh after it.
             </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory.Stack">
+            <summary>The stack this history writes to.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory.CanUndo">
+            <summary>True when the stack can undo anything at all.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory.CanUndoVoxel">
+            <summary>True when the next undo step is a voxel edit.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory.CanRedoVoxel">
+            <summary>True when the next redo step is a voxel edit.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory.Undo">
+            <summary>Undoes the top item if it is a voxel edit; false otherwise.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Voxel.Editing.VoxelCommandHistory.Redo">
+            <summary>Redoes the top item if it is a voxel edit; false otherwise.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Voxel.Editing.VoxelHistoryItem">
+            <summary>A voxel command on the unified history stack.</summary>
         </member>
         <member name="T:PixlPunkt.Core.Voxel.Editing.VoxelEditEngine">
             <summary>
             Core voxel edit engine for canonical voxel model operations (Phase 1 scaffold).
             </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Voxel.Editing.VoxelEditEngine.#ctor(PixlPunkt.Core.Document.VoxelModelDocumentState,PixlPunkt.Core.History.UnifiedHistoryStack)">
+            <param name="model">The voxel model to edit.</param>
+            <param name="history">
+            The stack voxel edits are recorded on. Pass the document's so the canvas and the voxel
+            workspace share one undo timeline; null gives the engine a private stack (tests).
+            </param>
         </member>
         <member name="T:PixlPunkt.Core.Voxel.Editing.VoxelSelectionService">
             <summary>
@@ -30434,77 +29593,24 @@
             Pushes a multi-region pixel change to the unified history stack.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.LiftSelectionWithHistory">
-            <summary>
-            Lifts the current selection to a floating buffer and records BEFORE/AFTER history.
-            Selected pixels are copied into a floating buffer and cleared from the layer.
-            Changes are propagated to all mapped tile instances.
-            </summary>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CommitFloatingWithHistory(System.Nullable{System.Int32})">
+            <param name="keyframeIndex">Frame to capture the keyframe on; null = the current frame.</param>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CommitFloatingWithHistory">
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.IsStructuralItem(PixlPunkt.Core.History.IHistoryItem)">
             <summary>
-            Applies scale/rotation to the floating selection, writes it back to the canvas,
-            and records full BEFORE/AFTER deltas.
+            Returns true when undoing or redoing <paramref name="item"/> can change the canvas
+            dimensions or the shape of the layer tree, and the host therefore has to re-sync
+            zoom, selection region size, composite and stroke state.
             </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.RestoreFloatingSelection(PixlPunkt.Core.History.SelectionCommitItem.FloatingSnapshot)">
-            <summary>
-            Restores a floating selection state from a commit undo.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ClearFloatingSelection">
-            <summary>
-            Clears the floating selection state (for commit redo).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ApplyPixelsToLayer(PixlPunkt.Core.Document.Layer.RasterLayer,Windows.Graphics.RectInt32,System.Byte[])">
-            <summary>
-            Applies pixel data to a layer region (for history undo/redo).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ClearSelectionHistoryState">
-            <summary>
-            Clears selection history state after commit or cancel.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.RestoreLayerSnapshot(System.Byte[],System.Int32,System.Int32,Windows.Graphics.RectInt32,System.Byte[])">
-            <summary>
-            Creates a layer snapshot with a region restored to its previous state.
-            Used to compute combined before state for history.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.RebuildSelectionRegionAsRotatedRect(System.Int32,System.Int32,System.Int32,System.Int32,System.Double,Windows.Graphics.RectInt32,System.Int32,System.Int32)">
-            <summary>
-            Builds the selection region as a rotated rectangle after transforms.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.RebuildSelectionRegionFromTransformedBuffer(Windows.Graphics.RectInt32,Windows.Graphics.RectInt32,System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32)">
-            <summary>
-            Builds the selection region from the transformed buffer's alpha,
-            walking the destination area and including pixels where alpha != 0.
-            Use when you want ants to trace actual pixels (after scale/rotate),
-            rather than parametric geometry.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ApplyWithHistory(Windows.Graphics.RectInt32,System.Action{System.Byte[]},System.String)">
-            <summary>
-            Runs a mutator over a clamped rectangle and pushes to unified history.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.RestoreFloatingPixelsToCanvas">
-            <summary>
-            Blits the floating buffer back to the canvas at its current position, reversing
-            the lift operation without touching history. Called before undoing a
-            SelectionChangeItem when the selection is still floating, so the canvas hole
-            left by the lift is filled before the floating state is discarded.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.LiftSelectionSilently">
-            <summary>
-            Lifts the current selection to a floating buffer without recording any history.
-            Mirror of LiftSelectionWithHistory used when redoing a SelectionChangeItem whose
-            paired undo previously blitted the floating pixels back via RestoreFloatingPixelsToCanvas.
-            </summary>
+            <remarks>
+            Every item that adds, removes, reorders, merges, flattens or reparents a layer or
+            folder belongs here. Note that CanvasDocument.AddLayer pushes a
+            <see cref="T:PixlPunkt.Core.History.LayerTreeAddItem"/> when the active layer sits inside a folder and a
+            <see cref="T:PixlPunkt.Core.History.LayerAddItem"/> otherwise, so both have to be listed or the same user
+            action re-syncs only for layers at root level.
+            Reference layers are deliberately excluded: they live outside the layer tree and a
+            plain recomposite plus invalidate is enough for them.
+            </remarks>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Undo">
             <summary>
@@ -30514,6 +29620,37 @@
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Redo">
             <summary>
             Redoes the last undone operation from the unified history stack.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.JumpHistoryTo(System.Int32)">
+            <summary>
+            Moves the history cursor to <paramref name="appliedCount"/> (0 = start), stepping
+            through every item in between but refreshing the view only once at the end.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.CanvasHost.CanvasViewHost.HistoryStepResult">
+            <summary>
+            What a history step changed, so the view can be refreshed proportionately.
+            </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.HistoryStepResult.Structural">
+            <summary>Canvas size or layer tree may have changed.</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.HistoryStepResult.Pixels">
+            <summary>Layer pixels may have changed (needs a recomposite).</summary>
+        </member>
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.HistoryStepResult.AlreadyRefreshed">
+            <summary>The step already fully refreshed the view itself.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.StepHistory(System.Boolean,System.Boolean)">
+            <summary>
+            Performs exactly one undo or redo without touching the view. Selection items apply to
+            the document themselves and raise SelectionChanged, which the view observes.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.RefreshAfterHistory(PixlPunkt.UI.CanvasHost.CanvasViewHost.HistoryStepResult)">
+            <summary>
+            Brings the view in line with the document after one or more history steps.
             </summary>
         </member>
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._symmetryAxisDragging">
@@ -30826,7 +29963,7 @@
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._cachedFramePositions">
             <summary>Cached dictionary for tile animation frame positions.</summary>
         </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._cachedFrameIndexList">
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._showStageOverlay">
             <summary>Cached list for reuse in frame position building.</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CanvasView_Draw(PixlPunkt.Core.Rendering.ICanvasRenderer)">
@@ -30925,6 +30062,19 @@
             Rendering tick used to advance marching ants and invalidate when needed.
             </summary>
         </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.HasPaintConstrainingSelection">
+            <summary>
+            True when a committed (non-floating) selection exists that constrains where painting
+            may land. Mirrors the mask handed to the stroke engine, so every painting path -
+            brushes, fills, gradients, plugins - agrees on the answer.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.IsPointSelected(System.Int32,System.Int32)">
+            <summary>
+            Whether document pixel <paramref name="x"/>,<paramref name="y"/> may be painted given
+            the current selection. With no constraining selection every point is paintable.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.ScaledW">
             <summary>Gets the scaled width of the floating selection.</summary>
         </member>
@@ -30958,15 +30108,17 @@
             Pushes selection change history after a marquee operation completes.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ApplySelectionRegionFromHistory(PixlPunkt.Core.Selection.SelectionRegion)">
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnDocumentSelectionChanged">
             <summary>
-            Applies a selection region from history (undo/redo).
+            The document's selection or floating selection changed (an operation, or undo/redo).
+            Bring the view state in line; the document is the source of truth.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ApplyTransformSnapshotAndRedraw(PixlPunkt.Core.History.SelectionTransformItem.TransformSnapshot)">
-            <summary>
-            Applies a transform snapshot and triggers redraw.
-            </summary>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnFrameChangedForSelection(System.Int32)">
+            <summary>Commit a floating selection onto the frame it was edited on before the timeline leaves it.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.PushHistoryItem(PixlPunkt.Core.History.IHistoryItem)">
+            <summary>Pushes an item produced by a selection operation and refreshes what depends on it.</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Selection_SelectAll">
             <summary>Selects the entire document.</summary>
@@ -30985,6 +30137,9 @@
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.PasteClipboard">
             <summary>Pasts from clipboard.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.PasteClipboardAt(System.Int32,System.Int32)">
+            <summary>Pastes the clipboard with its top-left corner at a document position.</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.CancelSelection">
             <summary>Cancels the active selection.</summary>
@@ -31336,6 +30491,9 @@
             Symmetry service for live stroke mirroring.
             </summary>
         </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost._selRegion">
+            <summary>The document's selection mask (see <see cref="P:PixlPunkt.Core.Document.CanvasDocument.Selection"/>).</summary>
+        </member>
         <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._isActivePainting">
             <summary>
             Whether we're actively painting (mouse down + moving).
@@ -31496,12 +30654,10 @@
             Whether the paint invalidation system is active.
             </summary>
         </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost._idleFrameCount">
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.MaxIdleFramesBeforeStop">
             <summary>
             Counter to track idle frames for auto-stop.
             </summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.MaxIdleFramesBeforeStop">
             <summary>
             Maximum idle ticks before auto-stopping.
             </summary>
@@ -31623,139 +30779,25 @@
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard">
             <summary>
-            Handles clipboard operations (copy, cut, paste, delete) for selections.
-            </summary>
-            <remarks>
-            <para>
-            SelectionClipboard manages the following operations:
-            - Copy: Copies selected pixels to internal and system clipboard
-            - Cut: Copies selected pixels then clears the selection
-            - Paste: Creates a floating selection from clipboard data
-            - Delete: Clears selected pixels or discards floating buffer
-            </para>
-            <para>
-            <strong>Clipboard Architecture</strong>: The class maintains an internal staging buffer
-            for quick paste operations and also synchronizes with the system clipboard for
-            cross-application support.
-            </para>
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.GetActiveLayer">
-            <summary>
-            Gets or sets the function to get the active layer.
+            Copy / cut / paste / delete / cancel / select-all / invert. Every operation that changes
+            the document does so through <see cref="T:PixlPunkt.Core.Selection.FloatingSelectionOps"/> or a history item, so
+            each one is undoable and none of them can drop lifted pixels on the floor.
             </summary>
         </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.GetDocWidth">
-            <summary>
-            Gets or sets the function to get document width.
-            </summary>
+        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.EnsureSelectToolActive">
+            <summary>Called after a paste so the host can switch to a tool that can drag the float.</summary>
         </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.GetDocHeight">
-            <summary>
-            Gets or sets the function to get document height.
-            </summary>
+        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.HasClipboard">
+            <summary>Whether anything has been copied or cut in this session.</summary>
         </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.GetZoom">
-            <summary>
-            Gets or sets the function to get the zoom controller.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.GetHoverPosition">
-            <summary>
-            Gets or sets the function to get hover position.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.RequestRedraw">
-            <summary>
-            Gets or sets the action to request a canvas redraw.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.CommitFloating">
-            <summary>
-            Gets or sets the action to commit floating selection.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.ApplyWithHistory">
-            <summary>
-            Gets or sets the action to apply changes with history.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.SetCursor">
-            <summary>
-            Gets or sets the action to set cursor shape.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.PropagateTileChanges">
-            <summary>
-            Gets or sets the action to propagate changes to mapped tiles after delete.
-            /// </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.PushSelectionHistory">
-            <summary>
-            Gets or sets the action to push a selection change to history.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.#ctor(PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem)">
-            <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard"/> class.
-            </summary>
-            <param name="state">The selection subsystem state.</param>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.Copy">
-            <summary>
-            Copies the current selection to clipboard.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.Cut">
-            <summary>
-            Cuts the current selection (copy then delete).
-            </summary>
+        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.ClipboardSize">
+            <summary>Size of the internal clipboard image, or null when it is empty.</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.Paste">
-            <summary>
-            Pastes from clipboard into a new floating selection.
-            </summary>
+            <summary>Pastes centred on the hover point (or the view centre), kept on the canvas.</summary>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.Delete">
-            <summary>
-            Deletes the current selection.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.Cancel">
-            <summary>
-            Cancels the active selection.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.SelectAll">
-            <summary>
-            Selects the entire document.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.InvertSelection">
-            <summary>
-            Inverts the current selection (selects unselected pixels, deselects selected pixels).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.PushSelectionChangeHistory(PixlPunkt.Core.History.SelectionChangeItem.SelectionChangeKind,PixlPunkt.Core.Selection.SelectionRegion,PixlPunkt.Core.Selection.SelectionRegion)">
-            <summary>
-            Pushes a selection change to history if there was an actual change.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.ApplySelectionRegion(PixlPunkt.Core.Selection.SelectionRegion)">
-            <summary>
-            Applies a selection region snapshot (used for undo/redo).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.ClearSelectedPixels(System.Byte[],System.Int32,System.Int32)">
-            <summary>
-            Clears only the pixels that are selected in the region (not the bounding box).
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.CopySelectedPixels(System.Byte[],System.Int32,System.Int32)">
-            <summary>
-            Copies only the pixels that are selected in the region (not the entire bounding box).
-            Unselected pixels within the bounding box are set to transparent (alpha = 0).
-            </summary>
+        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.PasteAt(System.Int32,System.Int32)">
+            <summary>Pastes with the top-left corner at a document position.</summary>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionHitTesting">
             <summary>
@@ -31856,130 +30898,6 @@
             </summary>
             <returns>The pivot position in document coordinates.</returns>
         </member>
-        <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler">
-            <summary>
-            Handles pointer input events for selection operations.
-            </summary>
-            <remarks>
-            <para>
-            SelectionInputHandler processes pointer pressed, moved, and released events to enable:
-            - Marquee selection creation
-            - Selection movement (dragging)
-            - Scale handle manipulation
-            - Rotation handle manipulation
-            - Pivot point adjustment
-            </para>
-            <para>
-            <strong>Coordinate Flow</strong>: Input arrives in view coordinates and is converted to
-            document coordinates via the provided ViewToDoc callback.
-            </para>
-            </remarks>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.ViewToDoc">
-            <summary>
-            Gets or sets the function to convert view to document coordinates.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.ViewToDocClamped">
-            <summary>
-            Gets or sets the function to convert view to document coordinates (clamped).
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.TryGetDocInside">
-            <summary>
-            Gets or sets the function to check if a view point is inside the document.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.TryGetTileRect">
-            <summary>
-            Gets or sets the function to get tile rectangle at document position.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.RequestRedraw">
-            <summary>
-            Gets or sets the action to request a canvas redraw.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.LiftSelection">
-            <summary>
-            Gets or sets the action to lift selection to floating.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.CommitFloating">
-            <summary>
-            Gets or sets the action to commit floating selection.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.GetCanvas">
-            <summary>
-            Gets or sets the function to get the canvas control.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.GetActiveTool">
-            <summary>
-            Gets or sets the function to get the active selection tool.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.GetToolState">
-            <summary>
-            Gets or sets the function to get the tool state.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.GetActiveLayer">
-            <summary>
-            Gets or sets the function to get the active layer.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.SetCursor">
-            <summary>
-            Gets or sets the action to set the cursor shape.
-            </summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.IsInsideTransformedSelection">
-            <summary>
-            Gets or sets the function to check if a point is inside the transformed selection.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.#ctor(PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem,PixlPunkt.UI.CanvasHost.Selection.SelectionHitTesting,PixlPunkt.UI.CanvasHost.Selection.SelectionTransformOps)">
-            <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler"/> class.
-            </summary>
-            <param name="state">The selection subsystem state.</param>
-            <param name="hitTest">The hit testing handler.</param>
-            <param name="transform">The transform operations handler.</param>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.HandleDoubleTapped(Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs,System.Boolean)">
-            <summary>
-            Handles double-tap to select tile under pointer.
-            </summary>
-            <param name="e">The double-tapped event args.</param>
-            <param name="isSelectTool">Whether a selection tool is active.</param>
-            <returns>True if the event was handled.</returns>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.HandlePointerPressed(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs,System.Boolean)">
-            <summary>
-            Handles pointer pressed events.
-            </summary>
-            <param name="e">The pointer event args.</param>
-            <param name="isSelectTool">Whether a selection tool is active.</param>
-            <returns>True if the event was handled.</returns>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.HandlePointerMoved(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs,System.Boolean)">
-            <summary>
-            Handles pointer moved events.
-            </summary>
-            <param name="e">The pointer event args.</param>
-            <param name="isSelectTool">Whether a selection tool is active.</param>
-            <returns>True if the event was handled.</returns>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionInputHandler.HandlePointerReleased(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs,System.Boolean)">
-            <summary>
-            Handles pointer released events.
-            </summary>
-            <param name="e">The pointer event args.</param>
-            <param name="isSelectTool">Whether a selection tool is active.</param>
-            <returns>True if the event was handled.</returns>
-        </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionRenderer">
             <summary>
             Handles rendering of selection visuals including marching ants, handles, and floating selections.
@@ -32019,27 +30937,25 @@
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem">
             <summary>
-            Encapsulates all selection state and coordinates selection subsystem components.
+            View-side selection state for <c>CanvasViewHost</c>: the marquee phase, drag/hover state,
+            marching-ants animation, preview caches, and the tool-state bridge.
             </summary>
             <remarks>
             <para>
-            SelectionSubsystem is the central coordinator for selection functionality in CanvasViewHost.
-            It manages:
-            - Selection state (active, floating, armed)
-            - Floating buffer data and transform parameters
-            - Pivot point configuration for rotation
-            - Coordination between input handling, hit testing, rendering, and clipboard operations
+            The <em>floating</em> selection itself is document state (<see cref="T:PixlPunkt.Core.Selection.FloatingSelection"/>,
+            owned by <c>CanvasDocument.Floating</c>). <see cref="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Lifted"/> is the view's reference to
+            that same object, and every floating/transform property here forwards to it while a
+            selection is lifted. When nothing is lifted, the transform properties fall back to local
+            values that describe the handle frame of the armed (non-floating) marquee.
             </para>
             <para>
-            <strong>Architecture</strong>: This class owns the selection state and provides access to
-            specialized handlers (input, hit testing, rendering, clipboard) that operate on that state.
+            That means there is exactly one copy of the floating state, and history items, the save
+            path and the view all read the same object.
             </para>
             </remarks>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelectionState">
-            <summary>
-            Selection state machine states.
-            </summary>
+            <summary>Selection state machine states.</summary>
         </member>
         <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelectionState.None">
             <summary>No selection exists.</summary>
@@ -32048,263 +30964,44 @@
             <summary>Selection exists and can be transformed.</summary>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelHandle">
-            <summary>
-            Scale handle positions.
-            </summary>
+            <summary>Scale handle positions.</summary>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelDrag">
-            <summary>
-            Current drag operation type.
-            </summary>
+            <summary>Current drag operation type.</summary>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotHandle">
-            <summary>
-            Rotation handle positions.
-            </summary>
+            <summary>Rotation handle positions.</summary>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PivotSnap">
-            <summary>
-            Pivot snap positions.
-            </summary>
-        </member>
-        <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SelCombine">
-            <summary>
-            Selection combine modes.
-            </summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.HANDLE_DRAW_SIZE">
-            <summary>Visual size of scale handles.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.HANDLE_HIT_PAD">
-            <summary>Hit detection padding for scale handles.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PIVOT_HIT_RADIUS">
-            <summary>Hit radius for pivot handle.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PIVOT_DRAW_SIZE">
-            <summary>Visual size of pivot indicator.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ROT_HANDLE_OFFSET">
-            <summary>Distance of rotation handles from selection edge.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ROT_HANDLE_RADIUS">
-            <summary>Hit radius for rotation handles.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ANTS_THICKNESS">
-            <summary>Marching ants line thickness.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ANTS_ON">
-            <summary>Marching ants dash length.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ANTS_OFF">
-            <summary>Marching ants gap length.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ANTS_SPEED">
-            <summary>Marching ants animation speed (pixels per second).</summary>
+            <summary>Pivot snap positions.</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Active">
-            <summary>Gets or sets whether a selection is active.</summary>
+            <summary>Gets or sets whether a selection is active (marquee or floating).</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Rect">
-            <summary>Gets or sets the selection bounding rectangle.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Floating">
-            <summary>Gets or sets whether the selection is floating (lifted from layer).</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.FloatX">
-            <summary>Gets or sets the floating buffer X position.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.FloatY">
-            <summary>Gets or sets the floating buffer Y position.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Buffer">
-            <summary>Gets or sets the floating buffer pixel data.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.BufferWidth">
-            <summary>Gets or sets the floating buffer width.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.BufferHeight">
-            <summary>Gets or sets the floating buffer height.</summary>
+            <summary>Gets or sets the selection bounding rectangle (a cached copy of <c>Region.Bounds</c>).</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.State">
             <summary>Gets or sets the selection state machine state.</summary>
         </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Dirty">
-            <summary>Gets or sets whether the selection has been modified.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Changed">
-            <summary>Gets or sets whether the selection has changed (for conditional commit).</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Drag">
-            <summary>Gets or sets the current drag operation type.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.DragStartView">
-            <summary>Gets or sets the drag start position in view space.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.DragStartRect">
-            <summary>Gets or sets the selection rect at drag start.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.MoveStartX">
-            <summary>Gets or sets the move start X position.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.MoveStartY">
-            <summary>Gets or sets the move start Y position.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.HoverHandle">
-            <summary>Gets or sets the hovered scale handle.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ActiveHandle">
-            <summary>Gets or sets the active scale handle during drag.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleX">
-            <summary>Gets or sets the X scale factor.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleY">
-            <summary>Gets or sets the Y scale factor.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleLink">
-            <summary>Gets or sets whether scale is linked (maintain aspect ratio).</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleFilter">
-            <summary>Gets or sets the scale interpolation filter.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotMode">
-            <summary>Gets or sets the rotation mode.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.AngleDeg">
-            <summary>Gets or sets the current drag rotation angle (degrees).</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.CumulativeAngleDeg">
-            <summary>Gets or sets the cumulative rotation angle (degrees).</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleStartFX">
-            <summary>Gets or sets the floating X at scale start.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleStartFY">
-            <summary>Gets or sets the floating Y at scale start.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleStartW">
-            <summary>Gets or sets the width at scale start.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleStartH">
-            <summary>Gets or sets the height at scale start.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleStartScaleX">
-            <summary>Gets or sets the X scale at scale start.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaleStartScaleY">
-            <summary>Gets or sets the Y scale at scale start.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.OrigW">
-            <summary>Gets or sets the original buffer width before transforms.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.OrigH">
-            <summary>Gets or sets the original buffer height before transforms.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.OrigCenterX">
-            <summary>Gets or sets the original center X position.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.OrigCenterY">
-            <summary>Gets or sets the original center Y position.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PivotOffsetX">
-            <summary>Gets or sets the pivot X offset from center in local space.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PivotOffsetY">
-            <summary>Gets or sets the pivot Y offset from center in local space.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PivotCustom">
-            <summary>Gets or sets whether the pivot has been customized.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PivotSnappedTo">
-            <summary>Gets or sets the snap position the pivot is snapped to.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotStartCenterX">
-            <summary>Gets or sets the rotation start center X.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotStartCenterY">
-            <summary>Gets or sets the rotation start center Y.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotStartAngleDeg">
-            <summary>Gets or sets the rotation start angle.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotStartPointerAngleDeg">
-            <summary>Gets or sets the rotation start pointer angle.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotFixedPivotX">
-            <summary>Gets or sets the fixed pivot X during rotation.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotFixedPivotY">
-            <summary>Gets or sets the fixed pivot Y during rotation.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.AntsPhase">
-            <summary>Gets or sets the marching ants animation phase.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem._antsTimer">
-            <summary>Tracks real elapsed time for frame-rate-independent ant animation.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PendingCs">
-            <summary>Gets or sets the pending pixel change item for history.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.LiftRect">
-            <summary>Gets or sets the lift rectangle for history tracking.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.LiftedFromDoc">
-            <summary>Gets or sets whether selection was lifted from document.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.SourceRect">
-            <summary>Gets or sets the source rectangle for lifted selection.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.HavePreview">
-            <summary>Gets or sets whether a preview is active.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewRect">
-            <summary>Gets or sets the preview rectangle.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewBuf">
-            <summary>Gets or sets the preview buffer.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewW">
-            <summary>Gets or sets the preview buffer width.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewH">
-            <summary>Gets or sets the preview buffer height.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewScaleX">
-            <summary>Gets or sets the preview scale X.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewScaleY">
-            <summary>Gets or sets the preview scale Y.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewAngle">
-            <summary>Gets or sets the preview angle.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewScaleFilter">
-            <summary>Gets or sets the preview scale filter.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.PreviewRotMode">
-            <summary>Gets or sets the preview rotation mode.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.BufferFlipped">
-            <summary>Gets or sets whether the buffer has been flipped (requires buffer-based ant drawing).</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RegionNonRectangular">
-            <summary>Gets or sets whether the selection region is non-rectangular (polygon, wand, or paint selection).</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.CombineMode">
-            <summary>Gets or sets the selection combine mode.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.HadSelBefore">
-            <summary>Gets or sets whether there was a selection before the current operation.</summary>
-        </member>
-        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.BeforeRect">
-            <summary>Gets or sets the selection rect before the current operation.</summary>
-        </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Region">
-            <summary>Gets the selection region mask.</summary>
+            <summary>Gets the selection region mask. This is the document's mask (<c>CanvasDocument.Selection</c>).</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ToolState">
             <summary>Gets or sets the tool state for synchronization.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Lifted">
+            <summary>
+            The document's floating selection, or null. Set by the host whenever
+            <c>CanvasDocument.SelectionChanged</c> fires. When a selection becomes lifted, the
+            view's current scale filter / rotation mode / link settings are carried onto it.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Floating">
+            <summary>Gets whether the selection is floating (lifted from its layer).</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Buffer">
+            <summary>The floating buffer (null when not floating). Setting it while floating replaces the lifted pixels.</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ScaledW">
             <summary>Gets the scaled width.</summary>
@@ -32316,76 +31013,12 @@
             <summary>Snapshot of transform state at the start of a drag operation.</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.CaptureTransformSnapshot(System.Boolean)">
-            <summary>
-            Captures the current transform state as a snapshot.
-            </summary>
-            <param name="includeBuffer">Whether to include the buffer data (for scale/rotate operations).</param>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ApplyTransformSnapshot(PixlPunkt.Core.History.SelectionTransformItem.TransformSnapshot)">
-            <summary>
-            Applies a transform snapshot to restore selection state.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.#ctor">
-            <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem"/> class.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.#ctor(PixlPunkt.Core.Selection.SelectionRegion)">
-            <summary>
-            Initializes a new instance of the <see cref="T:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem"/> class with an existing region.
-            </summary>
-            <param name="region">The selection region to use.</param>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ResetPivot">
-            <summary>
-            Resets the pivot to the center of the selection.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ResetTransform">
-            <summary>
-            Resets all transform state to defaults.
-            </summary>
+            <summary>Captures the current floating transform (default when nothing is lifted).</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Clear">
             <summary>
-            Clears all selection state.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.AdvanceAnts">
-            <summary>
-            Updates the marching ants animation phase based on real elapsed time,
-            so speed is consistent regardless of render/invalidation frequency.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.NotifyToolState">
-            <summary>
-            Notifies the tool state of selection presence changes.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Normalize(Windows.Graphics.RectInt32)">
-            <summary>
-            Normalizes a rectangle to have positive width and height.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.ClampToSurface(Windows.Graphics.RectInt32,System.Int32,System.Int32)">
-            <summary>
-            Clamps a rectangle to surface bounds.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.Intersect(Windows.Graphics.RectInt32,Windows.Graphics.RectInt32)">
-            <summary>
-            Computes the intersection of two rectangles.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.UnionRect(Windows.Graphics.RectInt32,Windows.Graphics.RectInt32)">
-            <summary>
-            Computes the union of two rectangles.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionSubsystem.RotateAround(System.Single,System.Single,System.Single,System.Single,System.Single)">
-            <summary>
-            Rotates a point around a center.
+            Clears the view's marquee state. Does not touch the document's floating selection:
+            callers commit or cancel through <c>FloatingSelectionOps</c> first.
             </summary>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionTransformOps">
@@ -35611,6 +34244,14 @@
             Forces all layer previews to refresh. Call after canvas resize operations.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Layers.LayersPanel.RevealItem(PixlPunkt.Core.Document.Layer.LayerBase)">
+            <summary>
+            Syncs the list selection from the document and then makes <paramref name="item"/> the
+            selected row (folders are not the document's active layer, so they are selected
+            directly) and scrolls it into view. Without this a new or duplicated item could land
+            outside the viewport after the rebuild snapped the list back to the top.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.InitializeComponent">
             <summary>
             InitializeComponent()
@@ -36375,6 +35016,13 @@
             Handles special templates like BrushCanvasTemplate.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.File_NewFromClipboard_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Creates a canvas exactly the size of the clipboard image, as one tile of that size,
+            and pastes the clipboard into it at the origin, so copy → new → paste needs no
+            positioning.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.CreateAndOpenCanvas(System.String,Windows.Graphics.SizeInt32,Windows.Graphics.SizeInt32)">
             <summary>
             Legacy overload for backward compatibility.
@@ -36535,6 +35183,12 @@
             Merges duplicate tiles in the document.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Tiles_Renumber_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+            <summary>
+            Renumbers the tile ids 1..N so deletions don't leave gaps like 1, 3, 45, 56, 90.
+            Every layer mapping and voxel side-tile reference follows; one undo step.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Tiles_RemoveUnused_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
             <summary>
             Removes tiles that are not used in any layer mapping.
@@ -36549,6 +35203,14 @@
             <summary>
             Gets the active XamlRoot for dialogs/flyouts owned by the main window.
             Throws if the window content has not been initialized yet.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.TryGetMainXamlRoot">
+            <summary>
+            Like <see cref="P:PixlPunkt.UI.PixlPunktMainWindow.MainXamlRoot"/> but never throws: returns null before the content
+            exists and after the window has closed. Focus events still arrive during teardown,
+            and <c>Window.Content</c> throws <c>COMException 0x800710DD</c> once the native
+            window is gone.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.OnRootLoaded(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
@@ -37476,6 +36138,18 @@
             Attempts to build orthographic voxel input images from tile-mapped document layers.
             Layer names are matched by tokens (e.g. "front", "side"/"left", "top").
             6-face mode optionally uses "back", "right", and "bottom" for face overrides.
+            </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.CanUndoVoxelEdits">
+            <summary>True when the next undo step on the document's history is a voxel edit.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.CanRedoVoxelEdits">
+            <summary>True when the next redo step on the document's history is a voxel edit.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TryUndoVoxelEdit">
+            <summary>
+            Undoes the top history item if it is a voxel edit. Returns false when it is a canvas
+            item, which the caller should route to the canvas host instead.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.RenderViewport(PixlPunkt.UI.Voxel.VoxelWorkspaceControl.ViewportRenderOverrides,System.Boolean,System.Action{System.Byte[],System.Int32,System.Int32})">

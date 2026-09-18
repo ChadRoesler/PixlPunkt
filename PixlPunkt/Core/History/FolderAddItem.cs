@@ -52,7 +52,6 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void Undo()
         {
-            _document.RaiseBeforeStructureChanged();
             _document.RemoveLayerTreeWithoutHistory(_folder);
             _document.RaiseStructureChanged();
             LoggingService.Info("Undo folder add document={Doc} folder={Folder} index={Index}",
@@ -64,7 +63,6 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void Redo()
         {
-            _document.RaiseBeforeStructureChanged();
             _document.InsertLayerTreeWithoutHistory(_folder, _parent, _insertIndex);
             _document.RaiseStructureChanged();
             LoggingService.Info("Redo folder add document={Doc} folder={Folder} index={Index}",

@@ -208,7 +208,7 @@ namespace PixlPunkt.Core.Tools.Selection
                     if (px < 0 || py < 0 || px >= w || py >= h)
                         continue;
 
-                    region.AddRect(CreateRect(px, py, 1, 1));
+                    region.AddPixel(px, py);
                 }
             }
 

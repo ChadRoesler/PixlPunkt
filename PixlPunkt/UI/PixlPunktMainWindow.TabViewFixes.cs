@@ -10,7 +10,6 @@ namespace PixlPunkt.UI
     public sealed partial class PixlPunktMainWindow : Window
     {
         private Button? _tabAddButton;
-        private bool _measuringGoodTop;
 
         private void FixTabViewAddButtonAlignment(TabView tabView)
         {

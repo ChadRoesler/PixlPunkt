@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using FluentIcons.Common;
 using PixlPunkt.Core.Document.Layer;
@@ -12,7 +13,7 @@ namespace PixlPunkt.Core.History
     /// Tracks pixel changes and optional tile mapping assignment.
     /// Propagates changes to all mapped tile instances on undo/redo.
     /// </summary>
-    public sealed class TileStampHistoryItem : IHistoryItem, IRenderResult
+    public sealed class TileStampHistoryItem : OffloadableHistoryItemBase, IRenderResult
     {
         private readonly RasterLayer _layer;
         private TileMapping? _mapping;
@@ -24,8 +25,8 @@ namespace PixlPunkt.Core.History
         private readonly int _docY;
         private readonly int _width;
         private readonly int _height;
-        private readonly byte[] _pixelsBefore;
-        private readonly byte[] _pixelsAfter;
+        private byte[] _pixelsBefore;
+        private byte[] _pixelsAfter;
 
         // Tile mapping changes (optional)
         private readonly int _mappingTileX;
@@ -41,7 +42,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Gets a quick reference icon of the opperation (for UI display).
         /// </summary>
-        public Icon HistoryIcon { get; set; } = Icon.TableCursor;
+        public override Icon HistoryIcon { get; set; } = Icon.TableCursor;
 
         private class TileChange
         {
@@ -54,10 +55,62 @@ namespace PixlPunkt.Core.History
         // ====================================================================
 
         /// <inheritdoc/>
-        public string Description => _description;
+        public override string Description => _description;
 
         /// <inheritdoc/>
         public bool HasChanges => true;
+
+        // ── memory budget ──────────────────────────────────────────────
+
+        protected override long PayloadBytes
+        {
+            get
+            {
+                long total = _pixelsBefore.Length + _pixelsAfter.Length;
+                foreach (var c in _tileChanges.Values) total += c.Before.Length + c.After.Length;
+                return total;
+            }
+        }
+
+        protected override byte[]? SerializePayload()
+        {
+            using var ms = new MemoryStream();
+            using var bw = new BinaryWriter(ms);
+            bw.Write(_pixelsBefore.Length); bw.Write(_pixelsBefore);
+            bw.Write(_pixelsAfter.Length); bw.Write(_pixelsAfter);
+            bw.Write(_tileChanges.Count);
+            foreach (var (id, c) in _tileChanges)
+            {
+                bw.Write(id);
+                bw.Write(c.Before.Length); bw.Write(c.Before);
+                bw.Write(c.After.Length); bw.Write(c.After);
+            }
+            return ms.ToArray();
+        }
+
+        protected override void DeserializePayload(byte[] data)
+        {
+            using var ms = new MemoryStream(data);
+            using var br = new BinaryReader(ms);
+            _pixelsBefore = br.ReadBytes(br.ReadInt32());
+            _pixelsAfter = br.ReadBytes(br.ReadInt32());
+            int count = br.ReadInt32();
+            for (int i = 0; i < count; i++)
+            {
+                int id = br.ReadInt32();
+                var before = br.ReadBytes(br.ReadInt32());
+                var after = br.ReadBytes(br.ReadInt32());
+                if (_tileChanges.TryGetValue(id, out var c)) { c.Before = before; c.After = after; }
+                else _tileChanges[id] = new TileChange { Before = before, After = after };
+            }
+        }
+
+        protected override void ReleasePayload()
+        {
+            _pixelsBefore = Array.Empty<byte>();
+            _pixelsAfter = Array.Empty<byte>();
+            foreach (var c in _tileChanges.Values) { c.Before = Array.Empty<byte>(); c.After = Array.Empty<byte>(); }
+        }
 
         /// <inheritdoc/>
         public bool CanPushToHistory => true;
@@ -314,7 +367,7 @@ namespace PixlPunkt.Core.History
         // ====================================================================
 
         /// <inheritdoc/>
-        public void Undo()
+        public override void Undo()
         {
             var layerName = _layer.Name ?? "(layer)";
             LoggingService.Info("Undo tile stamp on layer={Layer} region={X},{Y} {W}x{H} mappingChanged={Mapping}",
@@ -361,7 +414,7 @@ namespace PixlPunkt.Core.History
         }
 
         /// <inheritdoc/>
-        public void Redo()
+        public override void Redo()
         {
             var layerName = _layer.Name ?? "(layer)";
             LoggingService.Info("Redo tile stamp on layer={Layer} region={X},{Y} {W}x{H} mappingChanged={Mapping}",

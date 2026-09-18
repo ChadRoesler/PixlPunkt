@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.ComponentModel;
 using System.Linq;
 using PixlPunkt.Core.Animation;
@@ -12,6 +13,7 @@ using PixlPunkt.Core.Reference;
 using PixlPunkt.Core.Tile;
 using Windows.Graphics;
 using PixlPunkt.Core.Logging;
+using PixlPunkt.Core.Selection;
 
 namespace PixlPunkt.Core.Document
 {
@@ -82,7 +84,35 @@ namespace PixlPunkt.Core.Document
         /// Call this after a successful save operation. The <see cref="IsDirty"/> property
         /// will return false until further changes are made.
         /// </remarks>
-        public void MarkSaved() => History.MarkSaved();
+        public void MarkSaved()
+        {
+            History.MarkSaved();
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // SELECTION
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>The selection mask. History items, painting masks, plugins and the view all read this one object.</summary>
+        public SelectionRegion Selection { get; } = new();
+
+        /// <summary>
+        /// Pixels currently lifted off a layer, or null. Bound to the layer they came from; see
+        /// <see cref="FloatingSelection"/>. Only <c>FloatingSelectionOps</c> and history items set this.
+        /// </summary>
+        public FloatingSelection? Floating { get; private set; }
+
+        /// <summary>Raised when <see cref="Selection"/> or <see cref="Floating"/> changed. Not a structure change.</summary>
+        public event Action? SelectionChanged;
+
+        public void SetFloating(FloatingSelection? floating)
+        {
+            if (ReferenceEquals(Floating, floating)) return;
+            Floating = floating;
+            SelectionChanged?.Invoke();
+        }
+
+        public void RaiseSelectionChanged() => SelectionChanged?.Invoke();
 
         /// <summary>
         /// Gets the tile set containing all unique tiles for this document.
@@ -102,34 +132,89 @@ namespace PixlPunkt.Core.Document
         /// <remarks>
         /// Used during document loading to restore the tile set from a saved file.
         /// </remarks>
+        [MemberNotNull(nameof(TileSet))]
         internal void SetTileSet(TileSet tileSet)
         {
             if (TileSet != null)
             {
                 // Unhook old events
                 TileSet.TileAdded -= OnTileSetChanged;
-                TileSet.TileRemoved -= OnTileSetChanged;
+                TileSet.TileRemoved -= OnTileRemoved;
                 TileSet.TileUpdated -= OnTileSetChanged;
                 TileSet.TileSetCleared -= OnTileSetCleared;
             }
 
+            ArgumentNullException.ThrowIfNull(tileSet);
             TileSet = tileSet;
 
-            if (TileSet != null)
-            {
-                // Hook new events
-                TileSet.TileAdded += OnTileSetChanged;
-                TileSet.TileRemoved += OnTileSetChanged;
-                TileSet.TileUpdated += OnTileSetChanged;
-                TileSet.TileSetCleared += OnTileSetCleared;
-            }
+            TileSet.TileAdded += OnTileSetChanged;
+            TileSet.TileRemoved += OnTileRemoved;
+            TileSet.TileUpdated += OnTileSetChanged;
+            TileSet.TileSetCleared += OnTileSetCleared;
 
             TileSetChanged?.Invoke();
         }
 
         private void OnTileSetChanged(TileDefinition _) => TileSetChanged?.Invoke();
-        private void OnTileSetChanged(int _) => TileSetChanged?.Invoke();
         private void OnTileSetCleared() => TileSetChanged?.Invoke();
+
+        /// <summary>
+        /// A deleted tile must not leave dangling ids behind: every mapping cell that pointed
+        /// at it becomes unmapped, and the voxel side-tile slots that used it are cleared.
+        /// </summary>
+        private void OnTileRemoved(int tileId)
+        {
+            foreach (var layer in GetAllRasterLayers())
+                layer.TileMapping?.RemoveTileId(tileId);
+            RemapVoxelTileReferences(id => id == tileId ? -1 : id);
+            TileSetChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Renumbers the tiles 1..N in ascending id order (so {1, 3, 45, 56, 90} becomes
+        /// {1, 2, 3, 4, 5}) and rewrites every reference. Undoable as one step.
+        /// </summary>
+        /// <returns>How many tile ids changed; 0 when they were already sequential.</returns>
+        public int RenumberTiles()
+        {
+            var map = TileSet.BuildRenumberMap();
+            if (map.Count == 0) return 0;
+
+            var item = new TileRenumberItem(this, map);
+            item.Redo();
+            History.Push(item);
+            return map.Count;
+        }
+
+        /// <summary>
+        /// Applies an old-id → new-id map to the tile set, every layer mapping and the voxel
+        /// side-tile references in one pass. Shared by <see cref="RenumberTiles"/> and its undo.
+        /// </summary>
+        internal void ApplyTileIdMap(IReadOnlyDictionary<int, int> map)
+        {
+            if (map.Count == 0) return;
+
+            TileSet.ApplyIdMap(map);
+            foreach (var layer in GetAllRasterLayers())
+                layer.TileMapping?.RemapTileIds(map);
+            RemapVoxelTileReferences(id => id >= 0 && map.TryGetValue(id, out int n) ? n : id);
+
+            TileSetChanged?.Invoke();
+            RaiseDocumentModified();
+        }
+
+        private void RemapVoxelTileReferences(Func<int, int> remap)
+        {
+            var w = VoxelWorkspace;
+            w.FrontTileId3 = remap(w.FrontTileId3); w.SideTileId3 = remap(w.SideTileId3); w.TopTileId3 = remap(w.TopTileId3);
+            w.FrontTileId6 = remap(w.FrontTileId6); w.BackTileId6 = remap(w.BackTileId6); w.LeftTileId6 = remap(w.LeftTileId6);
+            w.RightTileId6 = remap(w.RightTileId6); w.TopTileId6 = remap(w.TopTileId6); w.BottomTileId6 = remap(w.BottomTileId6);
+
+            var v = VoxelPreviewState;
+            v.FrontTileId3 = remap(v.FrontTileId3); v.SideTileId3 = remap(v.SideTileId3); v.TopTileId3 = remap(v.TopTileId3);
+            v.FrontTileId6 = remap(v.FrontTileId6); v.BackTileId6 = remap(v.BackTileId6); v.LeftTileId6 = remap(v.LeftTileId6);
+            v.RightTileId6 = remap(v.RightTileId6); v.TopTileId6 = remap(v.TopTileId6); v.BottomTileId6 = remap(v.BottomTileId6);
+        }
 
         /// <summary>
         /// Occurs when the tile set changes (tile added, removed, or updated).
@@ -190,11 +275,9 @@ namespace PixlPunkt.Core.Document
             History.EnableMemoryManagement(documentId: name);
 
             // Initialize tile set with document's tile dimensions
-            TileSet = new TileSet(tileSize.Width, tileSize.Height);
-            TileSet.TileAdded += _ => TileSetChanged?.Invoke();
-            TileSet.TileRemoved += _ => TileSetChanged?.Invoke();
-            TileSet.TileUpdated += _ => TileSetChanged?.Invoke();
-            TileSet.TileSetCleared += () => TileSetChanged?.Invoke();
+            // Through SetTileSet so a new document gets the same hooks as a loaded one
+            // (the tile-removed handler that clears dangling mapping cells lives there).
+            SetTileSet(new TileSet(tileSize.Width, tileSize.Height));
 
             _rootItems.Add(new RasterLayer(PixelWidth, PixelHeight, $"Layer {_newLayerCounter++}"));
             HookLayer(_rootItems[^1]);
@@ -440,7 +523,7 @@ namespace PixlPunkt.Core.Document
             }
 
             var rasters = GetFlattenedRasterLayers();
-            _active = rasters.IndexOf(layer);
+            _active = layer == null ? _active : rasters.IndexOf(layer);
             if (_active < 0) _active = 0;
 
             LayersChanged?.Invoke();
@@ -454,18 +537,13 @@ namespace PixlPunkt.Core.Document
         /// </summary>
         internal void AddLayerWithoutHistory(RasterLayer layer, int insertAt)
         {
-            RaiseBeforeStructureChanged();
-
             int at = Math.Clamp(insertAt, 0, _rootItems.Count);
             HookLayer(layer);
             _rootItems.Insert(at, layer);
 
             var rasters = GetFlattenedRasterLayers();
-            _active = rasters.IndexOf(layer);
+            _active = layer == null ? _active : rasters.IndexOf(layer);
             if (_active < 0) _active = 0;
-
-            // Recomposite after structural change
-            CompositeTo(Surface);
 
             LayersChanged?.Invoke();
             ActiveLayerChanged?.Invoke();
@@ -473,10 +551,13 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
-        /// Creates a new folder. If the active layer is inside a folder, the new folder
-        /// is created inside that same parent folder. Otherwise, creates at root level.
+        /// Creates a new folder. With <paramref name="into"/> the folder goes inside that
+        /// folder (the one selected in the layers panel); otherwise, if the active layer is
+        /// inside a folder, the new folder is created inside that same parent folder, and
+        /// otherwise at root level. Within the parent it lands just above the active layer when
+        /// that layer is a direct child, else on top.
         /// </summary>
-        public LayerFolder AddFolder(string? name = null, int? insertAt = null)
+        public LayerFolder AddFolder(string? name = null, int? insertAt = null, LayerFolder? into = null)
         {
             RaiseBeforeStructureChanged();
 
@@ -484,15 +565,14 @@ namespace PixlPunkt.Core.Document
             var folder = new LayerFolder(nm);
             HookLayer(folder);
 
-            // Determine target folder based on active layer's parent
             var activeLayer = ActiveLayer;
-            LayerFolder? targetFolder = activeLayer?.Parent;
+            LayerFolder? targetFolder = into ?? activeLayer?.Parent;
 
             if (targetFolder != null)
             {
-                // Insert into the same folder as the active layer, after the active layer
-                int activeIdx = targetFolder.IndexOfChild(activeLayer!);
-                int insertIdx = insertAt ?? (activeIdx + 1);
+                int insertIdx = insertAt ?? (activeLayer != null && activeLayer.Parent == targetFolder
+                    ? targetFolder.IndexOfChild(activeLayer) + 1
+                    : targetFolder.Children.Count);
                 insertIdx = Math.Clamp(insertIdx, 0, targetFolder.Children.Count);
                 targetFolder.InsertChild(insertIdx, folder);
 
@@ -524,8 +604,6 @@ namespace PixlPunkt.Core.Document
         /// <returns>The created folder.</returns>
         internal LayerFolder AddFolderAtRootWithoutHistory(string name, int insertAt)
         {
-            RaiseBeforeStructureChanged();
-
             var folder = new LayerFolder(name);
             HookLayer(folder);
 
@@ -547,6 +625,11 @@ namespace PixlPunkt.Core.Document
         public void MoveLayerToFolder(LayerBase layer, LayerFolder? targetFolder, int? targetIndex = null)
         {
             if (layer == null) return;
+            if (WouldCreateCycle(layer, targetFolder))
+            {
+                LoggingService.Warning("MoveLayerToFolder refused: '{Layer}' cannot be moved into itself or a descendant", layer.Name ?? "unnamed");
+                return;
+            }
 
             // Capture original state for history
             var originalParent = layer.Parent;
@@ -609,6 +692,19 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
+        /// True when <paramref name="target"/> is <paramref name="item"/> itself or sits anywhere
+        /// beneath it. Inserting there would make the tree cyclic, and every recursive walk
+        /// (<see cref="GetFlattenedLayers"/>, compositing) would then overflow the stack.
+        /// </summary>
+        private static bool WouldCreateCycle(LayerBase item, LayerFolder? target)
+        {
+            if (item is not LayerFolder folder) return false;
+            for (LayerFolder? f = target; f != null; f = f.Parent)
+                if (ReferenceEquals(f, folder)) return true;
+            return false;
+        }
+
+        /// <summary>
         /// Moves a layer into a folder or back to root without pushing to history (used by undo/redo).
         /// </summary>
         /// <param name="layer">The layer to move.</param>
@@ -617,8 +713,7 @@ namespace PixlPunkt.Core.Document
         internal void MoveLayerToFolderWithoutHistory(LayerBase layer, LayerFolder? targetFolder, int targetIndex)
         {
             if (layer == null) return;
-
-            RaiseBeforeStructureChanged();
+            if (WouldCreateCycle(layer, targetFolder)) return;
 
             // Remove from current parent
             if (layer.Parent != null)
@@ -644,9 +739,6 @@ namespace PixlPunkt.Core.Document
                 _rootItems.Insert(targetIndex, layer);
             }
 
-            // Recomposite after structural change
-            CompositeTo(Surface);
-
             LayersChanged?.Invoke();
             RaiseStructureChanged();
         }
@@ -663,8 +755,6 @@ namespace PixlPunkt.Core.Document
 
             newIndex = Math.Clamp(newIndex, 0, _rootItems.Count - 1);
             if (oldIndex == newIndex) return;
-
-            RaiseBeforeStructureChanged();
 
             _rootItems.RemoveAt(oldIndex);
             _rootItems.Insert(newIndex, item);
@@ -720,8 +810,6 @@ namespace PixlPunkt.Core.Document
             if (layer == null) return;
             if (!allowRemoveLast && GetAllRasterLayers().Count <= 1) return;
 
-            RaiseBeforeStructureChanged();
-
             UnhookLayer(layer);
 
             if (layer.Parent != null)
@@ -735,9 +823,6 @@ namespace PixlPunkt.Core.Document
 
             var newRasters = GetFlattenedRasterLayers();
             _active = Math.Clamp(_active, 0, Math.Max(0, newRasters.Count - 1));
-
-            // Recomposite after structural change
-            CompositeTo(Surface);
 
             LayersChanged?.Invoke();
             ActiveLayerChanged?.Invoke();
@@ -814,7 +899,7 @@ namespace PixlPunkt.Core.Document
                 History.Push(new LayerReorderItem(this, rl, fromRootIdx, toRootIdx));
             }
 
-            _active = GetFlattenedRasterLayers().IndexOf(activeLayer);
+            _active = activeLayer == null ? _active : GetFlattenedRasterLayers().IndexOf(activeLayer);
             if (_active < 0) _active = 0;
 
             LayersChanged?.Invoke();
@@ -841,8 +926,6 @@ namespace PixlPunkt.Core.Document
 
             if (currentIndex == targetRootIndex) return;
 
-            RaiseBeforeStructureChanged();
-
             var activeLayer = ActiveLayer;
 
             // Remove from current position
@@ -851,11 +934,8 @@ namespace PixlPunkt.Core.Document
             // Insert at target position (see detailed comments above for why this is correct)
             _rootItems.Insert(targetRootIndex, layer);
 
-            _active = GetFlattenedRasterLayers().IndexOf(activeLayer);
+            _active = activeLayer == null ? _active : GetFlattenedRasterLayers().IndexOf(activeLayer);
             if (_active < 0) _active = 0;
-
-            // Recomposite after structural change
-            CompositeTo(Surface);
 
             LayersChanged?.Invoke();
             ActiveLayerChanged?.Invoke();
@@ -876,8 +956,6 @@ namespace PixlPunkt.Core.Document
             to = Math.Clamp(to, 0, rasters.Count - 1);
             if (from == to) return;
 
-            RaiseBeforeStructureChanged();
-
             var activeLayer = ActiveLayer;
             var layer = rasters[from];
 
@@ -890,7 +968,7 @@ namespace PixlPunkt.Core.Document
                 _rootItems.Insert(toIdx, layer);
             }
 
-            _active = GetFlattenedRasterLayers().IndexOf(activeLayer);
+            _active = activeLayer == null ? _active : GetFlattenedRasterLayers().IndexOf(activeLayer);
             if (_active < 0) _active = 0;
 
             LayersChanged?.Invoke();
@@ -1336,8 +1414,6 @@ namespace PixlPunkt.Core.Document
         {
             if (layer == null) return;
 
-            RaiseBeforeStructureChanged();
-
             UnhookLayer(layer);
 
             if (layer.Parent != null)
@@ -1354,8 +1430,6 @@ namespace PixlPunkt.Core.Document
         /// </summary>
         internal void AddReferenceLayerWithoutHistory(ReferenceLayer layer, int insertAt)
         {
-            RaiseBeforeStructureChanged();
-
             HookLayer(layer);
             insertAt = Math.Clamp(insertAt, 0, _rootItems.Count);
             _rootItems.Insert(insertAt, layer);

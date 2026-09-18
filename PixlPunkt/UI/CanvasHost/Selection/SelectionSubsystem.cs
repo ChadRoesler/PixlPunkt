@@ -10,20 +10,20 @@ using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
 namespace PixlPunkt.UI.CanvasHost.Selection
 {
     /// <summary>
-    /// Encapsulates all selection state and coordinates selection subsystem components.
+    /// View-side selection state for <c>CanvasViewHost</c>: the marquee phase, drag/hover state,
+    /// marching-ants animation, preview caches, and the tool-state bridge.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// SelectionSubsystem is the central coordinator for selection functionality in CanvasViewHost.
-    /// It manages:
-    /// - Selection state (active, floating, armed)
-    /// - Floating buffer data and transform parameters
-    /// - Pivot point configuration for rotation
-    /// - Coordination between input handling, hit testing, rendering, and clipboard operations
+    /// The <em>floating</em> selection itself is document state (<see cref="FloatingSelection"/>,
+    /// owned by <c>CanvasDocument.Floating</c>). <see cref="Lifted"/> is the view's reference to
+    /// that same object, and every floating/transform property here forwards to it while a
+    /// selection is lifted. When nothing is lifted, the transform properties fall back to local
+    /// values that describe the handle frame of the armed (non-floating) marquee.
     /// </para>
     /// <para>
-    /// <strong>Architecture</strong>: This class owns the selection state and provides access to
-    /// specialized handlers (input, hit testing, rendering, clipboard) that operate on that state.
+    /// That means there is exactly one copy of the floating state, and history items, the save
+    /// path and the view all read the same object.
     /// </para>
     /// </remarks>
     public sealed class SelectionSubsystem
@@ -32,9 +32,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         // ENUMS
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Selection state machine states.
-        /// </summary>
+        /// <summary>Selection state machine states.</summary>
         public enum SelectionState
         {
             /// <summary>No selection exists.</summary>
@@ -43,418 +41,212 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             Armed
         }
 
-        /// <summary>
-        /// Scale handle positions.
-        /// </summary>
+        /// <summary>Scale handle positions.</summary>
         public enum SelHandle { None, NW, N, NE, E, SE, S, SW, W }
 
-        /// <summary>
-        /// Current drag operation type.
-        /// </summary>
+        /// <summary>Current drag operation type.</summary>
         public enum SelDrag { None, Marquee, Move, Scale, Rotate, Pivot }
 
-        /// <summary>
-        /// Rotation handle positions.
-        /// </summary>
+        /// <summary>Rotation handle positions.</summary>
         public enum RotHandle { None, RNW, RN, RNE, RE, RSE, RS, RSW, RW }
 
-        /// <summary>
-        /// Pivot snap positions.
-        /// </summary>
+        /// <summary>Pivot snap positions.</summary>
         public enum PivotSnap { None, Center, NW, N, NE, E, SE, S, SW, W }
-
-        /// <summary>
-        /// Selection combine modes.
-        /// </summary>
-        public enum SelCombine { Replace, Add, Subtract }
 
         // ════════════════════════════════════════════════════════════════════
         // CONSTANTS
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>Visual size of scale handles.</summary>
         public const float HANDLE_DRAW_SIZE = 10f;
-        /// <summary>Hit detection padding for scale handles.</summary>
         public const float HANDLE_HIT_PAD = 14f;
-        /// <summary>Hit radius for pivot handle.</summary>
         public const float PIVOT_HIT_RADIUS = 12f;
-        /// <summary>Visual size of pivot indicator.</summary>
         public const float PIVOT_DRAW_SIZE = 8f;
-        /// <summary>Distance of rotation handles from selection edge.</summary>
         public const float ROT_HANDLE_OFFSET = 22f;
-        /// <summary>Hit radius for rotation handles.</summary>
         public const float ROT_HANDLE_RADIUS = 8f;
 
-        // Marching ants parameters
-        /// <summary>Marching ants line thickness.</summary>
         public const float ANTS_THICKNESS = 2.0f;
-        /// <summary>Marching ants dash length.</summary>
         public const float ANTS_ON = 4.0f;
-        /// <summary>Marching ants gap length.</summary>
         public const float ANTS_OFF = 4.0f;
-        /// <summary>Marching ants animation speed (pixels per second).</summary>
         public const float ANTS_SPEED = 30f;
 
         // ════════════════════════════════════════════════════════════════════
-        // SELECTION STATE
+        // MARQUEE STATE (view-owned)
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>Gets or sets whether a selection is active.</summary>
+        /// <summary>Gets or sets whether a selection is active (marquee or floating).</summary>
         public bool Active { get; set; }
 
-        /// <summary>Gets or sets the selection bounding rectangle.</summary>
+        /// <summary>Gets or sets the selection bounding rectangle (a cached copy of <c>Region.Bounds</c>).</summary>
         public RectInt32 Rect { get; set; }
-
-        /// <summary>Gets or sets whether the selection is floating (lifted from layer).</summary>
-        public bool Floating { get; set; }
-
-        /// <summary>Gets or sets the floating buffer X position.</summary>
-        public int FloatX { get; set; }
-
-        /// <summary>Gets or sets the floating buffer Y position.</summary>
-        public int FloatY { get; set; }
-
-        /// <summary>Gets or sets the floating buffer pixel data.</summary>
-        public byte[]? Buffer { get; set; }
-
-        /// <summary>Gets or sets the floating buffer width.</summary>
-        public int BufferWidth { get; set; }
-
-        /// <summary>Gets or sets the floating buffer height.</summary>
-        public int BufferHeight { get; set; }
 
         /// <summary>Gets or sets the selection state machine state.</summary>
         public SelectionState State { get; set; } = SelectionState.None;
 
-        /// <summary>Gets or sets whether the selection has been modified.</summary>
-        public bool Dirty { get; set; }
-
-        /// <summary>Gets or sets whether the selection has changed (for conditional commit).</summary>
-        public bool Changed { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // DRAG STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the current drag operation type.</summary>
-        public SelDrag Drag { get; set; }
-
-        /// <summary>Gets or sets the drag start position in view space.</summary>
-        public Windows.Foundation.Point DragStartView { get; set; }
-
-        /// <summary>Gets or sets the selection rect at drag start.</summary>
-        public RectInt32 DragStartRect { get; set; }
-
-        /// <summary>Gets or sets the move start X position.</summary>
-        public int MoveStartX { get; set; }
-
-        /// <summary>Gets or sets the move start Y position.</summary>
-        public int MoveStartY { get; set; }
-
-        /// <summary>Gets or sets the hovered scale handle.</summary>
-        public SelHandle HoverHandle { get; set; }
-
-        /// <summary>Gets or sets the active scale handle during drag.</summary>
-        public SelHandle ActiveHandle { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // TRANSFORM STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the X scale factor.</summary>
-        public double ScaleX { get; set; } = 1.0;
-
-        /// <summary>Gets or sets the Y scale factor.</summary>
-        public double ScaleY { get; set; } = 1.0;
-
-        /// <summary>Gets or sets whether scale is linked (maintain aspect ratio).</summary>
-        public bool ScaleLink { get; set; }
-
-        /// <summary>Gets or sets the scale interpolation filter.</summary>
-        public ScaleMode ScaleFilter { get; set; } = ScaleMode.NearestNeighbor;
-
-        /// <summary>Gets or sets the rotation mode.</summary>
-        public RotationMode RotMode { get; set; } = RotationMode.RotSprite;
-
-        /// <summary>Gets or sets the current drag rotation angle (degrees).</summary>
-        public double AngleDeg { get; set; }
-
-        /// <summary>Gets or sets the cumulative rotation angle (degrees).</summary>
-        public double CumulativeAngleDeg { get; set; }
-
-        // Scale drag state
-        /// <summary>Gets or sets the floating X at scale start.</summary>
-        public int ScaleStartFX { get; set; }
-        /// <summary>Gets or sets the floating Y at scale start.</summary>
-        public int ScaleStartFY { get; set; }
-        /// <summary>Gets or sets the width at scale start.</summary>
-        public int ScaleStartW { get; set; }
-        /// <summary>Gets or sets the height at scale start.</summary>
-        public int ScaleStartH { get; set; }
-        /// <summary>Gets or sets the X scale at scale start.</summary>
-        public double ScaleStartScaleX { get; set; }
-        /// <summary>Gets or sets the Y scale at scale start.</summary>
-        public double ScaleStartScaleY { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // ORIGINAL DIMENSIONS (for handle positioning after rotation)
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the original buffer width before transforms.</summary>
-        public int OrigW { get; set; }
-
-        /// <summary>Gets or sets the original buffer height before transforms.</summary>
-        public int OrigH { get; set; }
-
-        /// <summary>Gets or sets the original center X position.</summary>
-        public int OrigCenterX { get; set; }
-
-        /// <summary>Gets or sets the original center Y position.</summary>
-        public int OrigCenterY { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // PIVOT STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the pivot X offset from center in local space.</summary>
-        public double PivotOffsetX { get; set; }
-
-        /// <summary>Gets or sets the pivot Y offset from center in local space.</summary>
-        public double PivotOffsetY { get; set; }
-
-        /// <summary>Gets or sets whether the pivot has been customized.</summary>
-        public bool PivotCustom { get; set; }
-
-        /// <summary>Gets or sets the snap position the pivot is snapped to.</summary>
-        public PivotSnap PivotSnappedTo { get; set; } = PivotSnap.Center;
-
-        // ════════════════════════════════════════════════════════════════════
-        // ROTATION DRAG STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the rotation start center X.</summary>
-        public int RotStartCenterX { get; set; }
-
-        /// <summary>Gets or sets the rotation start center Y.</summary>
-        public int RotStartCenterY { get; set; }
-
-        /// <summary>Gets or sets the rotation start angle.</summary>
-        public double RotStartAngleDeg { get; set; }
-
-        /// <summary>Gets or sets the rotation start pointer angle.</summary>
-        public double RotStartPointerAngleDeg { get; set; }
-
-        /// <summary>Gets or sets the fixed pivot X during rotation.</summary>
-        public double RotFixedPivotX { get; set; }
-
-        /// <summary>Gets or sets the fixed pivot Y during rotation.</summary>
-        public double RotFixedPivotY { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // MARCHING ANTS STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the marching ants animation phase.</summary>
-        public float AntsPhase { get; set; }
-
-        /// <summary>Tracks real elapsed time for frame-rate-independent ant animation.</summary>
-        private readonly Stopwatch _antsTimer = Stopwatch.StartNew();
-
-        // ════════════════════════════════════════════════════════════════════
-        // HISTORY STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the pending pixel change item for history.</summary>
-        public PixelChangeItem? PendingCs { get; set; }
-
-        /// <summary>Gets or sets the lift rectangle for history tracking.</summary>
-        public RectInt32 LiftRect { get; set; }
-
-        /// <summary>Gets or sets whether selection was lifted from document.</summary>
-        public bool LiftedFromDoc { get; set; }
-
-        /// <summary>Gets or sets the source rectangle for lifted selection.</summary>
-        public RectInt32 SourceRect { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // PREVIEW STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets whether a preview is active.</summary>
-        public bool HavePreview { get; set; }
-
-        /// <summary>Gets or sets the preview rectangle.</summary>
-        public RectInt32 PreviewRect { get; set; }
-
-        /// <summary>Gets or sets the preview buffer.</summary>
-        public byte[]? PreviewBuf { get; set; }
-
-        /// <summary>Gets or sets the preview buffer width.</summary>
-        public int PreviewW { get; set; }
-
-        /// <summary>Gets or sets the preview buffer height.</summary>
-        public int PreviewH { get; set; }
-
-        /// <summary>Gets or sets the preview scale X.</summary>
-        public double PreviewScaleX { get; set; }
-
-        /// <summary>Gets or sets the preview scale Y.</summary>
-        public double PreviewScaleY { get; set; }
-
-        /// <summary>Gets or sets the preview angle.</summary>
-        public double PreviewAngle { get; set; }
-
-        /// <summary>Gets or sets the preview scale filter.</summary>
-        public ScaleMode PreviewScaleFilter { get; set; }
-
-        /// <summary>Gets or sets the preview rotation mode.</summary>
-        public RotationMode PreviewRotMode { get; set; }
-
-        /// <summary>Gets or sets whether the buffer has been flipped (requires buffer-based ant drawing).</summary>
-        public bool BufferFlipped { get; set; }
-
-        /// <summary>Gets or sets whether the selection region is non-rectangular (polygon, wand, or paint selection).</summary>
-        public bool RegionNonRectangular { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // COMBINE MODE STATE
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets or sets the selection combine mode.</summary>
-        public SelCombine CombineMode { get; set; } = SelCombine.Replace;
-
-        /// <summary>Gets or sets whether there was a selection before the current operation.</summary>
-        public bool HadSelBefore { get; set; }
-
-        /// <summary>Gets or sets the selection rect before the current operation.</summary>
-        public RectInt32 BeforeRect { get; set; }
-
-        // ════════════════════════════════════════════════════════════════════
-        // EXTERNAL DEPENDENCIES
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Gets the selection region mask.</summary>
+        /// <summary>Gets the selection region mask. This is the document's mask (<c>CanvasDocument.Selection</c>).</summary>
         public SelectionRegion Region { get; }
 
         /// <summary>Gets or sets the tool state for synchronization.</summary>
         public ToolState? ToolState { get; set; }
 
         // ════════════════════════════════════════════════════════════════════
-        // COMPUTED PROPERTIES
+        // FLOATING SELECTION (document-owned; forwarded)
         // ════════════════════════════════════════════════════════════════════
+
+        private FloatingSelection? _lifted;
+
+        /// <summary>
+        /// The document's floating selection, or null. Set by the host whenever
+        /// <c>CanvasDocument.SelectionChanged</c> fires. When a selection becomes lifted, the
+        /// view's current scale filter / rotation mode / link settings are carried onto it.
+        /// </summary>
+        public FloatingSelection? Lifted
+        {
+            get => _lifted;
+            set
+            {
+                if (ReferenceEquals(_lifted, value)) return;
+                bool becameLifted = value != null && _lifted == null;
+                _lifted = value;
+                if (becameLifted)
+                {
+                    value!.ScaleFilter = _scaleFilter;
+                    value.RotMode = _rotMode;
+                    value.ScaleLink = _scaleLink;
+                }
+                if (value == null)
+                {
+                    // Back to an armed marquee (or nothing): the handle frame is the region bounds.
+                    _scaleX = _scaleY = 1.0;
+                    _angleDeg = _cumulativeAngleDeg = 0.0;
+                    _origW = Rect.Width; _origH = Rect.Height;
+                    _origCenterX = Rect.X + Rect.Width / 2; _origCenterY = Rect.Y + Rect.Height / 2;
+                    _pivotOffsetX = _pivotOffsetY = 0; _pivotCustom = false;
+                    _regionNonRectangular = false; _bufferFlipped = false;
+                    PreviewBuf = null;
+                }
+            }
+        }
+
+        /// <summary>Gets whether the selection is floating (lifted from its layer).</summary>
+        public bool Floating => _lifted != null;
+
+        /// <summary>The floating buffer (null when not floating). Setting it while floating replaces the lifted pixels.</summary>
+        public byte[]? Buffer
+        {
+            get => _lifted?.Pixels;
+            set { if (_lifted != null && value != null) _lifted.Pixels = value; }
+        }
+        public int BufferWidth { get => _lifted?.Width ?? 0; set { if (_lifted != null) _lifted.Width = value; } }
+        public int BufferHeight { get => _lifted?.Height ?? 0; set { if (_lifted != null) _lifted.Height = value; } }
+        public int FloatX { get => _lifted?.X ?? 0; set { if (_lifted != null) _lifted.X = value; } }
+        public int FloatY { get => _lifted?.Y ?? 0; set { if (_lifted != null) _lifted.Y = value; } }
+
+        // Transform frame: forwards while lifted, local for the armed marquee otherwise.
+        private double _scaleX = 1.0, _scaleY = 1.0;
+        private bool _scaleLink;
+        private ScaleMode _scaleFilter = ScaleMode.NearestNeighbor;
+        private RotationMode _rotMode = RotationMode.RotSprite;
+        private double _angleDeg, _cumulativeAngleDeg;
+        private int _origW, _origH, _origCenterX, _origCenterY;
+        private double _pivotOffsetX, _pivotOffsetY;
+        private bool _pivotCustom;
+        private bool _regionNonRectangular, _bufferFlipped;
+
+        public double ScaleX { get => _lifted?.ScaleX ?? _scaleX; set { if (_lifted != null) _lifted.ScaleX = value; else _scaleX = value; } }
+        public double ScaleY { get => _lifted?.ScaleY ?? _scaleY; set { if (_lifted != null) _lifted.ScaleY = value; else _scaleY = value; } }
+        public bool ScaleLink { get => _lifted?.ScaleLink ?? _scaleLink; set { if (_lifted != null) _lifted.ScaleLink = value; _scaleLink = value; } }
+        public ScaleMode ScaleFilter { get => _lifted?.ScaleFilter ?? _scaleFilter; set { if (_lifted != null) _lifted.ScaleFilter = value; _scaleFilter = value; } }
+        public RotationMode RotMode { get => _lifted?.RotMode ?? _rotMode; set { if (_lifted != null) _lifted.RotMode = value; _rotMode = value; } }
+        public double AngleDeg { get => _lifted?.AngleDeg ?? _angleDeg; set { if (_lifted != null) _lifted.AngleDeg = value; else _angleDeg = value; } }
+        public double CumulativeAngleDeg { get => _lifted?.CumulativeAngleDeg ?? _cumulativeAngleDeg; set { if (_lifted != null) _lifted.CumulativeAngleDeg = value; else _cumulativeAngleDeg = value; } }
+        public int OrigW { get => _lifted?.OrigW ?? _origW; set { if (_lifted != null) _lifted.OrigW = value; else _origW = value; } }
+        public int OrigH { get => _lifted?.OrigH ?? _origH; set { if (_lifted != null) _lifted.OrigH = value; else _origH = value; } }
+        public int OrigCenterX { get => _lifted?.OrigCenterX ?? _origCenterX; set { if (_lifted != null) _lifted.OrigCenterX = value; else _origCenterX = value; } }
+        public int OrigCenterY { get => _lifted?.OrigCenterY ?? _origCenterY; set { if (_lifted != null) _lifted.OrigCenterY = value; else _origCenterY = value; } }
+        public double PivotOffsetX { get => _lifted?.PivotOffsetX ?? _pivotOffsetX; set { if (_lifted != null) _lifted.PivotOffsetX = value; else _pivotOffsetX = value; } }
+        public double PivotOffsetY { get => _lifted?.PivotOffsetY ?? _pivotOffsetY; set { if (_lifted != null) _lifted.PivotOffsetY = value; else _pivotOffsetY = value; } }
+        public bool PivotCustom { get => _lifted?.PivotCustom ?? _pivotCustom; set { if (_lifted != null) _lifted.PivotCustom = value; else _pivotCustom = value; } }
+        public bool RegionNonRectangular { get => _lifted?.RegionNonRectangular ?? _regionNonRectangular; set { if (_lifted != null) _lifted.RegionNonRectangular = value; else _regionNonRectangular = value; } }
+        public bool BufferFlipped { get => _lifted?.BufferFlipped ?? _bufferFlipped; set { if (_lifted != null) _lifted.BufferFlipped = value; else _bufferFlipped = value; } }
 
         /// <summary>Gets the scaled width.</summary>
         public int ScaledW => Math.Max(1, (int)Math.Round(BufferWidth * ScaleX));
-
         /// <summary>Gets the scaled height.</summary>
         public int ScaledH => Math.Max(1, (int)Math.Round(BufferHeight * ScaleY));
 
         // ════════════════════════════════════════════════════════════════════
-        // TRANSFORM HISTORY TRACKING
+        // DRAG STATE
         // ════════════════════════════════════════════════════════════════════
+
+        public SelDrag Drag { get; set; }
+        public Windows.Foundation.Point DragStartView { get; set; }
+        public int MoveStartX { get; set; }
+        public int MoveStartY { get; set; }
+        public SelHandle HoverHandle { get; set; }
+        public SelHandle ActiveHandle { get; set; }
+
+        // Scale drag state
+        public int ScaleStartFX { get; set; }
+        public int ScaleStartFY { get; set; }
+        public int ScaleStartW { get; set; }
+        public int ScaleStartH { get; set; }
+        public double ScaleStartScaleX { get; set; }
+        public double ScaleStartScaleY { get; set; }
+
+        // Rotation drag state
+        public int RotStartCenterX { get; set; }
+        public int RotStartCenterY { get; set; }
+        public double RotStartAngleDeg { get; set; }
+        public double RotStartPointerAngleDeg { get; set; }
+        public double RotFixedPivotX { get; set; }
+        public double RotFixedPivotY { get; set; }
 
         /// <summary>Snapshot of transform state at the start of a drag operation.</summary>
         public SelectionTransformItem.TransformSnapshot? DragStartSnapshot { get; set; }
 
-        /// <summary>
-        /// Captures the current transform state as a snapshot.
-        /// </summary>
-        /// <param name="includeBuffer">Whether to include the buffer data (for scale/rotate operations).</param>
-        public SelectionTransformItem.TransformSnapshot CaptureTransformSnapshot(bool includeBuffer = false)
-        {
-            byte[]? bufferCopy = null;
-            if (includeBuffer && Buffer != null)
-            {
-                bufferCopy = (byte[])Buffer.Clone();
-            }
-
-            return new SelectionTransformItem.TransformSnapshot(
-                floatX: FloatX,
-                floatY: FloatY,
-                scaleX: ScaleX,
-                scaleY: ScaleY,
-                angleDeg: AngleDeg,
-                cumulativeAngleDeg: CumulativeAngleDeg,
-                origCenterX: OrigCenterX,
-                origCenterY: OrigCenterY,
-                origW: OrigW,
-                origH: OrigH,
-                pivotOffsetX: PivotOffsetX,
-                pivotOffsetY: PivotOffsetY,
-                pivotCustom: PivotCustom,
-                buffer: bufferCopy,
-                bufferWidth: BufferWidth,
-                bufferHeight: BufferHeight
-            );
-        }
-
-        /// <summary>
-        /// Applies a transform snapshot to restore selection state.
-        /// </summary>
-        public void ApplyTransformSnapshot(SelectionTransformItem.TransformSnapshot snapshot)
-        {
-            FloatX = snapshot.FloatX;
-            FloatY = snapshot.FloatY;
-            ScaleX = snapshot.ScaleX;
-            ScaleY = snapshot.ScaleY;
-            AngleDeg = snapshot.AngleDeg;
-            CumulativeAngleDeg = snapshot.CumulativeAngleDeg;
-            OrigCenterX = snapshot.OrigCenterX;
-            OrigCenterY = snapshot.OrigCenterY;
-            OrigW = snapshot.OrigW;
-            OrigH = snapshot.OrigH;
-            PivotOffsetX = snapshot.PivotOffsetX;
-            PivotOffsetY = snapshot.PivotOffsetY;
-            PivotCustom = snapshot.PivotCustom;
-
-            // Restore buffer if present in snapshot
-            if (snapshot.Buffer != null)
-            {
-                Buffer = (byte[])snapshot.Buffer.Clone();
-                BufferWidth = snapshot.BufferWidth;
-                BufferHeight = snapshot.BufferHeight;
-            }
-        }
+        /// <summary>Captures the current floating transform (default when nothing is lifted).</summary>
+        public SelectionTransformItem.TransformSnapshot CaptureTransformSnapshot(bool includeBuffer = false) =>
+            _lifted == null ? default : SelectionTransformItem.Capture(_lifted, includeBuffer);
 
         // ════════════════════════════════════════════════════════════════════
-        // CONSTRUCTOR
+        // MARCHING ANTS / PREVIEW STATE
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SelectionSubsystem"/> class.
-        /// </summary>
-        public SelectionSubsystem()
-        {
-            Region = new SelectionRegion();
-        }
+        public float AntsPhase { get; set; }
+        private readonly Stopwatch _antsTimer = Stopwatch.StartNew();
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SelectionSubsystem"/> class with an existing region.
-        /// </summary>
-        /// <param name="region">The selection region to use.</param>
+        public bool HavePreview { get; set; }
+        public byte[]? PreviewBuf { get; set; }
+        public int PreviewW { get; set; }
+        public int PreviewH { get; set; }
+        public double PreviewScaleX { get; set; }
+        public double PreviewScaleY { get; set; }
+        public double PreviewAngle { get; set; }
+        public ScaleMode PreviewScaleFilter { get; set; }
+        public RotationMode PreviewRotMode { get; set; }
+
+        // ════════════════════════════════════════════════════════════════════
+        // CONSTRUCTORS
+        // ════════════════════════════════════════════════════════════════════
+
+        public SelectionSubsystem() : this(new SelectionRegion()) { }
+
         public SelectionSubsystem(SelectionRegion region)
         {
-            Region = region;
+            Region = region ?? throw new ArgumentNullException(nameof(region));
         }
 
         // ════════════════════════════════════════════════════════════════════
         // STATE MANAGEMENT
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Resets the pivot to the center of the selection.
-        /// </summary>
         public void ResetPivot()
         {
             PivotOffsetX = 0;
             PivotOffsetY = 0;
             PivotCustom = false;
-            PivotSnappedTo = PivotSnap.Center;
         }
 
-        /// <summary>
-        /// Resets all transform state to defaults.
-        /// </summary>
         public void ResetTransform()
         {
             ScaleX = 1.0;
@@ -467,35 +259,22 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         }
 
         /// <summary>
-        /// Clears all selection state.
+        /// Clears the view's marquee state. Does not touch the document's floating selection:
+        /// callers commit or cancel through <c>FloatingSelectionOps</c> first.
         /// </summary>
         public void Clear()
         {
             Active = false;
-            Floating = false;
-            Buffer = null;
-            BufferWidth = 0;
-            BufferHeight = 0;
-            FloatX = 0;
-            FloatY = 0;
-            OrigW = 0;
-            OrigH = 0;
-            OrigCenterX = 0;
-            OrigCenterY = 0;
             State = SelectionState.None;
             Drag = SelDrag.None;
             HavePreview = false;
             PreviewBuf = null;
-            BufferFlipped = false;
             Region.Clear();
             Rect = CreateRect(0, 0, 0, 0);
+            _origW = _origH = _origCenterX = _origCenterY = 0;
             ResetTransform();
         }
 
-        /// <summary>
-        /// Updates the marching ants animation phase based on real elapsed time,
-        /// so speed is consistent regardless of render/invalidation frequency.
-        /// </summary>
         public void AdvanceAnts()
         {
             float elapsed = (float)_antsTimer.Elapsed.TotalSeconds;
@@ -504,9 +283,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             AntsPhase = (AntsPhase + ANTS_SPEED * elapsed) % period;
         }
 
-        /// <summary>
-        /// Notifies the tool state of selection presence changes.
-        /// </summary>
         public void NotifyToolState()
         {
             ToolState?.SetSelectionPresence(Active, Floating);
@@ -516,21 +292,45 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         }
 
         // ════════════════════════════════════════════════════════════════════
+        // PIVOT GEOMETRY (single home; hit-testing, rendering and transforms all use these)
+        // ════════════════════════════════════════════════════════════════════
+
+        public (double X, double Y) GetPivotPositionDoc()
+        {
+            double centerX = OrigCenterX;
+            double centerY = OrigCenterY;
+            if (!PivotCustom || (PivotOffsetX == 0 && PivotOffsetY == 0))
+                return (centerX, centerY);
+
+            double radians = CumulativeAngleDeg * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double globalOffsetX = PivotOffsetX * cos - PivotOffsetY * sin;
+            double globalOffsetY = PivotOffsetX * sin + PivotOffsetY * cos;
+            return (centerX + globalOffsetX, centerY + globalOffsetY);
+        }
+
+        public (float X, float Y) GetPivotPositionView(Windows.Foundation.Rect dest, double scale)
+        {
+            if (Drag == SelDrag.Rotate)
+            {
+                return ((float)(RotFixedPivotX * scale + dest.X),
+                        (float)(RotFixedPivotY * scale + dest.Y));
+            }
+            var (docX, docY) = GetPivotPositionDoc();
+            return ((float)(dest.X + docX * scale), (float)(dest.Y + docY * scale));
+        }
+
+        // ════════════════════════════════════════════════════════════════════
         // UTILITY METHODS
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Normalizes a rectangle to have positive width and height.
-        /// </summary>
         public static RectInt32 Normalize(RectInt32 r) =>
             CreateRect(r.Width >= 0 ? r.X : r.X + r.Width,
                 r.Height >= 0 ? r.Y : r.Y + r.Height,
                 Math.Abs(r.Width),
                 Math.Abs(r.Height));
 
-        /// <summary>
-        /// Clamps a rectangle to surface bounds.
-        /// </summary>
         public static RectInt32 ClampToSurface(RectInt32 r, int w, int h)
         {
             int x0 = Math.Clamp(r.X, 0, w);
@@ -540,9 +340,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             return CreateRect(x0, y0, Math.Max(0, x1 - x0), Math.Max(0, y1 - y0));
         }
 
-        /// <summary>
-        /// Computes the intersection of two rectangles.
-        /// </summary>
         public static RectInt32 Intersect(RectInt32 a, RectInt32 b)
         {
             int x0 = Math.Max(a.X, b.X);
@@ -552,9 +349,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             return (x1 > x0 && y1 > y0) ? CreateRect(x0, y0, x1 - x0, y1 - y0) : CreateRect(0, 0, 0, 0);
         }
 
-        /// <summary>
-        /// Computes the union of two rectangles.
-        /// </summary>
         public static RectInt32 UnionRect(RectInt32 a, RectInt32 b)
         {
             int x0 = Math.Min(a.X, b.X);
@@ -564,9 +358,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             return CreateRect(x0, y0, Math.Max(0, x1 - x0), Math.Max(0, y1 - y0));
         }
 
-        /// <summary>
-        /// Rotates a point around a center.
-        /// </summary>
         public static (float x, float y) RotateAround(float px, float py, float cx, float cy, float radians)
         {
             float dx = px - cx, dy = py - cy;

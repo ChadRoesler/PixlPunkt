@@ -1,121 +1,78 @@
 using System;
-using System.Collections.Generic;
+using FluentIcons.Common;
+using PixlPunkt.Core.History;
 
 namespace PixlPunkt.Core.Voxel.Editing
 {
     /// <summary>
-    /// Lightweight undo/redo stack for voxel workspace operations.
+    /// The voxel editor's view of a <see cref="UnifiedHistoryStack"/>. Voxel commands are pushed
+    /// as <see cref="VoxelHistoryItem"/>s and transactions are history groups, so when the stack
+    /// is the document's the canvas and the voxel workspace share one undo timeline, one dirty
+    /// flag and one memory budget. Undo/redo here only step items this class pushed; anything
+    /// else on top is left for the canvas host, which knows how to refresh after it.
     /// </summary>
     public sealed class VoxelCommandHistory
     {
-        private readonly Stack<IVoxelHistoryCommand> _undo = [];
-        private readonly Stack<IVoxelHistoryCommand> _redo = [];
-        private List<IVoxelHistoryCommand>? _pendingTransaction;
-        private string? _pendingTransactionName;
+        /// <summary>The stack this history writes to.</summary>
+        public UnifiedHistoryStack Stack { get; }
 
         public event Action? HistoryChanged;
 
-        public bool CanUndo => _undo.Count > 0 || (_pendingTransaction?.Count > 0);
-        public bool CanRedo => _redo.Count > 0;
-        public bool IsTransactionOpen => _pendingTransaction != null;
-
-        public void Clear()
+        public VoxelCommandHistory(UnifiedHistoryStack? stack = null)
         {
-            _undo.Clear();
-            _redo.Clear();
-            _pendingTransaction = null;
-            _pendingTransactionName = null;
-            HistoryChanged?.Invoke();
+            Stack = stack ?? new UnifiedHistoryStack();
+            Stack.HistoryChanged += () => HistoryChanged?.Invoke();
         }
+
+        /// <summary>True when the stack can undo anything at all.</summary>
+        public bool CanUndo => Stack.CanUndo || Stack.IsGroupOpen;
+
+        public bool CanRedo => Stack.CanRedo;
+
+        /// <summary>True when the next undo step is a voxel edit.</summary>
+        public bool CanUndoVoxel => Stack.PeekUndo() is VoxelHistoryItem;
+
+        /// <summary>True when the next redo step is a voxel edit.</summary>
+        public bool CanRedoVoxel => Stack.PeekRedo() is VoxelHistoryItem;
+
+        public bool IsTransactionOpen => Stack.IsGroupOpen;
 
         public void BeginTransaction(string name)
         {
-            if (_pendingTransaction != null)
+            if (Stack.IsGroupOpen)
                 throw new InvalidOperationException("A voxel history transaction is already open.");
-
-            _pendingTransaction = [];
-            _pendingTransactionName = string.IsNullOrWhiteSpace(name) ? "Voxel Edit" : name;
+            Stack.BeginGroup(string.IsNullOrWhiteSpace(name) ? "Voxel Edit" : name);
         }
 
-        public void CommitTransaction()
-        {
-            if (_pendingTransaction == null)
-                return;
-
-            if (_pendingTransaction.Count == 0)
-            {
-                _pendingTransaction = null;
-                _pendingTransactionName = null;
-                return;
-            }
-
-            IVoxelHistoryCommand command = _pendingTransaction.Count == 1
-                ? _pendingTransaction[0]
-                : new CompositeVoxelHistoryCommand(_pendingTransactionName ?? "Voxel Edit", _pendingTransaction);
-
-            _pendingTransaction = null;
-            _pendingTransactionName = null;
-            Push(command);
-        }
+        public void CommitTransaction() => Stack.EndGroup();
 
         public void CancelTransaction()
         {
-            if (_pendingTransaction == null)
-                return;
-
-            for (int i = _pendingTransaction.Count - 1; i >= 0; i--)
-            {
-                _pendingTransaction[i].Undo();
-            }
-
-            _pendingTransaction = null;
-            _pendingTransactionName = null;
+            if (!Stack.IsGroupOpen) return;
+            Stack.CancelGroup();
             HistoryChanged?.Invoke();
         }
 
         public void Push(IVoxelHistoryCommand command)
         {
-            if (command == null) throw new ArgumentNullException(nameof(command));
-
-            if (_pendingTransaction != null)
-            {
-                _pendingTransaction.Add(command);
-                return;
-            }
-
-            _undo.Push(command);
-            _redo.Clear();
-            HistoryChanged?.Invoke();
+            ArgumentNullException.ThrowIfNull(command);
+            Stack.Push(new VoxelHistoryItem(command));
         }
 
+        /// <summary>Undoes the top item if it is a voxel edit; false otherwise.</summary>
         public bool Undo()
         {
-            if (_pendingTransaction != null)
+            if (Stack.IsGroupOpen)
                 throw new InvalidOperationException("Cannot undo while a voxel history transaction is open.");
-
-            if (_undo.Count == 0)
-                return false;
-
-            var cmd = _undo.Pop();
-            cmd.Undo();
-            _redo.Push(cmd);
-            HistoryChanged?.Invoke();
-            return true;
+            return CanUndoVoxel && Stack.Undo();
         }
 
+        /// <summary>Redoes the top item if it is a voxel edit; false otherwise.</summary>
         public bool Redo()
         {
-            if (_pendingTransaction != null)
+            if (Stack.IsGroupOpen)
                 throw new InvalidOperationException("Cannot redo while a voxel history transaction is open.");
-
-            if (_redo.Count == 0)
-                return false;
-
-            var cmd = _redo.Pop();
-            cmd.Redo();
-            _undo.Push(cmd);
-            HistoryChanged?.Invoke();
-            return true;
+            return CanRedoVoxel && Stack.Redo();
         }
 
         public sealed class DelegateCommand : IVoxelHistoryCommand
@@ -131,40 +88,25 @@ namespace PixlPunkt.Core.Voxel.Editing
             }
 
             public string Description { get; }
-
             public void Undo() => _undo();
-
             public void Redo() => _redo();
         }
+    }
 
-        private sealed class CompositeVoxelHistoryCommand : IVoxelHistoryCommand
+    /// <summary>A voxel command on the unified history stack.</summary>
+    public sealed class VoxelHistoryItem : IHistoryItem
+    {
+        public IVoxelHistoryCommand Command { get; }
+        public Icon HistoryIcon { get; set; } = Icon.Cube;
+        public string Description => Command.Description;
+
+        public VoxelHistoryItem(IVoxelHistoryCommand command)
         {
-            private readonly IVoxelHistoryCommand[] _commands;
-
-            public CompositeVoxelHistoryCommand(string description, IList<IVoxelHistoryCommand> commands)
-            {
-                Description = description;
-                _commands = new IVoxelHistoryCommand[commands.Count];
-                for (int i = 0; i < commands.Count; i++)
-                {
-                    _commands[i] = commands[i];
-                }
-            }
-
-            public string Description { get; }
-
-            public void Undo()
-            {
-                for (int i = _commands.Length - 1; i >= 0; i--)
-                    _commands[i].Undo();
-            }
-
-            public void Redo()
-            {
-                for (int i = 0; i < _commands.Length; i++)
-                    _commands[i].Redo();
-            }
+            Command = command ?? throw new ArgumentNullException(nameof(command));
         }
+
+        public void Undo() => Command.Undo();
+        public void Redo() => Command.Redo();
     }
 
     public interface IVoxelHistoryCommand

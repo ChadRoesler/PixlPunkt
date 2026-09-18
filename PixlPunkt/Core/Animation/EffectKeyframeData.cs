@@ -40,7 +40,7 @@ namespace PixlPunkt.Core.Animation
         /// </summary>
         public EffectKeyframeData(LayerEffectBase effect)
         {
-            EffectId = effect.EffectId;
+            EffectId = effect.EffectId ?? string.Empty;
             IsEnabled = effect.IsEnabled;
             CaptureProperties(effect);
         }

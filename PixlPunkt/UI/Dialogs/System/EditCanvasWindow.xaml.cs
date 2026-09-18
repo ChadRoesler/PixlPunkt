@@ -5,6 +5,7 @@ using PixlPunkt.Core.Document;
 using PixlPunkt.Core.History;
 using Windows.Graphics;
 using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
+using PixlPunkt.Core.Selection;
 
 namespace PixlPunkt.UI.Dialogs
 {
@@ -146,15 +147,31 @@ namespace PixlPunkt.UI.Dialogs
                 contentOffsetX = tileOffsetX * _document.TileSize.Width;
                 contentOffsetY = tileOffsetY * _document.TileSize.Height;
 
-                // Create history item BEFORE resize (captures before state)
-                var historyItem = new CanvasResizeItem(_document);
+                // A floating selection has no place in a resize; commit it first. The commit and
+                // the resize undo as one step.
+                _document.History.BeginGroup("Resize Canvas");
+                try
+                {
+                    if (_document.Floating != null)
+                    {
+                        var commit = FloatingSelectionOps.Commit(_document);
+                        if (commit != null) _document.History.Push(commit);
+                    }
 
-                // Perform canvas resize
-                ResizeCanvas(newTileW, newTileH, _selectedAnchor, contentOffsetX, contentOffsetY);
+                    // Create history item BEFORE resize (captures before state)
+                    var historyItem = new CanvasResizeItem(_document);
 
-                // Capture after state and push to unified history
-                historyItem.CaptureAfterState();
-                _document.History.Push(historyItem);
+                    // Perform canvas resize
+                    ResizeCanvas(newTileW, newTileH, _selectedAnchor, contentOffsetX, contentOffsetY);
+
+                    // Capture after state and push to unified history
+                    historyItem.CaptureAfterState();
+                    _document.History.Push(historyItem);
+                }
+                finally
+                {
+                    _document.History.EndGroup();
+                }
             }
 
             // Notify document changed

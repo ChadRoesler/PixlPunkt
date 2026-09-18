@@ -89,8 +89,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         public void UpdateScaleFromHandle(int px, int py)
         {
             // Use original dimensions as base for scaling
-            int baseW = _state.OrigW > 0 ? _state.OrigW : _state.BufferWidth;
-            int baseH = _state.OrigH > 0 ? _state.OrigH : _state.BufferHeight;
+            int baseW = _state.OrigW;
+            int baseH = _state.OrigH;
 
             // Current center in global space
             double centerX = _state.ScaleStartFX + _state.ScaleStartW / 2.0;
@@ -269,8 +269,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         public void UpdatePivotFromDrag(int docX, int docY)
         {
             // Get current center
-            double centerX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.ScaledW / 2.0);
-            double centerY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.ScaledH / 2.0);
+            double centerX = _state.OrigCenterX;
+            double centerY = _state.OrigCenterY;
 
             // Transform pointer to local space (relative to center, unrotated)
             double globalDx = docX - centerX;
@@ -293,14 +293,12 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                 var (sx, sy) = GetSnapPositionOffset(snapTo);
                 _state.PivotOffsetX = sx;
                 _state.PivotOffsetY = sy;
-                _state.PivotSnappedTo = snapTo;
                 _state.PivotCustom = (snapTo != PivotSnap.Center);
             }
             else
             {
                 _state.PivotOffsetX = localX;
                 _state.PivotOffsetY = localY;
-                _state.PivotSnappedTo = PivotSnap.None;
                 _state.PivotCustom = true;
             }
 
@@ -311,24 +309,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// Gets the current pivot position in document space.
         /// </summary>
         /// <returns>The pivot position (X, Y) in document coordinates.</returns>
-        public (double X, double Y) GetPivotPositionDoc()
-        {
-            double centerX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.ScaledW / 2.0);
-            double centerY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.ScaledH / 2.0);
-
-            if (!_state.PivotCustom || (_state.PivotOffsetX == 0 && _state.PivotOffsetY == 0))
-                return (centerX, centerY);
-
-            // Transform pivot offset from local to global space
-            double radians = _state.CumulativeAngleDeg * Math.PI / 180.0;
-            double cos = Math.Cos(radians);
-            double sin = Math.Sin(radians);
-
-            double globalOffsetX = _state.PivotOffsetX * cos - _state.PivotOffsetY * sin;
-            double globalOffsetY = _state.PivotOffsetX * sin + _state.PivotOffsetY * cos;
-
-            return (centerX + globalOffsetX, centerY + globalOffsetY);
-        }
+        public (double X, double Y) GetPivotPositionDoc() => _state.GetPivotPositionDoc();
 
         /// <summary>
         /// Gets the pivot position in view space.
@@ -336,17 +317,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// <param name="dest">The destination rect.</param>
         /// <param name="scale">The zoom scale.</param>
         /// <returns>The pivot position in view coordinates.</returns>
-        public (float X, float Y) GetPivotPositionView(Rect dest, double scale)
-        {
-            if (_state.Drag == SelDrag.Rotate)
-            {
-                return ((float)(_state.RotFixedPivotX * scale + dest.X),
-                        (float)(_state.RotFixedPivotY * scale + dest.Y));
-            }
-
-            var (docX, docY) = GetPivotPositionDoc();
-            return ((float)(dest.X + docX * scale), (float)(dest.Y + docY * scale));
-        }
+        public (float X, float Y) GetPivotPositionView(Rect dest, double scale) => _state.GetPivotPositionView(dest, scale);
 
         /// <summary>
         /// Gets the snap position offset for a given snap type.
@@ -355,8 +326,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// <returns>Offset from center in local (unrotated) space.</returns>
         public (double X, double Y) GetSnapPositionOffset(PivotSnap snap)
         {
-            int handleW = (int)Math.Round((_state.OrigW > 0 ? _state.OrigW : _state.BufferWidth) * _state.ScaleX);
-            int handleH = (int)Math.Round((_state.OrigH > 0 ? _state.OrigH : _state.BufferHeight) * _state.ScaleY);
+            int handleW = (int)Math.Round(_state.OrigW * _state.ScaleX);
+            int handleH = (int)Math.Round(_state.OrigH * _state.ScaleY);
             double halfW = handleW / 2.0;
             double halfH = handleH / 2.0;
 
@@ -446,8 +417,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             percentX = Math.Max(1.0, Math.Round(percentX));
             percentY = link ? percentX : Math.Max(1.0, Math.Round(percentY));
 
-            double oldScaleX = _state.ScaleX;
-            double oldScaleY = _state.ScaleY;
 
             _state.ScaleX = percentX / 100.0;
             _state.ScaleY = percentY / 100.0;
@@ -455,28 +424,11 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             // Update floating position to keep the selection centered around its center point
             if (_state.Floating && _state.Buffer != null)
             {
-                // Get current center
+                // Scale about the transform centre (always valid; see FloatingSelection).
                 int centerX = _state.OrigCenterX;
                 int centerY = _state.OrigCenterY;
-
-                if (centerX == 0 && centerY == 0)
-                {
-                    // Calculate center from current position if not set
-                    int baseW = _state.OrigW > 0 ? _state.OrigW : _state.BufferWidth;
-                    int baseH = _state.OrigH > 0 ? _state.OrigH : _state.BufferHeight;
-                    int oldW = (int)Math.Round(baseW * oldScaleX);
-                    int oldH = (int)Math.Round(baseH * oldScaleY);
-                    centerX = _state.FloatX + oldW / 2;
-                    centerY = _state.FloatY + oldH / 2;
-                    _state.OrigCenterX = centerX;
-                    _state.OrigCenterY = centerY;
-                }
-
-                // Calculate new dimensions
-                int baseWidth = _state.OrigW > 0 ? _state.OrigW : _state.BufferWidth;
-                int baseHeight = _state.OrigH > 0 ? _state.OrigH : _state.BufferHeight;
-                int newW = (int)Math.Round(baseWidth * _state.ScaleX);
-                int newH = (int)Math.Round(baseHeight * _state.ScaleY);
+                int newW = (int)Math.Round(_state.OrigW * _state.ScaleX);
+                int newH = (int)Math.Round(_state.OrigH * _state.ScaleY);
 
                 // Update float position to keep centered
                 _state.FloatX = centerX - newW / 2;
@@ -523,7 +475,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                 FlipBufferHorizontal(_state.Buffer, _state.BufferWidth, _state.BufferHeight);
             }
 
-            _state.Changed = true;
             _state.BufferFlipped = true; // Mark that buffer differs from original region
             _state.PreviewBuf = null; // Clear preview to force regeneration
 
@@ -569,7 +520,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                 FlipBufferVertical(_state.Buffer, _state.BufferWidth, _state.BufferHeight);
             }
 
-            _state.Changed = true;
             _state.BufferFlipped = true; // Mark that buffer differs from original region
             _state.PreviewBuf = null; // Clear preview to force regeneration
 

@@ -26,7 +26,7 @@ namespace PixlPunkt.Core.History
     /// - All tile positions that need to be updated on undo/redo
     /// </para>
     /// </remarks>
-    public sealed class TileMappedPixelChangeItem : IHistoryItem, IRenderResult
+    public sealed class TileMappedPixelChangeItem : OffloadableHistoryItemBase, IRenderResult
     {
         private readonly RasterLayer _layer;
         private readonly TileSet _tileSet;
@@ -46,7 +46,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Gets a quick reference icon of the opperation (for UI display).
         /// </summary>
-        public Icon HistoryIcon { get; set; } = Icon.Map;
+        public override Icon HistoryIcon { get; set; } = Icon.Map;
 
         /// <summary>
         /// Represents the before/after state of a tile definition.
@@ -62,7 +62,7 @@ namespace PixlPunkt.Core.History
         // ====================================================================
 
         /// <inheritdoc/>
-        public string Description => _description;
+        public override string Description => _description;
 
         /// <summary>
         /// Gets whether this change item has any actual pixel changes.
@@ -71,6 +71,17 @@ namespace PixlPunkt.Core.History
 
         /// <inheritdoc/>
         public bool HasChanges => !IsEmpty;
+
+        // ── memory budget (counted; kept in memory) ──────────────────────
+        protected override long PayloadBytes
+        {
+            get
+            {
+                long total = _nonTileIndices.Count * 12L;
+                foreach (var c in _tileChanges.Values) total += c.Before.Length + c.After.Length;
+                return total;
+            }
+        }
 
         /// <inheritdoc/>
         public bool CanPushToHistory => HasChanges;
@@ -128,7 +139,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Undoes all changes - both non-tile pixels and all tile propagations.
         /// </summary>
-        public void Undo()
+        public override void Undo()
         {
             var layerPixels = _layer.Surface.Pixels;
             int layerW = _layer.Surface.Width;
@@ -174,7 +185,7 @@ namespace PixlPunkt.Core.History
         /// <summary>
         /// Redoes all changes - both non-tile pixels and all tile propagations.
         /// </summary>
-        public void Redo()
+        public override void Redo()
         {
             var layerPixels = _layer.Surface.Pixels;
             int layerW = _layer.Surface.Width;

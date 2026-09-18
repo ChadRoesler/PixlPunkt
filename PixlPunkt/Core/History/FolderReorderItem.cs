@@ -52,7 +52,6 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void Undo()
         {
-            _document.RaiseBeforeStructureChanged();
             MoveFolderToIndex(_newRootIndex, _originalRootIndex);
             _document.RaiseStructureChanged();
             LoggingService.Info("Undo folder reorder document={Doc} folder={Folder} from={From} to={To}",
@@ -64,7 +63,6 @@ namespace PixlPunkt.Core.History
         /// </summary>
         public void Redo()
         {
-            _document.RaiseBeforeStructureChanged();
             MoveFolderToIndex(_originalRootIndex, _newRootIndex);
             _document.RaiseStructureChanged();
             LoggingService.Info("Redo folder reorder document={Doc} folder={Folder} from={From} to={To}",

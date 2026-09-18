@@ -21,10 +21,10 @@ namespace PixlPunkt.UI.Layers
         public void WireFlyoutEvents()
         {
             // Panel menu flyout (empty area right-click)
-            PanelMenuFlyout.AddLayerRequested += (s, e) => Add_Click(s, new RoutedEventArgs());
-            PanelMenuFlyout.AddFolderRequested += (s, e) => AddFolder_Click(s, new RoutedEventArgs());
-            PanelMenuFlyout.AddReferenceLayerRequested += (s, e) => AddReferenceLayer_Click(s, new RoutedEventArgs());
-            PanelMenuFlyout.RemoveSelectedRequested += (s, e) => Remove_Click(s, new RoutedEventArgs());
+            PanelMenuFlyout.AddLayerRequested += (s, e) => Add_Click(s ?? this, new RoutedEventArgs());
+            PanelMenuFlyout.AddFolderRequested += (s, e) => AddFolder_Click(s ?? this, new RoutedEventArgs());
+            PanelMenuFlyout.AddReferenceLayerRequested += (s, e) => AddReferenceLayer_Click(s ?? this, new RoutedEventArgs());
+            PanelMenuFlyout.RemoveSelectedRequested += (s, e) => Remove_Click(s ?? this, new RoutedEventArgs());
 
             // Raster layer flyout
             LayerMenuFlyout.SettingsRequested += OnRasterSettings;
@@ -193,9 +193,9 @@ namespace PixlPunkt.UI.Layers
             {
                 if (_doc == null || layer == null) return;
 
-                _doc.DuplicateLayerTree(layer);
+                var clone = _doc.DuplicateLayerTree(layer);
                 RebuildFromDoc();
-                SelectFromDoc();
+                RevealItem(clone);
             }
             catch (Exception ex)
             {
@@ -262,9 +262,9 @@ namespace PixlPunkt.UI.Layers
             {
                 if (_doc == null || folder == null) return;
 
-                _doc.DuplicateLayerTree(folder);
+                var clone = _doc.DuplicateLayerTree(folder);
                 RebuildFromDoc();
-                SelectFromDoc();
+                RevealItem(clone);
             }
             catch (Exception ex)
             {

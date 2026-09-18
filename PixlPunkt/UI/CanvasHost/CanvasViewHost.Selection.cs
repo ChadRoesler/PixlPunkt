@@ -91,7 +91,7 @@ namespace PixlPunkt.UI.CanvasHost
 
         private bool _selActive { get => _selState?.Active ?? false; set { if (_selState != null) _selState.Active = value; } }
         private RectInt32 _selRect { get => _selState?.Rect ?? default; set { if (_selState != null) _selState.Rect = value; } }
-        private bool _selFloating { get => _selState?.Floating ?? false; set { if (_selState != null) _selState.Floating = value; } }
+        private bool _selFloating => _selState?.Floating ?? false;
         private int _selFX { get => _selState?.FloatX ?? 0; set { if (_selState != null) _selState.FloatX = value; } }
         private int _selFY { get => _selState?.FloatY ?? 0; set { if (_selState != null) _selState.FloatY = value; } }
         private byte[]? _selBuf { get => _selState?.Buffer; set { if (_selState != null) _selState.Buffer = value; } }
@@ -109,8 +109,6 @@ namespace PixlPunkt.UI.CanvasHost
         private int _selOrigH { get => _selState?.OrigH ?? 0; set { if (_selState != null) _selState.OrigH = value; } }
         private int _selOrigCenterX { get => _selState?.OrigCenterX ?? 0; set { if (_selState != null) _selState.OrigCenterX = value; } }
         private int _selOrigCenterY { get => _selState?.OrigCenterY ?? 0; set { if (_selState != null) _selState.OrigCenterY = value; } }
-        private PixelChangeItem? _selPendingCs { get => _selState?.PendingCs; set { if (_selState != null) _selState.PendingCs = value; } }
-        private RectInt32 _liftRect { get => _selState?.LiftRect ?? default; set { if (_selState != null) _selState.LiftRect = value; } }
 
         /// <summary>Gets the currently active selection tool based on ToolState.</summary>
         private ISelectionTool? ActiveSelectionTool
@@ -178,6 +176,21 @@ namespace PixlPunkt.UI.CanvasHost
         private bool IsSelectTool => _toolState?.ActiveCategory == ToolCategory.Select;
         public bool HasSelection => _selState?.Active ?? false;
 
+        /// <summary>
+        /// True when a committed (non-floating) selection exists that constrains where painting
+        /// may land. Mirrors the mask handed to the stroke engine, so every painting path -
+        /// brushes, fills, gradients, plugins - agrees on the answer.
+        /// </summary>
+        public bool HasPaintConstrainingSelection =>
+            _selState?.Active == true && !(_selState?.Floating ?? true) && !_selRegion.IsEmpty;
+
+        /// <summary>
+        /// Whether document pixel <paramref name="x"/>,<paramref name="y"/> may be painted given
+        /// the current selection. With no constraining selection every point is paintable.
+        /// </summary>
+        public bool IsPointSelected(int x, int y) =>
+            !HasPaintConstrainingSelection || _selRegion.Contains(x, y);
+
         private InputSystemCursorShape _curShape = InputSystemCursorShape.Arrow;
 
         /// <summary>Gets the scaled width of the floating selection.</summary>
@@ -219,9 +232,8 @@ namespace PixlPunkt.UI.CanvasHost
             _selRenderer.NeedsContinuousRender = drag => drag == SelDrag.Marquee && (ActiveSelectionTool?.NeedsContinuousRender ?? false);
 
             // Wire up dependencies for clipboard
+            _selClipboard.GetDocument = () => Document;
             _selClipboard.GetActiveLayer = () => Document.ActiveLayer as RasterLayer;
-            _selClipboard.GetDocWidth = () => Document.PixelWidth;
-            _selClipboard.GetDocHeight = () => Document.PixelHeight;
             _selClipboard.GetZoom = () => _zoom;
             _selClipboard.GetHoverPosition = () => (_hoverX, _hoverY, _hoverValid);
             _selClipboard.RequestRedraw = () => InvalidateMainCanvas();
@@ -229,7 +241,13 @@ namespace PixlPunkt.UI.CanvasHost
             _selClipboard.ApplyWithHistory = (rect, mutator) => ApplyWithHistory(rect, mutator, "Delete Selection");
             _selClipboard.SetCursor = SetCursor;
             _selClipboard.PropagateTileChanges = (bounds) => PropagateSelectionChangesToMappedTiles(bounds);
-            _selClipboard.PushSelectionHistory = PushSelectionChangeToHistory;
+            _selClipboard.PushHistory = PushHistoryItem;
+            // A pasted float is dragged with a selection tool; there is no separate move tool.
+            _selClipboard.EnsureSelectToolActive = () =>
+            {
+                if (_toolState != null && !_toolState.IsActiveSelectTool)
+                    _toolState.SetById(ToolIds.SelectRect);
+            };
 
             // Hook rendering for marching ants
             if (!_antsRenderHooked)
@@ -283,12 +301,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _ => SelectionTransformItem.TransformKind.Move
             };
 
-            var item = new SelectionTransformItem(
-                kind,
-                beforeSnapshot,
-                afterSnapshot,
-                ApplyTransformSnapshotAndRedraw
-            );
+            var item = new SelectionTransformItem(Document, kind, beforeSnapshot, afterSnapshot);
 
             // Only push if there were actual changes
             if (item.HasChanges)
@@ -317,12 +330,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _ => SelectionTransformItem.TransformKind.Scale
             };
 
-            var item = new SelectionTransformItem(
-                kind,
-                beforeSnapshot,
-                afterSnapshot,
-                ApplyTransformSnapshotAndRedraw
-            );
+            var item = new SelectionTransformItem(Document, kind, beforeSnapshot, afterSnapshot);
 
             if (item.HasChanges)
             {
@@ -353,12 +361,7 @@ namespace PixlPunkt.UI.CanvasHost
                 kind = SelectionChangeItem.SelectionChangeKind.Clear;
             }
 
-            var item = new SelectionChangeItem(
-                kind,
-                _selectionBeforeMarquee,
-                afterRegion,
-                ApplySelectionRegionFromHistory
-            );
+            var item = new SelectionChangeItem(Document, kind, _selectionBeforeMarquee, afterRegion);
 
             if (item.HasChanges)
             {
@@ -369,99 +372,55 @@ namespace PixlPunkt.UI.CanvasHost
             _selectionBeforeMarquee = null;
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // CURSOR MANAGEMENT
+        // ═══════════════════════════════════════════════════════════════
+
+        // ═══════════════════════════════════════════════════════════════
+        // DOCUMENT → VIEW SYNC
+        // ═══════════════════════════════════════════════════════════════
+
+        private int _lastKnownAnimFrame;
+
         /// <summary>
-        /// Applies a selection region from history (undo/redo).
+        /// The document's selection or floating selection changed (an operation, or undo/redo).
+        /// Bring the view state in line; the document is the source of truth.
         /// </summary>
-        private void ApplySelectionRegionFromHistory(Core.Selection.SelectionRegion region)
+        private void OnDocumentSelectionChanged()
         {
             if (_selState == null) return;
 
-            // Copy the region data directly - this preserves all mask data, bounds, and offset
-            _selRegion.CopyFrom(region);
-
-            // Update state based on the restored region
+            _selState.Lifted = Document.Floating;
             _selState.Rect = _selRegion.Bounds;
-            _selState.Active = !_selRegion.IsEmpty;
-            _selState.State = _selState.Active ? SelectionState.Armed : SelectionState.None;
-            _selState.Floating = false;
-            _selState.Buffer = null;
-
-            if (_selState.Active)
+            bool active = !_selRegion.IsEmpty || _selState.Floating;
+            _selState.Active = active;
+            _selState.State = active ? SelectionState.Armed : SelectionState.None;
+            if (!active)
             {
-                _selState.OrigW = _selState.Rect.Width;
-                _selState.OrigH = _selState.Rect.Height;
-                _selState.OrigCenterX = _selState.Rect.X + _selState.Rect.Width / 2;
-                _selState.OrigCenterY = _selState.Rect.Y + _selState.Rect.Height / 2;
-                _selState.ResetPivot();
+                _selState.Drag = SelDrag.None;
+                _selState.HavePreview = false;
             }
-
-            _selState.ResetTransform();
+            _selState.PreviewBuf = null;
             _selState.NotifyToolState();
-
-            // Notify tool state of selection presence change
-            _toolState?.SetSelectionPresence(_selState.Active, false);
-
+            _toolState?.SetSelectionPresence(active, _selState.Floating);
             InvalidateMainCanvas();
         }
 
-        /// <summary>
-        /// Applies a transform snapshot and triggers redraw.
-        /// </summary>
-        private void ApplyTransformSnapshotAndRedraw(SelectionTransformItem.TransformSnapshot snapshot)
+        /// <summary>Commit a floating selection onto the frame it was edited on before the timeline leaves it.</summary>
+        private void OnFrameChangedForSelection(int newFrame)
         {
-            if (_selState == null) return;
+            int previous = _lastKnownAnimFrame;
+            _lastKnownAnimFrame = newFrame;
+            if (previous != newFrame && _selState?.Floating == true)
+                CommitFloatingWithHistory(previous);
+        }
 
-            _selState.ApplyTransformSnapshot(snapshot);
-
-            // TransformItems are only pushed while the selection is floating, so always restore that state.
-            _selState.Floating = true;
-            _selState.Active = true;
-            _selState.State = SelectionState.Armed;
-
-            // Rebuild the region from the current buffer (restored by ApplyTransformSnapshot for
-            // scale/rotate items, or unchanged for move items — buffer content never changes on a
-            // pure move, only position does). Using _selState.Buffer instead of snapshot.Buffer
-            // means the move case is handled correctly: the mask is rebuilt in LOCAL space at the
-            // restored FloatX/FloatY, avoiding the world-space double-shift that SetOffset alone caused.
-            var buf = _selState.Buffer;
-            int bw = _selState.BufferWidth, bh = _selState.BufferHeight;
-
-            if (buf != null && bw > 0 && bh > 0)
-            {
-                int regionW = Math.Max(Document.PixelWidth, bw + Math.Abs(snapshot.FloatX));
-                int regionH = Math.Max(Document.PixelHeight, bh + Math.Abs(snapshot.FloatY));
-                _selRegion.EnsureSize(regionW, regionH);
-                _selRegion.Clear();
-                _selRegion.SetOffset(snapshot.FloatX, snapshot.FloatY);
-
-                for (int y = 0; y < bh; y++)
-                    for (int x = 0; x < bw; x++)
-                        if (buf[(y * bw + x) * 4 + 3] > 0)
-                            _selRegion.AddRect(CreateRect(x, y, 1, 1));
-
-                // Re-derive RegionNonRectangular from the buffer alpha.
-                bool isRect = true;
-                for (int ry = 0; ry < bh && isRect; ry++)
-                    for (int rx = 0; rx < bw && isRect; rx++)
-                        if (buf[(ry * bw + rx) * 4 + 3] == 0) isRect = false;
-                _selState.RegionNonRectangular = !isRect;
-            }
-            else
-            {
-                _selRegion.SetOffset(snapshot.FloatX, snapshot.FloatY);
-            }
-
-            _selState.Rect = _selRegion.Bounds;
-
-            // Sync tool state
-            _toolState?.SetSelectionScale(snapshot.ScaleX * 100.0, snapshot.ScaleY * 100.0, _selState.ScaleLink);
-            _toolState?.SetRotationAngle(snapshot.AngleDeg);
-            _toolState?.SetSelectionPresence(_selState.Active, _selState.Floating);
-
-            // Clear any cached preview
-            _selState.PreviewBuf = null;
-
-            Document.RaiseStructureChanged();
+        /// <summary>Pushes an item produced by a selection operation and refreshes what depends on it.</summary>
+        private void PushHistoryItem(IHistoryItem item)
+        {
+            Document.History.Push(item);
+            HistoryStateChanged?.Invoke();
+            UpdateActiveLayerPreview();
             InvalidateMainCanvas();
         }
 
@@ -547,6 +506,9 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>Pasts from clipboard.</summary>
         public void PasteClipboard() => _selClipboard?.Paste();
 
+        /// <summary>Pastes the clipboard with its top-left corner at a document position.</summary>
+        public void PasteClipboardAt(int x, int y) => _selClipboard?.PasteAt(x, y);
+
         /// <summary>Cancels the active selection.</summary>
         public void CancelSelection() => _selClipboard?.Cancel();
 
@@ -570,6 +532,9 @@ namespace PixlPunkt.UI.CanvasHost
                 LiftSelectionWithHistory();
             }
 
+            if (!_selState.Floating) return;
+            var before = _selState.CaptureTransformSnapshot();
+
             // Move the floating selection
             _selState.FloatX += dx;
             _selState.FloatY += dy;
@@ -579,8 +544,8 @@ namespace PixlPunkt.UI.CanvasHost
             // Update the selection region offset
             OffsetSelectionRegion(dx, dy);
 
-            _selState.Dirty = true;
-            _selState.Changed = true;
+            var item = new SelectionTransformItem(Document, SelectionTransformItem.TransformKind.Move, before, _selState.CaptureTransformSnapshot());
+            if (item.HasChanges) PushHistoryItem(item);
             InvalidateMainCanvas();
         }
 
@@ -634,7 +599,11 @@ namespace PixlPunkt.UI.CanvasHost
                     LiftSelectionWithHistory();
             }
 
+            if (_selState?.Floating != true) return;
+            var before = _selState.CaptureTransformSnapshot(includeBuffer: true);
             _selTransform?.FlipHorizontal(useGlobalAxis);
+            var item = new SelectionTransformItem(Document, SelectionTransformItem.TransformKind.Scale, before, _selState.CaptureTransformSnapshot(includeBuffer: true));
+            if (item.HasChanges) PushHistoryItem(item);
             InvalidateMainCanvas();
         }
 
@@ -648,7 +617,11 @@ namespace PixlPunkt.UI.CanvasHost
                     LiftSelectionWithHistory();
             }
 
+            if (_selState?.Floating != true) return;
+            var before = _selState.CaptureTransformSnapshot(includeBuffer: true);
             _selTransform?.FlipVertical(useGlobalAxis);
+            var item = new SelectionTransformItem(Document, SelectionTransformItem.TransformKind.Scale, before, _selState.CaptureTransformSnapshot(includeBuffer: true));
+            if (item.HasChanges) PushHistoryItem(item);
             InvalidateMainCanvas();
         }
 
@@ -681,8 +654,6 @@ namespace PixlPunkt.UI.CanvasHost
 
             _selState.Rect = _selRegion.Bounds;
             _selState.Active = true;
-            _selState.Floating = false;
-            _selState.Buffer = null;
             _selState.State = SelectionState.Armed;
             _selState.OrigW = r.Width;
             _selState.OrigH = r.Height;
@@ -716,7 +687,6 @@ namespace PixlPunkt.UI.CanvasHost
                     // Capture snapshot for potential history
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
                     _mainCanvas.CapturePointer(e.Pointer);
-                    _selState.Dirty = true;
                     return true;
                 }
 
@@ -737,7 +707,6 @@ namespace PixlPunkt.UI.CanvasHost
                     // Capture snapshot for history - include buffer since rotate bakes transforms
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
                     _mainCanvas.CapturePointer(e.Pointer);
-                    _selState.Dirty = true;
                     return true;
                 }
 
@@ -757,7 +726,6 @@ namespace PixlPunkt.UI.CanvasHost
                     // Capture snapshot for history - include buffer since scale bakes transforms
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
                     _mainCanvas.CapturePointer(e.Pointer);
-                    _selState.Dirty = true;
                     return true;
                 }
 
@@ -772,7 +740,6 @@ namespace PixlPunkt.UI.CanvasHost
                     // Capture snapshot for history
                     _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
                     _mainCanvas.CapturePointer(e.Pointer);
-                    _selState.Dirty = true;
                     return true;
                 }
 
@@ -851,8 +818,6 @@ namespace PixlPunkt.UI.CanvasHost
                         _selState.OrigCenterX += dx;
                         _selState.OrigCenterY += dy;
                         OffsetSelectionRegion(dx, dy);
-                        _selState.Dirty = true;
-                        _selState.Changed = true;
                         InvalidateMainCanvas();
                     }
                     return true;
@@ -861,8 +826,6 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_selState.Floating)
                     {
                         _selTransform.UpdateScaleFromHandle(docX, docY);
-                        _selState.Dirty = true;
-                        _selState.Changed = true;
                         InvalidateMainCanvas();
                     }
                     return true;
@@ -871,8 +834,6 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_selState.Floating)
                     {
                         UpdateRotation(docX, docY);
-                        _selState.Dirty = true;
-                        _selState.Changed = true;
                         InvalidateMainCanvas();
                     }
                     return true;
@@ -881,7 +842,6 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_selState.Floating)
                     {
                         _selTransform.UpdatePivotFromDrag(docX, docY);
-                        _selState.Dirty = true;
                     }
                     return true;
             }
@@ -939,7 +899,6 @@ namespace PixlPunkt.UI.CanvasHost
             if (_selState.Drag == SelDrag.Move && _selState.Floating)
             {
                 PushTransformHistory(_selState.Drag);
-                _selState.Changed = true;
             }
 
             // Push transform history for pivot changes (no pixel changes, just UI state)
@@ -952,7 +911,6 @@ namespace PixlPunkt.UI.CanvasHost
             _selState.ActiveHandle = SelHandle.None;
             _selState.DragStartSnapshot = null;
             _mainCanvas.ReleasePointerCaptures();
-            _selState.Dirty = false;
             InvalidateMainCanvas();
             return true;
         }
@@ -1000,8 +958,8 @@ namespace PixlPunkt.UI.CanvasHost
                 _selState.OrigCenterX = (int)Math.Round(pivotDocX + rotatedOffsetX);
                 _selState.OrigCenterY = (int)Math.Round(pivotDocY + rotatedOffsetY);
 
-                int handleW = (int)Math.Round((_selState.OrigW > 0 ? _selState.OrigW : _selState.BufferWidth) * _selState.ScaleX);
-                int handleH = (int)Math.Round((_selState.OrigH > 0 ? _selState.OrigH : _selState.BufferHeight) * _selState.ScaleY);
+                int handleW = (int)Math.Round(_selState.OrigW * _selState.ScaleX);
+                int handleH = (int)Math.Round(_selState.OrigH * _selState.ScaleY);
                 _selState.FloatX = _selState.OrigCenterX - handleW / 2;
                 _selState.FloatY = _selState.OrigCenterY - handleH / 2;
             }
@@ -1020,8 +978,8 @@ namespace PixlPunkt.UI.CanvasHost
 
             bool hasScale = Math.Abs(_selState.ScaleX - 1.0) > 0.001 || Math.Abs(_selState.ScaleY - 1.0) > 0.001;
             bool hasRotation = Math.Abs(_selState.AngleDeg) > 0.1;
-            int centerX = _selState.OrigCenterX != 0 ? _selState.OrigCenterX : (_selState.FloatX + ScaledW / 2);
-            int centerY = _selState.OrigCenterY != 0 ? _selState.OrigCenterY : (_selState.FloatY + ScaledH / 2);
+            int centerX = _selState.OrigCenterX;
+            int centerY = _selState.OrigCenterY;
 
             if (hasScale)
             {
@@ -1056,8 +1014,8 @@ namespace PixlPunkt.UI.CanvasHost
                 {
                     var floatRect = CreateRect(_selState.FloatX, _selState.FloatY, _selState.BufferWidth, _selState.BufferHeight);
                     var dstClamp = ClampToSurface(floatRect, Document.PixelWidth, Document.PixelHeight);
-                    RebuildSelectionRegionFromTransformedBuffer(
-                        floatRect, dstClamp, _selState.Buffer!,
+                    Core.Selection.SelectionRegionBuilders.RebuildFromTransformedBuffer(
+                        _selRegion, floatRect, dstClamp, _selState.Buffer!,
                         _selState.BufferWidth, _selState.BufferHeight,
                         Document.PixelWidth, Document.PixelHeight);
                 }
@@ -1067,8 +1025,8 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 // Rectangular selections: rebuild as a rotated rectangle using the cumulative angle.
                 var docClamp = CreateRect(0, 0, Document.PixelWidth, Document.PixelHeight);
-                RebuildSelectionRegionAsRotatedRect(
-                    centerX, centerY,
+                Core.Selection.SelectionRegionBuilders.RebuildAsRotatedRect(
+                    _selRegion, centerX, centerY,
                     _selState.BufferWidth, _selState.BufferHeight,
                     _selState.CumulativeAngleDeg,
                     docClamp,
@@ -1078,7 +1036,6 @@ namespace PixlPunkt.UI.CanvasHost
             _selState.Rect = _selRegion.Bounds;
             _toolState?.SetSelectionScale(100.0, 100.0, _selState.ScaleLink);
             _toolState?.SetRotationAngle(0.0);
-            _selState.Changed = true;
         }
 
         private void OffsetSelectionRegion(int dx, int dy)
@@ -1155,115 +1112,17 @@ namespace PixlPunkt.UI.CanvasHost
         // BUFFER TRANSFORM METHODS
         // ═══════════════════════════════════════════════════════════════
 
-        private static (byte[] buf, int w, int h) BuildScaledBufferForCommit(byte[] src, int sw, int sh, double sx, double sy, ScaleMode filter)
-        {
-            int outW = Math.Max(1, (int)Math.Round(sw * sx));
-            int outH = Math.Max(1, (int)Math.Round(sh * sy));
-            if (outW == sw && outH == sh) return (src, sw, sh);
-            return filter switch
-            {
-                ScaleMode.NearestNeighbor => (PixelOps.ResizeNearest(src, sw, sh, outW, outH), outW, outH),
-                ScaleMode.Bilinear => (PixelOps.ResizeBilinear(src, sw, sh, outW, outH), outW, outH),
-                ScaleMode.EPX => PixelOps.ScaleBy2xStepsThenNearest(src, sw, sh, outW, outH, epx: true),
-                ScaleMode.Scale2x => PixelOps.ScaleBy2xStepsThenNearest(src, sw, sh, outW, outH, epx: false),
-                _ => (PixelOps.ResizeNearest(src, sw, sh, outW, outH), outW, outH)
-            };
-        }
+        private static (byte[] buf, int w, int h) BuildScaledBufferForCommit(byte[] src, int sw, int sh, double sx, double sy, ScaleMode filter) => Core.Selection.SelectionBufferOps.BuildScaled(src, sw, sh, sx, sy, filter);
 
-        private static (byte[] buf, int w, int h) BuildRotatedBufferForCommit(byte[] src, int sw, int sh, double angleDeg, RotationMode kind)
-        {
-            double a = angleDeg % 360.0;
-            if (Math.Abs(a) < 1e-6) return (src, sw, sh);
-            return kind switch
-            {
-                RotationMode.RotSprite => PixelOps.RotateSpriteApprox(src, sw, sh, a),
-                _ => PixelOps.RotateNearest(src, sw, sh, a)
-            };
-        }
+        private static (byte[] buf, int w, int h) BuildRotatedBufferForCommit(byte[] src, int sw, int sh, double angleDeg, RotationMode kind) => Core.Selection.SelectionBufferOps.BuildRotated(src, sw, sh, angleDeg, kind);
 
-        private static void BlitAlphaOver(byte[] dst, int w, int h, int dx, int dy, byte[] src, int sw, int sh)
-        {
-            int x0 = Math.Max(0, dx), y0 = Math.Max(0, dy), x1 = Math.Min(w, dx + sw), y1 = Math.Min(h, dy + sh);
-            if (x1 <= x0 || y1 <= y0) return;
-            int dstStride = w * 4, srcStride = sw * 4;
-            for (int y = y0; y < y1; y++)
-            {
-                int sy = y - dy, dstRow = y * dstStride, srcRow = sy * srcStride;
-                for (int x = x0; x < x1; x++)
-                {
-                    int sx = x - dx, di = dstRow + x * 4, si = srcRow + sx * 4;
-                    byte sb = src[si], sg = src[si + 1], sr = src[si + 2], sa = src[si + 3];
-                    if (sa == 0) continue;
+        private static void BlitAlphaOver(byte[] dst, int w, int h, int dx, int dy, byte[] src, int sw, int sh) => PixelRectOps.BlitAlphaOver(dst, w, h, dx, dy, src, sw, sh);
 
-                    // For fully opaque source, just copy
-                    if (sa == 255)
-                    {
-                        dst[di] = sb;
-                        dst[di + 1] = sg;
-                        dst[di + 2] = sr;
-                        dst[di + 3] = 255;
-                        continue;
-                    }
+        private static byte[] CopyRectBytes(byte[] src, int w, int h, RectInt32 r) => PixelRectOps.CopyRect(src, w, h, r);
 
-                    byte db = dst[di], dg = dst[di + 1], dr = dst[di + 2], da = dst[di + 3];
+        private static void BlitBytes(byte[] dst, int w, int h, int dx, int dy, byte[] buf, int bw, int bh) => PixelRectOps.Blit(dst, w, h, dx, dy, buf, bw, bh);
 
-                    // Porter-Duff "source over" with straight alpha source
-                    // out_rgb = (src_rgb * src_a + dst_rgb * dst_a * (255 - src_a) / 255) / out_a
-                    // out_a = src_a + dst_a * (255 - src_a) / 255
-                    int invA = 255 - sa;
-                    int outA = sa + da * invA / 255;
-
-                    if (outA == 0)
-                    {
-                        dst[di] = 0;
-                        dst[di + 1] = 0;
-                        dst[di + 2] = 0;
-                        dst[di + 3] = 0;
-                    }
-                    else
-                    {
-                        // Blend with straight alpha: result = (src * srcA + dst * dstA * (1 - srcA)) / outA
-                        dst[di] = (byte)((sb * sa + db * da * invA / 255) / outA);
-                        dst[di + 1] = (byte)((sg * sa + dg * da * invA / 255) / outA);
-                        dst[di + 2] = (byte)((sr * sa + dr * da * invA / 255) / outA);
-                        dst[di + 3] = (byte)outA;
-                    }
-                }
-            }
-        }
-
-        private static byte[] CopyRectBytes(byte[] src, int w, int h, RectInt32 r)
-        {
-            int x0 = Math.Max(0, r.X), y0 = Math.Max(0, r.Y), x1 = Math.Min(w, r.X + r.Width), y1 = Math.Min(h, r.Y + r.Height);
-            int rw = Math.Max(0, x1 - x0), rh = Math.Max(0, y1 - y0);
-            var dst = new byte[rw * rh * 4];
-            if (rw == 0 || rh == 0) return dst;
-            int srcStride = w * 4, dstStride = rw * 4;
-            for (int y = 0; y < rh; y++)
-                System.Buffer.BlockCopy(src, (y0 + y) * srcStride + x0 * 4, dst, y * dstStride, dstStride);
-            return dst;
-        }
-
-        private static void BlitBytes(byte[] dst, int w, int h, int dx, int dy, byte[] buf, int bw, int bh)
-        {
-            int x0 = Math.Max(0, dx), y0 = Math.Max(0, dy), x1 = Math.Min(w, dx + bw), y1 = Math.Min(h, dy + bh);
-            if (x1 <= x0 || y1 <= y0) return;
-            int dstStride = w * 4, srcStride = bw * 4;
-            for (int y = y0; y < y1; y++)
-            {
-                int sy = y - dy;
-                System.Buffer.BlockCopy(buf, sy * srcStride + (x0 - dx) * 4, dst, y * dstStride + x0 * 4, (x1 - x0) * 4);
-            }
-        }
-
-        private static void ClearRectBytes(byte[] dst, int w, int h, RectInt32 r)
-        {
-            int x0 = Math.Clamp(r.X, 0, w), y0 = Math.Clamp(r.Y, 0, h);
-            int x1 = Math.Clamp(r.X + r.Width, 0, w), y1 = Math.Clamp(r.Y + r.Height, 0, h);
-            int dstStride = w * 4, bytes = (x1 - x0) * 4;
-            for (int y = y0; y < y1; y++)
-                Array.Clear(dst, y * dstStride + x0 * 4, bytes);
-        }
+        private static void ClearRectBytes(byte[] dst, int w, int h, RectInt32 r) => PixelRectOps.ClearRect(dst, w, h, r);
 
         private static RectInt32 Normalize(RectInt32 r) => SelectionSubsystem.Normalize(r);
         private static RectInt32 ClampToSurface(RectInt32 r, int w, int h) => SelectionSubsystem.ClampToSurface(r, w, h);

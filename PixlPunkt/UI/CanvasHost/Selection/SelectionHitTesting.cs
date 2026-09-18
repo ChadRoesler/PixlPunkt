@@ -80,8 +80,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             double s = _getScale?.Invoke() ?? 1.0;
 
             // Use current scaled dimensions and position
-            int handleW = (int)Math.Round((_state.OrigW > 0 ? _state.OrigW : _state.BufferWidth) * _state.ScaleX);
-            int handleH = (int)Math.Round((_state.OrigH > 0 ? _state.OrigH : _state.BufferHeight) * _state.ScaleY);
+            int handleW = (int)Math.Round(_state.OrigW * _state.ScaleX);
+            int handleH = (int)Math.Round(_state.OrigH * _state.ScaleY);
 
             float selX = _state.Floating ? _state.FloatX : _state.Rect.X;
             float selY = _state.Floating ? _state.FloatY : _state.Rect.Y;
@@ -132,8 +132,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             var dest = _getDestRect?.Invoke() ?? new Rect();
             double s = _getScale?.Invoke() ?? 1.0;
 
-            int handleW = (int)Math.Round((_state.OrigW > 0 ? _state.OrigW : _state.BufferWidth) * _state.ScaleX);
-            int handleH = (int)Math.Round((_state.OrigH > 0 ? _state.OrigH : _state.BufferHeight) * _state.ScaleY);
+            int handleW = (int)Math.Round(_state.OrigW * _state.ScaleX);
+            int handleH = (int)Math.Round(_state.OrigH * _state.ScaleY);
 
             float selX = _state.Floating ? _state.FloatX : _state.Rect.X;
             float selY = _state.Floating ? _state.FloatY : _state.Rect.Y;
@@ -233,8 +233,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             // Check preview buffer if we have one (during scale/rotate transforms)
             if (_state.Floating && _state.PreviewBuf != null && _state.PreviewW > 0 && _state.PreviewH > 0)
             {
-                float pivotX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.BufferWidth / 2f);
-                float pivotY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.BufferHeight / 2f);
+                float pivotX = _state.OrigCenterX;
+                float pivotY = _state.OrigCenterY;
                 float bufferLeft = pivotX - _state.PreviewW / 2f;
                 float bufferTop = pivotY - _state.PreviewH / 2f;
                 int localX = (int)(docX - bufferLeft);
@@ -282,39 +282,12 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// <param name="dest">The destination rect.</param>
         /// <param name="scale">The zoom scale.</param>
         /// <returns>The pivot position in view coordinates.</returns>
-        public (float X, float Y) GetPivotPositionView(Rect dest, double scale)
-        {
-            if (_state.Drag == SelDrag.Rotate)
-            {
-                return ((float)(_state.RotFixedPivotX * scale + dest.X),
-                        (float)(_state.RotFixedPivotY * scale + dest.Y));
-            }
-
-            var (docX, docY) = GetPivotPositionDoc();
-            return ((float)(dest.X + docX * scale), (float)(dest.Y + docY * scale));
-        }
+        public (float X, float Y) GetPivotPositionView(Rect dest, double scale) => _state.GetPivotPositionView(dest, scale);
 
         /// <summary>
         /// Gets the pivot position in document space.
         /// </summary>
         /// <returns>The pivot position in document coordinates.</returns>
-        public (double X, double Y) GetPivotPositionDoc()
-        {
-            double centerX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.ScaledW / 2.0);
-            double centerY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.ScaledH / 2.0);
-
-            if (!_state.PivotCustom || (_state.PivotOffsetX == 0 && _state.PivotOffsetY == 0))
-                return (centerX, centerY);
-
-            // Transform pivot offset from local to global space
-            double radians = _state.CumulativeAngleDeg * Math.PI / 180.0;
-            double cos = Math.Cos(radians);
-            double sin = Math.Sin(radians);
-
-            double globalOffsetX = _state.PivotOffsetX * cos - _state.PivotOffsetY * sin;
-            double globalOffsetY = _state.PivotOffsetX * sin + _state.PivotOffsetY * cos;
-
-            return (centerX + globalOffsetX, centerY + globalOffsetY);
-        }
+        public (double X, double Y) GetPivotPositionDoc() => _state.GetPivotPositionDoc();
     }
 }

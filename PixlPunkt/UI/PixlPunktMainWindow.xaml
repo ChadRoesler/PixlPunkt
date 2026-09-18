@@ -93,6 +93,7 @@
                     <MenuFlyoutSubItem x:Name="File_NewFromTemplate_Submenu" Text="New from Template…">
                         <MenuFlyoutItem Text="(No templates)" IsEnabled="False"/>
                     </MenuFlyoutSubItem>
+                    <MenuFlyoutItem Text="New from Clipboard" Click="File_NewFromClipboard_Click"/>
                     <MenuFlyoutItem Text="Open…"  Click="File_OpenDocument_Click" />
                     <MenuFlyoutSubItem x:Name="File_OpenRecent_Submenu" Text="Open Recent…">
                         <MenuFlyoutSubItem x:Name="File_OpenFromAutosave_Submenu" Text="From Autosave…" >
@@ -236,6 +237,7 @@
                 <MenuBarItem Title="Tiles">
                     <MenuFlyoutItem Text="Merge Duplicate Tiles" Click="Tiles_MergeDuplicates_Click"/>
                     <MenuFlyoutItem Text="Remove Unused Tiles" Click="Tiles_RemoveUnused_Click"/>
+                    <MenuFlyoutItem Text="Renumber Tiles" Click="Tiles_Renumber_Click"/>
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Voxel Preview…" Click="Tiles_VoxelPreview_Click"/>
                     <MenuFlyoutSeparator/>

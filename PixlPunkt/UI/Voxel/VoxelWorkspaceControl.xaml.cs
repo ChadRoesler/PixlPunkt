@@ -344,7 +344,7 @@ namespace PixlPunkt.UI.Voxel
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _palette = palette;
             _voxelToolState = new VoxelToolState();
-            _editEngine = new VoxelEditEngine(_document.VoxelModel);
+            _editEngine = new VoxelEditEngine(_document.VoxelModel, _document.History);
 
             // XAML checkbox/NumberBox events can fire during InitializeComponent().
             // Create the camera first so early RenderViewport() calls are safe.
@@ -1858,10 +1858,16 @@ namespace PixlPunkt.UI.Voxel
             }
         }
 
-        public bool CanUndoVoxelEdits => _editEngine.History.CanUndo;
+        /// <summary>True when the next undo step on the document's history is a voxel edit.</summary>
+        public bool CanUndoVoxelEdits => _editEngine.History.CanUndoVoxel;
 
-        public bool CanRedoVoxelEdits => _editEngine.History.CanRedo;
+        /// <summary>True when the next redo step on the document's history is a voxel edit.</summary>
+        public bool CanRedoVoxelEdits => _editEngine.History.CanRedoVoxel;
 
+        /// <summary>
+        /// Undoes the top history item if it is a voxel edit. Returns false when it is a canvas
+        /// item, which the caller should route to the canvas host instead.
+        /// </summary>
         public bool TryUndoVoxelEdit()
         {
             FlushPendingLightingHistory();
@@ -3965,24 +3971,17 @@ namespace PixlPunkt.UI.Voxel
                 }
             }
 
+            // Only voxel items are stepped here; a canvas item on top is left unhandled so the
+            // window's accelerator routes it through the canvas host.
             if (ctrl && e.Key == VirtualKey.Z)
             {
-                bool redid = shift ? _editEngine.Redo() : _editEngine.Undo();
-                if (redid)
-                {
-                    UpdateVoxelSelectionStatusText(shift ? "Redo voxel edit." : "Undo voxel edit.");
-                }
-                e.Handled = true;
+                e.Handled = shift ? TryRedoVoxelEdit() : TryUndoVoxelEdit();
                 return;
             }
 
             if (ctrl && e.Key == VirtualKey.Y)
             {
-                if (_editEngine.Redo())
-                {
-                    UpdateVoxelSelectionStatusText("Redo voxel edit.");
-                }
-                e.Handled = true;
+                e.Handled = TryRedoVoxelEdit();
                 return;
             }
 

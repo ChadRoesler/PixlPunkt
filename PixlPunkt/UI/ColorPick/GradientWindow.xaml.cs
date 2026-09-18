@@ -29,7 +29,6 @@ namespace PixlPunkt.UI.ColorPick
         private int _steps = 7;
 
         private bool _suppress;
-        private bool _toggling;
 
         // Initialize brushes at declaration to ensure they exist before binding evaluation
         private readonly SolidColorBrush _startBrush = new(Colors.Black);

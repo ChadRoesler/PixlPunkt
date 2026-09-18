@@ -103,11 +103,11 @@ namespace PixlPunkt.UI.CanvasHost
             var settings = _toolState.GradientFill;
             bool hasTileMapping = BeginTileWriteThroughIfMapped();
 
-            // Get selection mask if any
+            // Constrain to the live selection region, exactly as brush strokes are.
             Func<int, int, bool>? selMask = null;
-            if (_selectionEngine.HasActiveSelection)
+            if (HasPaintConstrainingSelection)
             {
-                selMask = (x, y) => _selectionEngine.Sel.Mask.Contains(x, y);
+                selMask = (x, y) => _selRegion.Contains(x, y);
             }
 
             // Render the gradient

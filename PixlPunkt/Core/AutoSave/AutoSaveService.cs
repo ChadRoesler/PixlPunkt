@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Settings;
 
@@ -27,6 +28,7 @@ namespace PixlPunkt.Core.AutoSave
     public sealed class AutoSaveService : IDisposable
     {
         private readonly object _lock = new();
+        private SynchronizationContext? _documentContext;
         private readonly HashSet<CanvasDocument> _documents = [];
         private readonly Dictionary<CanvasDocument, DateTime> _lastSaveTimes = [];
         private Timer? _timer;
@@ -111,6 +113,11 @@ namespace PixlPunkt.Core.AutoSave
         public void Start()
         {
             if (_disposed) return;
+
+            // Captured here because Start() runs on the UI thread. The timer fires on a thread-pool
+            // thread, and serializing a document reads (and in places writes) state the UI thread
+            // is mutating, so that step is marshalled back through this context.
+            _documentContext = SynchronizationContext.Current;
 
             lock (_lock)
             {
@@ -258,6 +265,27 @@ namespace PixlPunkt.Core.AutoSave
         }
 
         /// <summary>
+        /// Runs <see cref="DocumentIO.SaveToBytes"/> on the thread that owns the document.
+        /// Uses Post rather than Send because the WinUI dispatcher synchronization context does
+        /// not support Send; the calling pool thread simply blocks until the UI thread is done.
+        /// </summary>
+        private byte[] SerializeOnDocumentThread(CanvasDocument doc)
+        {
+            var ctx = _documentContext;
+            if (ctx == null)
+                return DocumentIO.SaveToBytes(doc);
+
+            var tcs = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            ctx.Post(_ =>
+            {
+                try { tcs.SetResult(DocumentIO.SaveToBytes(doc)); }
+                catch (Exception ex) { tcs.SetException(ex); }
+            }, null);
+
+            return tcs.Task.GetAwaiter().GetResult();
+        }
+
+        /// <summary>
         /// Saves a single document to the auto-save location with timestamp.
         /// </summary>
         private void SaveDocument(CanvasDocument doc)
@@ -279,8 +307,9 @@ namespace PixlPunkt.Core.AutoSave
 
                 Debug.WriteLine($"[AutoSave] Saving '{doc.Name}' to: {filePath}");
 
-                // Save using DocumentIO
-                DocumentIO.Save(doc, filePath);
+                // Serialize on the document's thread, then do the disk write here on the pool.
+                byte[] bytes = SerializeOnDocumentThread(doc);
+                DocumentIO.WriteFileAtomically(filePath, bytes);
 
                 // Update last save time
                 lock (_lock)

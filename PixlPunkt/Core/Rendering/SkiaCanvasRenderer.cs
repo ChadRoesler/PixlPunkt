@@ -47,7 +47,6 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
     /// <summary>Cached paint for image drawing operations.</summary>
     private readonly SKPaint _imagePaint = new()
     {
-        FilterQuality = SKFilterQuality.None,
         IsAntialias = false
     };
 
@@ -223,10 +222,10 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
             throw new ArgumentException("Expected SKBitmap", nameof(bitmap));
 
         _imagePaint.Color = new SKColor(255, 255, 255, (byte)(opacity * 255));
-        _imagePaint.FilterQuality = MapInterpolation(interpolation);
+        var sampling = MapInterpolation(interpolation);
         _imagePaint.IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor;
 
-        _canvas.DrawBitmap(skBitmap, srcRect.ToSKRect(), destRect.ToSKRect(), _imagePaint);
+        DrawBitmapSampled(skBitmap, srcRect.ToSKRect(), destRect.ToSKRect(), interpolation, sampling);
     }
 
     public void DrawImage(ICanvasBitmap bitmap, Rect destRect, Rect srcRect, float opacity)
@@ -253,10 +252,10 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
 
         // Configure paint and draw
         _imagePaint.Color = new SKColor(255, 255, 255, (byte)(opacity * 255));
-        _imagePaint.FilterQuality = MapInterpolation(interpolation);
+        var sampling = MapInterpolation(interpolation);
         _imagePaint.IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor;
 
-        _canvas.DrawBitmap(bitmap, srcRect.ToSKRect(), destRect.ToSKRect(), _imagePaint);
+        DrawBitmapSampled(bitmap, srcRect.ToSKRect(), destRect.ToSKRect(), interpolation, sampling);
     }
 
     /// <summary>
@@ -444,14 +443,33 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
         };
     }
 
-    private static SKFilterQuality MapInterpolation(ImageInterpolation interpolation)
+    /// <summary>
+    /// Draws a bitmap with the requested sampling. This SkiaSharp exposes sampling options only
+    /// on <see cref="SKCanvas.DrawImage(SKImage, SKRect, SKRect, SKSamplingOptions, SKPaint)"/>,
+    /// so non-nearest draws (reference layers) go through a transient <see cref="SKImage"/>;
+    /// nearest-neighbour draws - every cached pixel-art bitmap - stay on the direct path, where
+    /// nearest is already the default and no conversion is paid.
+    /// </summary>
+    private void DrawBitmapSampled(SKBitmap bitmap, SKRect src, SKRect dst, ImageInterpolation interpolation, SKSamplingOptions sampling)
+    {
+        if (interpolation == ImageInterpolation.NearestNeighbor)
+        {
+            _canvas.DrawBitmap(bitmap, src, dst, _imagePaint);
+            return;
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        _canvas.DrawImage(image, src, dst, sampling, _imagePaint);
+    }
+
+    private static SKSamplingOptions MapInterpolation(ImageInterpolation interpolation)
     {
         return interpolation switch
         {
-            ImageInterpolation.NearestNeighbor => SKFilterQuality.None,
-            ImageInterpolation.Linear => SKFilterQuality.Low,
-            ImageInterpolation.HighQualityCubic => SKFilterQuality.High,
-            _ => SKFilterQuality.None
+            ImageInterpolation.NearestNeighbor => new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None),
+            ImageInterpolation.Linear => new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None),
+            ImageInterpolation.HighQualityCubic => new SKSamplingOptions(SKCubicResampler.Mitchell),
+            _ => new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None)
         };
     }
 
@@ -571,8 +589,7 @@ public sealed class SkiaTextLayout : ITextLayout
 
     public SkiaTextLayout(string text, SKFont font, float maxWidth, float maxHeight)
     {
-        using var paint = new SKPaint { IsAntialias = true };
-        paint.GetFontMetrics(out var metrics);
+        font.GetFontMetrics(out var metrics);
         
         var width = font.MeasureText(text);
         var height = font.Size;

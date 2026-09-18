@@ -28,14 +28,12 @@ namespace PixlPunkt.Core.History
 
         public void Undo()
         {
-            _doc.RaiseBeforeStructureChanged();
             _doc.RemoveLayerTreeWithoutHistory(_tree);
             _doc.RaiseStructureChanged();
         }
 
         public void Redo()
         {
-            _doc.RaiseBeforeStructureChanged();
             _doc.InsertLayerTreeWithoutHistory(_tree, _parent, _index);
             _doc.RaiseStructureChanged();
         }

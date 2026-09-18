@@ -12,6 +12,7 @@ using PixlPunkt.Core.Tile;
 using PixlPunkt.Core.Voxel;
 using Windows.Graphics;
 using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
+using PixlPunkt.Core.Selection;
 
 namespace PixlPunkt.Core.Document
 {
@@ -123,8 +124,7 @@ namespace PixlPunkt.Core.Document
             try
             {
                 LoggingService.Info("Saving document {DocumentName} to {FilePath}", doc.Name ?? "(unnamed)", filePath);
-                using var fs = File.Create(filePath);
-                Save(doc, fs);
+                WriteFileAtomically(filePath, SaveToBytes(doc));
                 LoggingService.Info("Document saved {DocumentName} -> {FilePath}", doc.Name ?? "(unnamed)", filePath);
             }
             catch (Exception ex)
@@ -135,11 +135,61 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
+        /// Serializes a document to an in-memory buffer without touching any file. This is the
+        /// step that reads live document state, so it must run on the thread that owns the
+        /// document; the resulting bytes can then be written from any thread.
+        /// </summary>
+        public static byte[] SaveToBytes(CanvasDocument doc)
+        {
+            using var buffer = new MemoryStream();
+            SaveCore(doc, buffer);
+            return buffer.ToArray();
+        }
+
+        /// <summary>
+        /// Writes <paramref name="bytes"/> to a sibling temp file and moves it over
+        /// <paramref name="filePath"/> only once everything is on disk. The previous file is
+        /// therefore never truncated early, so a failure part-way (disk full, crash) cannot
+        /// destroy the last good save.
+        /// </summary>
+        public static void WriteFileAtomically(string filePath, byte[] bytes)
+        {
+            string tempPath = filePath + ".tmp";
+            try
+            {
+                using (var fs = File.Create(tempPath))
+                {
+                    fs.Write(bytes, 0, bytes.Length);
+                    fs.Flush(flushToDisk: true);
+                }
+
+                File.Move(tempPath, filePath, overwrite: true);
+            }
+            catch
+            {
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { /* best effort */ }
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Saves a document to the specified stream in native .pxp format.
         /// </summary>
         /// <param name="doc">The document to save.</param>
         /// <param name="stream">The target stream (must support writing).</param>
         public static void Save(CanvasDocument doc, Stream stream)
+        {
+            // Serialize into memory first. The target stream is written only after the whole
+            // document has serialized successfully, so a failure part-way through never leaves
+            // the destination truncated or half-written.
+            using var buffer = new MemoryStream();
+            SaveCore(doc, buffer);
+            buffer.Position = 0;
+            buffer.CopyTo(stream);
+            stream.Flush();
+        }
+
+        private static void SaveCore(CanvasDocument doc, Stream stream)
         {
             using var bw = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
 
@@ -182,7 +232,7 @@ namespace PixlPunkt.Core.Document
             
             foreach (var item in rootItems)
             {
-                WriteLayerItem(bw, item);
+                WriteLayerItem(bw, doc.Floating, item);
             }
 
             // Transitional sync: current voxel UI still writes legacy preview state.
@@ -198,10 +248,30 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
+        /// Reads exactly <paramref name="count"/> bytes. <see cref="BinaryReader.ReadBytes"/>
+        /// silently returns fewer at end of stream, which is how a truncated file would
+        /// otherwise turn into an ArgumentException deep inside a buffer copy.
+        /// </summary>
+        private static byte[] ReadExactBytes(BinaryReader br, int count, string what)
+        {
+            if (count < 0)
+                throw new InvalidDataException($"Corrupt document: negative length for {what}.");
+
+            var bytes = br.ReadBytes(count);
+            if (bytes.Length != count)
+                throw new InvalidDataException($"Corrupt document: file ends inside {what} (expected {count} bytes, found {bytes.Length}).");
+
+            return bytes;
+        }
+
+        /// <summary>
         /// Writes canvas animation state to the stream.
         /// </summary>
         private static void WriteCanvasAnimationState(BinaryWriter bw, CanvasAnimationState animState)
         {
+            // Pixel buffers orphaned by keyframe edits would otherwise be serialized too.
+            animState.CleanupUnusedPixelData();
+
             // Timeline settings
             bw.Write(animState.FrameCount);
             bw.Write(animState.FramesPerSecond);
@@ -400,10 +470,10 @@ namespace PixlPunkt.Core.Document
             }
 
             LoggingService.Debug("Wrote animation reel '{ReelName}' with {FrameCount} frames",
-                reel.Name, reel.Frames.Count);
+                reel.Name ?? "(unnamed)", reel.Frames.Count);
         }
 
-        private static void WriteLayerItem(BinaryWriter bw, LayerBase item)
+        private static void WriteLayerItem(BinaryWriter bw, FloatingSelection? floating, LayerBase item)
         {
             if (item is RasterLayer rl)
             {
@@ -416,10 +486,15 @@ namespace PixlPunkt.Core.Document
                 bw.Write(rl.Opacity);
 
                 var surf = rl.Surface;
+                // A selection lifted from this layer is written as the user sees it - rasterized
+                // onto a copy - so a save while floating never loses pixels and never commits.
+                var pixels = floating != null && ReferenceEquals(floating.Layer, rl)
+                    ? FloatingSelectionOps.RasterizeOnto(surf.Pixels, surf.Width, surf.Height, floating)
+                    : surf.Pixels;
                 bw.Write(surf.Width);
                 bw.Write(surf.Height);
-                bw.Write(surf.Pixels.Length);
-                bw.Write(surf.Pixels);
+                bw.Write(pixels.Length);
+                bw.Write(pixels);
 
                 // Effects (binary serialization)
                 EffectSerializer.SerializeEffects(bw, new List<LayerEffectBase>(rl.Effects));
@@ -451,7 +526,7 @@ namespace PixlPunkt.Core.Document
                 bw.Write(folder.Children.Count);
                 foreach (var child in folder.Children)
                 {
-                    WriteLayerItem(bw, child);
+                    WriteLayerItem(bw, floating, child);
                 }
             }
         }
@@ -714,6 +789,14 @@ namespace PixlPunkt.Core.Document
             int tilesX = br.ReadInt32();
             int tilesY = br.ReadInt32();
 
+            // Everything below allocates from these numbers, so reject nonsense up front
+            // rather than surfacing an OverflowException or OutOfMemoryException.
+            int maxDim = PixlPunkt.Constants.CanvasConstants.MaxCanvasDimension;
+            if (pixelWidth <= 0 || pixelHeight <= 0 || pixelWidth > maxDim || pixelHeight > maxDim)
+                throw new InvalidDataException($"Corrupt document: canvas size {pixelWidth}x{pixelHeight} is out of range (1-{maxDim}).");
+            if (tileW <= 0 || tileH <= 0 || tilesX <= 0 || tilesY <= 0)
+                throw new InvalidDataException($"Corrupt document: tile geometry {tileW}x{tileH} / {tilesX}x{tilesY} is invalid.");
+
             var name = displayNameOverride ?? storedName ?? "Untitled";
             var doc = new CanvasDocument(name, pixelWidth, pixelHeight, CreateSize(tileW, tileH), CreateSize(tilesX, tilesY));
 
@@ -812,7 +895,7 @@ namespace PixlPunkt.Core.Document
             {
                 int id = br.ReadInt32();
                 int length = br.ReadInt32();
-                var data = br.ReadBytes(length);
+                var data = ReadExactBytes(br, length, "animation pixel data");
                 animState.PixelDataStorage[id] = data;
 
                 // Track the maximum ID so we can resume from there
@@ -1219,7 +1302,7 @@ namespace PixlPunkt.Core.Document
             {
                 int id = br.ReadInt32();
                 int pixelLen = br.ReadInt32();
-                var pixels = br.ReadBytes(pixelLen);
+                var pixels = ReadExactBytes(br, pixelLen, "tile pixels");
                 tileSet.AddTileInternal(new TileDefinition(id, tileW, tileH, pixels));
             }
 
@@ -1289,7 +1372,7 @@ namespace PixlPunkt.Core.Document
             }
 
             LoggingService.Debug("Read animation reel '{ReelName}' with {FrameCount} frames",
-                reel.Name, reel.Frames.Count);
+                reel.Name ?? "(unnamed)", reel.Frames.Count);
 
             return reel;
         }
@@ -1312,7 +1395,7 @@ namespace PixlPunkt.Core.Document
                 int w = br.ReadInt32();
                 int h = br.ReadInt32();
                 int dataLen = br.ReadInt32();
-                var data = br.ReadBytes(dataLen);
+                var data = ReadExactBytes(br, dataLen, "layer pixels");
 
                 var effects = EffectSerializer.DeserializeEffects(br, warnings);
                 var mapping = ReadTileMapping(br);
@@ -1353,6 +1436,8 @@ namespace PixlPunkt.Core.Document
 
                 if (rl.Surface.Width != w || rl.Surface.Height != h)
                     throw new InvalidDataException("Layer surface size mismatch.");
+                if (dataLen != rl.Surface.Pixels.Length)
+                    throw new InvalidDataException($"Corrupt document: layer '{layerName}' has {dataLen} pixel bytes, expected {rl.Surface.Pixels.Length}.");
 
                 Buffer.BlockCopy(data, 0, rl.Surface.Pixels, 0, dataLen);
 

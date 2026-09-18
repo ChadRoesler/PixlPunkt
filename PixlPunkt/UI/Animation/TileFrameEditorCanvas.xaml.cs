@@ -471,7 +471,7 @@ namespace PixlPunkt.UI.Animation
             using var bitmap = new SKBitmap(_tileWidth, _tileHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
             System.Runtime.InteropServices.Marshal.Copy(tilePixels, 0, bitmap.GetPixels(), tilePixels.Length);
 
-            using var paint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
+            using var paint = new SKPaint { IsAntialias = false };
             canvas.DrawBitmap(bitmap, new SKRect(0, 0, _tileWidth, _tileHeight), destRect, paint);
 
             // Draw pixel grid if zoomed in
@@ -533,7 +533,7 @@ namespace PixlPunkt.UI.Animation
             using var bitmap = new SKBitmap(_tileWidth, _tileHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
             System.Runtime.InteropServices.Marshal.Copy(tintedPixels, 0, bitmap.GetPixels(), tintedPixels.Length);
 
-            using var paint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
+            using var paint = new SKPaint { IsAntialias = false };
             canvas.DrawBitmap(bitmap, new SKRect(0, 0, _tileWidth, _tileHeight), destRect, paint);
         }
 

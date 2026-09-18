@@ -164,7 +164,7 @@ namespace PixlPunkt.UI.Dialogs
         {
             TileItems.Clear();
 
-            if (_selectedDocument?.Document.TileSet == null)
+            if (_selectedDocument?.Document?.TileSet == null)
             {
                 UpdateSelectionSummary();
                 CheckTileSizeCompatibility();
@@ -237,7 +237,7 @@ namespace PixlPunkt.UI.Dialogs
         {
             if (_sizeWarning == null) return;
 
-            if (_selectedDocument?.Document.TileSet == null || _targetDocument.TileSet == null)
+            if (_selectedDocument?.Document?.TileSet == null || _targetDocument.TileSet == null)
             {
                 _sizeWarning.IsOpen = false;
                 return;
@@ -313,6 +313,6 @@ namespace PixlPunkt.UI.Dialogs
         /// <summary>
         /// Gets the source tile set for size comparison during import.
         /// </summary>
-        public TileSet? SourceTileSet => _selectedDocument?.Document.TileSet;
+        public TileSet? SourceTileSet => _selectedDocument?.Document?.TileSet;
     }
 }

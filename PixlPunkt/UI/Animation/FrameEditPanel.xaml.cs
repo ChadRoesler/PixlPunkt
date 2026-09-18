@@ -364,7 +364,6 @@ namespace PixlPunkt.UI.Animation
 
                     using var paint = new SKPaint
                     {
-                        FilterQuality = SKFilterQuality.None,
                         IsAntialias = false
                     };
 

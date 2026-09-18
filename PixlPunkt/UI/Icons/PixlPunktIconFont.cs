@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -39,7 +40,7 @@ namespace PixlPunkt.UI.Icons
 
         public static bool IsAvailable => _isAvailable ??= DetectFontAsset();
 
-        public static bool TryCreateGlyph(PixlPunktCodicon codicon, double glyphSize, out UIElement? element, double opticalScale = 1d)
+        public static bool TryCreateGlyph(PixlPunktCodicon codicon, double glyphSize, [NotNullWhen(true)] out UIElement? element, double opticalScale = 1d)
         {
             element = null;
             if (!IsAvailable)
@@ -78,12 +79,12 @@ namespace PixlPunkt.UI.Icons
         }
 
         [Obsolete("Use PixlPunktCodicon overload.")]
-        public static bool TryCreateGlyph(PixlPunktGlyph glyph, double glyphSize, out UIElement? element, double opticalScale = 1d)
+        public static bool TryCreateGlyph(PixlPunktGlyph glyph, double glyphSize, [NotNullWhen(true)] out UIElement? element, double opticalScale = 1d)
         {
             return TryCreateGlyph((PixlPunktCodicon)glyph, glyphSize, out element, opticalScale);
         }
 
-        public static bool TryCreateGlyph(string codiconName, double glyphSize, out UIElement? element, double opticalScale = 1d)
+        public static bool TryCreateGlyph(string codiconName, double glyphSize, [NotNullWhen(true)] out UIElement? element, double opticalScale = 1d)
         {
             if (Enum.TryParse<PixlPunktCodicon>(codiconName, true, out var codicon))
             {

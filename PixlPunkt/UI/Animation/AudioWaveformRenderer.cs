@@ -257,13 +257,11 @@ namespace PixlPunkt.UI.Animation
             using var textPaint = new SKPaint
             {
                 Color = new SKColor(200, 200, 200, 180),
-                TextSize = 10,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI"),
-                TextAlign = SKTextAlign.Center
+                IsAntialias = true
             };
+            using var textFont = new SKFont(SKTypeface.FromFamilyName("Segoe UI"), 10);
 
-            canvas.DrawText(text, (float)(bounds.X + bounds.Width / 2), centerY + 16, textPaint);
+            canvas.DrawText(text, (float)(bounds.X + bounds.Width / 2), centerY + 16, SKTextAlign.Center, textFont, textPaint);
         }
 
         /// <summary>
@@ -318,19 +316,18 @@ namespace PixlPunkt.UI.Animation
             using var textPaint = new SKPaint
             {
                 Color = SKColors.White,
-                TextSize = 10,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyleWeight.SemiBold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
+                IsAntialias = true
             };
+            using var textFont = new SKFont(
+                SKTypeface.FromFamilyName("Segoe UI", SKFontStyleWeight.SemiBold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright), 10);
 
-            var textBounds = new SKRect();
-            textPaint.MeasureText(label, ref textBounds);
+            textFont.MeasureText(label, out var textBounds, textPaint);
 
             // Background for readability
             using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 180), IsAntialias = true };
             canvas.DrawRoundRect(x - 2, (float)bounds.Y + 2, textBounds.Width + 4, textBounds.Height + 4, 2, 2, bgPaint);
 
-            canvas.DrawText(label, x, y, textPaint);
+            canvas.DrawText(label, x, y, SKTextAlign.Left, textFont, textPaint);
         }
 
         private static SKColor ToSKColor(Color c) => new SKColor(c.R, c.G, c.B, c.A);

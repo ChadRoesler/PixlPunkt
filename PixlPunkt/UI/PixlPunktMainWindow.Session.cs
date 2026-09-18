@@ -69,7 +69,7 @@ namespace PixlPunkt.UI
                 // Update session state (now includes this document since it has an auto-save)
                 if (wasFirstAutoSave)
                 {
-                    LoggingService.Debug("First auto-save for document '{Name}' - adding to session state", doc.Name);
+                    LoggingService.Debug("First auto-save for document '{Name}' - adding to session state", doc.Name ?? "(unnamed)");
                 }
 
                 // Trigger session update on UI thread
@@ -281,7 +281,7 @@ namespace PixlPunkt.UI
                     {
                         // Skip this document - no file to recover from
                         LoggingService.Debug("Skipping document '{Name}' from session - no auto-save or saved file yet",
-                            doc.Name);
+                            doc.Name ?? "(unnamed)");
                         continue;
                     }
 

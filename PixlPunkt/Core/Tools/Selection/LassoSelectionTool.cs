@@ -152,51 +152,7 @@ namespace PixlPunkt.Core.Tools.Selection
         /// </summary>
         private static void DrawDashedLine(ICanvasRenderer renderer, float x1, float y1, float x2, float y2,
             Color color1, Color color2, float thickness, float dashOn, float dashOff, float phase)
-        {
-            float dx = x2 - x1;
-            float dy = y2 - y1;
-            float length = MathF.Sqrt(dx * dx + dy * dy);
-            if (length < 0.001f) return;
-
-            // Normalize direction
-            float nx = dx / length;
-            float ny = dy / length;
-
-            float dashLength = dashOn + dashOff;
-            float pos = -phase % dashLength;
-            if (pos < 0) pos += dashLength;
-
-            while (pos < length)
-            {
-                float startPos = Math.Max(0, pos);
-                float endPos = Math.Min(length, pos + dashOn);
-
-                if (endPos > startPos)
-                {
-                    float sx = x1 + nx * startPos;
-                    float sy = y1 + ny * startPos;
-                    float ex = x1 + nx * endPos;
-                    float ey = y1 + ny * endPos;
-
-                    renderer.DrawLine(sx, sy, ex, ey, color1, thickness);
-                }
-
-                // Draw the "off" portion with color2
-                float offStart = pos + dashOn;
-                float offEnd = Math.Min(length, pos + dashLength);
-                if (offEnd > offStart && offStart < length)
-                {
-                    float sx = x1 + nx * Math.Max(0, offStart);
-                    float sy = y1 + ny * Math.Max(0, offStart);
-                    float ex = x1 + nx * offEnd;
-                    float ey = y1 + ny * offEnd;
-
-                    renderer.DrawLine(sx, sy, ex, ey, color2, thickness);
-                }
-
-                pos += dashLength;
-            }
-        }
+            => SelectionToolDrawing.DrawDashedLine(renderer, x1, y1, x2, y2, color1, color2, thickness, dashOn, dashOff, phase);
 
         // ====================================================================
         // SELECTION LOGIC
@@ -376,19 +332,18 @@ namespace PixlPunkt.Core.Tools.Selection
                     int x0 = Math.Clamp(intersections[i], 0, w - 1);
                     int x1 = Math.Clamp(intersections[i + 1], 0, w - 1);
 
-                    for (int x = x0; x <= x1; x++)
+                    // The scanline span x0..x1 is one contiguous run: apply it in a single call.
+                    var run = CreateRect(x0, y, x1 - x0 + 1, 1);
+                    switch (CombineMode)
                     {
-                        switch (CombineMode)
-                        {
-                            case SelectionCombineMode.Add:
-                            case SelectionCombineMode.Replace:
-                                region.AddRect(CreateRect(x, y, 1, 1));
-                                break;
+                        case SelectionCombineMode.Add:
+                        case SelectionCombineMode.Replace:
+                            region.AddRect(run);
+                            break;
 
-                            case SelectionCombineMode.Subtract:
-                                region.SubtractRect(CreateRect(x, y, 1, 1));
-                                break;
-                        }
+                        case SelectionCombineMode.Subtract:
+                            region.SubtractRect(run);
+                            break;
                     }
                 }
             }

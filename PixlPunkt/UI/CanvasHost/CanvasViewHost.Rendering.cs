@@ -51,12 +51,14 @@ namespace PixlPunkt.UI.CanvasHost
 
         /// <summary>Cached paint for tile mapping text rendering.</summary>
         private SKPaint? _tileMappingTextPaint;
+        private SKFont? _tileMappingFont;
         
         /// <summary>Cached paint for tile mapping background.</summary>
         private SKPaint? _tileMappingBgPaint;
         
         /// <summary>Cached paint for tile animation text rendering.</summary>
         private SKPaint? _tileAnimTextPaint;
+        private SKFont? _tileAnimFont;
         
         /// <summary>Cached paint for tile animation background.</summary>
         private SKPaint? _tileAnimBgPaint;
@@ -68,7 +70,6 @@ namespace PixlPunkt.UI.CanvasHost
         private Dictionary<(int, int), List<int>>? _cachedFramePositions;
         
         /// <summary>Cached list for reuse in frame position building.</summary>
-        private List<int>? _cachedFrameIndexList;
 
         private bool _showStageOverlay = true;
 
@@ -501,16 +502,13 @@ namespace PixlPunkt.UI.CanvasHost
             float fontSize = Math.Max(8f, Math.Min(14f, tileW * scale * 0.3f));
 
             // Initialize or update cached text paint
-            if (_tileMappingTextPaint == null)
+            _tileMappingTextPaint ??= new SKPaint
             {
-                _tileMappingTextPaint = new SKPaint
-                {
-                    Color = SKColors.White,
-                    IsAntialias = true,
-                    Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
-                };
-            }
-            _tileMappingTextPaint.TextSize = fontSize;
+                Color = SKColors.White,
+                IsAntialias = true
+            };
+            _tileMappingFont ??= new SKFont(SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold));
+            _tileMappingFont.Size = fontSize;
 
             // Initialize cached background paint
             _tileMappingBgPaint ??= new SKPaint
@@ -535,14 +533,14 @@ namespace PixlPunkt.UI.CanvasHost
 
                     // Draw background for readability
                     string text = tileId.ToString();
-                    float textW = _tileMappingTextPaint.MeasureText(text);
+                    float textW = _tileMappingFont.MeasureText(text);
                     float textH = fontSize;
 
                     var bgRect = new SKRect(screenX + 2, screenY + 2, screenX + 2 + textW + 4, screenY + 2 + textH + 2);
                     canvas.DrawRect(bgRect, _tileMappingBgPaint);
 
                     // Draw text
-                    canvas.DrawText(text, screenX + 4, screenY + 2 + textH, _tileMappingTextPaint);
+                    canvas.DrawText(text, screenX + 4, screenY + 2 + textH, SKTextAlign.Left, _tileMappingFont, _tileMappingTextPaint);
                 }
             }
         }
@@ -629,11 +627,10 @@ namespace PixlPunkt.UI.CanvasHost
                 _tileAnimTextPaint = new SKPaint
                 {
                     Color = isCurrent ? SKColors.White : new SKColor(200, 220, 255),
-                    TextSize = 12f,
-                    IsAntialias = true,
-                    Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
+                    IsAntialias = true
                 };
             }
+            _tileAnimFont ??= new SKFont(SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold), 12f);
 
             // Lazy-create background paint if needed
             if (_tileAnimBgPaint == null)
@@ -661,8 +658,8 @@ namespace PixlPunkt.UI.CanvasHost
                 label = $"×{frameIndices.Count}";
             }
 
-            float textW = _tileAnimTextPaint.MeasureText(label);
-            float textH = _tileAnimTextPaint.TextSize;
+            float textW = _tileAnimFont.MeasureText(label);
+            float textH = _tileAnimFont.Size;
 
             float labelX = screenX + 2;
             float labelY = screenY + 2;
@@ -679,7 +676,7 @@ namespace PixlPunkt.UI.CanvasHost
             canvas.DrawRoundRect(bgRect, 2, 2, bgPaint);
 
             // Draw text
-            canvas.DrawText(label, labelX + 2, labelY + textH, _tileAnimTextPaint);
+            canvas.DrawText(label, labelX + 2, labelY + textH, SKTextAlign.Left, _tileAnimFont, _tileAnimTextPaint);
         }
 
         // ════════════════════════════════════════════════════════════════════

@@ -183,7 +183,7 @@ namespace PixlPunkt.Core.Tools.Selection
                     continue;
 
                 // Add to wand region
-                wandRegion.AddRect(CreateRect(x, y, 1, 1));
+                wandRegion.AddPixel(x, y);
 
                 // Expand to neighbors (only if contiguous mode)
                 if (contiguous)
@@ -217,7 +217,7 @@ namespace PixlPunkt.Core.Tools.Selection
                             int idx = (y * w + x) * 4;
                             if (Imaging.PixelOps.PixelsSimilar(pix, idx, idxStart, tolerance, useAlpha))
                             {
-                                wandRegion.AddRect(CreateRect(x, y, 1, 1));
+                                wandRegion.AddPixel(x, y);
                             }
                         }
                     }

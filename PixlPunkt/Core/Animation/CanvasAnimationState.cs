@@ -646,6 +646,8 @@ namespace PixlPunkt.Core.Animation
             }
 
             track.SetKeyframe(keyframe);
+            // Replacing a keyframe orphans the previous one's pixel buffer.
+            CleanupUnusedPixelData();
             KeyframeChanged?.Invoke(track, keyframe.FrameIndex);
         }
 
@@ -660,6 +662,7 @@ namespace PixlPunkt.Core.Animation
             bool removed = track.RemoveKeyframeAt(frameIndex);
             if (removed)
             {
+                CleanupUnusedPixelData();
                 KeyframeChanged?.Invoke(track, frameIndex);
             }
             return removed;

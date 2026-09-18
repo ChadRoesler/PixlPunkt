@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Text.Json;
+using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Helpers;
@@ -184,9 +185,8 @@ namespace PixlPunkt.Core.Document
         /// </para>
         /// <para><strong>Current Limitations:</strong></para>
         /// <list type="bullet">
-        /// <item>Layer groups/folders are ignored (only flat layer list)</item>
-        /// <item>Tileset mapping and animation data not imported</item>
-        /// <item>All layers must match canvas dimensions (no offset/partial layers)</item>
+        /// <item>Tile reference transforms (rotation/flip) are currently ignored</item>
+        /// <item>All raster layers must match canvas dimensions (no offset/partial layers)</item>
         /// </list>
         /// </remarks>
         public static CanvasDocument ImportPyxel(string filePath)
@@ -235,61 +235,143 @@ namespace PixlPunkt.Core.Document
                 pixelHeight,
                 tileSize,
                 tileCounts);
-            // ── 2) Sort layers by numeric key: "0", "1", "2", ... ─────────
+            // ── 2) Parse and sort layers by numeric key: "0", "1", "2", ... ─────────
             var layers = docJson.Canvas.Layers ?? [];
 
-            var ordered = layers
-                .Select(kvp =>
-                {
-                    int index = 0;
-                    int.TryParse(kvp.Key, out index);
-                    return (index, dto: kvp.Value, key: kvp.Key);
-                })
-                .OrderBy(t => t.index)
-                .ToList();
-            ordered.Reverse();
-
-            foreach (var (index, dto, key) in ordered)
+            var parsed = new List<(int Index, PyxelLayerDto Dto)>();
+            foreach (var kvp in layers)
             {
-                string layerPngName = $"layer{index}.png";
-
-                var pngEntry = zip.GetEntry(layerPngName);
-                if (pngEntry == null)
+                if (!int.TryParse(kvp.Key, out int index))
                 {
-                    // No pixels for this layer (e.g. pure group), skip for first pass.
+                    LoggingService.Warning("Pyxel import: skipping non-numeric layer key '{LayerKey}'", kvp.Key);
                     continue;
                 }
 
-                // 2D pixels from PNG
-                PixelSurface layerSurface = LoadSurfaceFromPng(pngEntry);
+                parsed.Add((index, kvp.Value ?? new PyxelLayerDto()));
+            }
 
-                if (layerSurface.Width != pixelWidth || layerSurface.Height != pixelHeight)
+            var ordered = parsed
+                .OrderByDescending(t => t.Index)
+                .ToList();
+
+            // Import tiles before applying layer tile references.
+            var pyxelTileToDocTileId = ImportPyxelTiles(zip, doc, tileW, tileH);
+
+            // Capture CanvasDocument's default starter layer. It is dropped only after the
+            // imported stack is in place, so a file that yields no layers keeps a usable document.
+            var starterLayer = doc.Layers.Count == 1 ? doc.Layers[0] : null;
+
+            var builtByIndex = new Dictionary<int, LayerBase>();
+
+            // Create all layer/folder nodes first.
+            foreach (var (index, dto) in ordered)
+            {
+                if (IsPyxelGroupLayer(dto.Type))
                 {
-                    LoggingService.Warning("Pyxel layer {LayerIndex} size {LW}x{LH} does not match canvas {CW}x{CH}", index, layerSurface.Width, layerSurface.Height, pixelWidth, pixelHeight);
-                    throw new InvalidDataException($"Pyxel layer {index} bitmap size does not match canvas.");
+                    var folder = new LayerFolder(string.IsNullOrWhiteSpace(dto.Name) ? $"Group {index}" : dto.Name)
+                    {
+                        Visible = !dto.Hidden,
+                        Locked = false,
+                        IsExpanded = !dto.Collapsed
+                    };
+                    builtByIndex[index] = folder;
+                    continue;
                 }
 
-                // Create a new raster layer in PixlPunkt
-                int newIndex = doc.AddLayer(dto?.Name ?? $"Layer {index}");
-                if (newIndex < 0 || newIndex >= doc.Layers.Count)
-                    throw new InvalidOperationException("Document.AddLayer returned invalid index.");
+                var rl = new RasterLayer(pixelWidth, pixelHeight, string.IsNullOrWhiteSpace(dto.Name) ? $"Layer {index}" : dto.Name);
 
-                if (doc.Layers[newIndex] is not RasterLayer rl)
-                    throw new InvalidOperationException("Unexpected non-raster layer returned by AddLayer.");
+                string layerPngName = $"layer{index}.png";
+                var pngEntry = zip.GetEntry(layerPngName);
 
-                // Copy pixel data into our surface
-                Buffer.BlockCopy(
-                    layerSurface.Pixels, 0,
-                    rl.Surface.Pixels, 0,
-                    rl.Surface.Pixels.Length);
+                if (pngEntry != null)
+                {
+                    PixelSurface layerSurface = LoadSurfaceFromPng(pngEntry);
 
-                // Map basic flags
-                rl.Visible = !(dto?.Hidden ?? false);
-                rl.Locked = false; // Pyxel doesn't really have lock in this way
-                rl.Opacity = (byte)Math.Clamp(dto?.Alpha ?? 255, 0, 255);
-                rl.Blend = MapPyxelBlend(dto?.BlendMode);
+                    if (layerSurface.Width != pixelWidth || layerSurface.Height != pixelHeight)
+                    {
+                        LoggingService.Warning("Pyxel layer {LayerIndex} size {LW}x{LH} does not match canvas {CW}x{CH}", index, layerSurface.Width, layerSurface.Height, pixelWidth, pixelHeight);
+                        throw new InvalidDataException($"Pyxel layer {index} bitmap size does not match canvas.");
+                    }
+
+                    Buffer.BlockCopy(
+                        layerSurface.Pixels, 0,
+                        rl.Surface.Pixels, 0,
+                        rl.Surface.Pixels.Length);
+                }
+
+                // Map core properties
+                rl.Visible = !dto.Hidden;
+                rl.Locked = false;
+                rl.Opacity = (byte)Math.Clamp(dto.Alpha, 0, 255);
+                rl.Blend = MapPyxelBlend(dto.BlendMode);
                 rl.UpdatePreview();
+
+                builtByIndex[index] = rl;
             }
+
+            // Rebuild hierarchy by parentIndex while preserving stack order.
+            var rootItems = new List<LayerBase>();
+            foreach (var (index, dto) in ordered)
+            {
+                if (!builtByIndex.TryGetValue(index, out var node))
+                    continue;
+
+                if (dto.ParentIndex >= 0 &&
+                    builtByIndex.TryGetValue(dto.ParentIndex, out var parentNode) &&
+                    parentNode is LayerFolder parentFolder)
+                {
+                    parentFolder.AddChild(node);
+                }
+                else
+                {
+                    rootItems.Add(node);
+                }
+            }
+
+            foreach (var rootItem in rootItems)
+            {
+                doc.InsertLayerTreeWithoutHistory(rootItem, null, int.MaxValue);
+            }
+
+            // Drop the starter layer now the imported stack exists. RemoveLayer cannot be used here:
+            // it bails out when the document holds a single raster, and it pushes an undo entry.
+            if (starterLayer != null && rootItems.Count > 0)
+                doc.RemoveLayerTreeWithoutHistory(starterLayer);
+
+            // Apply tile references to imported raster layers.
+            foreach (var (index, dto) in ordered)
+            {
+                if (!builtByIndex.TryGetValue(index, out var node) || node is not RasterLayer rl)
+                    continue;
+
+                if (dto.TileRefs.Count == 0)
+                    continue;
+
+                var mapping = rl.GetOrCreateTileMapping(tilesX, tilesY);
+
+                foreach (var tileRefKvp in dto.TileRefs)
+                {
+                    if (!int.TryParse(tileRefKvp.Key, out int cellIndex))
+                        continue;
+
+                    var tileRef = tileRefKvp.Value;
+                    if (tileRef == null)
+                        continue;
+
+                    int tileX = cellIndex % tilesX;
+                    int tileY = cellIndex / tilesX;
+
+                    if ((uint)tileX >= (uint)tilesX || (uint)tileY >= (uint)tilesY)
+                        continue;
+
+                    if (!pyxelTileToDocTileId.TryGetValue(tileRef.Index, out int mappedTileId))
+                        continue;
+
+                    mapping.SetTileId(tileX, tileY, mappedTileId);
+                }
+            }
+
+            ImportPyxelTileAnimations(docJson, doc, pyxelTileToDocTileId);
 
             // Ensure composite is up-to-date
             doc.CompositeTo(doc.Surface);
@@ -306,6 +388,157 @@ namespace PixlPunkt.Core.Document
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
+
+        private static Dictionary<int, int> ImportPyxelTiles(ZipArchive zip, CanvasDocument doc, int tileW, int tileH)
+        {
+            var result = new Dictionary<int, int>();
+
+            var tileEntries = zip.Entries
+                .Select(e => (entry: e, index: TryParsePyxelTileIndex(e.Name)))
+                .Where(t => t.index >= 0)
+                .OrderBy(t => t.index)
+                .ToList();
+
+            if (tileEntries.Count == 0)
+                return result;
+
+            doc.TileSet.Clear();
+
+            foreach (var (entry, pyxelTileIndex) in tileEntries)
+            {
+                var tileSurface = LoadSurfaceFromPng(entry);
+                if (tileSurface.Width != tileW || tileSurface.Height != tileH)
+                {
+                    LoggingService.Warning(
+                        "Pyxel tile {TileIndex} size {TW}x{TH} does not match expected tile size {EW}x{EH}; skipping",
+                        pyxelTileIndex,
+                        tileSurface.Width,
+                        tileSurface.Height,
+                        tileW,
+                        tileH);
+                    continue;
+                }
+
+                int tileId = doc.TileSet.AddTile(tileSurface.Pixels);
+                result[pyxelTileIndex] = tileId;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Reads an integer attribute from a Tiled element. A missing attribute yields
+        /// <paramref name="fallback"/>; a present but non-numeric one is a malformed file.
+        /// </summary>
+        private static int ReadIntAttribute(System.Xml.Linq.XElement element, string name, int fallback)
+        {
+            string? raw = element.Attribute(name)?.Value;
+            if (raw == null)
+                return fallback;
+
+            if (!int.TryParse(raw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int value))
+                throw new InvalidDataException($"Invalid Tiled file: attribute '{name}' on <{element.Name.LocalName}> is not an integer ('{raw}').");
+
+            return value;
+        }
+
+        private static int TryParsePyxelTileIndex(string entryName)
+        {
+            if (!entryName.StartsWith("tile", StringComparison.OrdinalIgnoreCase) ||
+                !entryName.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            {
+                return -1;
+            }
+
+            string numberPart = entryName.Substring(4, entryName.Length - 8);
+            return int.TryParse(numberPart, out int idx) ? idx : -1;
+        }
+
+        private static void ImportPyxelTileAnimations(PyxelDocDto docJson, CanvasDocument doc, Dictionary<int, int> pyxelTileToDocTileId)
+        {
+            if (docJson.Animations.Count == 0)
+                return;
+
+            // A Pyxel animation is a run of consecutive *tileset* indices (baseTile, baseTile+1, ...).
+            // PixlPunkt reels reference canvas cells instead, so find, for each imported tile, a
+            // cell on the canvas that uses it. Tiles not placed anywhere cannot be animated here.
+            var cellForDocTileId = new Dictionary<int, (int X, int Y)>();
+            foreach (var layer in doc.Layers)
+            {
+                var mapping = layer.TileMapping;
+                if (mapping == null) continue;
+
+                for (int ty = 0; ty < mapping.Height; ty++)
+                {
+                    for (int tx = 0; tx < mapping.Width; tx++)
+                    {
+                        int id = mapping.GetTileId(tx, ty);
+                        if (id >= 0 && !cellForDocTileId.ContainsKey(id))
+                            cellForDocTileId[id] = (tx, ty);
+                    }
+                }
+            }
+
+            var orderedAnimations = docJson.Animations
+                .Select(kvp =>
+                {
+                    int.TryParse(kvp.Key, out int index);
+                    return (index, dto: kvp.Value ?? new PyxelAnimationDto());
+                })
+                .OrderBy(a => a.index)
+                .ToList();
+
+            foreach (var (_, anim) in orderedAnimations)
+            {
+                int length = Math.Max(0, anim.Length);
+                if (length == 0)
+                    continue;
+
+                string reelName = string.IsNullOrWhiteSpace(anim.Name) ? "Pyxel Animation" : anim.Name;
+                int defaultFrameMs = anim.FrameDuration > 0 ? anim.FrameDuration : 100;
+                var frames = new List<ReelFrame>(length);
+
+                for (int i = 0; i < length; i++)
+                {
+                    int pyxelTileIndex = anim.BaseTile + i;
+
+                    if (!pyxelTileToDocTileId.TryGetValue(pyxelTileIndex, out int docTileId))
+                    {
+                        LoggingService.Warning("Pyxel animation '{Reel}' frame {Frame} references tile {Tile}, which the file does not define; skipping frame",
+                            reelName, i, pyxelTileIndex);
+                        continue;
+                    }
+
+                    if (!cellForDocTileId.TryGetValue(docTileId, out var cell))
+                    {
+                        LoggingService.Warning("Pyxel animation '{Reel}' frame {Frame} uses tile {Tile}, which is not placed on the canvas; skipping frame",
+                            reelName, i, pyxelTileIndex);
+                        continue;
+                    }
+
+                    int? durationMs = null;
+                    if (i < anim.FrameDurationMultipliers.Count)
+                    {
+                        int multiplier = anim.FrameDurationMultipliers[i];
+                        if (multiplier > 0 && multiplier != 100)
+                            durationMs = Math.Max(1, (int)Math.Round(defaultFrameMs * (multiplier / 100.0)));
+                    }
+
+                    frames.Add(new ReelFrame(cell.X, cell.Y, durationMs));
+                }
+
+                if (frames.Count == 0)
+                {
+                    LoggingService.Warning("Pyxel animation '{Reel}' produced no usable frames and was not imported", reelName);
+                    continue;
+                }
+
+                var reel = doc.TileAnimationState.AddReel(reelName);
+                reel.DefaultFrameTimeMs = defaultFrameMs;
+                foreach (var f in frames)
+                    reel.Frames.Add(f);
+            }
+        }
 
         /// <summary>
         /// Maps PyxelEdit blend mode string to PixlPunkt <see cref="BlendMode"/> enum.
@@ -324,11 +557,19 @@ namespace PixlPunkt.Core.Document
                 "screen" => BlendMode.Screen,
                 "overlay" => BlendMode.Overlay,
                 "add" or "addition" or "linear_dodge" => BlendMode.Add,
+                "darken" => BlendMode.Darken,
+                "lighten" => BlendMode.Lighten,
+                "difference" => BlendMode.Difference,
+                "hardlight" or "hard_light" => BlendMode.HardLight,
+                "invert" => BlendMode.Invert,
                 "subtract" => BlendMode.Subtract,
                 // Fallback to normal; we can refine as we learn more modes.
                 _ => BlendMode.Normal
             };
         }
+
+        private static bool IsPyxelGroupLayer(string? layerType)
+            => string.Equals(layerType, "group_layer", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// Loads a PixelSurface from a PNG stored within a ZIP archive entry.
@@ -415,14 +656,14 @@ namespace PixlPunkt.Core.Document
             LoggingService.Info("Aseprite import {FilePath}: {W}x{H}, depth={Depth}, frames={Frames}",
                 filePath, width, height, colorDepth, frameCount);
 
-            // ── 2) Parse frames (we only care about frame 0) ─────────────
+            // ── 2) Parse all frames and chunks ───────────────────────────
             var layers = new List<AseLayer>();
-            var cels = new List<AseCel>();
-            uint[]? palette = null;
+            var frames = new List<AseFrame>(Math.Max(1, (int)frameCount));
+            uint[]? globalPalette = null;
 
-            // Read frame 0
-            if (frameCount > 0)
+            for (int frameIndex = 0; frameIndex < frameCount; frameIndex++)
             {
+                long frameStart = fs.Position;
                 uint frameBytes = br.ReadUInt32();
                 ushort frameMagic = br.ReadUInt16();
                 if (frameMagic != 0xF1FA)
@@ -434,6 +675,8 @@ namespace PixlPunkt.Core.Document
                 uint newChunkCount = br.ReadUInt32();
 
                 uint chunkCount = newChunkCount == 0 ? oldChunkCount : newChunkCount;
+                var frame = new AseFrame { DurationMs = frameDuration, Palette = globalPalette };
+                bool frameHasNewPalette = false;
 
                 for (uint c = 0; c < chunkCount; c++)
                 {
@@ -444,24 +687,63 @@ namespace PixlPunkt.Core.Document
                     switch (chunkType)
                     {
                         case 0x2004: // Layer chunk
-                            layers.Add(ReadAseLayerChunk(br));
+                            if (frameIndex == 0)
+                                layers.Add(ReadAseLayerChunk(br));
+                            else
+                                _ = ReadAseLayerChunk(br);
                             break;
 
                         case 0x2005: // Cel chunk
-                            cels.Add(ReadAseCelChunk(br, colorDepth, width, height));
+                            {
+                                var cel = ReadAseCelChunk(br, colorDepth, width, height);
+                                frame.CelsByLayer[(int)cel.LayerIndex] = cel;
+                            }
                             break;
 
                         case 0x2019: // Palette chunk
-                            palette = ReadAsePaletteChunk(br);
+                            frame.Palette = ReadAsePaletteChunk(br, frame.Palette);
+                            frameHasNewPalette = true;
+                            globalPalette = frame.Palette;
                             break;
 
-                        case 0x0004: // Old palette chunk (deprecated but still used)
-                            palette ??= ReadAseOldPaletteChunk(br);
+                        case 0x0004: // Old palette chunk (deprecated, and carries no alpha).
+                            // Aseprite emits both formats; prefer 0x2019 when this frame has one.
+                            if (!frameHasNewPalette)
+                            {
+                                frame.Palette = ReadAseOldPaletteChunk(br, frame.Palette);
+                                globalPalette = frame.Palette;
+                            }
                             break;
                     }
 
                     // Skip to end of chunk
                     fs.Position = chunkStart + chunkSize;
+                }
+
+                // Land exactly on the next frame regardless of how the chunk loop left the stream
+                // (unknown chunk types, a ZLibStream that read ahead, a short frame).
+                fs.Position = frameStart + frameBytes;
+                frames.Add(frame);
+            }
+
+            if (layers.Count == 0)
+            {
+                int maxLayerIndex = frames
+                    .SelectMany(f => f.CelsByLayer.Keys)
+                    .DefaultIfEmpty(-1)
+                    .Max();
+
+                for (int i = 0; i <= maxLayerIndex; i++)
+                {
+                    layers.Add(new AseLayer
+                    {
+                        Name = $"Layer {i}",
+                        Flags = 1,
+                        Type = 0,
+                        Opacity = 255,
+                        BlendMode = 0,
+                        ChildLevel = 0
+                    });
                 }
             }
 
@@ -481,56 +763,158 @@ namespace PixlPunkt.Core.Document
                 CreateSize(tileW, tileH),
                 CreateSize(tilesX, tilesY));
 
-            // ── 4) Create layers from cels ───────────────────────────────
-            // Sort cels by layer index and build layers bottom-to-top
-            var celsByLayer = cels
-                .GroupBy(c => c.LayerIndex)
-                .OrderBy(g => g.Key)
-                .ToList();
+            // Capture the starter layer; dropped after the Aseprite tree is inserted (see below).
+            var starterLayer = doc.Layers.Count == 1 ? doc.Layers[0] : null;
 
-            foreach (var group in celsByLayer)
+            // ── 4) Rebuild Aseprite layer tree ───────────────────────────
+            var rootItems = new List<LayerBase>();
+            var folderAtDepth = new List<LayerFolder?>();
+            var rasterByAseIndex = new Dictionary<int, RasterLayer>();
+
+            for (int layerIdx = 0; layerIdx < layers.Count; layerIdx++)
             {
-                int layerIdx = group.Key;
-                var cel = group.First(); // Frame 0 cel
+                var aseLayer = layers[layerIdx];
+                LayerBase node;
 
-                // Get layer info if available
-                string layerName = layerIdx < layers.Count ? layers[layerIdx].Name : $"Layer {layerIdx}";
-                bool visible = layerIdx < layers.Count ? layers[layerIdx].Visible : true;
-                byte opacity = layerIdx < layers.Count ? layers[layerIdx].Opacity : (byte)255;
-                BlendMode blend = layerIdx < layers.Count ? MapAseBlend(layers[layerIdx].BlendMode) : BlendMode.Normal;
-
-                // Skip group layers (they have no pixel data)
-                if (layerIdx < layers.Count && layers[layerIdx].Type != 0)
-                    continue;
-
-                // Create new layer
-                int newIdx = doc.AddLayer(layerName);
-                if (doc.Layers[newIdx] is not RasterLayer rl)
-                    continue;
-
-                // Compose cel pixels onto layer surface
-                if (cel.Pixels != null && cel.Width > 0 && cel.Height > 0)
+                if (aseLayer.Type == 1)
                 {
-                    byte[] finalPixels;
-                    if (colorDepth == 8 && palette != null)
+                    node = new LayerFolder(string.IsNullOrWhiteSpace(aseLayer.Name) ? $"Group {layerIdx}" : aseLayer.Name)
                     {
-                        // Convert indexed to BGRA
-                        finalPixels = ConvertIndexedToBgra(cel.Pixels, palette, transparentIndex);
-                    }
-                    else
+                        Visible = aseLayer.Visible,
+                        Locked = false
+                    };
+                }
+                else if (aseLayer.Type == 0)
+                {
+                    var raster = new RasterLayer(width, height, string.IsNullOrWhiteSpace(aseLayer.Name) ? $"Layer {layerIdx}" : aseLayer.Name)
                     {
-                        // Already RGBA, convert to BGRA
-                        finalPixels = ConvertRgbaToBgra(cel.Pixels);
+                        Visible = aseLayer.Visible,
+                        Locked = false,
+                        Opacity = aseLayer.Opacity,
+                        Blend = MapAseBlend(aseLayer.BlendMode)
+                    };
+
+                    // Seed raster pixels from frame 0 for immediate document appearance.
+                    if (frames.Count > 0)
+                    {
+                        byte[] frame0Pixels = BuildAseLayerPixelsForFrame(
+                            frames,
+                            0,
+                            layerIdx,
+                            colorDepth,
+                            transparentIndex,
+                            width,
+                            height,
+                            globalPalette);
+
+                        Buffer.BlockCopy(frame0Pixels, 0, raster.Surface.Pixels, 0, Math.Min(frame0Pixels.Length, raster.Surface.Pixels.Length));
                     }
 
-                    // Blit cel onto layer at position
-                    BlitPixels(finalPixels, cel.Width, cel.Height, cel.X, cel.Y, rl.Surface);
+                    raster.UpdatePreview();
+                    rasterByAseIndex[layerIdx] = raster;
+                    node = raster;
+                }
+                else
+                {
+                    LoggingService.Warning("Aseprite layer type {LayerType} is not fully supported; skipping layer '{LayerName}'", aseLayer.Type, aseLayer.Name);
+                    continue;
                 }
 
-                rl.Visible = visible;
-                rl.Opacity = opacity;
-                rl.Blend = blend;
-                rl.UpdatePreview();
+                int childLevel = Math.Max(0, (int)aseLayer.ChildLevel);
+                LayerFolder? parent = childLevel > 0 && childLevel - 1 < folderAtDepth.Count
+                    ? folderAtDepth[childLevel - 1]
+                    : null;
+
+                if (parent != null)
+                    parent.AddChild(node);
+                else
+                    rootItems.Add(node);
+
+                if (node is LayerFolder folder)
+                {
+                    while (folderAtDepth.Count <= childLevel)
+                        folderAtDepth.Add(null);
+
+                    folderAtDepth[childLevel] = folder;
+                    for (int d = childLevel + 1; d < folderAtDepth.Count; d++)
+                        folderAtDepth[d] = null;
+                }
+            }
+
+            foreach (var root in rootItems)
+            {
+                doc.InsertLayerTreeWithoutHistory(root, null, int.MaxValue);
+            }
+
+            // Drop the starter layer now the imported tree exists. RemoveLayer cannot be used here:
+            // it bails out when the document holds a single raster, and it pushes an undo entry.
+            if (starterLayer != null && rootItems.Count > 0)
+                doc.RemoveLayerTreeWithoutHistory(starterLayer);
+
+            // ── 5) Build canvas animation tracks from all frames ─────────
+            if (frames.Count > 0)
+            {
+                var anim = doc.CanvasAnimationState;
+                anim.SyncTracksFromDocument(doc);
+                anim.FrameCount = Math.Max(1, (int)frameCount);
+
+                int avgDuration = (int)Math.Max(1, Math.Round(frames.Average(f => Math.Max(1, f.DurationMs))));
+                anim.FramesPerSecond = Math.Clamp((int)Math.Round(1000.0 / avgDuration), 1, 60);
+
+                // Aseprite cels are sparse: most layers have no cel on most frames, and linked
+                // cels repeat an earlier one. Storing a full-canvas buffer per layer per frame
+                // would cost layers x frames x W x H x 4 bytes, nearly all of it blank or
+                // duplicated. Emit a keyframe only where the resolved cel actually changes,
+                // and let every "no cel" run share one blank buffer.
+                int blankPixelDataId = -1;
+
+                foreach (var layerPair in rasterByAseIndex)
+                {
+                    int layerIdx = layerPair.Key;
+                    var raster = layerPair.Value;
+                    AseCel? previousCel = null;
+                    bool first = true;
+
+                    for (int f = 0; f < frames.Count; f++)
+                    {
+                        var cel = ResolveAseCelForLayer(frames, f, layerIdx);
+                        bool hasPixels = cel != null && cel.Pixels != null && cel.Width > 0 && cel.Height > 0;
+
+                        // Same cel object as last frame (linked cel, or still no cel): nothing new to key.
+                        if (!first && ReferenceEquals(cel, previousCel))
+                            continue;
+                        first = false;
+                        previousCel = cel;
+
+                        int pixelDataId;
+                        if (hasPixels)
+                        {
+                            byte[] framePixels = BuildAseLayerPixelsForFrame(
+                                frames,
+                                f,
+                                layerIdx,
+                                colorDepth,
+                                transparentIndex,
+                                width,
+                                height,
+                                globalPalette);
+                            pixelDataId = anim.StorePixelData(framePixels);
+                        }
+                        else
+                        {
+                            if (blankPixelDataId < 0)
+                                blankPixelDataId = anim.StorePixelData(new byte[width * height * 4]);
+                            pixelDataId = blankPixelDataId;
+                        }
+
+                        anim.SetKeyframe(raster, new LayerKeyframeData(
+                            f,
+                            raster.Visible,
+                            raster.Opacity,
+                            raster.Blend,
+                            pixelDataId));
+                    }
+                }
             }
 
             // Ensure composite is up-to-date
@@ -546,6 +930,7 @@ namespace PixlPunkt.Core.Document
         {
             public ushort Flags { get; set; }
             public ushort Type { get; set; } // 0=normal, 1=group, 2=tilemap
+            public ushort ChildLevel { get; set; }
             public string Name { get; set; } = string.Empty;
             public byte Opacity { get; set; } = 255;
             public ushort BlendMode { get; set; }
@@ -557,9 +942,19 @@ namespace PixlPunkt.Core.Document
             public ushort LayerIndex { get; set; }
             public short X { get; set; }
             public short Y { get; set; }
+            public byte Opacity { get; set; } = 255;
+            public ushort CelType { get; set; }
+            public ushort LinkedFrameIndex { get; set; }
             public int Width { get; set; }
             public int Height { get; set; }
             public byte[]? Pixels { get; set; } // Raw pixel data (RGBA or indexed)
+        }
+
+        private sealed class AseFrame
+        {
+            public int DurationMs { get; set; } = 100;
+            public Dictionary<int, AseCel> CelsByLayer { get; } = [];
+            public uint[]? Palette { get; set; }
         }
 
         private static AseLayer ReadAseLayerChunk(BinaryReader br)
@@ -582,6 +977,7 @@ namespace PixlPunkt.Core.Document
             {
                 Flags = flags,
                 Type = type,
+                ChildLevel = childLevel,
                 Name = name,
                 Opacity = opacity,
                 BlendMode = blendMode
@@ -598,7 +994,7 @@ namespace PixlPunkt.Core.Document
             short zIndex = br.ReadInt16();
             br.ReadBytes(5); // reserved
 
-            var cel = new AseCel { LayerIndex = layerIndex, X = x, Y = y };
+            var cel = new AseCel { LayerIndex = layerIndex, X = x, Y = y, Opacity = opacity, CelType = celType };
 
             switch (celType)
             {
@@ -614,7 +1010,7 @@ namespace PixlPunkt.Core.Document
                     break;
 
                 case 1: // Linked cel (reference to previous frame)
-                    // We only process frame 0, so linked cels are empty
+                    cel.LinkedFrameIndex = br.ReadUInt16();
                     cel.Width = 0;
                     cel.Height = 0;
                     break;
@@ -655,14 +1051,16 @@ namespace PixlPunkt.Core.Document
             return cel;
         }
 
-        private static uint[] ReadAsePaletteChunk(BinaryReader br)
+        private static uint[] ReadAsePaletteChunk(BinaryReader br, uint[]? previous)
         {
             uint paletteSize = br.ReadUInt32();
             uint firstIndex = br.ReadUInt32();
             uint lastIndex = br.ReadUInt32();
             br.ReadBytes(8); // reserved
 
-            var palette = new uint[256];
+            // A palette chunk only describes entries firstIndex..lastIndex; every other
+            // entry keeps whatever the palette in force already held.
+            var palette = previous is null ? new uint[256] : (uint[])previous.Clone();
 
             for (uint i = firstIndex; i <= lastIndex && i < 256; i++)
             {
@@ -686,9 +1084,10 @@ namespace PixlPunkt.Core.Document
             return palette;
         }
 
-        private static uint[] ReadAseOldPaletteChunk(BinaryReader br)
+        private static uint[] ReadAseOldPaletteChunk(BinaryReader br, uint[]? previous)
         {
-            var palette = new uint[256];
+            // Packets skip over unchanged entries, so this is a partial update too.
+            var palette = previous is null ? new uint[256] : (uint[])previous.Clone();
             ushort packets = br.ReadUInt16();
 
             int index = 0;
@@ -714,17 +1113,97 @@ namespace PixlPunkt.Core.Document
 
         private static BlendMode MapAseBlend(ushort aseBlend)
         {
-            return aseBlend switch
+            switch (aseBlend)
             {
-                0 => BlendMode.Normal,
-                1 => BlendMode.Multiply,
-                2 => BlendMode.Screen,
-                3 => BlendMode.Overlay,
-                // 4-15: Various unsupported blend modes, default to Normal
-                16 => BlendMode.Add, // Addition
-                17 => BlendMode.Subtract,
-                _ => BlendMode.Normal
-            };
+                case 0: return BlendMode.Normal;
+                case 1: return BlendMode.Multiply;
+                case 2: return BlendMode.Screen;
+                case 3: return BlendMode.Overlay;
+                case 4: return BlendMode.Darken;
+                case 5: return BlendMode.Lighten;
+                case 8: return BlendMode.HardLight;
+                case 10: return BlendMode.Difference;
+                case 16: return BlendMode.Add; // Addition
+                case 17: return BlendMode.Subtract;
+
+                // No exact equivalent; the nearest mode is used and the user is told.
+                case 6: // Color Dodge
+                    LoggingService.Warning("Aseprite blend mode Color Dodge has no equivalent; approximating with Add");
+                    return BlendMode.Add;
+                case 7: // Color Burn
+                    LoggingService.Warning("Aseprite blend mode Color Burn has no equivalent; approximating with Multiply");
+                    return BlendMode.Multiply;
+                case 11: // Exclusion
+                    LoggingService.Warning("Aseprite blend mode Exclusion has no equivalent; approximating with Difference");
+                    return BlendMode.Difference;
+
+                default: // 9 Soft Light, 12-15 Hue/Saturation/Color/Luminosity, 18 Divide
+                    LoggingService.Warning("Aseprite blend mode {Mode} is not supported; falling back to Normal", aseBlend);
+                    return BlendMode.Normal;
+            }
+        }
+
+        private static byte[] BuildAseLayerPixelsForFrame(
+            IReadOnlyList<AseFrame> frames,
+            int frameIndex,
+            int layerIndex,
+            ushort colorDepth,
+            byte transparentIndex,
+            int canvasWidth,
+            int canvasHeight,
+            uint[]? fallbackPalette)
+        {
+            var dst = new PixelSurface(canvasWidth, canvasHeight);
+            var cel = ResolveAseCelForLayer(frames, frameIndex, layerIndex);
+            if (cel == null || cel.Pixels == null || cel.Width <= 0 || cel.Height <= 0)
+                return dst.Pixels;
+
+            var framePalette = frameIndex >= 0 && frameIndex < frames.Count ? frames[frameIndex].Palette : null;
+            byte[] finalPixels;
+
+            if (colorDepth == 8)
+            {
+                finalPixels = ConvertIndexedToBgra(cel.Pixels, framePalette ?? fallbackPalette ?? new uint[256], transparentIndex);
+            }
+            else if (colorDepth == 16)
+            {
+                finalPixels = ConvertGrayAlphaToBgra(cel.Pixels);
+            }
+            else
+            {
+                finalPixels = ConvertRgbaToBgra(cel.Pixels);
+            }
+
+            BlitPixels(finalPixels, cel.Width, cel.Height, cel.X, cel.Y, dst, cel.Opacity);
+            return dst.Pixels;
+        }
+
+        private static AseCel? ResolveAseCelForLayer(IReadOnlyList<AseFrame> frames, int frameIndex, int layerIndex)
+        {
+            if ((uint)frameIndex >= (uint)frames.Count)
+                return null;
+
+            var visited = new HashSet<int>();
+            int current = frameIndex;
+
+            while (current >= 0 && current < frames.Count)
+            {
+                if (!visited.Add(current))
+                    return null;
+
+                if (!frames[current].CelsByLayer.TryGetValue(layerIndex, out var cel))
+                    return null;
+
+                if (cel.CelType == 1)
+                {
+                    current = cel.LinkedFrameIndex;
+                    continue;
+                }
+
+                return cel;
+            }
+
+            return null;
         }
 
         private static byte[] ConvertRgbaToBgra(byte[] rgba)
@@ -756,7 +1235,28 @@ namespace PixlPunkt.Core.Document
             return bgra;
         }
 
-        private static void BlitPixels(byte[] src, int srcW, int srcH, int dstX, int dstY, PixelSurface dst)
+        private static byte[] ConvertGrayAlphaToBgra(byte[] grayAlpha)
+        {
+            int pixelCount = grayAlpha.Length / 2;
+            var bgra = new byte[pixelCount * 4];
+
+            int src = 0;
+            int dst = 0;
+            for (int i = 0; i < pixelCount; i++)
+            {
+                byte g = grayAlpha[src++];
+                byte a = grayAlpha[src++];
+
+                bgra[dst++] = g;
+                bgra[dst++] = g;
+                bgra[dst++] = g;
+                bgra[dst++] = a;
+            }
+
+            return bgra;
+        }
+
+        private static void BlitPixels(byte[] src, int srcW, int srcH, int dstX, int dstY, PixelSurface dst, byte sourceOpacity = 255)
         {
             int dstW = dst.Width;
             int dstH = dst.Height;
@@ -774,10 +1274,38 @@ namespace PixlPunkt.Core.Document
                     int srcIdx = (sy * srcW + sx) * 4;
                     int dstIdx = (dy * dstW + dx) * 4;
 
-                    dst.Pixels[dstIdx + 0] = src[srcIdx + 0];
-                    dst.Pixels[dstIdx + 1] = src[srcIdx + 1];
-                    dst.Pixels[dstIdx + 2] = src[srcIdx + 2];
-                    dst.Pixels[dstIdx + 3] = src[srcIdx + 3];
+                    byte srcB = src[srcIdx + 0];
+                    byte srcG = src[srcIdx + 1];
+                    byte srcR = src[srcIdx + 2];
+                    byte srcA = src[srcIdx + 3];
+
+                    int effectiveA = (srcA * sourceOpacity + 127) / 255;
+                    if (effectiveA <= 0)
+                        continue;
+
+                    byte dstB = dst.Pixels[dstIdx + 0];
+                    byte dstG = dst.Pixels[dstIdx + 1];
+                    byte dstR = dst.Pixels[dstIdx + 2];
+                    byte dstA = dst.Pixels[dstIdx + 3];
+
+                    int outA = effectiveA + ((dstA * (255 - effectiveA) + 127) / 255);
+                    if (outA <= 0)
+                    {
+                        dst.Pixels[dstIdx + 0] = 0;
+                        dst.Pixels[dstIdx + 1] = 0;
+                        dst.Pixels[dstIdx + 2] = 0;
+                        dst.Pixels[dstIdx + 3] = 0;
+                        continue;
+                    }
+
+                    int srcFactor = effectiveA * 255;
+                    int dstFactor = dstA * (255 - effectiveA);
+                    int denom = outA * 255;
+
+                    dst.Pixels[dstIdx + 0] = (byte)Math.Clamp((srcB * srcFactor + dstB * dstFactor) / Math.Max(1, denom), 0, 255);
+                    dst.Pixels[dstIdx + 1] = (byte)Math.Clamp((srcG * srcFactor + dstG * dstFactor) / Math.Max(1, denom), 0, 255);
+                    dst.Pixels[dstIdx + 2] = (byte)Math.Clamp((srcR * srcFactor + dstR * dstFactor) / Math.Max(1, denom), 0, 255);
+                    dst.Pixels[dstIdx + 3] = (byte)Math.Clamp(outA, 0, 255);
                 }
             }
         }
@@ -823,10 +1351,10 @@ namespace PixlPunkt.Core.Document
                 throw new InvalidDataException("TMX file root element is not 'map'.");
 
             // Parse map attributes
-            int mapWidth = int.Parse(mapElement.Attribute("width")?.Value ?? "0");
-            int mapHeight = int.Parse(mapElement.Attribute("height")?.Value ?? "0");
-            int tileWidth = int.Parse(mapElement.Attribute("tilewidth")?.Value ?? "16");
-            int tileHeight = int.Parse(mapElement.Attribute("tileheight")?.Value ?? "16");
+            int mapWidth = ReadIntAttribute(mapElement, "width", 0);
+            int mapHeight = ReadIntAttribute(mapElement, "height", 0);
+            int tileWidth = ReadIntAttribute(mapElement, "tilewidth", 16);
+            int tileHeight = ReadIntAttribute(mapElement, "tileheight", 16);
 
             if (mapWidth <= 0 || mapHeight <= 0)
                 throw new InvalidDataException("TMX map has invalid dimensions.");
@@ -861,8 +1389,8 @@ namespace PixlPunkt.Core.Document
             foreach (var layerElement in mapElement.Elements("layer"))
             {
                 string layerName = layerElement.Attribute("name")?.Value ?? "Layer";
-                int layerWidth = int.Parse(layerElement.Attribute("width")?.Value ?? mapWidth.ToString());
-                int layerHeight = int.Parse(layerElement.Attribute("height")?.Value ?? mapHeight.ToString());
+                int layerWidth = ReadIntAttribute(layerElement, "width", mapWidth);
+                int layerHeight = ReadIntAttribute(layerElement, "height", mapHeight);
                 bool visible = layerElement.Attribute("visible")?.Value != "0";
                 float opacity = float.Parse(layerElement.Attribute("opacity")?.Value ?? "1", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -907,7 +1435,7 @@ namespace PixlPunkt.Core.Document
 
         private static TmxTileset? LoadTmxTileset(System.Xml.Linq.XElement tsElement, string baseDir, int defaultTileW, int defaultTileH)
         {
-            int firstGid = int.Parse(tsElement.Attribute("firstgid")?.Value ?? "1");
+            int firstGid = ReadIntAttribute(tsElement, "firstgid", 1);
 
             string? source = tsElement.Attribute("source")?.Value;
             if (!string.IsNullOrEmpty(source))
@@ -925,10 +1453,10 @@ namespace PixlPunkt.Core.Document
                 }
             }
 
-            int tileWidth = int.Parse(tsElement.Attribute("tilewidth")?.Value ?? defaultTileW.ToString());
-            int tileHeight = int.Parse(tsElement.Attribute("tileheight")?.Value ?? defaultTileH.ToString());
-            int tileCount = int.Parse(tsElement.Attribute("tilecount")?.Value ?? "0");
-            int columns = int.Parse(tsElement.Attribute("columns")?.Value ?? "1");
+            int tileWidth = ReadIntAttribute(tsElement, "tilewidth", defaultTileW);
+            int tileHeight = ReadIntAttribute(tsElement, "tileheight", defaultTileH);
+            int tileCount = ReadIntAttribute(tsElement, "tilecount", 0);
+            int columns = ReadIntAttribute(tsElement, "columns", 1);
 
             var imageElement = tsElement.Element("image");
             if (imageElement == null) return null;
@@ -1152,10 +1680,10 @@ namespace PixlPunkt.Core.Document
                 throw new InvalidDataException("TSX file root element is not 'tileset'.");
 
             string name = tilesetElement.Attribute("name")?.Value ?? Path.GetFileNameWithoutExtension(filePath);
-            int tileWidth = int.Parse(tilesetElement.Attribute("tilewidth")?.Value ?? "16");
-            int tileHeight = int.Parse(tilesetElement.Attribute("tileheight")?.Value ?? "16");
-            int tileCount = int.Parse(tilesetElement.Attribute("tilecount")?.Value ?? "0");
-            int columns = int.Parse(tilesetElement.Attribute("columns")?.Value ?? "1");
+            int tileWidth = ReadIntAttribute(tilesetElement, "tilewidth", 16);
+            int tileHeight = ReadIntAttribute(tilesetElement, "tileheight", 16);
+            int tileCount = ReadIntAttribute(tilesetElement, "tilecount", 0);
+            int columns = ReadIntAttribute(tilesetElement, "columns", 1);
 
             string baseDir = Path.GetDirectoryName(filePath) ?? ".";
 
@@ -1385,6 +1913,7 @@ namespace PixlPunkt.Core.Document
         {
             public PyxelCanvasDto? Canvas { get; set; }
             public PyxelTilesetDto? Tileset { get; set; }
+            public Dictionary<string, PyxelAnimationDto> Animations { get; set; } = [];
         }
 
         private sealed class PyxelCanvasDto
@@ -1404,11 +1933,31 @@ namespace PixlPunkt.Core.Document
         {
             public string Type { get; set; } = string.Empty;
             public string Name { get; set; } = string.Empty;
+            public int ParentIndex { get; set; } = -1;
+            public bool Collapsed { get; set; }
             public bool Hidden { get; set; }
             public bool Muted { get; set; }
             public bool Soloed { get; set; }
             public int Alpha { get; set; } = 255;
             public string BlendMode { get; set; } = "normal";
+            public Dictionary<string, PyxelTileRefDto> TileRefs { get; set; } = [];
+        }
+
+        private sealed class PyxelTileRefDto
+        {
+            public int Index { get; set; }
+            public int Rot { get; set; }
+            public bool FlipX { get; set; }
+            public bool FlipY { get; set; }
+        }
+
+        private sealed class PyxelAnimationDto
+        {
+            public string Name { get; set; } = string.Empty;
+            public int Length { get; set; }
+            public int FrameDuration { get; set; } = 100;
+            public List<int> FrameDurationMultipliers { get; set; } = [];
+            public int BaseTile { get; set; }
         }
     }
 }

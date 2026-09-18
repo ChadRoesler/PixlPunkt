@@ -207,6 +207,28 @@ namespace PixlPunkt.Core.Tile
         }
 
         /// <summary>
+        /// Rewrites every cell through <paramref name="idMap"/> in a single pass, so overlapping
+        /// renumberings (3→2 and 2→1) cannot chain. Ids absent from the map are left alone.
+        /// </summary>
+        /// <returns>Number of cells changed.</returns>
+        public int RemapTileIds(IReadOnlyDictionary<int, int> idMap)
+        {
+            int count = 0;
+            for (int x = 0; x < Width; x++)
+            {
+                for (int y = 0; y < Height; y++)
+                {
+                    int id = _grid[x, y];
+                    if (id < 0 || !idMap.TryGetValue(id, out int newId) || newId == id) continue;
+                    _grid[x, y] = newId;
+                    MappingChanged?.Invoke(x, y, newId);
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
         /// Resizes the mapping grid, preserving existing mappings where possible.
         /// </summary>
         /// <param name="newWidth">New number of tile columns.</param>

@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Imaging;
+using PixlPunkt.Core.Logging;
 
 namespace PixlPunkt.Core.Compositing.Helpers
 {
@@ -178,15 +179,29 @@ namespace PixlPunkt.Core.Compositing.Helpers
                 // Run all enabled effects in order, in-place
                 foreach (var fx in enabledEffects)
                 {
-                    if (fx.NeedsSnapshot)
+                    // Effects include plugin code. One that throws must not take the render loop
+                    // (and the app) down with it, and because the effect is persisted with the
+                    // layer that would also make the document impossible to reopen. Disable the
+                    // faulting instance so the layer still renders and the UI reflects the state.
+                    try
                     {
-                        // Copy current pixels into snapshot before this effect modifies them
-                        fxSpan.Slice(0, pixelCount).CopyTo(_fxSnapshot.AsSpan(0, pixelCount));
-                        fx.Apply(fxSpan, new ReadOnlySpan<uint>(_fxSnapshot, 0, pixelCount), canvasW, canvasH);
+                        if (fx.NeedsSnapshot)
+                        {
+                            // Copy current pixels into snapshot before this effect modifies them
+                            fxSpan.Slice(0, pixelCount).CopyTo(_fxSnapshot.AsSpan(0, pixelCount));
+                            fx.Apply(fxSpan, new ReadOnlySpan<uint>(_fxSnapshot, 0, pixelCount), canvasW, canvasH);
+                        }
+                        else
+                        {
+                            fx.Apply(fxSpan, canvasW, canvasH);
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        fx.Apply(fxSpan, canvasW, canvasH);
+                        LoggingService.Error(
+                            $"Layer effect '{fx.DisplayName}' (id={fx.EffectId ?? "?"}) threw on layer '{l.Name}' and has been disabled.",
+                            ex);
+                        fx.IsEnabled = false;
                     }
                 }
 

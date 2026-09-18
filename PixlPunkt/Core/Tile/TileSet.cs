@@ -69,6 +69,12 @@ namespace PixlPunkt.Core.Tile
         public event Action? TileSetCleared;
 
         /// <summary>
+        /// Raised after <see cref="ApplyIdMap"/> re-keyed the tiles. The argument maps old id
+        /// to new id for every tile whose id changed.
+        /// </summary>
+        public event Action<IReadOnlyDictionary<int, int>>? TilesRenumbered;
+
+        /// <summary>
         /// Creates a new tile set with the specified tile dimensions.
         /// </summary>
         /// <param name="tileWidth">Width of each tile in pixels.</param>
@@ -260,6 +266,55 @@ namespace PixlPunkt.Core.Tile
                 }
                 return hash;
             }
+        }
+
+        /// <summary>
+        /// Computes the map that renumbers the tiles 1..Count in ascending id order, e.g.
+        /// {1, 3, 45, 56, 90} → {1, 2, 3, 4, 5}. Only ids that change are included, so an empty
+        /// map means the set is already sequential. Apply it with
+        /// <see cref="ApplyIdMap"/> (the document does this for every mapping too).
+        /// </summary>
+        public Dictionary<int, int> BuildRenumberMap()
+        {
+            var map = new Dictionary<int, int>();
+            int next = 1;
+            foreach (int id in TileIds)
+            {
+                if (id != next) map[id] = next;
+                next++;
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// Re-keys the tiles through <paramref name="idMap"/> (old id → new id) in one pass.
+        /// The map must be a bijection on the ids it contains; callers are responsible for
+        /// updating every <see cref="TileMapping"/> and other id holders.
+        /// </summary>
+        public void ApplyIdMap(IReadOnlyDictionary<int, int> idMap)
+        {
+            if (idMap.Count == 0) return;
+
+            var rekeyed = new Dictionary<int, TileDefinition>(_tiles.Count);
+            foreach (var tile in _tiles.Values)
+            {
+                int newId = idMap.TryGetValue(tile.Id, out int mapped) ? mapped : tile.Id;
+                if (rekeyed.ContainsKey(newId))
+                    throw new InvalidOperationException($"Tile id map is not a bijection: {newId} is produced twice.");
+                rekeyed[newId] = tile.Id == newId ? tile : tile.WithId(newId);
+            }
+
+            _tiles.Clear();
+            int maxId = 0;
+            foreach (var (id, tile) in rekeyed)
+            {
+                _tiles[id] = tile;
+                if (id > maxId) maxId = id;
+            }
+            _nextId = maxId + 1;
+
+            LoggingService.Info("Tiles renumbered changed={Changed} count={Count}", idMap.Count, _tiles.Count);
+            TilesRenumbered?.Invoke(idMap);
         }
 
         /// <summary>

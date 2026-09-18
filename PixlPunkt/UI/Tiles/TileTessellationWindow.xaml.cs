@@ -690,7 +690,7 @@ namespace PixlPunkt.UI.Tiles
             Marshal.Copy(previewPixels, 0, handle, previewPixels.Length);
 
             // Render grid of tiles
-            using var tilePaint = new SKPaint { FilterQuality = SKFilterQuality.None, IsAntialias = false };
+            using var tilePaint = new SKPaint { IsAntialias = false };
 
             for (int gy = 0; gy < _gridSize; gy++)
             {

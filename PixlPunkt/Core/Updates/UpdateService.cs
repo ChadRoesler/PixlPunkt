@@ -330,6 +330,15 @@ namespace PixlPunkt.Core.Updates
         /// </summary>
         public static void OpenReleaseUrl(string url)
         {
+            // The URL comes from the GitHub API response. With UseShellExecute a non-web value
+            // could launch a local program, so refuse anything that is not http(s).
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+            {
+                LoggingService.Warning("Refusing to open non-web release URL: {Url}", url);
+                return;
+            }
+
             try
             {
                 var psi = new System.Diagnostics.ProcessStartInfo

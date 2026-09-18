@@ -111,6 +111,19 @@ namespace PixlPunkt.Core.Tile
         /// </summary>
         /// <param name="newId">The ID for the cloned tile.</param>
         /// <returns>A new tile with copied pixel data.</returns>
+        /// <summary>
+        /// The same tile (same pixel buffer, thumbnail and name) under a different id. Used when
+        /// the tile set is renumbered; nothing is copied.
+        /// </summary>
+        internal TileDefinition WithId(int newId)
+        {
+            return new TileDefinition(newId, Width, Height, Pixels)
+            {
+                Name = Name,
+                Thumbnail = Thumbnail
+            };
+        }
+
         public TileDefinition Clone(int newId)
         {
             var clonedPixels = new byte[Pixels.Length];

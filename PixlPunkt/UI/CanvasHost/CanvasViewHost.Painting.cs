@@ -279,7 +279,6 @@ namespace PixlPunkt.UI.CanvasHost
                 }
 
                 _hasLastDocPos = true;
-                _didMove = false;
                 _lastDocX = x;
                 _lastDocY = y;
             }
@@ -289,7 +288,6 @@ namespace PixlPunkt.UI.CanvasHost
                 _isActivePainting = false;
                 _pendingStrokeFromOutside = true;
                 _hasLastDocPos = false;
-                _didMove = false;
                 _shiftLineActive = false;
             }
 
@@ -325,7 +323,6 @@ namespace PixlPunkt.UI.CanvasHost
                 }
 
                 _hasLastDocPos = false;
-                _didMove = false;
                 _lastDocX = x;
                 _lastDocY = y;
             }
@@ -338,7 +335,6 @@ namespace PixlPunkt.UI.CanvasHost
                 var (targetX, targetY) = ComputeShiftLineTarget(_shiftLineOriginX, _shiftLineOriginY, rawX, rawY, ctrlHeld);
                 _lastDocX = targetX;
                 _lastDocY = targetY;
-                _didMove = true;
                 OnBrushMoved(new System.Numerics.Vector2(_hoverX, _hoverY), (float)((_brushSize - 1) * 0.5));
                 ForceInvalidate();
                 return;
@@ -374,7 +370,6 @@ namespace PixlPunkt.UI.CanvasHost
                 _lastDocY = y;
             }
 
-            _didMove = true;
             _hasLastDocPos = true;
 
             // Composite the changes to the visible surface
@@ -518,7 +513,6 @@ namespace PixlPunkt.UI.CanvasHost
                 }
 
                 _hasLastDocPos = true;
-                _didMove = false;
                 _lastDocX = x;
                 _lastDocY = y;
             }
@@ -528,7 +522,6 @@ namespace PixlPunkt.UI.CanvasHost
                 _isActivePainting = false;
                 _pendingStrokeFromOutside = true;
                 _hasLastDocPos = false;
-                _didMove = false;
                 _shiftLineActive = false;
             }
 
@@ -580,7 +573,6 @@ namespace PixlPunkt.UI.CanvasHost
                 }
 
                 _hasLastDocPos = false;
-                _didMove = false;
                 _lastDocX = x;
                 _lastDocY = y;
                 _shiftLineOriginX = x;
@@ -595,7 +587,6 @@ namespace PixlPunkt.UI.CanvasHost
                 var (targetX, targetY) = ComputeShiftLineTarget(_shiftLineOriginX, _shiftLineOriginY, rawX, rawY, ctrlHeld);
                 _lastDocX = targetX;
                 _lastDocY = targetY;
-                _didMove = true;
                 OnBrushMoved(new System.Numerics.Vector2(_hoverX, _hoverY), (float)((_brushSize - 1) * 0.5));
                 ForceInvalidate();
                 return;
@@ -621,7 +612,6 @@ namespace PixlPunkt.UI.CanvasHost
                         if (_hasLastDocPos && (_lastDocX != drawX || _lastDocY != drawY))
                         {
                             _stroke.StampLineWithPainter(_lastDocX, _lastDocY, drawX, drawY, _fg, _bgColor, strokeSettings);
-                            _didMove = true;
 
                             int lineMinX = Math.Min(_lastDocX, drawX) + minDx;
                             int lineMinY = Math.Min(_lastDocY, drawY) + minDy;
@@ -632,7 +622,6 @@ namespace PixlPunkt.UI.CanvasHost
                         else
                         {
                             _stroke.StampAtWithPainter(drawX, drawY, _fg, _bgColor, strokeSettings);
-                            _didMove = true;
                             PropagateLiveTileChanges(drawX + minDx, drawY + minDy, drawX + maxDx, drawY + maxDy);
                         }
 
@@ -646,7 +635,6 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_hasLastDocPos)
                     {
                         _stroke.StampLineWithPainter(_lastDocX, _lastDocY, x, y, _fg, _bgColor, strokeSettings);
-                        _didMove = true;
 
                         int lineMinX = Math.Min(_lastDocX, x) + minDx;
                         int lineMinY = Math.Min(_lastDocY, y) + minDy;
@@ -657,7 +645,6 @@ namespace PixlPunkt.UI.CanvasHost
                     else
                     {
                         _stroke.StampAtWithPainter(x, y, _fg, _bgColor, strokeSettings);
-                        _didMove = true;
                         PropagateLiveTileChanges(x + minDx, y + minDy, x + maxDx, y + maxDy);
                     }
 
@@ -784,17 +771,19 @@ namespace PixlPunkt.UI.CanvasHost
             RaiseFrame();
         }
 
-        private void AutoCaptureKeyframeIfNeeded()
+        private void AutoCaptureKeyframeIfNeeded(RasterLayer? layer = null, int? frameIndex = null)
         {
-            if (Document.ActiveLayer is not RasterLayer rl) return;
+            var rl = layer ?? Document.ActiveLayer as RasterLayer;
+            if (rl == null) return;
 
             var animState = Document.CanvasAnimationState;
             if (animState == null) return;
+            int frame = frameIndex ?? animState.CurrentFrameIndex;
 
             // Always update existing keyframe if one exists at current frame
-            if (animState.HasKeyframe(rl, animState.CurrentFrameIndex))
+            if (animState.HasKeyframe(rl, frame))
             {
-                animState.CaptureKeyframe(rl, animState.CurrentFrameIndex);
+                animState.CaptureKeyframe(rl, frame);
                 return;
             }
 
@@ -805,7 +794,7 @@ namespace PixlPunkt.UI.CanvasHost
                 var track = animState.GetTrackForLayer(rl);
                 if (track != null && track.Keyframes.Count > 0)
                 {
-                    animState.CaptureKeyframe(rl, animState.CurrentFrameIndex);
+                    animState.CaptureKeyframe(rl, frame);
                 }
             }
         }

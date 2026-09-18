@@ -112,8 +112,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             bool hasCumulativeRotation = Math.Abs(_state.CumulativeAngleDeg) > 0.1;
             bool needsTransform = hasScale || hasDragRotation || hasCumulativeRotation;
 
-            float pivotDocX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.BufferWidth / 2f);
-            float pivotDocY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.BufferHeight / 2f);
+            float pivotDocX = _state.OrigCenterX;
+            float pivotDocY = _state.OrigCenterY;
             float pivotViewX = (float)(dest.X + pivotDocX * scale);
             float pivotViewY = (float)(dest.Y + pivotDocY * scale);
 
@@ -212,8 +212,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// </summary>
         public void DrawTransformHandles(ICanvasRenderer renderer, Rect dest, double scale)
         {
-            int handleW = (int)Math.Round((_state.OrigW > 0 ? _state.OrigW : _state.BufferWidth) * _state.ScaleX);
-            int handleH = (int)Math.Round((_state.OrigH > 0 ? _state.OrigH : _state.BufferHeight) * _state.ScaleY);
+            int handleW = (int)Math.Round(_state.OrigW * _state.ScaleX);
+            int handleH = (int)Math.Round(_state.OrigH * _state.ScaleY);
             float selX = _state.Floating ? _state.FloatX : _state.Rect.X;
             float selY = _state.Floating ? _state.FloatY : _state.Rect.Y;
             float x = (float)(dest.X + selX * scale);
@@ -436,8 +436,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                         // Non-rectangular selection (polygon, wand, paint): trace the actual
                         // pixel boundary of the transformed preview buffer so the marquee follows
                         // the true shape through scale and rotation.
-                        float pivotDocX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.BufferWidth / 2f);
-                        float pivotDocY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.BufferHeight / 2f);
+                        float pivotDocX = _state.OrigCenterX;
+                        float pivotDocY = _state.OrigCenterY;
                         float pivotViewX = (float)(dest.X + pivotDocX * scale);
                         float pivotViewY = (float)(dest.Y + pivotDocY * scale);
                         float bufLeft = pivotViewX - (float)(_state.PreviewW * scale / 2.0);
@@ -447,11 +447,11 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                     }
                     else
                     {
-                        int scaledW = Math.Max(1, (int)Math.Round((_state.OrigW > 0 ? _state.OrigW : _state.BufferWidth) * _state.ScaleX));
-                        int scaledH = Math.Max(1, (int)Math.Round((_state.OrigH > 0 ? _state.OrigH : _state.BufferHeight) * _state.ScaleY));
+                        int scaledW = Math.Max(1, (int)Math.Round(_state.OrigW * _state.ScaleX));
+                        int scaledH = Math.Max(1, (int)Math.Round(_state.OrigH * _state.ScaleY));
 
-                        float pivotX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.BufferWidth / 2f);
-                        float pivotY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.BufferHeight / 2f);
+                        float pivotX = _state.OrigCenterX;
+                        float pivotY = _state.OrigCenterY;
                         float cx = (float)(dest.X + pivotX * scale);
                         float cy = (float)(dest.Y + pivotY * scale);
 
@@ -572,8 +572,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         {
             if (_state.PreviewBuf != null && _state.PreviewW > 0 && _state.PreviewH > 0)
             {
-                float pivotX = _state.OrigCenterX != 0 ? _state.OrigCenterX : (_state.FloatX + _state.BufferWidth / 2f);
-                float pivotY = _state.OrigCenterY != 0 ? _state.OrigCenterY : (_state.FloatY + _state.BufferHeight / 2f);
+                float pivotX = _state.OrigCenterX;
+                float pivotY = _state.OrigCenterY;
                 float cx = (float)(dest.X + pivotX * scale);
                 float cy = (float)(dest.Y + pivotY * scale);
                 float bufferLeft = cx - (float)(_state.PreviewW * scale / 2.0);
@@ -589,8 +589,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
 
         public void DrawRotatedRectangleAnts(ICanvasRenderer renderer, Rect dest, double scale, bool animated)
         {
-            int handleW = (int)Math.Round((_state.OrigW > 0 ? _state.OrigW : _state.BufferWidth) * _state.ScaleX);
-            int handleH = (int)Math.Round((_state.OrigH > 0 ? _state.OrigH : _state.BufferHeight) * _state.ScaleY);
+            int handleW = (int)Math.Round(_state.OrigW * _state.ScaleX);
+            int handleH = (int)Math.Round(_state.OrigH * _state.ScaleY);
             float selX = _state.Floating ? _state.FloatX : _state.Rect.X;
             float selY = _state.Floating ? _state.FloatY : _state.Rect.Y;
             float x = (float)(dest.X + selX * scale);
@@ -642,31 +642,8 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         // BUFFER TRANSFORM HELPERS
         // ════════════════════════════════════════════════════════════════════
 
-        private static (byte[] buf, int w, int h) BuildScaledBuffer(byte[] src, int sw, int sh, double sx, double sy, ScaleMode filter)
-        {
-            int outW = Math.Max(1, (int)Math.Round(sw * sx));
-            int outH = Math.Max(1, (int)Math.Round(sh * sy));
-            if (outW == sw && outH == sh) return (src, sw, sh);
+        private static (byte[] buf, int w, int h) BuildScaledBuffer(byte[] src, int sw, int sh, double sx, double sy, ScaleMode filter) => Core.Selection.SelectionBufferOps.BuildScaled(src, sw, sh, sx, sy, filter);
 
-            return filter switch
-            {
-                ScaleMode.NearestNeighbor => (PixelOps.ResizeNearest(src, sw, sh, outW, outH), outW, outH),
-                ScaleMode.Bilinear => (PixelOps.ResizeBilinear(src, sw, sh, outW, outH), outW, outH),
-                ScaleMode.EPX => PixelOps.ScaleBy2xStepsThenNearest(src, sw, sh, outW, outH, epx: true),
-                ScaleMode.Scale2x => PixelOps.ScaleBy2xStepsThenNearest(src, sw, sh, outW, outH, epx: false),
-                _ => (PixelOps.ResizeNearest(src, sw, sh, outW, outH), outW, outH)
-            };
-        }
-
-        private static (byte[] buf, int w, int h) BuildRotatedBuffer(byte[] src, int sw, int sh, double angleDeg, RotationMode kind)
-        {
-            double a = angleDeg % 360.0;
-            if (Math.Abs(a) < 1e-6) return (src, sw, sh);
-            return kind switch
-            {
-                RotationMode.RotSprite => PixelOps.RotateSpriteApprox(src, sw, sh, a),
-                _ => PixelOps.RotateNearest(src, sw, sh, a)
-            };
-        }
+        private static (byte[] buf, int w, int h) BuildRotatedBuffer(byte[] src, int sw, int sh, double angleDeg, RotationMode kind) => Core.Selection.SelectionBufferOps.BuildRotated(src, sw, sh, angleDeg, kind);
     }
 }

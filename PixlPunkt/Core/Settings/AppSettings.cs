@@ -204,7 +204,10 @@ namespace PixlPunkt.Core.Settings
                 AppPaths.EnsureDirectoryExists(AppPaths.RootDirectory);
 
                 var json = JsonSerializer.Serialize(this, AppSettingsJsonContext.Default.AppSettings);
-                File.WriteAllText(path, json);
+                // Temp + move so a crash mid-write cannot leave a half-written settings file.
+                var tempPath = path + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, path, overwrite: true);
             }
             catch
             {

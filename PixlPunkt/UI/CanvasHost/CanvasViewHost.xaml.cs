@@ -181,7 +181,6 @@ namespace PixlPunkt.UI.CanvasHost
         private readonly ZoomController _zoom = new();
         private StrokeEngine _stroke;
         private PixelSurface? _composite;
-        private SelectionEngine _selectionEngine;
 
         /// <summary>
         /// Symmetry service for live stroke mirroring.
@@ -215,7 +214,6 @@ namespace PixlPunkt.UI.CanvasHost
         private byte _brushDensity = 255;
         private bool _hasLastDocPos;
         private int _lastDocX, _lastDocY;
-        private bool _didMove;
         private bool _pendingStrokeFromOutside;
         private IStrokePainter? _activePainter;
 
@@ -267,9 +265,8 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - SELECTION STATE
         // ════════════════════════════════════════════════════════════════════
 
-        private SelectionRegion _selRegion = new();
-        private bool _havePreview;
-        private RectInt32 _previewRect;
+        /// <summary>The document's selection mask (see <see cref="CanvasDocument.Selection"/>).</summary>
+        private SelectionRegion _selRegion => Document.Selection;
         private bool _selPushToTool;
         private bool _selApplyFromTool;
 
@@ -329,8 +326,6 @@ namespace PixlPunkt.UI.CanvasHost
         // FIELDS - EXTERNAL MODIFICATION TRACKING
         // ════════════════════════════════════════════════════════════════════
 
-        private bool _isCommittingChanges;
-
         // ════════════════════════════════════════════════════════════════════
         // FIELDS - LOCKED LAYER WARNING
         // ════════════════════════════════════════════════════════════════════
@@ -383,14 +378,6 @@ namespace PixlPunkt.UI.CanvasHost
             ResetStrokeForActive();
             _stroke.SetForeground(_fg);
 
-            // Selection engine
-            _selectionEngine = new SelectionEngine(
-                activeLayerProvider: () => Document.ActiveLayer,
-                docSizeProvider: () => (Document.PixelWidth, Document.PixelHeight),
-                liftCallback: () => LiftSelectionWithHistory(),
-                commitCallback: () => CommitFloatingWithHistory()
-            );
-
             // Document hooks
             Document.ActiveLayerChanged += () =>
             {
@@ -402,6 +389,12 @@ namespace PixlPunkt.UI.CanvasHost
             Document.StructureChanged += OnDocChanged;
             Document.LayersChanged += OnDocChanged;
             Document.DocumentModified += OnExternalDocumentModified;
+            Document.SelectionChanged += OnDocumentSelectionChanged;
+
+            // A floating selection is committed before the timeline moves off its frame; the
+            // animation panels subscribe later than this, so this runs before frame pixels swap.
+            _lastKnownAnimFrame = Document.CanvasAnimationState.CurrentFrameIndex;
+            Document.CanvasAnimationState.CurrentFrameChanged += OnFrameChangedForSelection;
 
             EnsureComposite();
 
@@ -665,9 +658,6 @@ namespace PixlPunkt.UI.CanvasHost
         {
             // Skip if we're actively painting (we're the source of changes)
             if (_isPainting) return;
-
-            // Skip if we're committing (avoid reentry)
-            if (_isCommittingChanges) return;
 
             // Refresh to pick up changes from external sources (e.g., TileFrameEditorCanvas)
             // This also handles mask editing mode toggling which fires StructureChanged
@@ -1270,7 +1260,6 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Counter to track idle frames for auto-stop.
         /// </summary>
-        private int _idleFrameCount;
 
         /// <summary>
         /// Maximum idle ticks before auto-stopping.
@@ -1295,7 +1284,6 @@ namespace PixlPunkt.UI.CanvasHost
         {
             if (_isRenderingHooked) return;
             _isRenderingHooked = true;
-            _idleFrameCount = 0;
             _invalidationCounter = 0;
         }
 
@@ -1340,7 +1328,6 @@ namespace PixlPunkt.UI.CanvasHost
             // During active painting, periodically force synchronous processing
             if (_isActivePainting)
             {
-                _idleFrameCount = 0;
                 _invalidationCounter++;
 
                 // Every N invalidations, force a synchronous layout pass

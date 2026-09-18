@@ -30,8 +30,6 @@ namespace PixlPunkt.Core.Structs
         public readonly int HoverY;
 
         /// <summary>Legacy float-based center position. Use HoverX/HoverY for precise coordinates.</summary>
-        [Obsolete("Use HoverX/HoverY instead for precise integer coordinates")]
-        public readonly Vector2 Center;
 
         /// <summary>Brush radius for circular preview.</summary>
         public readonly float Radius;
@@ -182,7 +180,6 @@ namespace PixlPunkt.Core.Structs
             // (the caller passes _hoverX/_hoverY here for precise integer alignment)
             HoverX = shapeStartX;
             HoverY = shapeStartY;
-            Center = center;
             Radius = radius;
             Mask = mask;
             FillGhost = fillGhost;

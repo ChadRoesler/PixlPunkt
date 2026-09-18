@@ -10,6 +10,8 @@ using PixlPunkt.Core.Document;
 using PixlPunkt.Core.Settings;
 using PixlPunkt.UI.CanvasArea;
 using PixlPunkt.UI.CanvasHost;
+using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
+using PixlPunkt.UI.CanvasHost.Selection;
 using PixlPunkt.UI.Dialogs;
 using PixlPunkt.UI.Helpers;
 using Windows.Graphics;
@@ -166,7 +168,7 @@ namespace PixlPunkt.UI
         /// Creates and opens a canvas from a NewCanvasResult.
         /// Handles special templates like BrushCanvasTemplate.
         /// </summary>
-        private void CreateAndOpenCanvas(NewCanvasResult result)
+        private CanvasViewHost? CreateAndOpenCanvas(NewCanvasResult result)
         {
             // Ensure the app-wide stripe/theme choice is applied before creating a new host
             try
@@ -207,6 +209,39 @@ namespace PixlPunkt.UI
             {
                 DocsTab.SelectedItem = tab;
             });
+
+            return GetCanvasHostFromTab(tab);
+        }
+
+        /// <summary>
+        /// Creates a canvas exactly the size of the clipboard image, as one tile of that size,
+        /// and pastes the clipboard into it at the origin, so copy → new → paste needs no
+        /// positioning.
+        /// </summary>
+        private async void File_NewFromClipboard_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectionClipboard.ClipboardSize is not { } size)
+            {
+                await ShowDialogGuardedAsync(new ContentDialog
+                {
+                    XamlRoot = MainXamlRoot,
+                    Title = "Clipboard Empty",
+                    Content = "Copy or cut a selection first.",
+                    CloseButtonText = "OK"
+                });
+                return;
+            }
+
+            var host = CreateAndOpenCanvas(new NewCanvasResult("NewCanvas", CreateSize(size.w, size.h), CreateSize(1, 1), null));
+            if (host == null) return;
+
+            // Runs after the deferred tab selection above has attached the host (same priority, FIFO).
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                host.PasteClipboardAt(0, 0);
+                UpdateHistoryUI();
+            });
+            UpdateSessionState();
         }
 
         /// <summary>

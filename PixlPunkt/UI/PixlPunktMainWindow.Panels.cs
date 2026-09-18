@@ -15,7 +15,6 @@ namespace PixlPunkt.UI
     {
         private DockingManager? _dockingManager;
         private PanelWindow? _animationPreviewWindow;
-        private Grid? _animationPreviewContainerBackup;
         private double _animationPreviewColumnWidth = 200;
 
         /// <summary>

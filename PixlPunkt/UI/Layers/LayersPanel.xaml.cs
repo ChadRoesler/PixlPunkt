@@ -38,7 +38,6 @@ namespace PixlPunkt.UI.Layers
 
         private readonly ObservableCollection<object> _uiLayers = [];
 
-        private bool _suppressDocRefresh;
         private bool _suppressCollectionMove;
         private bool _suppressSelectionChanged;
 
@@ -270,7 +269,7 @@ namespace PixlPunkt.UI.Layers
             }
 
             var activeLayer = _doc.ActiveLayer;
-            int uiIndex = _uiLayers.IndexOf(activeLayer);
+            int uiIndex = activeLayer == null ? -1 : _uiLayers.IndexOf(activeLayer);
 
             _suppressSelectionChanged = true;
             try { LayersList.SelectedIndex = uiIndex; }
@@ -334,8 +333,6 @@ namespace PixlPunkt.UI.Layers
 
         private void OnDocLayersChanged()
         {
-            if (_suppressDocRefresh) return;
-
             if (_draggedItem != null)
             {
                 _needsRebuildAfterDrag = true;
@@ -405,15 +402,46 @@ namespace PixlPunkt.UI.Layers
             if (_doc is null) return;
             _doc.AddLayer();
             RebuildFromDoc();
-            SelectFromDoc();
+            RevealItem(_doc.ActiveLayer);
         }
 
         private void AddFolder_Click(object sender, RoutedEventArgs e)
         {
             if (_doc is null) return;
-            _doc.AddFolder();
+            // A selected folder becomes the parent; otherwise the active layer's parent (or root).
+            var into = LayersList.SelectedItem as LayerFolder;
+            var folder = _doc.AddFolder(into: into);
             RebuildFromDoc();
+            RevealItem(folder);
+        }
+
+        /// <summary>
+        /// Syncs the list selection from the document and then makes <paramref name="item"/> the
+        /// selected row (folders are not the document's active layer, so they are selected
+        /// directly) and scrolls it into view. Without this a new or duplicated item could land
+        /// outside the viewport after the rebuild snapped the list back to the top.
+        /// </summary>
+        private void RevealItem(LayerBase? item)
+        {
             SelectFromDoc();
+            if (item is null) return;
+
+            int ui = _uiLayers.IndexOf(item);
+            if (ui < 0) return; // inside a collapsed folder
+
+            if (item is LayerFolder)
+            {
+                _suppressSelectionChanged = true;
+                try { LayersList.SelectedIndex = ui; }
+                finally { _suppressSelectionChanged = false; }
+            }
+
+            // The containers do not exist until the ListView has laid out the new collection.
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                try { LayersList.ScrollIntoView(item); }
+                catch (Exception) { }
+            });
         }
 
         private async void AddReferenceLayer_Click(object sender, RoutedEventArgs e)
@@ -678,9 +706,9 @@ namespace PixlPunkt.UI.Layers
             var item = ItemFromSender(sender);
             if (item is null) return;
 
-            _doc.DuplicateLayerTree(item);
+            var clone = _doc.DuplicateLayerTree(item);
             RebuildFromDoc();
-            SelectFromDoc();
+            RevealItem(clone);
         }
 
         private void ItemFlyout_Vis_Toggled(object sender, RoutedEventArgs e) => _doc?.RaiseStructureChanged();
