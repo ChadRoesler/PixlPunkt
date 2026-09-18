@@ -49,8 +49,7 @@ namespace PixlPunkt.Core.Selection
         public double CumulativeAngleDeg { get; set; }
 
         /// <summary>
-        /// Handle-frame size: the unscaled buffer size (scale is never baked into the pixels
-        /// before commit, so this equals <see cref="Width"/>/<see cref="Height"/>). Invariant: <see cref="OrigW"/>,
+        /// Handle-frame size: the buffer size at the last bake. Invariant: <see cref="OrigW"/>,
         /// <see cref="OrigH"/>, <see cref="OrigCenterX"/> and <see cref="OrigCenterY"/> are always
         /// valid. They are set in the constructor, every move shifts the centre with the float,
         /// and a bake re-centres and resizes them. Readers use them directly; there is no

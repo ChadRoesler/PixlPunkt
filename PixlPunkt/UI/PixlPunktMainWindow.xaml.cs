@@ -483,6 +483,21 @@ namespace PixlPunkt.UI
         // ─────────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Update layer thumbnail size at runtime (0 = hidden). The panel's own menu persists it too.
+        /// </summary>
+        public void SetLayerPreviewSize(int size)
+        {
+            try
+            {
+                LayersPanel.SetPreviewSize(size, persist: false);
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Debug("Failed to set layer preview size: {Error}", ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Update palette swatch size at runtime.
         /// </summary>
         public void SetPaletteSwatchSize(int size)
@@ -823,12 +838,7 @@ namespace PixlPunkt.UI
         {
             if (IsTextInputFocused()) return;
 
-            var dlg = new NewCanvasDialog { XamlRoot = MainXamlRoot };
-            var res = await ShowDialogGuardedAsync(dlg);
-            if (res != ContentDialogResult.Primary) return;
-
-            var values = dlg.GetValues();
-            CreateAndOpenCanvas(values.name, values.tileSize, values.tileCounts);
+            await ShowNewCanvasDialogAsync();
         }
 
         private async Task OpenDocumentAsync()

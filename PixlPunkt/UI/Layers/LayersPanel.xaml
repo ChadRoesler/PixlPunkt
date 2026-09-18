@@ -1,5 +1,6 @@
 ﻿<UserControl
     x:Class="PixlPunkt.UI.Layers.LayersPanel"
+    x:Name="Self"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:doc="using:PixlPunkt.Core.Document"
@@ -14,7 +15,8 @@
         <conv:LevelToIndentDoubleConverter x:Key="LevelToIndent" Indent="16"/>
         <conv:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
         <Style x:Key="RasterItemStyle" TargetType="ListViewItem">
-            <Setter Property="MinHeight" Value="56"/>
+            <!-- Row height comes from the template (RowMinHeight follows the preview size) -->
+            <Setter Property="MinHeight" Value="0"/>
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         </Style>
@@ -25,7 +27,7 @@
         </Style>
 
         <Style x:Key="ReferenceItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource RasterItemStyle}">
-            <Setter Property="MinHeight" Value="56"/>
+            <Setter Property="MinHeight" Value="0"/>
             <Setter Property="Padding" Value="6,4"/>
         </Style>
 
@@ -45,6 +47,7 @@
         <!-- Template for RasterLayer -->
         <DataTemplate x:Key="RasterLayerTemplate" x:DataType="layer:RasterLayer">
             <Grid ColumnSpacing="8"
+                  MinHeight="{Binding RowMinHeight, ElementName=Self}"
                   RightTapped="Item_RightTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Active indicator -->
@@ -72,11 +75,11 @@
                 <!-- Preview thumbnails container (layer + mask) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
                     <!-- Layer preview thumbnail with selection border -->
-                    <Grid>
+                    <Grid Visibility="{Binding PreviewVisibility, ElementName=Self}">
                         <!-- Selection border (outside, behind the preview) - EDITING LAYER -->
                         <Border x:Name="LayerEditIndicator"
-                                Width="54"
-                                Height="54"
+                                Width="{Binding EditFrameSize, ElementName=Self}"
+                                Height="{Binding EditFrameSize, ElementName=Self}"
                                 BorderBrush="#FF00D4FF"
                                 BorderThickness="3"
                                 CornerRadius="6"
@@ -87,8 +90,9 @@
                         </Border>
                         <!-- Layer preview thumbnail -->
                         <Border x:Name="LayerPreviewBorder"
-                                Width="48"
-                                Height="48"
+                                Width="{Binding PreviewSize, ElementName=Self}"
+                                Height="{Binding PreviewSize, ElementName=Self}"
+                                Visibility="{Binding PreviewVisibility, ElementName=Self}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
                                 CornerRadius="4"
@@ -103,8 +107,8 @@
                     <Grid Visibility="{Binding HasMask, Mode=OneWay, Converter={StaticResource BoolToVis}}">
                         <!-- Selection border (outside, behind the preview) - EDITING MASK -->
                         <Border x:Name="MaskEditIndicator"
-                                Width="38"
-                                Height="54"
+                                Width="{Binding MaskEditFrameWidth, ElementName=Self}"
+                                Height="{Binding EditFrameSize, ElementName=Self}"
                                 BorderBrush="#FFFF6B00"
                                 BorderThickness="3"
                                 CornerRadius="6"
@@ -115,8 +119,9 @@
                         </Border>
                         <!-- Mask preview thumbnail -->
                         <Border x:Name="MaskPreviewBorder"
-                                Width="32"
-                                Height="48"
+                                Width="{Binding MaskPreviewWidth, ElementName=Self}"
+                                Height="{Binding PreviewSize, ElementName=Self}"
+                                Visibility="{Binding PreviewVisibility, ElementName=Self}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
                                 CornerRadius="4"
@@ -354,6 +359,7 @@
         <!-- Template for ReferenceLayer -->
         <DataTemplate x:Key="ReferenceLayerTemplate" x:DataType="layer:ReferenceLayer">
             <Grid ColumnSpacing="8"
+                  MinHeight="{Binding RowMinHeight, ElementName=Self}"
                   RightTapped="Item_RightTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Active indicator spacer -->
@@ -376,8 +382,9 @@
                 <!-- Preview thumbnail -->
                 <Border x:Name="RefPreviewBorder"
                         Grid.Column="2"
-                        Width="48"
-                        Height="48"
+                        Width="{Binding PreviewSize, ElementName=Self}"
+                        Height="{Binding PreviewSize, ElementName=Self}"
+                        Visibility="{Binding PreviewVisibility, ElementName=Self}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="4"

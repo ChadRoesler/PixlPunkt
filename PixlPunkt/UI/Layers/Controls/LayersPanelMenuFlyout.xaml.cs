@@ -21,6 +21,8 @@ namespace PixlPunkt.UI.Layers.Controls
 
         /// <summary>Raised when "Remove Selected" is clicked.</summary>
         public event EventHandler? RemoveSelectedRequested;
+        /// <summary>Raised with the requested thumbnail size in pixels (0 = hidden).</summary>
+        public event EventHandler<int>? PreviewSizeRequested;
 
         /// <summary>
         /// Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
@@ -62,6 +64,22 @@ namespace PixlPunkt.UI.Layers.Controls
         private void Remove_Click(object sender, RoutedEventArgs e)
         {
             RemoveSelectedRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>Checks the entry matching the current size (called before showing).</summary>
+        public void SetPreviewSize(int size)
+        {
+            foreach (var item in new[] { PreviewOff, PreviewSmall, PreviewNormal, PreviewLarge })
+                item.IsChecked = item.Tag is string t && int.TryParse(t, out int v) && v == size;
+        }
+
+        private void PreviewSize_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is ToggleMenuFlyoutItem item && item.Tag is string t && int.TryParse(t, out int size))
+            {
+                SetPreviewSize(size);
+                PreviewSizeRequested?.Invoke(this, size);
+            }
         }
     }
 }

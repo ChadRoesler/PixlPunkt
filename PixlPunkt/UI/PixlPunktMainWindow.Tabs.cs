@@ -154,14 +154,28 @@ namespace PixlPunkt.UI
 
         private async void DocsTab_AddTabButtonClick(TabView sender, object args)
         {
+            await ShowNewCanvasDialogAsync();
+            UpdateAddButtonOffset(DocsTab);
+        }
+
+        /// <summary>
+        /// The one New Canvas flow (Ctrl+N, File menu, tab "+"). Create makes the canvas the
+        /// dialog describes; From Clipboard makes one the size of the clipboard image with the
+        /// dialog's name.
+        /// </summary>
+        private async Task ShowNewCanvasDialogAsync()
+        {
             var dlg = new NewCanvasDialog { XamlRoot = MainXamlRoot };
             var res = await ShowDialogGuardedAsync(dlg);
             if (res == ContentDialogResult.Primary)
             {
-                var result = dlg.GetResult();
-                CreateAndOpenCanvas(result);
+                CreateAndOpenCanvas(dlg.GetResult());
+                UpdateSessionState();
             }
-            UpdateAddButtonOffset(DocsTab);
+            else if (res == ContentDialogResult.Secondary)
+            {
+                await CreateCanvasFromClipboardAsync(dlg.GetResult().Name);
+            }
         }
 
         /// <summary>
@@ -219,6 +233,9 @@ namespace PixlPunkt.UI
         /// positioning.
         /// </summary>
         private async void File_NewFromClipboard_Click(object sender, RoutedEventArgs e)
+            => await CreateCanvasFromClipboardAsync("NewCanvas");
+
+        private async Task CreateCanvasFromClipboardAsync(string name)
         {
             if (SelectionClipboard.ClipboardSize is not { } size)
             {
@@ -232,7 +249,7 @@ namespace PixlPunkt.UI
                 return;
             }
 
-            var host = CreateAndOpenCanvas(new NewCanvasResult("NewCanvas", CreateSize(size.w, size.h), CreateSize(1, 1), null));
+            var host = CreateAndOpenCanvas(new NewCanvasResult(name, CreateSize(size.w, size.h), CreateSize(1, 1), null));
             if (host == null) return;
 
             // Runs after the deferred tab selection above has attached the host (same priority, FIFO).

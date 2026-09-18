@@ -148,6 +148,17 @@
                             <TextBlock Text="Controls the transparency pattern shown behind images" Opacity="0.5" FontSize="11" Margin="0,-8,0,0"/>
 
                             <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="Layer Previews" FontWeight="SemiBold" Opacity="0.9" VerticalAlignment="Center" Width="160"/>
+                                <ComboBox x:Name="LayerPreviewSizeChoice" Width="160" SelectedIndex="2">
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="Small"/>
+                                    <ComboBoxItem Content="Normal"/>
+                                    <ComboBoxItem Content="Large"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <TextBlock Text="Thumbnail size in the layers panel; rows shrink or grow to match" Opacity="0.5" FontSize="11" Margin="0,-8,0,0"/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="12">
                                 <TextBlock Text="Swap Tool Rail in Voxel" FontWeight="SemiBold" Opacity="0.9" VerticalAlignment="Center" Width="160"/>
                                 <ToggleSwitch x:Name="SwapToolRailWhenVoxelActiveToggle"
                                               OnContent="On"

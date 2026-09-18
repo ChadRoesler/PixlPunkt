@@ -134,5 +134,8 @@ namespace PixlPunkt.Constants
 
         /// <summary>Menu item text for exporting layers as separate files.</summary>
         public const string LayersAsSeparateFiles = "Layers as separate files";
+
+        /// <summary>Checkbox text for trimming transparent edges off each exported layer.</summary>
+        public const string AutoCropLayers = "Auto crop (trim transparent edges)";
     }
 }

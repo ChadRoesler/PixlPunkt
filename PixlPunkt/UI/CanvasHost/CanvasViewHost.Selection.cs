@@ -333,7 +333,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (_selState == null || !_selState.DragStartSnapshot.HasValue) return;
 
             var beforeSnapshot = _selState.DragStartSnapshot.Value;
-            var afterSnapshot = _selState.CaptureTransformSnapshot();
+            var afterSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
 
             var kind = dragType switch
             {
@@ -719,7 +719,7 @@ namespace PixlPunkt.UI.CanvasHost
                     _selState.RotStartAngleDeg = _selState.AngleDeg;
                     _selState.RotStartPointerAngleDeg = Math.Atan2(docY - pivotDocY, docX - pivotDocX) * 180.0 / Math.PI;
                     if (!_selState.Floating) LiftSelectionWithHistory();
-                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
+                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
                     _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
@@ -737,7 +737,7 @@ namespace PixlPunkt.UI.CanvasHost
                     _selState.ScaleStartH = ScaledH;
                     _selState.ScaleStartScaleX = _selState.ScaleX;
                     _selState.ScaleStartScaleY = _selState.ScaleY;
-                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
+                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
                     _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
@@ -982,13 +982,6 @@ namespace PixlPunkt.UI.CanvasHost
             }
         }
 
-        /// <summary>
-        /// Settles a finished scale or rotate drag. Nothing is resampled here: scale stays live in
-        /// <c>ScaleX/Y</c> and rotation in <c>CumulativeAngleDeg</c>, and both are applied to the
-        /// original pixels exactly once, at commit (<c>FloatingSelectionOps.Rasterize</c>). Scaling
-        /// down and back up therefore returns the original pixels instead of a twice-resampled
-        /// blur, and the options box shows the true scale. Only the selection mask is rebuilt.
-        /// </summary>
         private void BakeTransformsOnRelease()
         {
             if (_selState == null || _selState.Buffer == null) return;
@@ -998,6 +991,21 @@ namespace PixlPunkt.UI.CanvasHost
             int centerX = _selState.OrigCenterX;
             int centerY = _selState.OrigCenterY;
 
+            if (hasScale)
+            {
+                var (buf, tw, th) = BuildScaledBufferForCommit(_selState.Buffer, _selState.BufferWidth, _selState.BufferHeight,
+                    _selState.ScaleX, _selState.ScaleY, _selState.ScaleFilter);
+                _selState.OrigW = tw;
+                _selState.OrigH = th;
+                _selState.Buffer = buf;
+                _selState.BufferWidth = tw;
+                _selState.BufferHeight = th;
+                _selState.FloatX = centerX - tw / 2;
+                _selState.FloatY = centerY - th / 2;
+                _selState.ScaleX = 1.0;
+                _selState.ScaleY = 1.0;
+            }
+
             if (hasRotation)
             {
                 _selState.CumulativeAngleDeg += _selState.AngleDeg;
@@ -1006,39 +1014,37 @@ namespace PixlPunkt.UI.CanvasHost
 
             _selState.PreviewBuf = null;
 
-            int scaledW = ScaledW, scaledH = ScaledH;
-            _selState.FloatX = centerX - scaledW / 2;
-            _selState.FloatY = centerY - scaledH / 2;
-
             if (_selState.RegionNonRectangular)
             {
-                // Non-rectangular selections (polygon, wand, paint): the mask follows the scaled
-                // alpha of the buffer. Rotation is never baked into the mask; it lives in
-                // CumulativeAngleDeg and is applied at display time and at commit.
+                // Non-rectangular selections (polygon, wand, paint): rebuild the region from the
+                // freshly scaled buffer's alpha channel after a scale bake. Rotation is NEVER
+                // baked into the region — it lives only in CumulativeAngleDeg and is applied
+                // at display time so the true shape is preserved through all transforms.
                 if (hasScale)
                 {
-                    var (buf, tw, th) = BuildScaledBufferForCommit(_selState.Buffer, _selState.BufferWidth, _selState.BufferHeight,
-                        _selState.ScaleX, _selState.ScaleY, _selState.ScaleFilter);
-                    var floatRect = CreateRect(_selState.FloatX, _selState.FloatY, tw, th);
+                    var floatRect = CreateRect(_selState.FloatX, _selState.FloatY, _selState.BufferWidth, _selState.BufferHeight);
                     var dstClamp = ClampToSurface(floatRect, Document.PixelWidth, Document.PixelHeight);
                     Core.Selection.SelectionRegionBuilders.RebuildFromTransformedBuffer(
-                        _selRegion, floatRect, dstClamp, buf, tw, th,
+                        _selRegion, floatRect, dstClamp, _selState.Buffer!,
+                        _selState.BufferWidth, _selState.BufferHeight,
                         Document.PixelWidth, Document.PixelHeight);
                 }
+                // Rotation only: region unchanged — CumulativeAngleDeg carries the rotation.
             }
             else
             {
+                // Rectangular selections: rebuild as a rotated rectangle using the cumulative angle.
                 var docClamp = CreateRect(0, 0, Document.PixelWidth, Document.PixelHeight);
                 Core.Selection.SelectionRegionBuilders.RebuildAsRotatedRect(
                     _selRegion, centerX, centerY,
-                    scaledW, scaledH,
+                    _selState.BufferWidth, _selState.BufferHeight,
                     _selState.CumulativeAngleDeg,
                     docClamp,
                     Document.PixelWidth, Document.PixelHeight);
             }
 
             _selState.Rect = _selRegion.Bounds;
-            _toolState?.SetSelectionScale(_selState.ScaleX * 100.0, _selState.ScaleY * 100.0, _selState.ScaleLink);
+            _toolState?.SetSelectionScale(100.0, 100.0, _selState.ScaleLink);
             _toolState?.SetRotationAngle(0.0);
         }
 

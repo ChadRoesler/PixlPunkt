@@ -431,6 +431,9 @@
         <member name="F:PixlPunkt.Constants.DialogMessages.LayersAsSeparateFiles">
             <summary>Menu item text for exporting layers as separate files.</summary>
         </member>
+        <member name="F:PixlPunkt.Constants.DialogMessages.AutoCropLayers">
+            <summary>Checkbox text for trimming transparent edges off each exported layer.</summary>
+        </member>
         <member name="T:PixlPunkt.Constants.FileDefaults">
             <summary>
             Default names for documents, layers, and exports.
@@ -12153,6 +12156,12 @@
         <member name="M:PixlPunkt.Core.Imaging.PixelRectOps.Blit(System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],System.Int32,System.Int32)">
             <summary>Copies a packed buffer into the surface at (dx, dy), clipping to the surface. No blending.</summary>
         </member>
+        <member name="M:PixlPunkt.Core.Imaging.PixelRectOps.OpaqueBounds(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            Tight bounds of every pixel with alpha &gt; 0, or null when the buffer is fully
+            transparent. Used by "auto crop" exports.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Core.Imaging.PixelRectOps.ClearRect(System.Byte[],System.Int32,System.Int32,Windows.Graphics.RectInt32)">
             <summary>Zeroes the pixels of <paramref name="r"/> (clamped to the surface).</summary>
         </member>
@@ -17736,8 +17745,7 @@
         </member>
         <member name="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW">
             <summary>
-            Handle-frame size: the unscaled buffer size (scale is never baked into the pixels
-            before commit, so this equals <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Width"/>/<see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Height"/>). Invariant: <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW"/>,
+            Handle-frame size: the buffer size at the last bake. Invariant: <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW"/>,
             <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigH"/>, <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigCenterX"/> and <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigCenterY"/> are always
             valid. They are set in the constructor, every move shifts the centre with the float,
             and a bake re-centres and resizes them. Readers use them directly; there is no
@@ -17969,6 +17977,12 @@
             <summary>
             Renders the animated marching-ants outline. Edge runs are computed once per mask
             version and cached; each frame only draws them at the current phase.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegion.DrawOutline(PixlPunkt.Core.Rendering.ICanvasRenderer,Windows.Foundation.Rect,System.Double,System.Single)">
+            <summary>
+            Draws the boundary as a solid white line (the "ants paused" look while dragging),
+            from the same cached edge runs the marching ants use, so all four sides are drawn.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Selection.SelectionRegion.Fill(Windows.Graphics.RectInt32,System.Boolean)">
@@ -19146,6 +19160,9 @@
             <summary>
             Gets or sets the palette swatch size in pixels.
             </summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Settings.AppSettings.LayerPreviewSize">
+            <summary>Layer thumbnail size in the layers panel, in pixels; 0 hides them.</summary>
         </member>
         <member name="P:PixlPunkt.Core.Settings.AppSettings.DefaultPalette">
             <summary>
@@ -30174,15 +30191,6 @@
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Selection_SetScale(System.Double,System.Double,System.Boolean)">
             <summary>Sets selection scale in percent.</summary>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.BakeTransformsOnRelease">
-            <summary>
-            Settles a finished scale or rotate drag. Nothing is resampled here: scale stays live in
-            <c>ScaleX/Y</c> and rotation in <c>CumulativeAngleDeg</c>, and both are applied to the
-            original pixels exactly once, at commit (<c>FloatingSelectionOps.Rasterize</c>). Scaling
-            down and back up therefore returns the original pixels instead of a twice-resampled
-            blur, and the options box shows the true scale. Only the selection mask is rebuilt.
-            </summary>
-        </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.GetShapeBuilderForCurrentTool">
             <summary>
             Gets the shape builder for the current tool from the registry.
@@ -32896,6 +32904,9 @@
             Supports scaling, background color selection for non-alpha formats, and layer separation.
             </summary>
         </member>
+        <member name="P:PixlPunkt.UI.Dialogs.Export.ImageExportDialog.AutoCrop">
+            <summary>Trim each layer's file to the bounds of its non-transparent pixels. Only with <see cref="P:PixlPunkt.UI.Dialogs.Export.ImageExportDialog.SeparateLayers"/>.</summary>
+        </member>
         <member name="M:PixlPunkt.UI.Dialogs.Export.ImageExportDialog.GetExportPixels">
             <summary>
             Gets the final export pixels with the selected scale and background applied.
@@ -33150,11 +33161,6 @@
         <member name="M:PixlPunkt.UI.Dialogs.NewCanvasDialog.GetResult">
             <summary>
             Gets the dialog result with all values needed to create a canvas.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Dialogs.NewCanvasDialog.GetValues">
-            <summary>
-            Legacy method for backward compatibility.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Dialogs.NewCanvasDialog.InitializeComponent">
@@ -33797,6 +33803,9 @@
         <member name="E:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.RemoveSelectedRequested">
             <summary>Raised when "Remove Selected" is clicked.</summary>
         </member>
+        <member name="E:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.PreviewSizeRequested">
+            <summary>Raised with the requested thumbnail size in pixels (0 = hidden).</summary>
+        </member>
         <member name="P:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.Flyout">
             <summary>
             Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
@@ -33806,6 +33815,9 @@
             <summary>
             Shows the flyout at the specified element with the given XamlRoot.
             </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.SetPreviewSize(System.Int32)">
+            <summary>Checks the entry matching the current size (called before showing).</summary>
         </member>
         <member name="M:PixlPunkt.UI.Layers.Controls.LayersPanelMenuFlyout.InitializeComponent">
             <summary>
@@ -34254,6 +34266,18 @@
             <summary>
             Forces all layer previews to refresh. Call after canvas resize operations.
             </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.LayersPanel.PreviewSize">
+            <summary>Thumbnail edge in pixels (0 = hidden). Bound by the row templates.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.LayersPanel.EditFrameSize">
+            <summary>The editing frame drawn around a thumbnail (3px border each side).</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Layers.LayersPanel.RowMinHeight">
+            <summary>Row height for raster and reference rows: the thumbnail frame plus a little air, or a text-height row when previews are off.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Layers.LayersPanel.SetPreviewSize(System.Int32,System.Boolean)">
+            <summary>Applies a thumbnail size to the templates and row heights; persists when asked.</summary>
         </member>
         <member name="M:PixlPunkt.UI.Layers.LayersPanel.RevealItem(PixlPunkt.Core.Document.Layer.LayerBase)">
             <summary>
@@ -35021,6 +35045,13 @@
             Steps the animation forward one frame.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.ShowNewCanvasDialogAsync">
+            <summary>
+            The one New Canvas flow (Ctrl+N, File menu, tab "+"). Create makes the canvas the
+            dialog describes; From Clipboard makes one the size of the clipboard image with the
+            dialog's name.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.CreateAndOpenCanvas(PixlPunkt.UI.Dialogs.NewCanvasResult)">
             <summary>
             Creates and opens a canvas from a NewCanvasResult.
@@ -35252,6 +35283,11 @@
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.PromptSaveAllChangesAsync(System.Collections.Generic.List{PixlPunkt.Core.Document.CanvasDocument})">
             <summary>
             Prompts the user to save changes for multiple documents when closing the app.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.SetLayerPreviewSize(System.Int32)">
+            <summary>
+            Update layer thumbnail size at runtime (0 = hidden). The panel's own menu persists it too.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.SetPaletteSwatchSize(System.Int32)">
@@ -35532,6 +35568,9 @@
             <summary>
             View model for palette selection in settings.
             </summary>
+        </member>
+        <member name="F:PixlPunkt.UI.Settings.SettingsWindow.LayerPreviewSizes">
+            <summary>Thumbnail edge in pixels for the Layer Previews choice: Off, Small, Normal, Large.</summary>
         </member>
         <member name="M:PixlPunkt.UI.Settings.SettingsWindow.InitializeWithToolState(PixlPunkt.Core.Tools.ToolState)">
             <summary>

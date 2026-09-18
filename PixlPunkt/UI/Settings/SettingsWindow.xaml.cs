@@ -47,6 +47,9 @@ namespace PixlPunkt.UI.Settings
 
     public sealed partial class SettingsWindow : Window
     {
+        /// <summary>Thumbnail edge in pixels for the Layer Previews choice: Off, Small, Normal, Large.</summary>
+        private static readonly int[] LayerPreviewSizes = { 0, 28, 48, 72 };
+
         public ObservableCollection<CustomCanvasTemplate> CustomTemplates { get; } = new();
         public ObservableCollection<CustomPalette> CustomPalettes { get; } = new();
         public ObservableCollection<LoadedPlugin> LoadedPlugins { get; } = new();
@@ -104,6 +107,8 @@ namespace PixlPunkt.UI.Settings
             BackupIntervalBox.Value = s.AutoBackupMinutes;
             MaxBackupCountBox.Value = s.MaxBackupCount;
             PaletteSwatchSizeBox.Value = s.PaletteSwatchSize;
+            int previewIndex = Array.IndexOf(LayerPreviewSizes, s.LayerPreviewSize);
+            LayerPreviewSizeChoice.SelectedIndex = previewIndex >= 0 ? previewIndex : 2;
             TileSwatchSizeBox.Value = s.TileSwatchSize;
             DefaultTileSetPathBox.Text = s.DefaultTileSetPath;
             AppThemeChoice.SelectedIndex = (int)s.AppTheme;
@@ -851,6 +856,7 @@ namespace PixlPunkt.UI.Settings
                 s.AutoBackupMinutes = Math.Max(4, (int)BackupIntervalBox.Value);
                 s.MaxBackupCount = Math.Max(1, (int)MaxBackupCountBox.Value);
                 s.PaletteSwatchSize = (int)PaletteSwatchSizeBox.Value;
+                s.LayerPreviewSize = LayerPreviewSizes[Math.Clamp(LayerPreviewSizeChoice.SelectedIndex, 0, LayerPreviewSizes.Length - 1)];
                 s.TileSwatchSize = (int)TileSwatchSizeBox.Value;
                 s.DefaultTileSetPath = DefaultTileSetPathBox.Text ?? string.Empty;
                 s.AppTheme = (AppThemeChoice)AppThemeChoice.SelectedIndex;
@@ -893,6 +899,7 @@ namespace PixlPunkt.UI.Settings
                         main.SetAppTheme(s.AppTheme);
                         main.SetStripeTheme(s.StripeTheme);
                         main.SetPaletteSwatchSize(s.PaletteSwatchSize);
+                        main.SetLayerPreviewSize(s.LayerPreviewSize);
                         main.SetSwapGlobalToolRailWhenVoxelActive(s.SwapGlobalToolRailWhenVoxelPaneActive);
                     }
                 }

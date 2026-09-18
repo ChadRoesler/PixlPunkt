@@ -34,6 +34,29 @@ namespace PixlPunkt.Core.Imaging
             }
         }
 
+        /// <summary>
+        /// Tight bounds of every pixel with alpha &gt; 0, or null when the buffer is fully
+        /// transparent. Used by "auto crop" exports.
+        /// </summary>
+        public static RectInt32? OpaqueBounds(byte[] src, int w, int h)
+        {
+            int minX = w, minY = h, maxX = -1, maxY = -1;
+            for (int y = 0; y < h; y++)
+            {
+                int row = y * w * 4;
+                for (int x = 0; x < w; x++)
+                {
+                    if (src[row + x * 4 + 3] == 0) continue;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+            if (maxX < 0) return null;
+            return new RectInt32 { X = minX, Y = minY, Width = maxX - minX + 1, Height = maxY - minY + 1 };
+        }
+
         /// <summary>Zeroes the pixels of <paramref name="r"/> (clamped to the surface).</summary>
         public static void ClearRect(byte[] dst, int w, int h, RectInt32 r)
         {

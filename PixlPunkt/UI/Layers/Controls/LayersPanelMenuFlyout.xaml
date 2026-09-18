@@ -23,6 +23,16 @@
                 </MenuFlyoutItem.Icon>
             </MenuFlyoutItem>
             <MenuFlyoutSeparator/>
+            <MenuFlyoutSubItem Text="Layer Previews">
+                <MenuFlyoutSubItem.Icon>
+                    <ic:FluentIcon Icon="Image"/>
+                </MenuFlyoutSubItem.Icon>
+                <ToggleMenuFlyoutItem x:Name="PreviewOff" Text="Off" Tag="0" Click="PreviewSize_Click"/>
+                <ToggleMenuFlyoutItem x:Name="PreviewSmall" Text="Small" Tag="28" Click="PreviewSize_Click"/>
+                <ToggleMenuFlyoutItem x:Name="PreviewNormal" Text="Normal" Tag="48" Click="PreviewSize_Click"/>
+                <ToggleMenuFlyoutItem x:Name="PreviewLarge" Text="Large" Tag="72" Click="PreviewSize_Click"/>
+            </MenuFlyoutSubItem>
+            <MenuFlyoutSeparator/>
             <MenuFlyoutItem Text="Remove Selected" Icon="Delete" Click="Remove_Click"/>
         </MenuFlyout>
     </UserControl.Resources>

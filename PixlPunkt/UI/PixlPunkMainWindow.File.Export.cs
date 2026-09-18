@@ -1177,6 +1177,7 @@ namespace PixlPunkt.UI
             int scale = dialog.Scale;
             string format = dialog.SelectedFormat;
             bool separateLayers = dialog.SeparateLayers;
+            bool autoCrop = dialog.AutoCrop;
             uint bgColorU = dialog.BackgroundColor;
 
             try
@@ -1203,6 +1204,17 @@ namespace PixlPunkt.UI
                         var src = layer.Surface.Pixels;
                         int w = doc.PixelWidth;
                         int h = doc.PixelHeight;
+
+                        if (autoCrop)
+                        {
+                            // Trim to the opaque pixels; an empty layer becomes a 1x1 transparent file
+                            // so the set of files stays complete.
+                            var bounds = Core.Imaging.PixelRectOps.OpaqueBounds(src, w, h)
+                                ?? new Windows.Graphics.RectInt32 { X = 0, Y = 0, Width = 1, Height = 1 };
+                            src = Core.Imaging.PixelRectOps.CopyRect(src, w, h, bounds);
+                            w = bounds.Width;
+                            h = bounds.Height;
+                        }
 
                         var outBgra = ComposePixelsForExport(src, w, h, layer.Opacity, bgColorU, format);
 

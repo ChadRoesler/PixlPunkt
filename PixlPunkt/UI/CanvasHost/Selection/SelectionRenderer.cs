@@ -613,25 +613,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         }
 
         private void DrawSolidOutline(ICanvasRenderer renderer, Rect dest, double scale)
-        {
-            if (_state.Region.IsEmpty) return;
-            float ox = (float)dest.X, oy = (float)dest.Y, s = (float)scale;
-            var b = _state.Region.Bounds;
-            for (int y = b.Y; y < b.Y + b.Height; y++)
-            {
-                int runX0 = -1;
-                for (int x = b.X; x <= b.X + b.Width; x++)
-                {
-                    bool edge = _state.Region.Contains(x, y) && !_state.Region.Contains(x, y - 1);
-                    if (edge && runX0 < 0) runX0 = x;
-                    if (!edge && runX0 >= 0)
-                    {
-                        renderer.FillRectangle(ox + runX0 * s, oy + y * s - ANTS_THICKNESS * 0.5f, (x - runX0) * s, ANTS_THICKNESS, Colors.White);
-                        runX0 = -1;
-                    }
-                }
-            }
-        }
+            => _state.Region.DrawOutline(renderer, dest, scale, ANTS_THICKNESS);
 
         private void DrawMarqueePreview(ICanvasRenderer renderer, Rect dest, double scale)
         {

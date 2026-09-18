@@ -66,6 +66,15 @@ namespace PixlPunkt.UI
             {
                 if (_tabAddButton == null) return;
 
+                // A tab may have arrived while this was queued (session restore, autosave
+                // recovery); the nudge is only for the empty strip, so bail rather than
+                // shove the button down next to a real tab.
+                if (tabView.TabItems.Count > 0)
+                {
+                    ((TranslateTransform)_tabAddButton.RenderTransform).Y = 0;
+                    return;
+                }
+
                 var t = (TranslateTransform)_tabAddButton.RenderTransform;
 
                 // Measure natural position with transform disabled

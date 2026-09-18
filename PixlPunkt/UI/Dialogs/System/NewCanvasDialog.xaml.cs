@@ -6,6 +6,7 @@ using PixlPunkt.Core.Canvas;
 using Windows.Graphics;
 using System.Threading.Tasks;
 using static PixlPunkt.Core.Helpers.GraphicsStructHelper;
+using PixlPunkt.UI.CanvasHost.Selection;
 
 namespace PixlPunkt.UI.Dialogs
 {
@@ -30,6 +31,10 @@ namespace PixlPunkt.UI.Dialogs
 
             // Set DataContext for simple XAML bindings
             DataContext = this;
+
+            // Secondary button = a canvas the size of the clipboard image (see the window's
+            // CreateCanvasFromClipboard); only offered when something has been copied.
+            SecondaryButtonText = SelectionClipboard.HasClipboard ? "From Clipboard" : null;
 
             // Load all templates (built-in + custom)
             LoadAllTemplates();
@@ -169,15 +174,5 @@ namespace PixlPunkt.UI.Dialogs
             );
         }
 
-        /// <summary>
-        /// Legacy method for backward compatibility.
-        /// </summary>
-        public (string name, int pxW, int pxH, SizeInt32 tileSize, SizeInt32 tileCounts) GetValues()
-        {
-            var result = GetResult();
-            int pxW = result.TileSize.Width * result.TileCounts.Width;
-            int pxH = result.TileSize.Height * result.TileCounts.Height;
-            return (result.Name, pxW, pxH, result.TileSize, result.TileCounts);
-        }
     }
 }

@@ -72,6 +72,9 @@ namespace PixlPunkt.Core.Settings
         /// </summary>
         public int PaletteSwatchSize { get; set; } = 16;
 
+        /// <summary>Layer thumbnail size in the layers panel, in pixels; 0 hides them.</summary>
+        public int LayerPreviewSize { get; set; } = 48;
+
         /// <summary>
         /// Gets or sets the name of the default palette to load on startup.
         /// </summary>

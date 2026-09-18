@@ -13,6 +13,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
+using PixlPunkt.Core.Settings;
 using Windows.System;
 
 namespace PixlPunkt.UI.Layers
@@ -26,7 +28,7 @@ namespace PixlPunkt.UI.Layers
     /// - LayersPanel.Helpers.cs: Visual tree helpers and UI utilities
     /// - LayersPanel.Masks.cs: Layer mask operations
     /// </summary>
-    public sealed partial class LayersPanel : UserControl
+    public sealed partial class LayersPanel : UserControl, INotifyPropertyChanged
     {
         // ====================================================================
         // FIELDS
@@ -78,6 +80,7 @@ namespace PixlPunkt.UI.Layers
         public LayersPanel()
         {
             InitializeComponent();
+            ApplyPreviewSize(AppSettings.Instance.LayerPreviewSize);
 
             if (!Resources.ContainsKey("BooleanToVisibilityConverter"))
                 Resources["BooleanToVisibilityConverter"] = new BoolToVisibilityConverter();
@@ -413,6 +416,50 @@ namespace PixlPunkt.UI.Layers
             var folder = _doc.AddFolder(into: into);
             RebuildFromDoc();
             RevealItem(folder);
+        }
+
+        // ====================================================================
+        // LAYER PREVIEW SIZE
+        // ====================================================================
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private int _previewSize = 48;
+
+        /// <summary>Thumbnail edge in pixels (0 = hidden). Bound by the row templates.</summary>
+        public double PreviewSize => Math.Max(0, _previewSize);
+        public double MaskPreviewWidth => Math.Round(PreviewSize * 2.0 / 3.0);
+        public Visibility PreviewVisibility => _previewSize > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        /// <summary>The editing frame drawn around a thumbnail (3px border each side).</summary>
+        public double EditFrameSize => _previewSize > 0 ? PreviewSize + 6 : 0;
+        public double MaskEditFrameWidth => _previewSize > 0 ? MaskPreviewWidth + 6 : 0;
+
+        /// <summary>Row height for raster and reference rows: the thumbnail frame plus a little air, or a text-height row when previews are off.</summary>
+        public double RowMinHeight => _previewSize > 0 ? EditFrameSize + 2 : 30;
+
+        /// <summary>Applies a thumbnail size to the templates and row heights; persists when asked.</summary>
+        public void SetPreviewSize(int size, bool persist)
+        {
+            if (persist)
+            {
+                AppSettings.Instance.LayerPreviewSize = size;
+                AppSettings.Instance.Save();
+            }
+            ApplyPreviewSize(size);
+        }
+
+        private void ApplyPreviewSize(int size)
+        {
+            _previewSize = Math.Clamp(size, 0, 256);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PreviewSize)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MaskPreviewWidth)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PreviewVisibility)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EditFrameSize)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MaskEditFrameWidth)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowMinHeight)));
+            PanelMenuFlyout?.SetPreviewSize(_previewSize);
+            // The rows bind to these through ElementName=Self, so they resize in place; no rebuild.
         }
 
         /// <summary>

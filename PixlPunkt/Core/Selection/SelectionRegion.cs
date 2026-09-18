@@ -241,6 +241,27 @@ namespace PixlPunkt.Core.Selection
                 DrawAntsV(renderer, ox + xEdge * s, oy + y0 * s, (y1 - y0) * s, phase, antsOn, antsOff, antsThickness, invert);
         }
 
+        /// <summary>
+        /// Draws the boundary as a solid white line (the "ants paused" look while dragging),
+        /// from the same cached edge runs the marching ants use, so all four sides are drawn.
+        /// </summary>
+        public void DrawOutline(ICanvasRenderer renderer, Rect dest, double scale, float thickness)
+        {
+            if (IsEmpty) return;
+
+            if (_antsCacheVersion != _version)
+                RebuildAntsEdges();
+
+            float ox = (float)(dest.X + _offsetX * scale);
+            float oy = (float)(dest.Y + _offsetY * scale);
+            float s = (float)scale;
+
+            foreach (var (x0, yEdge, x1, _) in _antsH)
+                renderer.FillRectangle(ox + x0 * s, oy + yEdge * s - thickness * 0.5f, (x1 - x0) * s, thickness, Colors.White);
+            foreach (var (xEdge, y0, y1, _) in _antsV)
+                renderer.FillRectangle(ox + xEdge * s - thickness * 0.5f, oy + y0 * s, thickness, (y1 - y0) * s, Colors.White);
+        }
+
         private void RebuildAntsEdges()
         {
             _antsH.Clear();

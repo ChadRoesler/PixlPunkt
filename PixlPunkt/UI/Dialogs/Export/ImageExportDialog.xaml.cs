@@ -39,6 +39,7 @@ namespace PixlPunkt.UI.Dialogs.Export
         private readonly ComboBox _svgModeComboBox;
         private readonly StackPanel _svgModePanel;
         private readonly CheckBox _separateLayersCheckBox;
+        private readonly CheckBox _autoCropCheckBox;
         private readonly StackPanel _backgroundColorPanel;
         private readonly Border _backgroundColorSwatch;
         private readonly Image _previewImage;
@@ -48,6 +49,9 @@ namespace PixlPunkt.UI.Dialogs.Export
         public new int Scale { get; private set; }
         public string SelectedFormat { get; private set; }
         public bool SeparateLayers => _separateLayersCheckBox.IsChecked == true;
+
+        /// <summary>Trim each layer's file to the bounds of its non-transparent pixels. Only with <see cref="SeparateLayers"/>.</summary>
+        public bool AutoCrop => SeparateLayers && _autoCropCheckBox.IsChecked == true;
         public uint BackgroundColor => ColorUtil.ToBGRA(_backgroundColor);
         public SvgExportMode SvgMode => _svgModeComboBox.SelectedIndex == 1
             ? SvgExportMode.Block
@@ -89,6 +93,14 @@ namespace PixlPunkt.UI.Dialogs.Export
 
             _formatComboBox = new ComboBox { Width = 160 };
             _separateLayersCheckBox = new CheckBox { Content = DialogMessages.LayersAsSeparateFiles };
+            _autoCropCheckBox = new CheckBox
+            {
+                Content = DialogMessages.AutoCropLayers,
+                Margin = new Thickness(24, 0, 0, 0),
+                IsEnabled = false
+            };
+            _separateLayersCheckBox.Checked += (_, __) => _autoCropCheckBox.IsEnabled = true;
+            _separateLayersCheckBox.Unchecked += (_, __) => _autoCropCheckBox.IsEnabled = false;
 
             _svgModeComboBox = new ComboBox { Width = 200 };
             foreach (var mode in ImageExportConstants.SvgModes)
@@ -190,6 +202,7 @@ namespace PixlPunkt.UI.Dialogs.Export
 
             // Row 2: Options
             mainPanel.Children.Add(_separateLayersCheckBox);
+            mainPanel.Children.Add(_autoCropCheckBox);
             mainPanel.Children.Add(_svgModePanel);
             mainPanel.Children.Add(_backgroundColorPanel);
 

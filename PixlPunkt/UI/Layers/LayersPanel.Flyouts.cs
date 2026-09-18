@@ -25,6 +25,7 @@ namespace PixlPunkt.UI.Layers
             PanelMenuFlyout.AddFolderRequested += (s, e) => AddFolder_Click(s ?? this, new RoutedEventArgs());
             PanelMenuFlyout.AddReferenceLayerRequested += (s, e) => AddReferenceLayer_Click(s ?? this, new RoutedEventArgs());
             PanelMenuFlyout.RemoveSelectedRequested += (s, e) => Remove_Click(s ?? this, new RoutedEventArgs());
+            PanelMenuFlyout.PreviewSizeRequested += (s, size) => SetPreviewSize(size, persist: true);
 
             // Raster layer flyout
             LayerMenuFlyout.SettingsRequested += OnRasterSettings;
