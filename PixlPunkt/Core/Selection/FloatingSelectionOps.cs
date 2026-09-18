@@ -42,6 +42,7 @@ namespace PixlPunkt.Core.Selection
             var before = PixelRectOps.CopyRect(surf.Pixels, sw, sh, bounds);
             var after = (byte[])before.Clone();
             var lifted = new byte[bw * bh * 4];
+            var mask = new byte[bw * bh];
             int boxStride = bw * 4;
 
             for (int y = 0; y < bh; y++)
@@ -51,6 +52,7 @@ namespace PixlPunkt.Core.Selection
                 for (int x = 0; x < bw; x++)
                 {
                     if (!region.Contains(bounds.X + x, sy)) continue;
+                    mask[y * bw + x] = 1;
                     int i = row + x * 4;
                     lifted[i] = before[i]; lifted[i + 1] = before[i + 1]; lifted[i + 2] = before[i + 2]; lifted[i + 3] = before[i + 3];
                     after[i] = 0; after[i + 1] = 0; after[i + 2] = 0; after[i + 3] = 0;
@@ -66,7 +68,7 @@ namespace PixlPunkt.Core.Selection
                 tilesAfter = TileLayerPropagation.CaptureTileStates(doc.TileSet!, tilesBefore.Keys);
             }
 
-            var floating = new FloatingSelection(layer, lifted, bw, bh, bounds.X, bounds.Y, bounds, before)
+            var floating = new FloatingSelection(layer, lifted, bw, bh, bounds.X, bounds.Y, bounds, before, mask)
             {
                 RegionNonRectangular = nonRect
             };

@@ -995,6 +995,7 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 var (buf, tw, th) = BuildScaledBufferForCommit(_selState.Buffer, _selState.BufferWidth, _selState.BufferHeight,
                     _selState.ScaleX, _selState.ScaleY, _selState.ScaleFilter);
+                _selState.Lifted?.ResampleMask(tw, th);   // the shape scales with the pixels
                 _selState.OrigW = tw;
                 _selState.OrigH = th;
                 _selState.Buffer = buf;

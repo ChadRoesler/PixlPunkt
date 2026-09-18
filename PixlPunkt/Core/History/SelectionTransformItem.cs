@@ -29,6 +29,7 @@ namespace PixlPunkt.Core.History
             public readonly bool PivotCustom;
             public readonly bool BufferFlipped;
             public readonly byte[]? Buffer;
+            public readonly byte[]? Mask;
             public readonly int BufferWidth, BufferHeight;
 
             public TransformSnapshot(
@@ -36,19 +37,19 @@ namespace PixlPunkt.Core.History
                 double angleDeg, double cumulativeAngleDeg,
                 int origCenterX, int origCenterY, int origW, int origH,
                 double pivotOffsetX, double pivotOffsetY, bool pivotCustom, bool bufferFlipped,
-                byte[]? buffer = null, int bufferWidth = 0, int bufferHeight = 0)
+                byte[]? buffer = null, int bufferWidth = 0, int bufferHeight = 0, byte[]? mask = null)
             {
                 FloatX = floatX; FloatY = floatY; ScaleX = scaleX; ScaleY = scaleY;
                 AngleDeg = angleDeg; CumulativeAngleDeg = cumulativeAngleDeg;
                 OrigCenterX = origCenterX; OrigCenterY = origCenterY; OrigW = origW; OrigH = origH;
                 PivotOffsetX = pivotOffsetX; PivotOffsetY = pivotOffsetY; PivotCustom = pivotCustom; BufferFlipped = bufferFlipped;
-                Buffer = buffer; BufferWidth = bufferWidth; BufferHeight = bufferHeight;
+                Buffer = buffer; BufferWidth = bufferWidth; BufferHeight = bufferHeight; Mask = mask;
             }
 
-            public TransformSnapshot WithBuffer(byte[]? buffer) => new(
+            public TransformSnapshot WithBuffer(byte[]? buffer, byte[]? mask) => new(
                 FloatX, FloatY, ScaleX, ScaleY, AngleDeg, CumulativeAngleDeg,
                 OrigCenterX, OrigCenterY, OrigW, OrigH, PivotOffsetX, PivotOffsetY, PivotCustom, BufferFlipped,
-                buffer, BufferWidth, BufferHeight);
+                buffer, BufferWidth, BufferHeight, mask);
         }
 
         /// <summary>Captures the transform of <paramref name="f"/>; include the buffer when the operation bakes pixels (scale/rotate).</summary>
@@ -56,7 +57,8 @@ namespace PixlPunkt.Core.History
             f.X, f.Y, f.ScaleX, f.ScaleY, f.AngleDeg, f.CumulativeAngleDeg,
             f.OrigCenterX, f.OrigCenterY, f.OrigW, f.OrigH,
             f.PivotOffsetX, f.PivotOffsetY, f.PivotCustom, f.BufferFlipped,
-            includeBuffer ? (byte[])f.Pixels.Clone() : null, f.Width, f.Height);
+            includeBuffer ? (byte[])f.Pixels.Clone() : null, f.Width, f.Height,
+            includeBuffer ? (byte[])f.Mask.Clone() : null);
 
         /// <summary>Applies a snapshot to <paramref name="f"/> (restoring the buffer if the snapshot carries one).</summary>
         public static void ApplyTo(FloatingSelection f, in TransformSnapshot s)
@@ -72,6 +74,7 @@ namespace PixlPunkt.Core.History
                 f.Pixels = (byte[])s.Buffer.Clone();
                 f.Width = s.BufferWidth;
                 f.Height = s.BufferHeight;
+                if (s.Mask != null) f.Mask = (byte[])s.Mask.Clone();
             }
         }
 
@@ -146,7 +149,8 @@ namespace PixlPunkt.Core.History
 
         // ── memory budget ──────────────────────────────────────────────
 
-        protected override long PayloadBytes => (_before.Buffer?.Length ?? 0) + (_after.Buffer?.Length ?? 0);
+        protected override long PayloadBytes =>
+            (_before.Buffer?.Length ?? 0) + (_after.Buffer?.Length ?? 0) + (_before.Mask?.Length ?? 0) + (_after.Mask?.Length ?? 0);
 
         protected override byte[]? SerializePayload()
         {
@@ -155,6 +159,8 @@ namespace PixlPunkt.Core.History
             using var bw = new BinaryWriter(ms);
             HistoryBlobs.Write(bw, _before.Buffer);
             HistoryBlobs.Write(bw, _after.Buffer);
+            HistoryBlobs.Write(bw, _before.Mask);
+            HistoryBlobs.Write(bw, _after.Mask);
             return ms.ToArray();
         }
 
@@ -162,14 +168,16 @@ namespace PixlPunkt.Core.History
         {
             using var ms = new MemoryStream(data);
             using var br = new BinaryReader(ms);
-            _before = _before.WithBuffer(HistoryBlobs.Read(br));
-            _after = _after.WithBuffer(HistoryBlobs.Read(br));
+            var beforeBuf = HistoryBlobs.Read(br);
+            var afterBuf = HistoryBlobs.Read(br);
+            _before = _before.WithBuffer(beforeBuf, HistoryBlobs.Read(br));
+            _after = _after.WithBuffer(afterBuf, HistoryBlobs.Read(br));
         }
 
         protected override void ReleasePayload()
         {
-            _before = _before.WithBuffer(null);
-            _after = _after.WithBuffer(null);
+            _before = _before.WithBuffer(null, null);
+            _after = _after.WithBuffer(null, null);
         }
     }
 }

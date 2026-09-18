@@ -475,6 +475,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                 FlipBufferHorizontal(_state.Buffer, _state.BufferWidth, _state.BufferHeight);
             }
 
+            _state.Lifted?.FlipMaskHorizontal();
             _state.BufferFlipped = true; // Mark that buffer differs from original region
             _state.PreviewBuf = null; // Clear preview to force regeneration
 
@@ -520,6 +521,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                 FlipBufferVertical(_state.Buffer, _state.BufferWidth, _state.BufferHeight);
             }
 
+            _state.Lifted?.FlipMaskVertical();
             _state.BufferFlipped = true; // Mark that buffer differs from original region
             _state.PreviewBuf = null; // Clear preview to force regeneration
 

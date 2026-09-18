@@ -17734,6 +17734,15 @@
         <member name="P:PixlPunkt.Core.Selection.FloatingSelection.Pixels">
             <summary>BGRA pixel buffer, <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Width"/> × <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Height"/> × 4. Scale is baked into it on release; rotation is not.</summary>
         </member>
+        <member name="P:PixlPunkt.Core.Selection.FloatingSelection.Mask">
+            <summary>
+            The selection shape in the same local frame as <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Pixels"/>: one byte per
+            pixel, 1 = selected. It is the marquee the user drew (all ones for a paste), never
+            derived from pixel alpha, and it follows every change made to the pixels: a scale bake
+            resamples it (<see cref="M:PixlPunkt.Core.Selection.FloatingSelection.ResampleMask(System.Int32,System.Int32)"/>), a flip mirrors it. Stage 1 of the
+            selection-shape work carries it; later stages read it for the region and hit-testing.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Selection.FloatingSelection.X">
             <summary>Top-left of the (unrotated, unscaled) buffer in document coordinates. May be off-canvas.</summary>
         </member>
@@ -17769,6 +17778,13 @@
         </member>
         <member name="P:PixlPunkt.Core.Selection.FloatingSelection.HasSource">
             <summary>False for pasted selections, which have nothing to restore on cancel.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelection.ResampleMask(System.Int32,System.Int32)">
+            <summary>
+            Nearest-neighbour resample of the mask to a new size, for a scale bake that resamples
+            the pixels to the same size. Call before <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Width"/>/<see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Height"/>
+            change. A mask that is not the buffer's size (offloaded) is left alone.
+            </summary>
         </member>
         <member name="P:PixlPunkt.Core.Selection.FloatingSelection.ScaledW">
             <summary>Width after the current (unbaked) scale.</summary>

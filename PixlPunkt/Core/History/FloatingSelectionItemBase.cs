@@ -118,7 +118,7 @@ namespace PixlPunkt.Core.History
         {
             get
             {
-                long total = PixelsBefore.Length + PixelsAfter.Length + (Floating?.Pixels.Length ?? 0)
+                long total = PixelsBefore.Length + PixelsAfter.Length + (Floating?.Pixels.Length ?? 0) + (Floating?.Mask.Length ?? 0)
                              + (RegionBefore?.Length ?? 0) + (RegionAfter?.Length ?? 0);
                 if (TilesBefore != null) foreach (var t in TilesBefore.Values) total += t.Length;
                 if (TilesAfter != null) foreach (var t in TilesAfter.Values) total += t.Length;
@@ -135,6 +135,7 @@ namespace PixlPunkt.Core.History
             HistoryBlobs.WriteTiles(bw, TilesBefore);
             HistoryBlobs.WriteTiles(bw, TilesAfter);
             HistoryBlobs.Write(bw, Floating?.Pixels);
+            HistoryBlobs.Write(bw, Floating?.Mask);
             return ms.ToArray();
         }
 
@@ -147,7 +148,9 @@ namespace PixlPunkt.Core.History
             TilesBefore = HistoryBlobs.ReadTiles(br);
             TilesAfter = HistoryBlobs.ReadTiles(br);
             var fp = HistoryBlobs.Read(br);
+            var fm = HistoryBlobs.Read(br);
             if (Floating != null && fp != null) Floating.Pixels = fp;
+            if (Floating != null && fm != null) Floating.Mask = fm;
         }
 
         protected override void ReleasePayload()
@@ -157,7 +160,10 @@ namespace PixlPunkt.Core.History
             TilesBefore = null;
             TilesAfter = null;
             if (Floating != null)
+            {
                 Floating.Pixels = Array.Empty<byte>();
+                Floating.Mask = Array.Empty<byte>();
+            }
         }
     }
 

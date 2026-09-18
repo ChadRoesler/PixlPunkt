@@ -30,6 +30,15 @@ namespace PixlPunkt.Core.Selection
 
         /// <summary>BGRA pixel buffer, <see cref="Width"/> × <see cref="Height"/> × 4. Scale is baked into it on release; rotation is not.</summary>
         public byte[] Pixels { get; set; }
+
+        /// <summary>
+        /// The selection shape in the same local frame as <see cref="Pixels"/>: one byte per
+        /// pixel, 1 = selected. It is the marquee the user drew (all ones for a paste), never
+        /// derived from pixel alpha, and it follows every change made to the pixels: a scale bake
+        /// resamples it (<see cref="ResampleMask"/>), a flip mirrors it. Stage 1 of the
+        /// selection-shape work carries it; later stages read it for the region and hit-testing.
+        /// </summary>
+        public byte[] Mask { get; set; }
         public int Width { get; set; }
         public int Height { get; set; }
 
@@ -81,7 +90,8 @@ namespace PixlPunkt.Core.Selection
             RasterLayer layer,
             byte[] pixels, int width, int height,
             int x, int y,
-            RectInt32 sourceBounds, byte[] sourcePixelsBefore)
+            RectInt32 sourceBounds, byte[] sourcePixelsBefore,
+            byte[]? mask = null)
         {
             Layer = layer ?? throw new ArgumentNullException(nameof(layer));
             Pixels = pixels ?? throw new ArgumentNullException(nameof(pixels));
@@ -98,6 +108,59 @@ namespace PixlPunkt.Core.Selection
             OrigCenterY = y + height / 2;
             SourceBounds = sourceBounds;
             SourcePixelsBefore = sourcePixelsBefore ?? Array.Empty<byte>();
+
+            if (mask == null)
+            {
+                mask = new byte[width * height];
+                Array.Fill(mask, (byte)1);
+            }
+            else if (mask.Length != width * height)
+                throw new ArgumentException("Mask does not match the given size.", nameof(mask));
+            Mask = mask;
+        }
+
+        /// <summary>
+        /// Nearest-neighbour resample of the mask to a new size, for a scale bake that resamples
+        /// the pixels to the same size. Call before <see cref="Width"/>/<see cref="Height"/>
+        /// change. A mask that is not the buffer's size (offloaded) is left alone.
+        /// </summary>
+        public void ResampleMask(int newW, int newH)
+        {
+            if (newW <= 0 || newH <= 0 || Mask.Length != Width * Height) return;
+            if (newW == Width && newH == Height) return;
+
+            var next = new byte[newW * newH];
+            for (int y = 0; y < newH; y++)
+            {
+                int sy = Math.Min(Height - 1, (int)((y + 0.5) * Height / newH));
+                int srow = sy * Width, drow = y * newW;
+                for (int x = 0; x < newW; x++)
+                {
+                    int sx = Math.Min(Width - 1, (int)((x + 0.5) * Width / newW));
+                    next[drow + x] = Mask[srow + sx];
+                }
+            }
+            Mask = next;
+        }
+
+        public void FlipMaskHorizontal()
+        {
+            if (Mask.Length != Width * Height) return;
+            for (int y = 0; y < Height; y++)
+                Array.Reverse(Mask, y * Width, Width);
+        }
+
+        public void FlipMaskVertical()
+        {
+            if (Mask.Length != Width * Height) return;
+            var row = new byte[Width];
+            for (int y = 0; y < Height / 2; y++)
+            {
+                int a = y * Width, b = (Height - 1 - y) * Width;
+                Array.Copy(Mask, a, row, 0, Width);
+                Array.Copy(Mask, b, Mask, a, Width);
+                Array.Copy(row, 0, Mask, b, Width);
+            }
         }
 
         /// <summary>Width after the current (unbaked) scale.</summary>
@@ -108,7 +171,8 @@ namespace PixlPunkt.Core.Selection
         /// <summary>Deep copy, used for history snapshots.</summary>
         public FloatingSelection Clone()
         {
-            var c = new FloatingSelection(Layer, (byte[])Pixels.Clone(), Width, Height, X, Y, SourceBounds, SourcePixelsBefore)
+            var c = new FloatingSelection(Layer, (byte[])Pixels.Clone(), Width, Height, X, Y, SourceBounds, SourcePixelsBefore,
+                Mask.Length == Width * Height ? (byte[])Mask.Clone() : null)
             {
                 ScaleX = ScaleX,
                 ScaleY = ScaleY,
