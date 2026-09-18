@@ -614,6 +614,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (_selState?.Floating != true) return;
             var before = _selState.CaptureTransformSnapshot(includeBuffer: true);
             _selTransform?.FlipHorizontal(useGlobalAxis);
+            SyncRegionFromMask();
             var item = new SelectionTransformItem(Document, SelectionTransformItem.TransformKind.Scale, before, _selState.CaptureTransformSnapshot(includeBuffer: true));
             if (item.HasChanges) PushHistoryItem(item);
             InvalidateMainCanvas();
@@ -632,6 +633,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (_selState?.Floating != true) return;
             var before = _selState.CaptureTransformSnapshot(includeBuffer: true);
             _selTransform?.FlipVertical(useGlobalAxis);
+            SyncRegionFromMask();
             var item = new SelectionTransformItem(Document, SelectionTransformItem.TransformKind.Scale, before, _selState.CaptureTransformSnapshot(includeBuffer: true));
             if (item.HasChanges) PushHistoryItem(item);
             InvalidateMainCanvas();
@@ -1015,38 +1017,20 @@ namespace PixlPunkt.UI.CanvasHost
 
             _selState.PreviewBuf = null;
 
-            if (_selState.RegionNonRectangular)
-            {
-                // Non-rectangular selections (polygon, wand, paint): rebuild the region from the
-                // freshly scaled buffer's alpha channel after a scale bake. Rotation is NEVER
-                // baked into the region — it lives only in CumulativeAngleDeg and is applied
-                // at display time so the true shape is preserved through all transforms.
-                if (hasScale)
-                {
-                    var floatRect = CreateRect(_selState.FloatX, _selState.FloatY, _selState.BufferWidth, _selState.BufferHeight);
-                    var dstClamp = ClampToSurface(floatRect, Document.PixelWidth, Document.PixelHeight);
-                    Core.Selection.SelectionRegionBuilders.RebuildFromTransformedBuffer(
-                        _selRegion, floatRect, dstClamp, _selState.Buffer!,
-                        _selState.BufferWidth, _selState.BufferHeight,
-                        Document.PixelWidth, Document.PixelHeight);
-                }
-                // Rotation only: region unchanged — CumulativeAngleDeg carries the rotation.
-            }
-            else
-            {
-                // Rectangular selections: rebuild as a rotated rectangle using the cumulative angle.
-                var docClamp = CreateRect(0, 0, Document.PixelWidth, Document.PixelHeight);
-                Core.Selection.SelectionRegionBuilders.RebuildAsRotatedRect(
-                    _selRegion, centerX, centerY,
-                    _selState.BufferWidth, _selState.BufferHeight,
-                    _selState.CumulativeAngleDeg,
-                    docClamp,
-                    Document.PixelWidth, Document.PixelHeight);
-            }
-
+            // The marquee is the float's mask under the settled transform (stage 2 of the
+            // selection-shape work); it no longer comes from pixel alpha or an analytic rectangle.
+            SyncRegionFromMask();
             _selState.Rect = _selRegion.Bounds;
             _toolState?.SetSelectionScale(100.0, 100.0, _selState.ScaleLink);
             _toolState?.SetRotationAngle(0.0);
+        }
+
+        /// <summary>Rebuilds the document's selection region from the float's mask and refreshes the frame rect.</summary>
+        private void SyncRegionFromMask()
+        {
+            if (_selState?.Lifted is not { } f) return;
+            Core.Selection.SelectionRegionBuilders.RebuildFromMask(_selRegion, f, Document.PixelWidth, Document.PixelHeight);
+            _selState.Rect = _selRegion.Bounds;
         }
 
         private void OffsetSelectionRegion(int dx, int dy)

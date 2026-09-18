@@ -147,6 +147,49 @@ namespace PixlPunkt.Core.Selection
             f.RegionNonRectangular = !isRect;
         }
 
+        /// <summary>
+        /// Makes <paramref name="region"/> the floating selection's mask under its current scale
+        /// and rotation, centred on the transform centre exactly like the pixels are drawn and
+        /// committed. Transparent pixels inside the marquee stay selected because the mask, not
+        /// the alpha, is the source.
+        /// </summary>
+        public static void RebuildFromMask(SelectionRegion region, FloatingSelection f, int docW, int docH)
+        {
+            region.EnsureSize(docW, docH);
+            region.Clear();
+            if (f.Mask.Length != f.Width * f.Height) return;   // offloaded; nothing to build from
+
+            var (mask, mw, mh) = SelectionBufferOps.BuildTransformedMask(
+                f.Mask, f.Width, f.Height, f.ScaleX, f.ScaleY, f.CumulativeAngleDeg + f.AngleDeg, f.RotMode);
+            int ox = f.OrigCenterX - mw / 2;
+            int oy = f.OrigCenterY - mh / 2;
+
+            // The region keeps its document-sized local mask (history refresh re-asserts that
+            // size) and places it in world space through its offset, the same way a live drag
+            // does, so a shape hanging off the canvas is kept whole rather than clipped. The
+            // shape sits at local (0,0); only a shape larger than the canvas loses its excess.
+            region.SetOffset(ox, oy);
+
+            for (int y = 0; y < Math.Min(mh, docH); y++)
+            {
+                int row = y * mw;
+                int runStart = -1;
+                int limit = Math.Min(mw, docW);
+                for (int x = 0; x < limit; x++)
+                {
+                    bool on = mask[row + x] != 0;
+                    if (on && runStart < 0) runStart = x;
+                    else if (!on && runStart >= 0)
+                    {
+                        region.AddRect(CreateRect(runStart, y, x - runStart, 1));
+                        runStart = -1;
+                    }
+                }
+                if (runStart >= 0)
+                    region.AddRect(CreateRect(runStart, y, limit - runStart, 1));
+            }
+        }
+
         /// <summary>True when every pixel inside <paramref name="bounds"/> is selected.</summary>
         public static bool IsRectangular(SelectionRegion region, RectInt32 bounds)
         {

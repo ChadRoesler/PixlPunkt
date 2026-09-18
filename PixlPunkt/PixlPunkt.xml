@@ -17849,6 +17849,14 @@
             the on-screen preview and by the commit path so both produce the same pixels.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Core.Selection.SelectionBufferOps.BuildTransformedMask(System.Byte[],System.Int32,System.Int32,System.Double,System.Double,System.Double,PixlPunkt.Core.Enums.RotationMode)">
+            <summary>
+            Scales and rotates a 1-byte-per-pixel selection mask with the same geometry as the
+            pixels: nearest-neighbour for the scale, and the pixels' own rotation method for the
+            rotation so the outline shows what that method will produce. The mask rides the pixel
+            resamplers as alpha; any coverage counts as selected.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Selection.SelectionRegion">
             <summary>
             Represents a pixel-based selection region using a boolean mask with marching-ants rendering.
@@ -18140,6 +18148,14 @@
             The mask is kept document-sized; parts of the float that are off-canvas are simply not
             in the mask (they cannot be painted anyway, and hit-testing a floating selection uses
             the buffer directly). Also refreshes <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.RegionNonRectangular"/>.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildFromMask(PixlPunkt.Core.Selection.SelectionRegion,PixlPunkt.Core.Selection.FloatingSelection,System.Int32,System.Int32)">
+            <summary>
+            Makes <paramref name="region"/> the floating selection's mask under its current scale
+            and rotation, centred on the transform centre exactly like the pixels are drawn and
+            committed. Transparent pixels inside the marquee stay selected because the mask, not
+            the alpha, is the source.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.IsRectangular(PixlPunkt.Core.Selection.SelectionRegion,Windows.Graphics.RectInt32)">
@@ -30206,6 +30222,9 @@
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Selection_SetScale(System.Double,System.Double,System.Boolean)">
             <summary>Sets selection scale in percent.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.SyncRegionFromMask">
+            <summary>Rebuilds the document's selection region from the float's mask and refreshes the frame rect.</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.GetShapeBuilderForCurrentTool">
             <summary>

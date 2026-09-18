@@ -143,7 +143,8 @@ namespace PixlPunkt.Core.History
                 return;
             }
             ApplyTo(f, s);
-            SelectionRegionBuilders.RebuildFromFloating(_doc.Selection, f, _doc.PixelWidth, _doc.PixelHeight);
+            // The marquee is the mask under the restored transform, never the pixels' silhouette.
+            SelectionRegionBuilders.RebuildFromMask(_doc.Selection, f, _doc.PixelWidth, _doc.PixelHeight);
             _doc.RaiseSelectionChanged();
         }
 
