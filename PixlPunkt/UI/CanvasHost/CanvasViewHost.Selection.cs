@@ -161,12 +161,25 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Rendering tick used to advance marching ants and invalidate when needed.
         /// </summary>
+        /// <summary>Marching-ants repaint cadence. The phase is time-based, so a lower rate only lowers the repaint cost, not the speed.</summary>
+        private const double ANTS_FRAME_MS = 1000.0 / 24.0;
+        private readonly System.Diagnostics.Stopwatch _antsFrameClock = System.Diagnostics.Stopwatch.StartNew();
+
         private void OnAntsRendering(object? sender, object args)
         {
             if (_selState == null) return;
             bool isTransforming = _selState.Drag == SelDrag.Scale || _selState.Drag == SelDrag.Rotate || _selState.Drag == SelDrag.Move;
-            if ((_selState.Active || _selState.HavePreview || (_selState.Drag == SelDrag.Marquee && (ActiveSelectionTool?.NeedsContinuousRender ?? false))) && !isTransforming)
-                InvalidateMainCanvas();
+            bool painting = _selState.Drag == SelDrag.Marquee && (ActiveSelectionTool?.NeedsContinuousRender ?? false);
+            if (isTransforming) return;
+
+            // A tool that paints its marquee wants every frame; idle ants only need theirs.
+            if (!painting)
+            {
+                if (!(_selState.Active || _selState.HavePreview)) return;
+                if (_antsFrameClock.Elapsed.TotalMilliseconds < ANTS_FRAME_MS) return;
+                _antsFrameClock.Restart();
+            }
+            InvalidateMainCanvas();
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -320,8 +333,7 @@ namespace PixlPunkt.UI.CanvasHost
             if (_selState == null || !_selState.DragStartSnapshot.HasValue) return;
 
             var beforeSnapshot = _selState.DragStartSnapshot.Value;
-            // Capture after with buffer since we've just baked the transforms
-            var afterSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
+            var afterSnapshot = _selState.CaptureTransformSnapshot();
 
             var kind = dragType switch
             {
@@ -675,7 +687,10 @@ namespace PixlPunkt.UI.CanvasHost
             if (!pt.Properties.IsLeftButtonPressed) return false;
 
             var viewPos = pt.Position;
-            bool shiftDown = IsShiftDown(), altDown = IsAltDown();
+            // Same source the selection tools read (SelectionToolBase.PointerPressed), so the
+            // host's "modifier held → start a new marquee" and the tool's Add/Subtract agree.
+            bool shiftDown = (e.KeyModifiers & VirtualKeyModifiers.Shift) != 0;
+            bool altDown = (e.KeyModifiers & VirtualKeyModifiers.Menu) != 0;
 
             if (_selState.Active && _selState.State == SelectionState.Armed && !shiftDown && !altDown)
             {
@@ -704,8 +719,7 @@ namespace PixlPunkt.UI.CanvasHost
                     _selState.RotStartAngleDeg = _selState.AngleDeg;
                     _selState.RotStartPointerAngleDeg = Math.Atan2(docY - pivotDocY, docX - pivotDocX) * 180.0 / Math.PI;
                     if (!_selState.Floating) LiftSelectionWithHistory();
-                    // Capture snapshot for history - include buffer since rotate bakes transforms
-                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
+                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
                     _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
@@ -723,8 +737,7 @@ namespace PixlPunkt.UI.CanvasHost
                     _selState.ScaleStartH = ScaledH;
                     _selState.ScaleStartScaleX = _selState.ScaleX;
                     _selState.ScaleStartScaleY = _selState.ScaleY;
-                    // Capture snapshot for history - include buffer since scale bakes transforms
-                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot(includeBuffer: true);
+                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
                     _mainCanvas.CapturePointer(e.Pointer);
                     return true;
                 }
@@ -888,10 +901,7 @@ namespace PixlPunkt.UI.CanvasHost
             // Push transform history for scale/rotate operations
             if ((_selState.Drag == SelDrag.Scale || _selState.Drag == SelDrag.Rotate) && _selState.Floating && _selState.Buffer != null)
             {
-                // The DragStartSnapshot was captured at pointer press (with includeBuffer=true for scale/rotate)
-                // Now bake the transforms
                 BakeTransformsOnRelease();
-                // Then capture the after snapshot (with baked buffer) and push history
                 PushTransformHistoryWithBakedState(_selState.Drag);
             }
 
@@ -972,6 +982,13 @@ namespace PixlPunkt.UI.CanvasHost
             }
         }
 
+        /// <summary>
+        /// Settles a finished scale or rotate drag. Nothing is resampled here: scale stays live in
+        /// <c>ScaleX/Y</c> and rotation in <c>CumulativeAngleDeg</c>, and both are applied to the
+        /// original pixels exactly once, at commit (<c>FloatingSelectionOps.Rasterize</c>). Scaling
+        /// down and back up therefore returns the original pixels instead of a twice-resampled
+        /// blur, and the options box shows the true scale. Only the selection mask is rebuilt.
+        /// </summary>
         private void BakeTransformsOnRelease()
         {
             if (_selState == null || _selState.Buffer == null) return;
@@ -981,21 +998,6 @@ namespace PixlPunkt.UI.CanvasHost
             int centerX = _selState.OrigCenterX;
             int centerY = _selState.OrigCenterY;
 
-            if (hasScale)
-            {
-                var (buf, tw, th) = BuildScaledBufferForCommit(_selState.Buffer, _selState.BufferWidth, _selState.BufferHeight,
-                    _selState.ScaleX, _selState.ScaleY, _selState.ScaleFilter);
-                _selState.OrigW = tw;
-                _selState.OrigH = th;
-                _selState.Buffer = buf;
-                _selState.BufferWidth = tw;
-                _selState.BufferHeight = th;
-                _selState.FloatX = centerX - tw / 2;
-                _selState.FloatY = centerY - th / 2;
-                _selState.ScaleX = 1.0;
-                _selState.ScaleY = 1.0;
-            }
-
             if (hasRotation)
             {
                 _selState.CumulativeAngleDeg += _selState.AngleDeg;
@@ -1004,37 +1006,39 @@ namespace PixlPunkt.UI.CanvasHost
 
             _selState.PreviewBuf = null;
 
+            int scaledW = ScaledW, scaledH = ScaledH;
+            _selState.FloatX = centerX - scaledW / 2;
+            _selState.FloatY = centerY - scaledH / 2;
+
             if (_selState.RegionNonRectangular)
             {
-                // Non-rectangular selections (polygon, wand, paint): rebuild the region from the
-                // freshly scaled buffer's alpha channel after a scale bake. Rotation is NEVER
-                // baked into the region — it lives only in CumulativeAngleDeg and is applied
-                // at display time so the true shape is preserved through all transforms.
+                // Non-rectangular selections (polygon, wand, paint): the mask follows the scaled
+                // alpha of the buffer. Rotation is never baked into the mask; it lives in
+                // CumulativeAngleDeg and is applied at display time and at commit.
                 if (hasScale)
                 {
-                    var floatRect = CreateRect(_selState.FloatX, _selState.FloatY, _selState.BufferWidth, _selState.BufferHeight);
+                    var (buf, tw, th) = BuildScaledBufferForCommit(_selState.Buffer, _selState.BufferWidth, _selState.BufferHeight,
+                        _selState.ScaleX, _selState.ScaleY, _selState.ScaleFilter);
+                    var floatRect = CreateRect(_selState.FloatX, _selState.FloatY, tw, th);
                     var dstClamp = ClampToSurface(floatRect, Document.PixelWidth, Document.PixelHeight);
                     Core.Selection.SelectionRegionBuilders.RebuildFromTransformedBuffer(
-                        _selRegion, floatRect, dstClamp, _selState.Buffer!,
-                        _selState.BufferWidth, _selState.BufferHeight,
+                        _selRegion, floatRect, dstClamp, buf, tw, th,
                         Document.PixelWidth, Document.PixelHeight);
                 }
-                // Rotation only: region unchanged — CumulativeAngleDeg carries the rotation.
             }
             else
             {
-                // Rectangular selections: rebuild as a rotated rectangle using the cumulative angle.
                 var docClamp = CreateRect(0, 0, Document.PixelWidth, Document.PixelHeight);
                 Core.Selection.SelectionRegionBuilders.RebuildAsRotatedRect(
                     _selRegion, centerX, centerY,
-                    _selState.BufferWidth, _selState.BufferHeight,
+                    scaledW, scaledH,
                     _selState.CumulativeAngleDeg,
                     docClamp,
                     Document.PixelWidth, Document.PixelHeight);
             }
 
             _selState.Rect = _selRegion.Bounds;
-            _toolState?.SetSelectionScale(100.0, 100.0, _selState.ScaleLink);
+            _toolState?.SetSelectionScale(_selState.ScaleX * 100.0, _selState.ScaleY * 100.0, _selState.ScaleLink);
             _toolState?.SetRotationAngle(0.0);
         }
 
@@ -1070,9 +1074,6 @@ namespace PixlPunkt.UI.CanvasHost
 
         private static bool IsShiftDown() =>
             (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) & CoreVirtualKeyStates.Down) != 0;
-
-        private static bool IsAltDown() =>
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0;
 
         private (int x, int y) ViewToDoc(Point v)
         {

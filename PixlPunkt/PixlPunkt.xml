@@ -17736,7 +17736,8 @@
         </member>
         <member name="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW">
             <summary>
-            Handle-frame size: the buffer size at the last bake. Invariant: <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW"/>,
+            Handle-frame size: the unscaled buffer size (scale is never baked into the pixels
+            before commit, so this equals <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Width"/>/<see cref="P:PixlPunkt.Core.Selection.FloatingSelection.Height"/>). Invariant: <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigW"/>,
             <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigH"/>, <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigCenterX"/> and <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.OrigCenterY"/> are always
             valid. They are set in the constructor, every move shifts the centre with the float,
             and a bake re-centres and resizes them. Readers use them directly; there is no
@@ -30057,10 +30058,11 @@
             Tools are cached after first creation.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnAntsRendering(System.Object,System.Object)">
+        <member name="F:PixlPunkt.UI.CanvasHost.CanvasViewHost.ANTS_FRAME_MS">
             <summary>
             Rendering tick used to advance marching ants and invalidate when needed.
             </summary>
+            <summary>Marching-ants repaint cadence. The phase is time-based, so a lower rate only lowers the repaint cost, not the speed.</summary>
         </member>
         <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.HasPaintConstrainingSelection">
             <summary>
@@ -30171,6 +30173,15 @@
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Selection_SetScale(System.Double,System.Double,System.Boolean)">
             <summary>Sets selection scale in percent.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.BakeTransformsOnRelease">
+            <summary>
+            Settles a finished scale or rotate drag. Nothing is resampled here: scale stays live in
+            <c>ScaleX/Y</c> and rotation in <c>CumulativeAngleDeg</c>, and both are applied to the
+            original pixels exactly once, at commit (<c>FloatingSelectionOps.Rasterize</c>). Scaling
+            down and back up therefore returns the original pixels instead of a twice-resampled
+            blur, and the options box shows the true scale. Only the selection mask is rebuilt.
+            </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.GetShapeBuilderForCurrentTool">
             <summary>
@@ -36068,26 +36079,6 @@
             </list>
             </remarks>
         </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.SyncLightingControlsFromDocument">
-            <summary>
-            Pushes lighting state values from the document into the permanent lighting controls.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.PopulateTilePickers(System.Boolean)">
-            <summary>
-            Populates all tile picker ComboBoxes with tiles from the document's TileSet.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.GetSelectedTile(Microsoft.UI.Xaml.Controls.ComboBox)">
-            <summary>
-            Gets the selected <see cref="T:PixlPunkt.Core.Tile.TileDefinition"/> from a picker, or null if "(None)".
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.GetColorTolerance">
-            <summary>
-            Gets the current color tolerance value, or -1 if color linking is disabled.
-            </summary>
-        </member>
         <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.BuildAndRender">
             <summary>
             Builds the voxel volume from selected tiles and renders the viewport.
@@ -36140,6 +36131,11 @@
             6-face mode optionally uses "back", "right", and "bottom" for face overrides.
             </summary>
         </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.GetColorTolerance">
+            <summary>
+            Gets the current color tolerance value, or -1 if color linking is disabled.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.CanUndoVoxelEdits">
             <summary>True when the next undo step on the document's history is a voxel edit.</summary>
         </member>
@@ -36150,6 +36146,27 @@
             <summary>
             Undoes the top history item if it is a voxel edit. Returns false when it is a canvas
             item, which the caller should route to the canvas host instead.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.PopulateTilePickers(System.Boolean)">
+            <summary>
+            Populates all tile picker ComboBoxes with tiles from the document's TileSet.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.GetSelectedTile(Microsoft.UI.Xaml.Controls.ComboBox)">
+            <summary>
+            Gets the selected <see cref="T:PixlPunkt.Core.Tile.TileDefinition"/> from a picker, or null if "(None)".
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TilePickerItem">
+            <summary>
+            Wrapper for ComboBox items that displays a tile thumbnail
+            and holds a reference to the <see cref="T:PixlPunkt.Core.Tile.TileDefinition"/>.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.CreateTileThumbnail(PixlPunkt.Core.Tile.TileDefinition)">
+            <summary>
+            Creates a <see cref="T:Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap"/> from a tile's BGRA pixel data.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.RenderViewport(PixlPunkt.UI.Voxel.VoxelWorkspaceControl.ViewportRenderOverrides,System.Boolean,System.Action{System.Byte[],System.Int32,System.Int32})">
@@ -36189,15 +36206,9 @@
             geometry on each step.
             </summary>
         </member>
-        <member name="T:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.TilePickerItem">
+        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.SyncLightingControlsFromDocument">
             <summary>
-            Wrapper for ComboBox items that displays a tile thumbnail
-            and holds a reference to the <see cref="T:PixlPunkt.Core.Tile.TileDefinition"/>.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.CreateTileThumbnail(PixlPunkt.Core.Tile.TileDefinition)">
-            <summary>
-            Creates a <see cref="T:Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap"/> from a tile's BGRA pixel data.
+            Pushes lighting state values from the document into the permanent lighting controls.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.Voxel.VoxelWorkspaceControl.InitializeComponent">

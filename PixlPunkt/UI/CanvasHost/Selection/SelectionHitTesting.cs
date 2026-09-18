@@ -94,7 +94,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             float cx = x + w / 2f;
             float cy = y + h / 2f;
 
-            float rad = (float)(_state.CumulativeAngleDeg * Math.PI / 180.0);
+            float rad = (float)((_state.CumulativeAngleDeg + _state.AngleDeg) * Math.PI / 180.0);
 
             var pts = new (SelHandle h, float px, float py)[]
             {
@@ -148,7 +148,7 @@ namespace PixlPunkt.UI.CanvasHost.Selection
 
             float off = ROT_HANDLE_OFFSET;
             float radR = ROT_HANDLE_RADIUS;
-            float rad = (float)(_state.CumulativeAngleDeg * Math.PI / 180.0);
+            float rad = (float)((_state.CumulativeAngleDeg + _state.AngleDeg) * Math.PI / 180.0);
 
             var pts = new (RotHandle h, float px, float py)[]
             {

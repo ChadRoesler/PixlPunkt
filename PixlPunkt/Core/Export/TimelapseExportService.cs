@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using PixlPunkt.Core.Document;
 using PixlPunkt.Core.History;
+using PixlPunkt.Core.Voxel.Editing;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.Core.Logging;
 
@@ -143,6 +145,14 @@ namespace PixlPunkt.Core.Export
                     // Jump to this history position (automatically reloads offloaded items)
                     history.JumpTo(step);
 
+                    // Voxel edits share the stack but never touch the canvas; a frame per voxel
+                    // step would just duplicate the previous one.
+                    if (step > 0 && step - 1 < timeline.Count && !AffectsCanvas(timeline[step - 1]))
+                    {
+                        progress?.Report((double)(step - rangeStart + 1) / totalSteps);
+                        continue;
+                    }
+
                     // Composite the document at this state
                     document.CompositeTo(document.Surface);
 
@@ -219,6 +229,13 @@ namespace PixlPunkt.Core.Export
         //////////////////////////////////////////////////////////////////
         // PRIVATE HELPERS
         //////////////////////////////////////////////////////////////////
+
+        private static bool AffectsCanvas(IHistoryItem item) => item switch
+        {
+            VoxelHistoryItem => false,
+            HistoryGroupItem g => g.Items.Any(AffectsCanvas),
+            _ => true
+        };
 
         private byte[] CaptureFrame(CanvasDocument document, int scale)
         {
