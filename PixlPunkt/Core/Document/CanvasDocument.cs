@@ -105,6 +105,23 @@ namespace PixlPunkt.Core.Document
         /// <summary>Raised when <see cref="Selection"/> or <see cref="Floating"/> changed. Not a structure change.</summary>
         public event Action? SelectionChanged;
 
+        /// <summary>The canvas is shown mirrored left-right. View state only: not saved, does not dirty the document.</summary>
+        public bool ViewFlipHorizontal { get; private set; }
+
+        /// <summary>The canvas is shown mirrored top-bottom. View state only: not saved, does not dirty the document.</summary>
+        public bool ViewFlipVertical { get; private set; }
+
+        /// <summary>Raised when either view flip toggles; every view of this document re-applies its mirror.</summary>
+        public event Action? ViewFlipChanged;
+
+        /// <summary>Toggles a view flip. Go through <see cref="History.ViewFlipItem"/> to make it undoable.</summary>
+        public void ToggleViewFlip(bool horizontal)
+        {
+            if (horizontal) ViewFlipHorizontal = !ViewFlipHorizontal;
+            else ViewFlipVertical = !ViewFlipVertical;
+            ViewFlipChanged?.Invoke();
+        }
+
         public void SetFloating(FloatingSelection? floating)
         {
             if (ReferenceEquals(Floating, floating)) return;

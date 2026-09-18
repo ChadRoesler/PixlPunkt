@@ -525,6 +525,35 @@ namespace PixlPunkt.UI
             }
         }
 
+        // Non-destructive canvas flips (view only; undoable; not saved)
+        private void FlipViewVertical_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            if (IsTextInputFocused()) return;
+            CurrentHost?.ToggleViewFlip(horizontal: false);
+            UpdateHistoryUI();
+            e.Handled = true;
+        }
+
+        private void FlipViewHorizontal_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            if (IsTextInputFocused()) return;
+            CurrentHost?.ToggleViewFlip(horizontal: true);
+            UpdateHistoryUI();
+            e.Handled = true;
+        }
+
+        private void View_FlipVertical_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentHost?.ToggleViewFlip(horizontal: false);
+            UpdateHistoryUI();
+        }
+
+        private void View_FlipHorizontal_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentHost?.ToggleViewFlip(horizontal: true);
+            UpdateHistoryUI();
+        }
+
         private void PasteAccel_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)
         {
             if (IsTextInputFocused()) return;

@@ -6044,6 +6044,18 @@
         <member name="E:PixlPunkt.Core.Document.CanvasDocument.SelectionChanged">
             <summary>Raised when <see cref="P:PixlPunkt.Core.Document.CanvasDocument.Selection"/> or <see cref="P:PixlPunkt.Core.Document.CanvasDocument.Floating"/> changed. Not a structure change.</summary>
         </member>
+        <member name="P:PixlPunkt.Core.Document.CanvasDocument.ViewFlipHorizontal">
+            <summary>The canvas is shown mirrored left-right. View state only: not saved, does not dirty the document.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.CanvasDocument.ViewFlipVertical">
+            <summary>The canvas is shown mirrored top-bottom. View state only: not saved, does not dirty the document.</summary>
+        </member>
+        <member name="E:PixlPunkt.Core.Document.CanvasDocument.ViewFlipChanged">
+            <summary>Raised when either view flip toggles; every view of this document re-applies its mirror.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.CanvasDocument.ToggleViewFlip(System.Boolean)">
+            <summary>Toggles a view flip. Go through <see cref="T:PixlPunkt.Core.History.ViewFlipItem"/> to make it undoable.</summary>
+        </member>
         <member name="P:PixlPunkt.Core.Document.CanvasDocument.TileSet">
             <summary>
             Gets the tile set containing all unique tiles for this document.
@@ -10026,6 +10038,9 @@
             the timelapse rendering process.
             </remarks>
         </member>
+        <member name="M:PixlPunkt.Core.Export.TimelapseExportService.FlipPixels(System.Byte[],System.Int32,System.Int32,System.Boolean,System.Boolean)">
+            <summary>Mirrors a BGRA buffer in place.</summary>
+        </member>
         <member name="T:PixlPunkt.Core.Export.TimelapseExportSettings">
             <summary>
             Configuration settings for timelapse export from history.
@@ -10671,6 +10686,13 @@
             <summary>
             Try to fold <paramref name="next"/> into this item. Return true if this item now
             represents both and <paramref name="next"/> should not be pushed.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.IViewOnlyHistoryItem">
+            <summary>
+            A history item that changes only how the document is viewed (a view flip), never its
+            contents. It sits on the stack so it undoes and shows up in a timelapse, but it does not
+            make the document dirty and never needs a pixel or structure refresh.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.History.HistoryGroupItem">
@@ -11886,6 +11908,13 @@
             work, so the identity of the item on top is checked too.
             </remarks>
         </member>
+        <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.ContentTop">
+            <summary>
+            The newest item that changes document content, and how many such items are applied.
+            View-only items (<see cref="T:PixlPunkt.Core.History.IViewOnlyHistoryItem"/>) are skipped, so flipping the
+            view after a save leaves the document clean.
+            </summary>
+        </member>
         <member name="E:PixlPunkt.Core.History.UnifiedHistoryStack.HistoryChanged">
             <summary>
             Fired when the history state changes (after push, undo, or redo).
@@ -11989,6 +12018,13 @@
         <member name="M:PixlPunkt.Core.History.UnifiedHistoryStack.Dispose">
             <summary>
             Disposes of resources including the memory manager.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.History.ViewFlipItem">
+            <summary>
+            A non-destructive canvas flip (the view is mirrored; pixels are untouched), like
+            Krita's mirror view. Undoable and recorded for the timelapse; does not dirty the document
+            and is not saved with it.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Imaging.PixelOps">
@@ -30515,9 +30551,19 @@
             Helper to get the main canvas as a FrameworkElement for shared operations.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.InvalidateMainCanvas">
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ToggleViewFlip(System.Boolean)">
             <summary>
             Invalidates the main canvas.
+            </summary>
+            <summary>
+            Non-destructive canvas flip (Ctrl+F horizontal, Ctrl+Shift+F vertical): pushes an undoable view-only item.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ApplyViewFlip">
+            <summary>
+            Mirrors the canvas (and each ruler along its own axis) with a render transform. The
+            framework applies the same transform to pointer coordinates, so drawing, hit-testing
+            and every tool stay consistent without touching the coordinate maths.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.InvalidateRulers">

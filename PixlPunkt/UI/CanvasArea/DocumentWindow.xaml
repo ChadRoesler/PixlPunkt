@@ -22,6 +22,10 @@
             <MenuBarItem Title="View">
                 <MenuFlyoutItem Text="Fit to Screen (Ctrl+0)" Click="View_Fit_Click"/>
                 <MenuFlyoutItem Text="Actual Size (Ctrl+1)" Click="View_Actual_Click"/>
+                <MenuFlyoutSeparator/>
+                <MenuFlyoutItem Text="Flip View Horizontally" Click="View_FlipHorizontal_Click"/>
+                <MenuFlyoutItem Text="Flip View Vertically" Click="View_FlipVertical_Click"/>
+                <MenuFlyoutSeparator/>
                 <MenuFlyoutItem Text="Toggle Pixel Grid" Click="View_TogglePixelGrid_Click"/>
                 <MenuFlyoutItem Text="Toggle Tile Grid" Click="View_ToggleTileGrid_Click"/>
             </MenuBarItem>

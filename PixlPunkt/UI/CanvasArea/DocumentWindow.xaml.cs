@@ -111,6 +111,10 @@ namespace PixlPunkt.UI.CanvasArea
 
         private void View_Actual_Click(object sender, RoutedEventArgs e) => Host.CanvasActualSize();
 
+        private void View_FlipVertical_Click(object sender, RoutedEventArgs e) { Host.ToggleViewFlip(horizontal: false); UpdateHistoryUI(); }
+
+        private void View_FlipHorizontal_Click(object sender, RoutedEventArgs e) { Host.ToggleViewFlip(horizontal: true); UpdateHistoryUI(); }
+
         private void View_TogglePixelGrid_Click(object sender, RoutedEventArgs e) => Host.TogglePixelGrid();
 
         private void View_ToggleTileGrid_Click(object sender, RoutedEventArgs e) => Host.ToggleTileGrid();

@@ -243,15 +243,44 @@ namespace PixlPunkt.Core.Export
             int srcW = surface.Width;
             int srcH = surface.Height;
 
-            if (scale == 1)
+            byte[] frame = scale == 1
+                ? (byte[])surface.Pixels.Clone()
+                : ScalePixels(surface.Pixels, srcW, srcH, srcW * scale, srcH * scale);
+
+            // View flips are on the history stack, so the timelapse shows the canvas the way
+            // the artist was looking at it at that step.
+            if (document.ViewFlipHorizontal || document.ViewFlipVertical)
+                FlipPixels(frame, srcW * scale, srcH * scale, document.ViewFlipHorizontal, document.ViewFlipVertical);
+
+            return frame;
+        }
+
+        /// <summary>Mirrors a BGRA buffer in place.</summary>
+        internal static void FlipPixels(byte[] px, int w, int h, bool flipH, bool flipV)
+        {
+            int stride = w * 4;
+            if (flipH)
             {
-                return (byte[])surface.Pixels.Clone();
+                for (int y = 0; y < h; y++)
+                {
+                    int row = y * stride;
+                    for (int x0 = 0, x1 = w - 1; x0 < x1; x0++, x1--)
+                    {
+                        int a = row + x0 * 4, b = row + x1 * 4;
+                        for (int c = 0; c < 4; c++) (px[a + c], px[b + c]) = (px[b + c], px[a + c]);
+                    }
+                }
             }
-
-            int dstW = srcW * scale;
-            int dstH = srcH * scale;
-
-            return ScalePixels(surface.Pixels, srcW, srcH, dstW, dstH);
+            if (flipV)
+            {
+                var tmp = new byte[stride];
+                for (int y0 = 0, y1 = h - 1; y0 < y1; y0++, y1--)
+                {
+                    Buffer.BlockCopy(px, y0 * stride, tmp, 0, stride);
+                    Buffer.BlockCopy(px, y1 * stride, px, y0 * stride, stride);
+                    Buffer.BlockCopy(tmp, 0, px, y1 * stride, stride);
+                }
+            }
         }
 
         private List<RenderedFrame> GenerateTransitionFrames(

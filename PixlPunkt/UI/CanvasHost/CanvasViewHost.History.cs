@@ -250,7 +250,7 @@ namespace PixlPunkt.UI.CanvasHost
             var item = undo ? Document.History.PeekUndo() : Document.History.PeekRedo();
             bool isStructural = IsStructuralItem(item);
             // Mask-only and transform-only items never touch layer pixels; everything else may.
-            bool pixels = item is not (SelectionChangeItem or SelectionTransformItem);
+            bool pixels = item is not (SelectionChangeItem or SelectionTransformItem or IViewOnlyHistoryItem);
 
             // Items no longer capture the crossfade themselves (it was a full composite per item);
             // the view captures once per step, and only for steps that change the layer tree.

@@ -18,6 +18,13 @@ namespace PixlPunkt.Core.History
     }
 
     /// <summary>
+    /// A history item that changes only how the document is viewed (a view flip), never its
+    /// contents. It sits on the stack so it undoes and shows up in a timelapse, but it does not
+    /// make the document dirty and never needs a pixel or structure refresh.
+    /// </summary>
+    public interface IViewOnlyHistoryItem : IHistoryItem { }
+
+    /// <summary>
     /// Several history items that undo and redo as one user-level step, e.g. "Delete Selection"
     /// = clear the pixels + clear the mask. Created by
     /// <see cref="UnifiedHistoryStack.BeginGroup"/> / <see cref="UnifiedHistoryStack.EndGroup"/>.

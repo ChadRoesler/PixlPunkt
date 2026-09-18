@@ -110,10 +110,33 @@ namespace PixlPunkt.Core.History
         /// a fresh edit returns the stack to the saved depth while holding entirely different
         /// work, so the identity of the item on top is checked too.
         /// </remarks>
-        public bool IsDirty =>
-            !_savePointReachable ||
-            _undo.Count != _savedDepth ||
-            !ReferenceEquals(PeekUndo(), _savedItem);
+        public bool IsDirty
+        {
+            get
+            {
+                if (!_savePointReachable) return true;
+                var (top, depth) = ContentTop();
+                return depth != _savedDepth || !ReferenceEquals(top, _savedItem);
+            }
+        }
+
+        /// <summary>
+        /// The newest item that changes document content, and how many such items are applied.
+        /// View-only items (<see cref="IViewOnlyHistoryItem"/>) are skipped, so flipping the
+        /// view after a save leaves the document clean.
+        /// </summary>
+        private (IHistoryItem? item, int depth) ContentTop()
+        {
+            IHistoryItem? top = null;
+            int depth = 0;
+            foreach (var it in _undo)               // Stack<T> enumerates newest first
+            {
+                if (it is IViewOnlyHistoryItem) continue;
+                top ??= it;
+                depth++;
+            }
+            return (top, depth);
+        }
 
         /// <summary>
         /// Fired when the history state changes (after push, undo, or redo).
@@ -239,7 +262,7 @@ namespace PixlPunkt.Core.History
         {
             // If the cursor is behind the save point, that point lives in the redo stack we are
             // about to discard, so it can never be returned to again.
-            if (_undo.Count < _savedDepth)
+            if (ContentTop().depth < _savedDepth)
                 _savePointReachable = false;
 
             // Dispose redo items that support it
@@ -363,8 +386,7 @@ namespace PixlPunkt.Core.History
         /// </remarks>
         public void MarkSaved()
         {
-            _savedItem = PeekUndo();
-            _savedDepth = _undo.Count;
+            (_savedItem, _savedDepth) = ContentTop();
             _savePointReachable = true;
             LoggingService.Info("History marked saved at undoCount={UndoCount}", _savedDepth);
             RaiseChanged();

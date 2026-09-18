@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Document;
+using PixlPunkt.Core.History;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Imaging;
@@ -22,6 +23,7 @@ using PixlPunkt.UI.Helpers;
 using PixlPunkt.UI.Rendering;
 using SkiaSharp;
 using SkiaSharp.Views.Windows;
+using Windows.Foundation;
 #if HAS_UNO
 using Uno.WinUI.Graphics2DSK;
 #endif
@@ -153,6 +155,41 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>
         /// Invalidates the main canvas.
         /// </summary>
+        /// <summary>
+        /// Non-destructive canvas flip (Ctrl+F horizontal, Ctrl+Shift+F vertical): pushes an undoable view-only item.
+        /// </summary>
+        public void ToggleViewFlip(bool horizontal)
+        {
+            var item = new ViewFlipItem(Document, horizontal);
+            item.Redo();
+            PushHistoryItem(item);
+        }
+
+        /// <summary>
+        /// Mirrors the canvas (and each ruler along its own axis) with a render transform. The
+        /// framework applies the same transform to pointer coordinates, so drawing, hit-testing
+        /// and every tool stay consistent without touching the coordinate maths.
+        /// </summary>
+        private void ApplyViewFlip()
+        {
+            bool fh = Document.ViewFlipHorizontal, fv = Document.ViewFlipVertical;
+            static void Mirror(FrameworkElement? el, bool x, bool y)
+            {
+                if (el == null) return;
+                el.RenderTransformOrigin = new Point(0.5, 0.5);
+                el.RenderTransform = (x || y) ? new ScaleTransform { ScaleX = x ? -1 : 1, ScaleY = y ? -1 : 1 } : null;
+            }
+#if HAS_UNO
+            Mirror(_mainCanvasElement, fh, fv);
+            Mirror(_horizontalRulerElement, fh, false);
+            Mirror(_verticalRulerElement, false, fv);
+#endif
+            Mirror(_mainCanvasXaml, fh, fv);
+            Mirror(_horizontalRulerXaml, fh, false);
+            Mirror(_verticalRulerXaml, false, fv);
+            InvalidateMainCanvas();
+        }
+
         private void InvalidateMainCanvas()
         {
 #if HAS_UNO
@@ -390,6 +427,8 @@ namespace PixlPunkt.UI.CanvasHost
             Document.LayersChanged += OnDocChanged;
             Document.DocumentModified += OnExternalDocumentModified;
             Document.SelectionChanged += OnDocumentSelectionChanged;
+            Document.ViewFlipChanged += ApplyViewFlip;
+            ApplyViewFlip();
 
             // A floating selection is committed before the timeline moves off its frame; the
             // animation panels subscribe later than this, so this runs before frame pixels swap.
