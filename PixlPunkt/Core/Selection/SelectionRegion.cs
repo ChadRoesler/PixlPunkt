@@ -141,9 +141,13 @@ namespace PixlPunkt.Core.Selection
             w = Math.Max(1, w);
             h = Math.Max(1, h);
 
-            if (w == _w && h == _h && _m.Length == _w * _h) return;
+            // Grow-only: a floating selection scaled past the canvas needs a local mask larger
+            // than the document (see SelectionRegionBuilders.RebuildFromMask), and the callers
+            // that re-assert the document size afterwards must not shrink and wipe it. Every
+            // reader maps through the offset and the stored size, so a larger mask is harmless.
+            if (w <= _w && h <= _h && _m.Length == _w * _h) return;
 
-            _w = w; _h = h;
+            _w = Math.Max(w, _w); _h = Math.Max(h, _h);
             _m = new byte[_w * _h];
             _bounds = CreateRect(0, 0, 0, 0);
         }

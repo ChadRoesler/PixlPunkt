@@ -228,38 +228,11 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// <returns>True if the point is inside the selection.</returns>
         public bool IsInsideTransformedSelection(int docX, int docY)
         {
-            if (!_state.Active) return false;
-
-            // Check preview buffer if we have one (during scale/rotate transforms)
-            if (_state.Floating && _state.PreviewBuf != null && _state.PreviewW > 0 && _state.PreviewH > 0)
-            {
-                float pivotX = _state.OrigCenterX;
-                float pivotY = _state.OrigCenterY;
-                float bufferLeft = pivotX - _state.PreviewW / 2f;
-                float bufferTop = pivotY - _state.PreviewH / 2f;
-                int localX = (int)(docX - bufferLeft);
-                int localY = (int)(docY - bufferTop);
-                if (localX >= 0 && localX < _state.PreviewW && localY >= 0 && localY < _state.PreviewH)
-                    return _state.PreviewBuf[(localY * _state.PreviewW + localX) * 4 + 3] > 0;
-                return false;
-            }
-
-            // Check floating buffer - supports off-canvas positions
-            if (_state.Floating && _state.Buffer != null)
-            {
-                // Convert doc coords to local buffer coords
-                // Note: FloatX/FloatY can be negative when selection is dragged off-canvas
-                int localX = docX - _state.FloatX;
-                int localY = docY - _state.FloatY;
-
-                // Check if within buffer bounds (local coords are always 0 to BufferWidth/Height)
-                if (localX >= 0 && localX < _state.BufferWidth && localY >= 0 && localY < _state.BufferHeight)
-                    return _state.Buffer[(localY * _state.BufferWidth + localX) * 4 + 3] > 0;
-                return false;
-            }
-
-            // Check region - supports off-canvas via world-space offset
-            return _state.Region.Contains(docX, docY);
+            // Stage 3 of the selection-shape work: the region is the float's mask under its
+            // current transform (rebuilt on bake, flip, undo and options-box edits; shifted on
+            // move), so "inside" means inside the outline. A transparent pixel inside the
+            // marquee counts, matching what the ants show.
+            return _state.Active && _state.Region.Contains(docX, docY);
         }
 
         /// <summary>

@@ -155,26 +155,30 @@ namespace PixlPunkt.Core.Selection
         /// </summary>
         public static void RebuildFromMask(SelectionRegion region, FloatingSelection f, int docW, int docH)
         {
-            region.EnsureSize(docW, docH);
             region.Clear();
-            if (f.Mask.Length != f.Width * f.Height) return;   // offloaded; nothing to build from
+            if (f.Mask.Length != f.Width * f.Height)
+            {
+                region.EnsureSize(docW, docH);
+                return;   // offloaded; nothing to build from
+            }
 
             var (mask, mw, mh) = SelectionBufferOps.BuildTransformedMask(
                 f.Mask, f.Width, f.Height, f.ScaleX, f.ScaleY, f.CumulativeAngleDeg + f.AngleDeg, f.RotMode);
             int ox = f.OrigCenterX - mw / 2;
             int oy = f.OrigCenterY - mh / 2;
 
-            // The region keeps its document-sized local mask (history refresh re-asserts that
-            // size) and places it in world space through its offset, the same way a live drag
-            // does, so a shape hanging off the canvas is kept whole rather than clipped. The
-            // shape sits at local (0,0); only a shape larger than the canvas loses its excess.
+            // The shape is placed in world space through the region's offset, the same way a
+            // live drag does, so a shape hanging off the canvas is kept whole. The local mask is
+            // at least the document's size and grows to fit a shape scaled past the canvas
+            // (EnsureSize is grow-only, so the history refresh cannot shrink it back).
+            region.EnsureSize(Math.Max(docW, mw), Math.Max(docH, mh));
             region.SetOffset(ox, oy);
 
-            for (int y = 0; y < Math.Min(mh, docH); y++)
+            for (int y = 0; y < mh; y++)
             {
                 int row = y * mw;
                 int runStart = -1;
-                int limit = Math.Min(mw, docW);
+                int limit = mw;
                 for (int x = 0; x < limit; x++)
                 {
                     bool on = mask[row + x] != 0;

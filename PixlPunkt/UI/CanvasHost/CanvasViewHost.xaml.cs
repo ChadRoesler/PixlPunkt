@@ -919,6 +919,7 @@ namespace PixlPunkt.UI.CanvasHost
                     if (scaleChanged)
                     {
                         Selection_SetScale(wantX, wantY, link);
+                        SyncRegionFromMask();
                         needsRedraw = true;
                     }
 
@@ -926,6 +927,7 @@ namespace PixlPunkt.UI.CanvasHost
                     if (rotationChanged)
                     {
                         _selState.AngleDeg = angle;
+                        SyncRegionFromMask();
                         needsRedraw = true;
                     }
                 }
