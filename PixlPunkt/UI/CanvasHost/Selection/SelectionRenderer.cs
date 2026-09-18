@@ -35,12 +35,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         // CACHED OBJECTS - Reused across frames to minimize GC pressure
         // ════════════════════════════════════════════════════════════════════
 
-        /// <summary>Cached list for horizontal edges in DrawAntsFromBuffer.</summary>
-        private readonly List<(float x0, float y, float x1)> _cachedHEdges = new(256);
-        
-        /// <summary>Cached list for vertical edges in DrawAntsFromBuffer.</summary>
-        private readonly List<(float x, float y0, float y1)> _cachedVEdges = new(256);
-
         /// <summary>Cached buffer for premultiplied floating selection when no transform needed.</summary>
         private byte[]? _cachedPremulBuffer;
         private int _cachedPremulBufferSize;
@@ -345,70 +339,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             }
         }
 
-        private void DrawAntsFromBuffer(ICanvasRenderer renderer, byte[] buffer, int bufW, int bufH,
-            float offsetX, float offsetY, float scale, bool animated)
-        {
-            bool IsOpaque(int x, int y) => x >= 0 && y >= 0 && x < bufW && y < bufH && buffer[(y * bufW + x) * 4 + 3] > 0;
-
-            // Clear and reuse cached lists instead of allocating new ones
-            _cachedHEdges.Clear();
-            _cachedVEdges.Clear();
-
-            for (int y = 0; y < bufH; y++)
-            {
-                for (int x = 0; x < bufW; x++)
-                {
-                    if (!IsOpaque(x, y)) continue;
-                    if (!IsOpaque(x, y - 1)) _cachedHEdges.Add((offsetX + x * scale, offsetY + y * scale, offsetX + (x + 1) * scale));
-                    if (!IsOpaque(x, y + 1)) _cachedHEdges.Add((offsetX + x * scale, offsetY + (y + 1) * scale, offsetX + (x + 1) * scale));
-                    if (!IsOpaque(x - 1, y)) _cachedVEdges.Add((offsetX + x * scale, offsetY + y * scale, offsetY + (y + 1) * scale));
-                    if (!IsOpaque(x + 1, y)) _cachedVEdges.Add((offsetX + (x + 1) * scale, offsetY + y * scale, offsetY + (y + 1) * scale));
-                }
-            }
-
-            float period = ANTS_ON + ANTS_OFF;
-            if (animated)
-            {
-                foreach (var (x0, y, x1) in _cachedHEdges) DrawAntsLineH(renderer, x0, y, x1 - x0, _state.AntsPhase, period);
-                foreach (var (x, y0, y1) in _cachedVEdges) DrawAntsLineV(renderer, x, y0, y1 - y0, _state.AntsPhase, period);
-            }
-            else
-            {
-                foreach (var (x0, y, x1) in _cachedHEdges) renderer.DrawLine(x0, y, x1, y, Colors.White, ANTS_THICKNESS);
-                foreach (var (x, y0, y1) in _cachedVEdges) renderer.DrawLine(x, y0, x, y1, Colors.White, ANTS_THICKNESS);
-            }
-        }
-
-        private void DrawAntsLineH(ICanvasRenderer renderer, float x, float y, float length, float phase, float period)
-        {
-            for (float pos = -phase; pos < length; pos += period)
-            {
-                float segStart = Math.Max(0, pos);
-                float segEnd = Math.Min(length, pos + ANTS_ON);
-                if (segEnd > segStart)
-                    renderer.DrawLine(x + segStart, y, x + segEnd, y, Colors.White, ANTS_THICKNESS);
-                float blackStart = Math.Max(0, pos + ANTS_ON);
-                float blackEnd = Math.Min(length, pos + period);
-                if (blackEnd > blackStart)
-                    renderer.DrawLine(x + blackStart, y, x + blackEnd, y, Colors.Black, ANTS_THICKNESS);
-            }
-        }
-
-        private void DrawAntsLineV(ICanvasRenderer renderer, float x, float y, float length, float phase, float period)
-        {
-            for (float pos = -phase; pos < length; pos += period)
-            {
-                float segStart = Math.Max(0, pos);
-                float segEnd = Math.Min(length, pos + ANTS_ON);
-                if (segEnd > segStart)
-                    renderer.DrawLine(x, y + segStart, x, y + segEnd, Colors.White, ANTS_THICKNESS);
-                float blackStart = Math.Max(0, pos + ANTS_ON);
-                float blackEnd = Math.Min(length, pos + period);
-                if (blackEnd > blackStart)
-                    renderer.DrawLine(x, y + blackStart, x, y + blackEnd, Colors.Black, ANTS_THICKNESS);
-            }
-        }
-
         public void DrawMarchingAnts(ICanvasRenderer renderer, Rect dest, double scale, bool animated)
         {
             bool isPaintingSelection = _state.Drag == SelDrag.Marquee && (_needsContinuousRender?.Invoke(_state.Drag) ?? false);
@@ -418,82 +348,41 @@ namespace PixlPunkt.UI.CanvasHost.Selection
 
             bool hasRotation = Math.Abs(_state.CumulativeAngleDeg) > 0.1 || Math.Abs(_state.AngleDeg) > 0.1;
             bool hasScale = Math.Abs(_state.ScaleX - 1.0) > 0.001 || Math.Abs(_state.ScaleY - 1.0) > 0.001;
-            bool hasTransform = hasRotation || hasScale || _state.BufferFlipped;
 
             if (hasFloating)
             {
-                if (hasTransform)
+                if (hasRotation && !_state.RegionNonRectangular)
                 {
-                    if (_state.BufferFlipped && !hasRotation && !hasScale)
-                    {
-                        float x = (float)(dest.X + _state.FloatX * scale);
-                        float y = (float)(dest.Y + _state.FloatY * scale);
-                        DrawAntsFromBuffer(renderer, _state.Buffer!, _state.BufferWidth, _state.BufferHeight,
-                            x, y, (float)scale, animated);
-                    }
-                    else if (_state.RegionNonRectangular && _state.PreviewBuf != null)
-                    {
-                        // Non-rectangular selection (polygon, wand, paint): trace the actual
-                        // pixel boundary of the transformed preview buffer so the marquee follows
-                        // the true shape through scale and rotation.
-                        float pivotDocX = _state.OrigCenterX;
-                        float pivotDocY = _state.OrigCenterY;
-                        float pivotViewX = (float)(dest.X + pivotDocX * scale);
-                        float pivotViewY = (float)(dest.Y + pivotDocY * scale);
-                        float bufLeft = pivotViewX - (float)(_state.PreviewW * scale / 2.0);
-                        float bufTop = pivotViewY - (float)(_state.PreviewH * scale / 2.0);
-                        DrawAntsFromBuffer(renderer, _state.PreviewBuf, _state.PreviewW, _state.PreviewH,
-                            bufLeft, bufTop, (float)scale, animated);
-                    }
-                    else
-                    {
-                        int scaledW = Math.Max(1, (int)Math.Round(_state.OrigW * _state.ScaleX));
-                        int scaledH = Math.Max(1, (int)Math.Round(_state.OrigH * _state.ScaleY));
-
-                        float pivotX = _state.OrigCenterX;
-                        float pivotY = _state.OrigCenterY;
-                        float cx = (float)(dest.X + pivotX * scale);
-                        float cy = (float)(dest.Y + pivotY * scale);
-
-                        float rectLeft = cx - (float)(scaledW * scale / 2.0);
-                        float rectTop = cy - (float)(scaledH * scale / 2.0);
-                        float rectW = (float)(scaledW * scale);
-                        float rectH = (float)(scaledH * scale);
-
-                        if (hasRotation)
-                        {
-                            float totalAngle = (float)(_state.CumulativeAngleDeg + _state.AngleDeg);
-                            float rad = (float)(totalAngle * Math.PI / 180.0);
-
-                            var corners = new[] {
-                                RotateAround(rectLeft, rectTop, cx, cy, rad),
-                                RotateAround(rectLeft + rectW, rectTop, cx, cy, rad),
-                                RotateAround(rectLeft + rectW, rectTop + rectH, cx, cy, rad),
-                                RotateAround(rectLeft, rectTop + rectH, cx, cy, rad)
-                            };
-
-                            DrawAntsPolygon(renderer, corners, animated);
-                        }
-                        else
-                        {
-                            DrawAntsRectangle(renderer, rectLeft, rectTop, rectW, rectH, animated);
-                        }
-                    }
+                    // A rectangular selection keeps its analytic rotated frame while rotating; the
+                    // rasterised outline only takes over after commit.
+                    int scaledW = Math.Max(1, (int)Math.Round(_state.OrigW * _state.ScaleX));
+                    int scaledH = Math.Max(1, (int)Math.Round(_state.OrigH * _state.ScaleY));
+                    float cx = (float)(dest.X + _state.OrigCenterX * scale);
+                    float cy = (float)(dest.Y + _state.OrigCenterY * scale);
+                    float rectLeft = cx - (float)(scaledW * scale / 2.0);
+                    float rectTop = cy - (float)(scaledH * scale / 2.0);
+                    float rectW = (float)(scaledW * scale);
+                    float rectH = (float)(scaledH * scale);
+                    float rad = (float)((_state.CumulativeAngleDeg + _state.AngleDeg) * Math.PI / 180.0);
+                    var corners = new[] {
+                        RotateAround(rectLeft, rectTop, cx, cy, rad),
+                        RotateAround(rectLeft + rectW, rectTop, cx, cy, rad),
+                        RotateAround(rectLeft + rectW, rectTop + rectH, cx, cy, rad),
+                        RotateAround(rectLeft, rectTop + rectH, cx, cy, rad)
+                    };
+                    DrawAntsPolygon(renderer, corners, animated);
                 }
                 else
                 {
-                    // No transform (move only): use _selRegion which is kept in sync by
-                    // OffsetSelectionRegion(), preserving the original geometric marquee shape
-                    // regardless of pixel alpha in the floating buffer.
+                    // Everything else draws the region, which is kept equal to the float's mask
+                    // under the live transform (bake, flip, undo, options box and, since stage 4,
+                    // every scale/rotate pointer move), so the outline is the shape, not the
+                    // pixels' silhouette.
                     if (animated)
                         _state.Region.DrawAnts(renderer, dest, scale, _state.AntsPhase, ANTS_ON, ANTS_OFF, ANTS_THICKNESS);
                     else
                         DrawSolidOutline(renderer, dest, scale);
                 }
-            }
-            else if (hasRotation)
-            {
-                DrawTransformedMarchingAnts(renderer, dest, scale, animated);
             }
             else
             {
@@ -501,22 +390,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                     _state.Region.DrawAnts(renderer, dest, scale, _state.AntsPhase, ANTS_ON, ANTS_OFF, ANTS_THICKNESS);
                 else
                     DrawSolidOutline(renderer, dest, scale);
-            }
-        }
-
-        private void DrawAntsRectangle(ICanvasRenderer renderer, float x, float y, float w, float h, bool animated)
-        {
-            if (animated)
-            {
-                float period = ANTS_ON + ANTS_OFF;
-                DrawAntsLineH(renderer, x, y, w, _state.AntsPhase, period);
-                DrawAntsLineH(renderer, x, y + h, w, _state.AntsPhase, period);
-                DrawAntsLineV(renderer, x, y, h, _state.AntsPhase, period);
-                DrawAntsLineV(renderer, x + w, y, h, _state.AntsPhase, period);
-            }
-            else
-            {
-                renderer.DrawRectangle(x, y, w, h, Colors.White, ANTS_THICKNESS);
             }
         }
 
@@ -566,50 +439,6 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                     renderer.DrawLine(p1.x, p1.y, p2.x, p2.y, Colors.White, ANTS_THICKNESS);
                 }
             }
-        }
-
-        private void DrawTransformedMarchingAnts(ICanvasRenderer renderer, Rect dest, double scale, bool animated)
-        {
-            if (_state.PreviewBuf != null && _state.PreviewW > 0 && _state.PreviewH > 0)
-            {
-                float pivotX = _state.OrigCenterX;
-                float pivotY = _state.OrigCenterY;
-                float cx = (float)(dest.X + pivotX * scale);
-                float cy = (float)(dest.Y + pivotY * scale);
-                float bufferLeft = cx - (float)(_state.PreviewW * scale / 2.0);
-                float bufferTop = cy - (float)(_state.PreviewH * scale / 2.0);
-                DrawAntsFromBuffer(renderer, _state.PreviewBuf, _state.PreviewW, _state.PreviewH,
-                    bufferLeft, bufferTop, (float)scale, animated);
-            }
-            else
-            {
-                DrawRotatedRectangleAnts(renderer, dest, scale, animated);
-            }
-        }
-
-        public void DrawRotatedRectangleAnts(ICanvasRenderer renderer, Rect dest, double scale, bool animated)
-        {
-            int handleW = (int)Math.Round(_state.OrigW * _state.ScaleX);
-            int handleH = (int)Math.Round(_state.OrigH * _state.ScaleY);
-            float selX = _state.Floating ? _state.FloatX : _state.Rect.X;
-            float selY = _state.Floating ? _state.FloatY : _state.Rect.Y;
-            float x = (float)(dest.X + selX * scale);
-            float y = (float)(dest.Y + selY * scale);
-            float w = (float)(handleW * scale);
-            float h = (float)(handleH * scale);
-            float cx = x + w / 2f;
-            float cy = y + h / 2f;
-            float totalAngle = (float)(_state.CumulativeAngleDeg + _state.AngleDeg);
-            float rad = (float)(totalAngle * Math.PI / 180.0);
-
-            var corners = new[] {
-                RotateAround(x, y, cx, cy, rad),
-                RotateAround(x + w, y, cx, cy, rad),
-                RotateAround(x + w, y + h, cx, cy, rad),
-                RotateAround(x, y + h, cx, cy, rad)
-            };
-
-            DrawAntsPolygon(renderer, corners, animated);
         }
 
         private void DrawSolidOutline(ICanvasRenderer renderer, Rect dest, double scale)

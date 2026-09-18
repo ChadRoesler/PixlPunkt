@@ -38,7 +38,34 @@ namespace PixlPunkt.Core.Selection
         /// resamples it (<see cref="ResampleMask"/>), a flip mirrors it. Stage 1 of the
         /// selection-shape work carries it; later stages read it for the region and hit-testing.
         /// </summary>
-        public byte[] Mask { get; set; }
+        public byte[] Mask
+        {
+            get => _mask;
+            set { _mask = value ?? Array.Empty<byte>(); _maskVersion++; }
+        }
+        private byte[] _mask = Array.Empty<byte>();
+        private int _maskVersion;
+
+        private byte[]? _shapeCache;
+        private int _shapeW, _shapeH;
+        private (double sx, double sy, double angle, int w, int h, RotationMode rot, int ver) _shapeKey;
+
+        /// <summary>
+        /// The mask under the current scale and rotation (see
+        /// <see cref="SelectionBufferOps.BuildTransformedMask"/>), cached until the transform or
+        /// the mask changes so a drag's per-move region rebuild does not redo the work.
+        /// </summary>
+        public (byte[] mask, int w, int h) GetTransformedShape()
+        {
+            var key = (ScaleX, ScaleY, CumulativeAngleDeg + AngleDeg, Width, Height, RotMode, _maskVersion);
+            if (_shapeCache == null || key != _shapeKey)
+            {
+                (_shapeCache, _shapeW, _shapeH) = SelectionBufferOps.BuildTransformedMask(
+                    _mask, Width, Height, ScaleX, ScaleY, CumulativeAngleDeg + AngleDeg, RotMode);
+                _shapeKey = key;
+            }
+            return (_shapeCache, _shapeW, _shapeH);
+        }
         public int Width { get; set; }
         public int Height { get; set; }
 
@@ -140,14 +167,15 @@ namespace PixlPunkt.Core.Selection
                     next[drow + x] = Mask[srow + sx];
                 }
             }
-            Mask = next;
+            Mask = next;                                   // setter bumps the version
         }
 
         public void FlipMaskHorizontal()
         {
             if (Mask.Length != Width * Height) return;
             for (int y = 0; y < Height; y++)
-                Array.Reverse(Mask, y * Width, Width);
+                Array.Reverse(_mask, y * Width, Width);
+            _maskVersion++;
         }
 
         public void FlipMaskVertical()
@@ -157,10 +185,11 @@ namespace PixlPunkt.Core.Selection
             for (int y = 0; y < Height / 2; y++)
             {
                 int a = y * Width, b = (Height - 1 - y) * Width;
-                Array.Copy(Mask, a, row, 0, Width);
-                Array.Copy(Mask, b, Mask, a, Width);
-                Array.Copy(row, 0, Mask, b, Width);
+                Array.Copy(_mask, a, row, 0, Width);
+                Array.Copy(_mask, b, _mask, a, Width);
+                Array.Copy(row, 0, _mask, b, Width);
             }
+            _maskVersion++;
         }
 
         /// <summary>Width after the current (unbaked) scale.</summary>

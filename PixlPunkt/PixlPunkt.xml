@@ -17743,6 +17743,13 @@
             selection-shape work carries it; later stages read it for the region and hit-testing.
             </summary>
         </member>
+        <member name="M:PixlPunkt.Core.Selection.FloatingSelection.GetTransformedShape">
+            <summary>
+            The mask under the current scale and rotation (see
+            <see cref="M:PixlPunkt.Core.Selection.SelectionBufferOps.BuildTransformedMask(System.Byte[],System.Int32,System.Int32,System.Double,System.Double,System.Double,PixlPunkt.Core.Enums.RotationMode)"/>), cached until the transform or
+            the mask changes so a drag's per-move region rebuild does not redo the work.
+            </summary>
+        </member>
         <member name="P:PixlPunkt.Core.Selection.FloatingSelection.X">
             <summary>Top-left of the (unrotated, unscaled) buffer in document coordinates. May be off-canvas.</summary>
         </member>
@@ -18126,28 +18133,6 @@
             <summary>
             Ways of rebuilding the document's selection mask from a floating selection. These used
             to live in the view (duplicated); history items need them, so they live in Core.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildAsRotatedRect(PixlPunkt.Core.Selection.SelectionRegion,System.Int32,System.Int32,System.Int32,System.Int32,System.Double,Windows.Graphics.RectInt32,System.Int32,System.Int32)">
-            <summary>
-            Rebuilds the mask as the original marquee rectangle scaled to (baseW, baseH) and
-            rotated by <paramref name="angleDeg"/> about (centerX, centerY), clipped to
-            <paramref name="dstClamp"/>. Used at commit so the marquee keeps its geometric shape.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildFromTransformedBuffer(PixlPunkt.Core.Selection.SelectionRegion,Windows.Graphics.RectInt32,Windows.Graphics.RectInt32,System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32)">
-            <summary>
-            Rebuilds the mask from the alpha channel of a (transformed) buffer placed at
-            <paramref name="dstRect"/>, clipped to <paramref name="dstClamp"/>. Used after a scale
-            bake on non-rectangular selections so the marquee follows the true shape.
-            </summary>
-        </member>
-        <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildFromFloating(PixlPunkt.Core.Selection.SelectionRegion,PixlPunkt.Core.Selection.FloatingSelection,System.Int32,System.Int32)">
-            <summary>
-            Rebuilds the mask from a floating selection's buffer alpha at its current position.
-            The mask is kept document-sized; parts of the float that are off-canvas are simply not
-            in the mask (they cannot be painted anyway, and hit-testing a floating selection uses
-            the buffer directly). Also refreshes <see cref="P:PixlPunkt.Core.Selection.FloatingSelection.RegionNonRectangular"/>.
             </summary>
         </member>
         <member name="M:PixlPunkt.Core.Selection.SelectionRegionBuilders.RebuildFromMask(PixlPunkt.Core.Selection.SelectionRegion,PixlPunkt.Core.Selection.FloatingSelection,System.Int32,System.Int32)">
@@ -30961,12 +30946,6 @@
             This class caches frequently allocated objects (Lists, byte arrays) to minimize GC pressure
             during rendering. Selection visuals are drawn every frame while a selection is active.
             </remarks>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionRenderer._cachedHEdges">
-            <summary>Cached list for horizontal edges in DrawAntsFromBuffer.</summary>
-        </member>
-        <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionRenderer._cachedVEdges">
-            <summary>Cached list for vertical edges in DrawAntsFromBuffer.</summary>
         </member>
         <member name="F:PixlPunkt.UI.CanvasHost.Selection.SelectionRenderer._cachedPremulBuffer">
             <summary>Cached buffer for premultiplied floating selection when no transform needed.</summary>

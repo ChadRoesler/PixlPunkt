@@ -841,6 +841,7 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_selState.Floating)
                     {
                         _selTransform.UpdateScaleFromHandle(docX, docY);
+                        SyncRegionFromMask();   // stage 4: the outline follows the live transform
                         InvalidateMainCanvas();
                     }
                     return true;
@@ -849,6 +850,7 @@ namespace PixlPunkt.UI.CanvasHost
                     if (_selState.Floating)
                     {
                         UpdateRotation(docX, docY);
+                        SyncRegionFromMask();
                         InvalidateMainCanvas();
                     }
                     return true;

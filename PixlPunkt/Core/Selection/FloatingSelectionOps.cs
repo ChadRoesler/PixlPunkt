@@ -112,7 +112,7 @@ namespace PixlPunkt.Core.Selection
             var regionBefore = doc.Selection.Clone();
             var floatingBefore = f.Clone();
 
-            var (rotBuf, rotW, rotH, baseW, baseH, totalRotation) = Rasterize(f);
+            var (rotBuf, rotW, rotH, _, _, _) = Rasterize(f);
             int cx = f.OrigCenterX;
             int cy = f.OrigCenterY;
             var dstRect = CreateRect(cx - rotW / 2, cy - rotH / 2, rotW, rotH);
@@ -132,7 +132,7 @@ namespace PixlPunkt.Core.Selection
             var before = PixelRectOps.CopyRect(surf.Pixels, sw, sh, dstClamp);
 
             PixelRectOps.BlitAlphaOver(surf.Pixels, sw, sh, dstRect.X, dstRect.Y, rotBuf, rotW, rotH);
-            SelectionRegionBuilders.RebuildAsRotatedRect(doc.Selection, cx, cy, baseW, baseH, totalRotation, dstClamp, sw, sh);
+            SelectionRegionBuilders.RebuildFromMask(doc.Selection, f, sw, sh);
 
             var after = PixelRectOps.CopyRect(surf.Pixels, sw, sh, dstClamp);
 
@@ -209,7 +209,7 @@ namespace PixlPunkt.Core.Selection
         public static byte[] RasterizeOnto(byte[] layerPixels, int layerW, int layerH, FloatingSelection f)
         {
             var copy = (byte[])layerPixels.Clone();
-            var (rotBuf, rotW, rotH, baseW, baseH, _) = Rasterize(f);
+            var (rotBuf, rotW, rotH, _, _, _) = Rasterize(f);
             int cx = f.OrigCenterX;
             int cy = f.OrigCenterY;
             PixelRectOps.BlitAlphaOver(copy, layerW, layerH, cx - rotW / 2, cy - rotH / 2, rotBuf, rotW, rotH);
