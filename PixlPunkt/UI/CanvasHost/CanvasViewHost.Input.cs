@@ -575,6 +575,15 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
+            // An active pan (MMB / space / Pan tool) runs before hover, symmetry and guide logic,
+            // so nothing above can drop a move while the pointer is captured off-canvas.
+            if (GetUtilityHandler(ToolIds.Pan) is { IsActive: true } activePan)
+            {
+                var panPt = e.GetCurrentPoint(_mainCanvas);
+                activePan.PointerMoved(panPt.Position, ScreenToDocPoint(panPt.Position), panPt.Properties);
+                return;
+            }
+
             // External dropper mode - still update hover for cursor overlay
             if (_externalDropperActive)
             {
@@ -812,6 +821,13 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
+            if (GetUtilityHandler(ToolIds.Pan) is { IsActive: true } releasingPan)
+            {
+                var panPt = e.GetCurrentPoint(_mainCanvas);
+                releasingPan.PointerReleased(panPt.Position, ScreenToDocPoint(panPt.Position), panPt.Properties);
+                return;
+            }
+
             // ════════════════════════════════════════════════════════════════════
             // SYMMETRY AXIS INTERACTION - release axis drag
             // ════════════════════════════════════════════════════════════════════
@@ -960,8 +976,10 @@ namespace PixlPunkt.UI.CanvasHost
             if (_isPainting) _hasLastDocPos = false;
             _pendingStrokeFromOutside = false;
 
-            // Reset handlers on exit
-            GetUtilityHandler(ToolIds.Pan)?.Reset();
+            // Reset the pan handler on exit only when it is idle: a pan in progress holds the
+            // pointer capture and keeps receiving moves off-canvas, like the rotate drag does.
+            var exitPan = GetUtilityHandler(ToolIds.Pan);
+            if (exitPan?.IsActive != true) exitPan?.Reset();
 
             _hoverValid = false;
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using Microsoft.UI.Input;
@@ -191,11 +192,30 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 if (el == null) return;
                 el.RenderTransformOrigin = new Point(0.5, 0.5);
-                if (!x && !y && Math.Abs(angle) < 1e-9 && !dragging) { el.RenderTransform = null; return; }
-                var group = new TransformGroup();
-                group.Children.Add(new ScaleTransform { ScaleX = x ? -1 : 1, ScaleY = y ? -1 : 1 });
-                group.Children.Add(new RotateTransform { Angle = angle });
-                el.RenderTransform = group;
+                if (!x && !y && Math.Abs(angle) < 1e-9 && !dragging)
+                {
+                    el.RenderTransform = null;
+                    _viewTransforms.Remove(el);
+                    return;
+                }
+                // Persistent transform objects: updating their properties is committed by the
+                // framework straight away, whereas swapping in a new group each pointer move can
+                // sit unrendered until the next layout pass (seen as "jumps on release").
+                if (!_viewTransforms.TryGetValue(el, out var t) || !ReferenceEquals(el.RenderTransform, t.group))
+                {
+                    var scale = new ScaleTransform();
+                    var rotate = new RotateTransform();
+                    var group = new TransformGroup();
+                    group.Children.Add(scale);
+                    group.Children.Add(rotate);
+                    t = (group, scale, rotate);
+                    _viewTransforms[el] = t;
+                    el.RenderTransform = group;
+                }
+                t.scale.ScaleX = x ? -1 : 1;
+                t.scale.ScaleY = y ? -1 : 1;
+                t.rotate.Angle = angle;
+                if (dragging) el.InvalidateArrange();
             }
 #if HAS_UNO
             Apply(_mainCanvasElement, fh, fv, rot);
@@ -211,6 +231,7 @@ namespace PixlPunkt.UI.CanvasHost
         }
 
         private Point _viewOversizeMargin;
+        private readonly Dictionary<FrameworkElement, (TransformGroup group, ScaleTransform scale, RotateTransform rotate)> _viewTransforms = new();
 
         /// <summary>
         /// Removes the view transform, clip and oversize and unhooks their handlers. Called
@@ -232,6 +253,7 @@ namespace PixlPunkt.UI.CanvasHost
                 {
                     if (el == null) continue;
                     el.RenderTransform = null;
+                    _viewTransforms.Remove(el);
                     el.Width = double.NaN; el.Height = double.NaN;
                     el.HorizontalAlignment = HorizontalAlignment.Stretch;
                     el.VerticalAlignment = VerticalAlignment.Stretch;
