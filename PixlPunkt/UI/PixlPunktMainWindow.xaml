@@ -181,6 +181,7 @@
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Flip View Horizontally (Ctrl+F)" Click="View_FlipHorizontal_Click"/>
                     <MenuFlyoutItem Text="Flip View Vertically (Ctrl+Shift+F)" Click="View_FlipVertical_Click"/>
+                    <MenuFlyoutItem Text="Reset View Rotation (Ctrl+Shift+MMB drag rotates)" Click="View_ResetRotation_Click"/>
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Toggle Pixel Grid" Click="View_TogglePixelGrid_Click"/>
                     <MenuFlyoutItem Text="Toggle Tile Grid" Click="View_ToggleTileGrid_Click"/>

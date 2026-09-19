@@ -111,15 +111,29 @@ namespace PixlPunkt.Core.Document
         /// <summary>The canvas is shown mirrored top-bottom. View state only: not saved, does not dirty the document.</summary>
         public bool ViewFlipVertical { get; private set; }
 
-        /// <summary>Raised when either view flip toggles; every view of this document re-applies its mirror.</summary>
-        public event Action? ViewFlipChanged;
+        /// <summary>The canvas is shown rotated by this many degrees (clockwise). View state only: not saved, does not dirty the document.</summary>
+        public double ViewRotationDeg { get; private set; }
+
+        /// <summary>Raised when a view flip or the view rotation changes; every view of this document re-applies its transform.</summary>
+        public event Action? ViewTransformChanged;
 
         /// <summary>Toggles a view flip. Go through <see cref="History.ViewFlipItem"/> to make it undoable.</summary>
         public void ToggleViewFlip(bool horizontal)
         {
             if (horizontal) ViewFlipHorizontal = !ViewFlipHorizontal;
             else ViewFlipVertical = !ViewFlipVertical;
-            ViewFlipChanged?.Invoke();
+            ViewTransformChanged?.Invoke();
+        }
+
+        /// <summary>Sets the view rotation, normalised to (-180, 180]. Go through <see cref="History.ViewRotateItem"/> to make it undoable.</summary>
+        public void SetViewRotation(double degrees)
+        {
+            degrees %= 360.0;
+            if (degrees > 180.0) degrees -= 360.0;
+            if (degrees <= -180.0) degrees += 360.0;
+            if (Math.Abs(degrees - ViewRotationDeg) < 1e-9) return;
+            ViewRotationDeg = degrees;
+            ViewTransformChanged?.Invoke();
         }
 
         public void SetFloating(FloatingSelection? floating)

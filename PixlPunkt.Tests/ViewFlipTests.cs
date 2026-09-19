@@ -17,7 +17,7 @@ public class ViewFlipTests
     public void Flip_TogglesViewState_AndUndoes()
     {
         var doc = NewDoc();
-        int raised = 0; doc.ViewFlipChanged += () => raised++;
+        int raised = 0; doc.ViewTransformChanged += () => raised++;
         var item = new ViewFlipItem(doc, horizontal: true);
         item.Redo(); doc.History.Push(item);
 
@@ -77,5 +77,22 @@ public class ViewFlipTests
         TimelapseExportService.FlipPixels(px, 2, 2, flipH: false, flipV: true);
         px[0 * 4 + 0].Should().Be(255).And.Be(px[0 * 4 + 1], "white is now top-left");
         px[3 * 4 + 2].Should().Be(255, "red is now bottom-right");
+    }
+
+    [Test]
+    public void Rotate_IsUndoable_Normalised_AndClean()
+    {
+        var doc = NewDoc();
+        doc.MarkSaved();
+        var item = new ViewRotateItem(doc, 0.0, 200.0);
+        item.Redo(); doc.History.Push(item);
+
+        doc.ViewRotationDeg.Should().BeApproximately(-160.0, 1e-9, "normalised to (-180, 180]");
+        doc.IsDirty.Should().BeFalse();
+
+        doc.History.Undo().Should().BeTrue();
+        doc.ViewRotationDeg.Should().Be(0.0);
+
+        new ViewRotateItem(doc, 30.0, 30.0).HasChange.Should().BeFalse();
     }
 }

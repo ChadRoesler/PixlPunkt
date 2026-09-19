@@ -554,6 +554,12 @@ namespace PixlPunkt.UI
             UpdateHistoryUI();
         }
 
+        private void View_ResetRotation_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentHost?.ResetViewRotation();
+            UpdateHistoryUI();
+        }
+
         private void PasteAccel_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)
         {
             if (IsTextInputFocused()) return;

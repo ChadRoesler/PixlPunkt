@@ -233,6 +233,7 @@ namespace PixlPunkt.Core.Export
         private static bool AffectsCanvas(IHistoryItem item) => item switch
         {
             VoxelHistoryItem => false,
+            ViewRotateItem => false,          // a rotated frame would change size; flips are applied, rotation is not
             HistoryGroupItem g => g.Items.Any(AffectsCanvas),
             _ => true
         };

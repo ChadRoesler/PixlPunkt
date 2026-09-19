@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Input;
 using PixlPunkt.Core.Animation;
 using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
+using PixlPunkt.Core.History;
 using PixlPunkt.Core.Tools;
 using PixlPunkt.Core.Tools.Utility;
 using Windows.Foundation;
@@ -441,6 +442,14 @@ namespace PixlPunkt.UI.CanvasHost
                 }
             }
 
+            // Ctrl+Shift+MMB = rotate the view (non-destructive; one undo step per drag)
+            if (props.IsMiddleButtonPressed && IsKeyDown(Windows.System.VirtualKey.Control) && IsKeyDown(Windows.System.VirtualKey.Shift))
+            {
+                BeginViewRotate(e);
+                _mainCanvas.CapturePointer(e.Pointer);
+                return;
+            }
+
             // MMB or space-pan = always pan
             if (props.IsMiddleButtonPressed || _spacePan)
             {
@@ -560,6 +569,12 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void CanvasView_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
+            if (_viewRotateActive)
+            {
+                UpdateViewRotate(e);
+                return;
+            }
+
             // External dropper mode - still update hover for cursor overlay
             if (_externalDropperActive)
             {
@@ -789,6 +804,14 @@ namespace PixlPunkt.UI.CanvasHost
 
         private void CanvasView_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
+            if (_viewRotateActive)
+            {
+                EndViewRotate();
+                _mainCanvas.ReleasePointerCaptures();
+                e.Handled = true;
+                return;
+            }
+
             // ════════════════════════════════════════════════════════════════════
             // SYMMETRY AXIS INTERACTION - release axis drag
             // ════════════════════════════════════════════════════════════════════
@@ -983,6 +1006,50 @@ namespace PixlPunkt.UI.CanvasHost
         // ════════════════════════════════════════════════════════════════════
         // KEYBOARD HELPERS
         // ════════════════════════════════════════════════════════════════════
+
+        // ════════════════════════════════════════════════════════════════════
+        // VIEW ROTATION DRAG (Ctrl+Shift+MMB)
+        // Angles are measured in the untransformed container, not the rotating canvas element,
+        // so the drag stays stable while the element turns under the pointer.
+        // ════════════════════════════════════════════════════════════════════
+
+        private bool _viewRotateActive;
+        private double _viewRotateStartPointerDeg;
+        private double _viewRotateStartDeg;
+        private const double VIEW_ROTATE_SNAP_STEP = 15.0;
+        private const double VIEW_ROTATE_SNAP_WITHIN = 3.0;
+
+        private double PointerAngleInContainer(PointerRoutedEventArgs e)
+        {
+            var pos = e.GetCurrentPoint(CanvasContainer).Position;
+            double cx = CanvasContainer.ActualWidth / 2.0, cy = CanvasContainer.ActualHeight / 2.0;
+            return Math.Atan2(pos.Y - cy, pos.X - cx) * 180.0 / Math.PI;
+        }
+
+        private void BeginViewRotate(PointerRoutedEventArgs e)
+        {
+            _viewRotateActive = true;
+            _viewRotateStartPointerDeg = PointerAngleInContainer(e);
+            _viewRotateStartDeg = Document.ViewRotationDeg;
+        }
+
+        private void UpdateViewRotate(PointerRoutedEventArgs e)
+        {
+            double delta = PointerAngleInContainer(e) - _viewRotateStartPointerDeg;
+            double angle = _viewRotateStartDeg + delta;
+            // Snap to the nearest 15 degrees when close, so 0/90/180 are easy to hit by hand.
+            double nearest = Math.Round(angle / VIEW_ROTATE_SNAP_STEP) * VIEW_ROTATE_SNAP_STEP;
+            if (Math.Abs(angle - nearest) <= VIEW_ROTATE_SNAP_WITHIN) angle = nearest;
+            Document.SetViewRotation(angle);
+        }
+
+        private void EndViewRotate()
+        {
+            _viewRotateActive = false;
+            ApplyViewTransform();                        // settle: shrink back if the drag ended at 0
+            var item = new ViewRotateItem(Document, _viewRotateStartDeg, Document.ViewRotationDeg);
+            if (item.HasChange) PushHistoryItem(item);   // already applied live during the drag
+        }
 
         private static bool IsKeyDown(Windows.System.VirtualKey k)
         {

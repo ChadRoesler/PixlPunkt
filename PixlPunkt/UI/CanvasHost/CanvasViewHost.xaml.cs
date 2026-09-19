@@ -165,29 +165,151 @@ namespace PixlPunkt.UI.CanvasHost
             PushHistoryItem(item);
         }
 
+        /// <summary>Resets the view rotation to 0 as an undoable step (no-op when already 0).</summary>
+        public void ResetViewRotation()
+        {
+            var item = new ViewRotateItem(Document, Document.ViewRotationDeg, 0.0);
+            if (!item.HasChange) return;
+            item.Redo();
+            PushHistoryItem(item);
+        }
+
         /// <summary>
-        /// Mirrors the canvas (and each ruler along its own axis) with a render transform. The
-        /// framework applies the same transform to pointer coordinates, so drawing, hit-testing
-        /// and every tool stay consistent without touching the coordinate maths.
+        /// Mirrors and rotates the canvas with a render transform (rulers only mirror along their
+        /// own axis; they stay axis-aligned under rotation). The framework applies the same
+        /// transform to pointer coordinates, so drawing, hit-testing and every tool stay
+        /// consistent without touching the coordinate maths.
         /// </summary>
-        private void ApplyViewFlip()
+        private void ApplyViewTransform()
         {
             bool fh = Document.ViewFlipHorizontal, fv = Document.ViewFlipVertical;
-            static void Mirror(FrameworkElement? el, bool x, bool y)
+            double rot = Document.ViewRotationDeg;
+            // While a rotate drag is in progress the transform stays attached even when the
+            // angle snaps through exactly 0; dropping it for a frame flashes.
+            bool dragging = _viewRotateActive;
+            void Apply(FrameworkElement? el, bool x, bool y, double angle)
             {
                 if (el == null) return;
                 el.RenderTransformOrigin = new Point(0.5, 0.5);
-                el.RenderTransform = (x || y) ? new ScaleTransform { ScaleX = x ? -1 : 1, ScaleY = y ? -1 : 1 } : null;
+                if (!x && !y && Math.Abs(angle) < 1e-9 && !dragging) { el.RenderTransform = null; return; }
+                var group = new TransformGroup();
+                group.Children.Add(new ScaleTransform { ScaleX = x ? -1 : 1, ScaleY = y ? -1 : 1 });
+                group.Children.Add(new RotateTransform { Angle = angle });
+                el.RenderTransform = group;
             }
 #if HAS_UNO
-            Mirror(_mainCanvasElement, fh, fv);
-            Mirror(_horizontalRulerElement, fh, false);
-            Mirror(_verticalRulerElement, false, fv);
+            Apply(_mainCanvasElement, fh, fv, rot);
+            Apply(_horizontalRulerElement, fh, false, 0);
+            Apply(_verticalRulerElement, false, fv, 0);
 #endif
-            Mirror(_mainCanvasXaml, fh, fv);
-            Mirror(_horizontalRulerXaml, fh, false);
-            Mirror(_verticalRulerXaml, false, fv);
+            Apply(_mainCanvasXaml, fh, fv, rot);
+            Apply(_horizontalRulerXaml, fh, false, 0);
+            Apply(_verticalRulerXaml, false, fv, 0);
+            UpdateCanvasOversize();
+            UpdateCanvasClip();
             InvalidateMainCanvas();
+        }
+
+        private Point _viewOversizeMargin;
+
+        /// <summary>
+        /// Removes the view transform, clip and oversize and unhooks their handlers. Called
+        /// before the window closes so nothing transformed is left for the compositor to tear
+        /// down (an access violation at exit appeared once the canvas carried a transform).
+        /// </summary>
+        public void ReleaseViewTransformForTeardown()
+        {
+            try
+            {
+                if (Document != null) Document.ViewTransformChanged -= ApplyViewTransform;
+                CanvasContainer.SizeChanged -= OnCanvasContainerSizeChangedForClip;
+                CanvasContainer.Clip = null;
+                foreach (var el in new FrameworkElement?[] {
+#if HAS_UNO
+                    _mainCanvasElement, _horizontalRulerElement, _verticalRulerElement,
+#endif
+                    _mainCanvasXaml, _horizontalRulerXaml, _verticalRulerXaml })
+                {
+                    if (el == null) continue;
+                    el.RenderTransform = null;
+                    el.Width = double.NaN; el.Height = double.NaN;
+                    el.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    el.VerticalAlignment = VerticalAlignment.Stretch;
+                }
+                _viewOversizeMargin = default;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CanvasViewHost] View transform teardown: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// While rotated, the canvas element is enlarged to the container's diagonal (a square,
+        /// centred) so its rotated footprint always covers the visible area: the viewport reads
+        /// as infinite instead of showing the element's own corners. The document is shifted by
+        /// the same margin so it does not move on screen, and the element shrinks back at 0.
+        /// </summary>
+        private void UpdateCanvasOversize()
+        {
+            double w = CanvasContainer.ActualWidth, h = CanvasContainer.ActualHeight;
+            if (w <= 0 || h <= 0) return;
+
+            Point margin = default;
+            // Stay enlarged for the whole drag so snapping through 0 does not resize the element.
+            bool rotated = Math.Abs(Document.ViewRotationDeg) > 1e-9 || _viewRotateActive;
+            if (rotated)
+            {
+                double d = Math.Ceiling(Math.Sqrt(w * w + h * h));
+                margin = new Point((d - w) / 2.0, (d - h) / 2.0);
+                _mainCanvas.Width = d;
+                _mainCanvas.Height = d;
+                _mainCanvas.HorizontalAlignment = HorizontalAlignment.Center;
+                _mainCanvas.VerticalAlignment = VerticalAlignment.Center;
+            }
+            else
+            {
+                _mainCanvas.Width = double.NaN;
+                _mainCanvas.Height = double.NaN;
+                _mainCanvas.HorizontalAlignment = HorizontalAlignment.Stretch;
+                _mainCanvas.VerticalAlignment = VerticalAlignment.Stretch;
+            }
+
+            // Keep the document where it was on screen: the element's origin moved by the margin.
+            double dx = margin.X - _viewOversizeMargin.X, dy = margin.Y - _viewOversizeMargin.Y;
+            if (dx != 0 || dy != 0) _zoom.PanBy(dx, dy);
+            _viewOversizeMargin = margin;
+        }
+
+        /// <summary>
+        /// A rotated canvas element sticks out past its container, and a Grid does not clip its
+        /// children, so the container is clipped to its own bounds while a view transform is
+        /// active. Kept in sync with resizes; removed again when the view is untransformed.
+        /// </summary>
+        private void OnCanvasContainerSizeChangedForClip(object sender, SizeChangedEventArgs e)
+        {
+            UpdateCanvasOversize();
+            UpdateCanvasClip();
+        }
+
+        private void UpdateCanvasClip()
+        {
+            // Clip whenever the element is transformed OR oversized: mid-drag the angle can snap
+            // through exactly 0 while the element is still enlarged, and dropping the clip for
+            // that frame paints the canvas over the toolbars.
+            bool transformed = Document.ViewFlipHorizontal || Document.ViewFlipVertical
+                || Math.Abs(Document.ViewRotationDeg) > 1e-9
+                || _viewRotateActive
+                || _viewOversizeMargin.X != 0 || _viewOversizeMargin.Y != 0;
+            if (!transformed)
+            {
+                CanvasContainer.Clip = null;
+                return;
+            }
+            CanvasContainer.Clip = new RectangleGeometry
+            {
+                Rect = new Rect(0, 0, Math.Max(0, CanvasContainer.ActualWidth), Math.Max(0, CanvasContainer.ActualHeight))
+            };
         }
 
         private void InvalidateMainCanvas()
@@ -427,8 +549,10 @@ namespace PixlPunkt.UI.CanvasHost
             Document.LayersChanged += OnDocChanged;
             Document.DocumentModified += OnExternalDocumentModified;
             Document.SelectionChanged += OnDocumentSelectionChanged;
-            Document.ViewFlipChanged += ApplyViewFlip;
-            ApplyViewFlip();
+            Document.ViewTransformChanged += ApplyViewTransform;
+            CanvasContainer.SizeChanged -= OnCanvasContainerSizeChangedForClip;
+            CanvasContainer.SizeChanged += OnCanvasContainerSizeChangedForClip;
+            ApplyViewTransform();
 
             // A floating selection is committed before the timeline moves off its frame; the
             // animation panels subscribe later than this, so this runs before frame pixels swap.
@@ -452,6 +576,8 @@ namespace PixlPunkt.UI.CanvasHost
         /// </summary>
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
         {
+            ReleaseViewTransformForTeardown();
+
             // Stop the continuous rendering hook and fallback timer to prevent memory leaks
             StopContinuousRendering();
             

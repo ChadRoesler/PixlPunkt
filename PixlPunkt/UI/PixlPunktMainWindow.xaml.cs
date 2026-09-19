@@ -404,6 +404,17 @@ namespace PixlPunkt.UI
 
             LoggingService.Info("Main window closed and resources cleaned up");
 
+            // Drop view transforms/clips on every canvas before the trees tear down.
+            try
+            {
+                foreach (var t in DocsTab.TabItems)
+                    if (t is TabViewItem tab && GetCanvasHostFromTab(tab) is { } h)
+                        h.ReleaseViewTransformForTeardown();
+                foreach (var win in _docWindows.Values)
+                    win.Host.ReleaseViewTransformForTeardown();
+            }
+            catch (Exception) { }
+
             // Close all child windows (detached document windows, settings, color picker, etc.)
             CloseAllChildWindows();
 
