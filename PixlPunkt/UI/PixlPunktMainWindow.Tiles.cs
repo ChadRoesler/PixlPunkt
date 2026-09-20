@@ -711,6 +711,14 @@ namespace PixlPunkt.UI
         /// Renumbers the tile ids 1..N so deletions don't leave gaps like 1, 3, 45, 56, 90.
         /// Every layer mapping and voxel side-tile reference follows; one undo step.
         /// </summary>
+        private void Tiles_VoxelPopOut_Click(object sender, RoutedEventArgs e)
+        {
+            var host = GetActiveDocumentWorkspaceHost();
+            if (host == null) return;
+            if (host.IsVoxelPanePoppedOut) host.DockVoxelPane();
+            else host.PopOutVoxelPane(this);
+        }
+
         private async void Tiles_Renumber_Click(object sender, RoutedEventArgs e)
         {
             var doc = CurrentHost?.Document;

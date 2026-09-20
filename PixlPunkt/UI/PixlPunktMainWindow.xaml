@@ -253,6 +253,7 @@
                     <MenuFlyoutItem Text="Renumber Tiles" Click="Tiles_Renumber_Click"/>
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Voxel Preview…" Click="Tiles_VoxelPreview_Click"/>
+                    <MenuFlyoutItem Text="Pop Out Voxel Workspace" Click="Tiles_VoxelPopOut_Click"/>
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Export Tiles…" Click="Tiles_Export_Click"/>
                     <MenuFlyoutSubItem Text="Import Tiles…">

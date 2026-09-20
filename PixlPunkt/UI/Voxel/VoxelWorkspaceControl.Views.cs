@@ -46,6 +46,7 @@ namespace PixlPunkt.UI.Voxel
         {
             if (sender is Button btn && btn.Tag is string viewName)
             {
+                _camera.ResetPan();       // a preset re-frames the model
                 _camera.SetView(viewName);
                 StartAnimationLoop();
             }
