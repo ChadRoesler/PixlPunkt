@@ -91,7 +91,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{2922D242-9
 		docs\README.md = docs\README.md
 		docs\sample-glyph-set.asciifont.json = docs\sample-glyph-set.asciifont.json
 		docs\USER_GUIDE.md = docs\USER_GUIDE.md
-		docs\USER_GUIDE_BACKUP.md = docs\USER_GUIDE_BACKUP.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "assets", "assets", "{68BC55B7-FAFA-41F6-AB07-FA92BC0B1150}"
