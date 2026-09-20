@@ -434,7 +434,8 @@ namespace PixlPunkt.UI.CanvasHost
         {
             var clearColor = GetThemeClearColor();
 
-            if (!_showRulers)
+            // Axis-aligned strips cannot describe a rotated view; the on-canvas rulers take over.
+            if (!_showRulers || IsViewRotated)
             {
                 renderer.Clear(clearColor);
                 return;
@@ -486,7 +487,7 @@ namespace PixlPunkt.UI.CanvasHost
         {
             var clearColor = GetThemeClearColor();
 
-            if (!_showRulers)
+            if (!_showRulers || IsViewRotated)
             {
                 renderer.Clear(clearColor);
                 return;

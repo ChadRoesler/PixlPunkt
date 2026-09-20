@@ -166,6 +166,8 @@ namespace PixlPunkt.UI.CanvasHost
             // Draw guides
             DrawGuides(renderer, dest);
 
+            DrawCanvasRulers(renderer, dest);   // only while the view is rotated
+
             // Draw selection
             Selection_Draw(renderer);
         }

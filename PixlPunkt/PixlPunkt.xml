@@ -29441,6 +29441,14 @@
             during painting operations.
             </remarks>
             <summary>
+            Rulers that live on the canvas itself, along the document's top and left edges, so they
+            turn with a rotated view. The strip rulers in the layout are axis-aligned and can only
+            describe an unrotated view, so while the view is rotated they go blank and these take
+            over, including dragging a guide out of them. They are drawn in canvas-element space
+            before the view transform, and pointer positions arrive in that same space, so the
+            geometry needs no rotation maths of its own.
+            </summary>
+            <summary>
             Gradient fill tool subsystem for CanvasViewHost:
             - Gradient drag state machine
             - Gradient preview rendering
@@ -29670,6 +29678,12 @@
             Draws a semi-transparent ghost preview of a tile's pixels using SkiaSharp.
             Uses NearestNeighbor interpolation for crisp pixel-perfect rendering.
             </summary>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.IsViewRotated">
+            <summary>True while the view is rotated (or a rotate drag is in progress).</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.CanvasHost.CanvasViewHost.UseCanvasRulers">
+            <summary>The on-canvas rulers replace the strips while the view is rotated.</summary>
         </member>
         <member name="E:PixlPunkt.UI.CanvasHost.CanvasViewHost.HistoryStateChanged">
             <summary>

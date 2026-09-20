@@ -341,6 +341,13 @@ namespace PixlPunkt.UI.CanvasHost
             // ════════════════════════════════════════════════════════════════════
             // SYMMETRY AXIS INTERACTION - drag axis lines (only when Symmetry tool is active)
             // ════════════════════════════════════════════════════════════════════
+            // On-canvas rulers (rotated view): drag a guide out of a band.
+            if (CanvasRulers_TryHandlePointerPressed(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (Symmetry_TryHandlePointerPressed(e))
             {
                 e.Handled = true;
@@ -572,6 +579,13 @@ namespace PixlPunkt.UI.CanvasHost
             if (_viewRotateActive)
             {
                 UpdateViewRotate(e);
+                return;
+            }
+
+            if (_canvasRulerDragActive)
+            {
+                CanvasRulers_HandlePointerMoved(e);
+                e.Handled = true;
                 return;
             }
 
@@ -817,6 +831,13 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 EndViewRotate();
                 _mainCanvas.ReleasePointerCaptures();
+                e.Handled = true;
+                return;
+            }
+
+            if (_canvasRulerDragActive)
+            {
+                CanvasRulers_HandlePointerReleased(e);
                 e.Handled = true;
                 return;
             }

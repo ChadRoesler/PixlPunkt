@@ -228,6 +228,7 @@ namespace PixlPunkt.UI.CanvasHost
             UpdateCanvasOversize();
             UpdateCanvasClip();
             InvalidateMainCanvas();
+            InvalidateRulers();
         }
 
         private Point _viewOversizeMargin;
