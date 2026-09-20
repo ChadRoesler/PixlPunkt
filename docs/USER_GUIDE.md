@@ -53,6 +53,10 @@
    - The total pixel dimensions are calculated automatically
 3. Click **Create** to open your new canvas
 
+**New from Clipboard:** after copying a selection, **File → New from Clipboard** (or the
+**From Clipboard** button in the New Canvas dialog) creates a canvas exactly the size of the copied
+image, as a single tile, with the image already pasted at the origin.
+
 ### Opening Existing Documents
 
 - **File → Open** (`Ctrl+O`) to open `.pxp` (native) or import other formats
@@ -111,8 +115,16 @@
 | Pan | Hold `Space` + drag, or Middle Mouse drag |
 | Zoom In | `Ctrl++` or Mouse Wheel Up |
 | Zoom Out | `Ctrl+-` or Mouse Wheel Down |
-| Fit to Screen | `Ctrl+0` |
-| Actual Size (1:1) | `Ctrl+1` |
+| Fit to Screen | `Ctrl+0` (or `Ctrl+Home`) |
+| Actual Size (1:1) | `Ctrl+1` (or `Ctrl+End`) |
+| Flip view horizontally | `Ctrl+F` |
+| Flip view vertically | `Ctrl+Shift+F` |
+| Rotate the view | `Ctrl+Shift` + Middle Mouse drag (snaps every 15°) |
+| Reset rotation | **View → Reset View Rotation** |
+
+View flips and rotation are **non-destructive**: they change how the canvas is shown, not the
+pixels, the way Krita's mirror view does. Each one is an undo step, none of them mark the document
+as modified, and flips are reflected in timelapse exports so the recording shows what you saw.
 
 ### View Options (View Menu)
 
@@ -278,6 +290,13 @@ Once you have a selection:
 - **Flip** - Horizontal or Vertical flip options
 - **Apply** (`Enter`) - Commit the transformation
 - **Cancel** (`Esc`) - Revert changes
+- **Deselect** (`Ctrl+D`) - Commit anything floating and drop the selection
+- **Invert** (`Ctrl+Shift+I`)
+
+**The selection is a shape.** The outline you drew is what's selected, including any transparent
+pixels inside it, and it scales, rotates and flips with the pixels. Clicking a transparent spot
+inside the outline moves the selection rather than dropping it. While you rotate, the outline
+previews the result of the rotation method you have chosen (RotSprite or nearest neighbour).
 
 ---
 
@@ -527,7 +546,7 @@ This creates beautiful, painterly gradients that use your exact color palette.
 | Button/Action | Description |
 |--------------|-------------|
 | **+** | Add new raster layer |
-| **Folder +** | Add new folder |
+| **Folder +** | Add new folder. If a folder is selected, the new one goes inside it. |
 | **Trash Bin** | Delete selected layer/folder |
 | **Eye** | Toggle visibility |
 | **Lock** | Toggle lock |
@@ -874,7 +893,10 @@ This is ideal for:
 | **Duplicate** | Copy selected tile |
 | **Tessellator** | Open tile tessellation window |
 | **Zoom +/-** | Adjust tile preview size |
-| **Delete** | Remove selected tile |
+| **Delete** | Remove selected tile. Every mapping cell that used it becomes unmapped. |
+
+**Tiles menu → Renumber Tiles** closes gaps left by deletions (ids `1, 3, 45` become `1, 2, 3`)
+across every layer mapping, as one undo step.
 
 ### Tile Tessellation Window
 
@@ -1294,6 +1316,10 @@ Add audio tracks to help sync your animation to music or dialogue.
 | `Ctrl+V` | Paste |
 | `Ctrl+A` | Select All |
 | `Ctrl+D` | Deselect |
+| `Ctrl+Shift+I` | Invert Selection |
+| `Enter` | Commit floating selection |
+| `Esc` | Cancel floating selection (pixels go back) |
+| `Delete` / `Backspace` | Delete selected pixels |
 
 ### View
 | Shortcut | Action |
@@ -1302,6 +1328,10 @@ Add audio tracks to help sync your animation to music or dialogue.
 | `Ctrl+1` | Actual Size (1:1) |
 | `Ctrl++` | Zoom In |
 | `Ctrl+-` | Zoom Out |
+| `Ctrl+F` | Flip view horizontally (view only, undoable) |
+| `Ctrl+Shift+F` | Flip view vertically |
+| `Ctrl+Shift+MMB drag` | Rotate the view; snaps to 15° steps |
+| View → Reset View Rotation | Return to 0° |
 
 ### Tools
 | Shortcut | Action |
@@ -1351,6 +1381,7 @@ Access via **Settings → Configure…** or the gear icon.
 | **Auto-backup Interval** | Minutes between backups |
 | **Backups to Retain** | Number of backup files |
 | **Transparency Pattern** | Checkerboard style (System/Light/Dark) |
+| **Layer Previews** | Thumbnail size in the layers panel: Off, Small, Normal, Large. Rows shrink or grow to match. Also in the panel's right-click menu. |
 
 ### Palette Settings
 
@@ -1396,6 +1427,10 @@ Access via **Settings → Configure…** or the gear icon.
 | **MP4** | No | Yes | High quality video |
 | **BMP** | No | No | Uncompressed |
 | **JPEG** | No | Sequence | Not recommended for pixel art |
+
+**Layers as separate files** exports one image per layer into a folder you pick. With **Auto crop**
+checked, each file is trimmed to its layer's non-transparent pixels, so a small sprite on a big
+canvas comes out as a small file.
 
 ---
 

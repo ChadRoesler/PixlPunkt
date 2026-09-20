@@ -503,6 +503,9 @@ namespace PixlPunkt.UI.CanvasHost
         /// <summary>Selects the entire document.</summary>
         public void Selection_SelectAll() => _selClipboard?.SelectAll();
 
+        /// <summary>Drops the selection, committing a float first (Ctrl+D).</summary>
+        public void Selection_Deselect() => _selClipboard?.Deselect();
+
         /// <summary>Inverts the current selection.</summary>
         public void Selection_InvertSelection() => _selClipboard?.InvertSelection();
 

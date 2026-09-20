@@ -219,6 +219,35 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             RequestRedraw?.Invoke();
         }
 
+        /// <summary>Drops the selection (committing a float first). One undo step.</summary>
+        public void Deselect()
+        {
+            var doc = GetDocument?.Invoke();
+            if (doc == null) return;
+            if (!_state.Floating && _state.Region.IsEmpty) return;
+
+            _state.Drag = SelDrag.None;
+            _state.HavePreview = false;
+
+            doc.History.BeginGroup("Deselect");
+            try
+            {
+                if (_state.Floating)
+                    CommitFloating?.Invoke();
+
+                var before = _state.Region.Clone();
+                _state.Region.Clear();
+                doc.RaiseSelectionChanged();
+
+                PushSelectionChangeHistory(SelectionChangeItem.SelectionChangeKind.Clear, before, _state.Region.Clone());
+            }
+            finally
+            {
+                doc.History.EndGroup();
+            }
+            RequestRedraw?.Invoke();
+        }
+
         public void SelectAll()
         {
             var doc = GetDocument?.Invoke();

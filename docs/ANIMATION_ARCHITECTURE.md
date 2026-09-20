@@ -150,7 +150,9 @@ Dictionary<int, byte[]> PixelDataStorage
 3. When applying frame: `byte[] pixels = GetPixelData(keyframe.PixelDataId)`
 
 **Memory Management:**
-- `CleanupUnusedPixelData()` removes entries not referenced by any keyframe
+- `CleanupUnusedPixelData()` removes entries not referenced by any keyframe. It runs when a
+  keyframe is removed or overwritten and again before the animation state is saved, so orphaned
+  snapshots never reach disk.
 - Should be called after bulk keyframe deletions
 
 ---
@@ -437,13 +439,12 @@ Effects are matched by `EffectId` (string). When applying keyframes:
    - Currently hold-frame only
    - Could add tweening for opacity, position (if we add transforms)
 
-2. **Audio Track Support**
-   - Waveform visualization in timeline
-   - Sync markers for lip-sync/timing
+2. **Audio Track Support** - *shipped*: reference audio tracks with waveform display (see the
+   User Guide, "Audio Reference Tracks").
 
-3. **Timeline Recording (Timelapse)**
-   - Capture from undo history
-   - Export as animation
+3. **Timeline Recording (Timelapse)** - *shipped*: **File → Export To → Timelapse (from History)**
+   replays the undo stack (`TimelapseExportService`). View flips on the stack are applied to the
+   frames; view rotations and voxel-only steps are skipped.
 
 4. **Graph Editor**
    - Visual curve editing for easing

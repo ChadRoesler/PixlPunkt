@@ -1,3 +1,5 @@
+Custom UI icon font for PixlPunkt. **Full end-to-end guide: `docs/CUSTOM_ICONS.md`.**
+
 Place custom UI icon fonts here.
 
 Current runtime expectations:

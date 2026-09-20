@@ -594,6 +594,21 @@ namespace PixlPunkt.UI
             e.Handled = true;
         }
 
+        private void Deselect_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            if (IsTextInputFocused()) return;
+            CurrentHost?.Selection_Deselect();
+            UpdateHistoryUI();
+            e.Handled = true;
+        }
+
+        private void ExportImage_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            if (IsTextInputFocused()) return;
+            File_Export_Image_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+        }
+
         private void SelectAll_Invoked(KeyboardAccelerator s, KeyboardAcceleratorInvokedEventArgs e)
         {
             if (IsTextInputFocused()) return;

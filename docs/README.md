@@ -8,7 +8,7 @@ Welcome to the PixlPunkt docs! Pick your adventure:
 
 ---
 
-## ?? Quick Start (You Are Here)
+## Quick Start (You Are Here)
 
 **For when you just wanna make some art:**
 
@@ -19,7 +19,7 @@ Welcome to the PixlPunkt docs! Pick your adventure:
 
 ---
 
-## ?? The Wiki (Deep Dive)
+## The Wiki (Deep Dive)
 
 **For when you actually want to understand things:**
 
@@ -40,7 +40,7 @@ Welcome to the PixlPunkt docs! Pick your adventure:
 
 ---
 
-## ?? Plugin SDK
+## Plugin SDK
 
 Building plugins? Start here:
 
@@ -52,7 +52,19 @@ Building plugins? Start here:
 
 ---
 
-## ?? Philosophy
+## Working on PixlPunkt itself
+
+| Doc | What's Inside |
+|-----|---------------|
+| **[Custom Icons](CUSTOM_ICONS.md)** | Adding a glyph to the app's icon font, SVG to button |
+| **[Custom Glyph Sets](CUSTOM_GLYPH_SETS.md)** | ASCII-art glyph set file format |
+| **[Animation Architecture](ANIMATION_ARCHITECTURE.md)** | How canvas/tile animation, stage and export fit together |
+| **[Selection & History Deep Dive](SELECTION_AND_HISTORY_DEEP_DIVE.md)** | Why the floating selection is document state and how the undo stack works |
+| **[Code Review 2026-09-17](CODE_REVIEW_2026-09-17.md)** | Prioritized backlog with what landed |
+
+---
+
+## Philosophy
 
 **docs/ folder:** Quick hits. Scannable. For when you're in the zone and just need a reminder.
 

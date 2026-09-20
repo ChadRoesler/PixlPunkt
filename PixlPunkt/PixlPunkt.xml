@@ -30208,6 +30208,9 @@
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Selection_SelectAll">
             <summary>Selects the entire document.</summary>
         </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Selection_Deselect">
+            <summary>Drops the selection, committing a float first (Ctrl+D).</summary>
+        </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.Selection_InvertSelection">
             <summary>Inverts the current selection.</summary>
         </member>
@@ -30928,6 +30931,9 @@
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.PasteAt(System.Int32,System.Int32)">
             <summary>Pastes with the top-left corner at a document position.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasHost.Selection.SelectionClipboard.Deselect">
+            <summary>Drops the selection (committing a float first). One undo step.</summary>
         </member>
         <member name="T:PixlPunkt.UI.CanvasHost.Selection.SelectionHitTesting">
             <summary>

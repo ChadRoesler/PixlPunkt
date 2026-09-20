@@ -40,16 +40,22 @@
             <KeyboardAccelerator Key="Enter" Invoked="CommitSelection_Invoked"/>
             <KeyboardAccelerator Key="Escape" Invoked="CancelSelection_Invoked"/>
             <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAll_Invoked"/>
+            <KeyboardAccelerator Key="D" Modifiers="Control" Invoked="Deselect_Invoked"/>
             <!-- IO Operations -->
             <KeyboardAccelerator Key="N" Modifiers="Control" Invoked="NewDocument_Invoked"/>
             <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="SaveDocument_Invoked"/>
             <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OpenDocument_Invoked"/>
             <KeyboardAccelerator Key="S" Modifiers="Control,Shift" Invoked="SaveAsDocument_Invoked"/>
+            <KeyboardAccelerator Key="E" Modifiers="Control" Invoked="ExportImage_Invoked"/>
             <!-- Zoom -->
             <KeyboardAccelerator Key="Add" Modifiers="Control" Invoked="ZoomIn_Invoked"/>
             <KeyboardAccelerator Key="Subtract" Modifiers="Control" Invoked="ZoomOut_Invoked"/>
             <KeyboardAccelerator Key="Home" Modifiers="Control" Invoked="ZoomFit_Invoked"/>
             <KeyboardAccelerator Key="End" Modifiers="Control" Invoked="ZoomActualSize_Invoked"/>
+            <KeyboardAccelerator Key="Number0" Modifiers="Control" Invoked="ZoomFit_Invoked"/>
+            <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="ZoomActualSize_Invoked"/>
+            <KeyboardAccelerator Key="NumberPad0" Modifiers="Control" Invoked="ZoomFit_Invoked"/>
+            <KeyboardAccelerator Key="NumberPad1" Modifiers="Control" Invoked="ZoomActualSize_Invoked"/>
             <!-- Selection -->
             <KeyboardAccelerator Key="I" Modifiers="Control,Shift" Invoked="InvertSelection_Invoked"/>
             <!-- View (non-destructive canvas flips) -->

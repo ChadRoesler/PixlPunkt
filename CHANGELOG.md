@@ -5,6 +5,35 @@ All notable changes to PixlPunkt will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Added
+- **View flips and rotation** - `Ctrl+F` / `Ctrl+Shift+F` mirror the canvas, `Ctrl+Shift+MMB` drag rotates it (15° snaps), View → Reset View Rotation. Non-destructive, undoable, never dirty the document; flips show in timelapse exports.
+- **New from Clipboard** - File menu and the New Canvas dialog create a canvas the size of the copied image and paste it at the origin.
+- **Auto Crop** on per-layer image export - trims each layer's file to its non-transparent pixels.
+- **Renumber Tiles** (Tiles menu) - closes id gaps (1, 3, 45 → 1, 2, 3) across every mapping; one undo step.
+- **Layer preview size** - Off / Small / Normal / Large from the layers panel menu or Settings → General; rows resize to match.
+- **Layer Previews** and other view options persist per document.
+- Shortcuts the docs already promised: `Ctrl+0` / `Ctrl+1` for Fit / Actual Size (alongside `Ctrl+Home` / `Ctrl+End`), `Ctrl+E` Export Image, `Ctrl+D` Deselect.
+- `docs/CUSTOM_ICONS.md` - end-to-end guide for adding glyphs to the app's icon font.
+
+### Changed
+- **Selection is a shape.** The marquee is carried as a mask that scales, rotates and flips with the pixels. Transparent pixels inside the outline stay selected, clicking them moves the float, and the outline previews the chosen rotation method live while dragging.
+- Voxel edits share the document's undo stack (one Ctrl+Z, one dirty flag).
+- Deleting a tile clears every mapping cell and voxel side-tile slot that referenced it.
+- Add Folder nests inside the selected folder; new and duplicated layers scroll into view.
+- Pasting switches to the rectangle select tool; pastes are kept on-canvas when they fit.
+- Middle-button panning keeps going when the pointer leaves the canvas.
+- History items coalesce (a run of nudges is one undo) and multi-step gestures undo as one.
+
+### Fixed
+- Crash on close from a focus event after the window was gone.
+- Access violation on exit while the canvas carried a view transform.
+- Save while a selection is floating writes what you see instead of a hole.
+- Undo of a scale/rotate restored the pixels' silhouette instead of the marquee.
+- Selection outline lost its off-canvas part after undo/redo, and its excess when scaled past the canvas.
+- Static selection outline drew only its top edge while dragging.
+- New Canvas "+" button sat below the tab strip after session restore.
+- Autosave raced the UI thread; a throwing plugin effect no longer crashes the compositor.
+
 ## [1.0.0] - 2025-12-23
 
 ### Added

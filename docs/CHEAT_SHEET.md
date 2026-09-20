@@ -29,6 +29,15 @@
 
 **Modifiers:** `Shift` = add, `Alt` = subtract
 
+| Key | Action |
+|-----|--------|
+| `Enter` | Commit floating selection |
+| `Esc` | Cancel (put the pixels back) |
+| `Delete` | Delete selected pixels |
+| `Ctrl+A` | Select all |
+| `Ctrl+D` | Deselect |
+| `Ctrl+Shift+I` | Invert selection |
+
 ## Shapes
 
 | Key | Tool | Icon |
@@ -77,11 +86,15 @@
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+0` | Fit to screen |
-| `Ctrl+1` | Actual size (1:1) |
+| `Ctrl+0` / `Ctrl+Home` | Fit to screen |
+| `Ctrl+1` / `Ctrl+End` | Actual size (1:1) |
 | `Ctrl++` | Zoom in |
 | `Ctrl+-` | Zoom out |
 | `Space+Drag` | Pan |
+| `Ctrl+F` | Flip view horizontally (non-destructive, undoable) |
+| `Ctrl+Shift+F` | Flip view vertically |
+| `Ctrl+Shift+MMB drag` | Rotate the view (snaps every 15°) |
+| View → Reset View Rotation | Back to 0° |
 
 ---
 
@@ -102,7 +115,7 @@
 | Key | Action | Icon |
 |-----|--------|:----:|
 | `Ctrl+Z` | Undo | <img src="assets/icons/arrow_undo_16.png" width="16"> |
-| `Ctrl+Y` | Redo | <img src="assets/icons/arrow_redo_16.png" width="16"> |
+| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo | <img src="assets/icons/arrow_redo_16.png" width="16"> |
 | `Ctrl+C` | Copy | <img src="assets/icons/copy_16.png" width="16"> |
 | `Ctrl+X` | Cut | <img src="assets/icons/cut_16.png" width="16"> |
 | `Ctrl+V` | Paste | <img src="assets/icons/clipboard_paste_16.png" width="16"> |
@@ -163,7 +176,9 @@
 ## Remember
 
 - **Right-click** = Color picker (always)
-- **Middle-click drag** = Pan (always)
+- **Middle-click drag** = Pan (always, keeps going off the canvas)
+- **Ctrl+Shift + middle-click drag** = Rotate the view
+- **Flips and rotation never touch pixels** - they're view-only, undoable, and show up in timelapses
 - **Scroll** = Zoom (always)
 - **`Ctrl+Z`** = Your best friend
 
