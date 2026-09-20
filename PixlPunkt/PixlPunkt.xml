@@ -30635,9 +30635,15 @@
             </summary>
             <param name="doc">The canvas document to display and edit.</param>
         </member>
-        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnControlUnloaded(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+        <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.OnControlLoaded(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
             <summary>
             Handles control unload to clean up resources like the render hook and timers.
+            </summary>
+            <summary>
+            The host unloads whenever its tab is deselected, and unloading releases the view
+            transform and its handlers (see <see cref="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.ReleaseViewTransformForTeardown"/>), so
+            they must be hooked back up every time the host loads or live flips and rotation
+            stop reaching the canvas after a tab switch.
             </summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasHost.CanvasViewHost.InitializeCanvasElements">

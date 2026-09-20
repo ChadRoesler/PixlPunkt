@@ -78,12 +78,6 @@ namespace PixlPunkt.UI.Icons
             return true;
         }
 
-        [Obsolete("Use PixlPunktCodicon overload.")]
-        public static bool TryCreateGlyph(PixlPunktGlyph glyph, double glyphSize, [NotNullWhen(true)] out UIElement? element, double opticalScale = 1d)
-        {
-            return TryCreateGlyph((PixlPunktCodicon)glyph, glyphSize, out element, opticalScale);
-        }
-
         public static bool TryCreateGlyph(string codiconName, double glyphSize, [NotNullWhen(true)] out UIElement? element, double opticalScale = 1d)
         {
             if (Enum.TryParse<PixlPunktCodicon>(codiconName, true, out var codicon))

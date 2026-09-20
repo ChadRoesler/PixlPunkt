@@ -571,10 +571,7 @@ namespace PixlPunkt.UI.CanvasHost
             Document.LayersChanged += OnDocChanged;
             Document.DocumentModified += OnExternalDocumentModified;
             Document.SelectionChanged += OnDocumentSelectionChanged;
-            Document.ViewTransformChanged += ApplyViewTransform;
-            CanvasContainer.SizeChanged -= OnCanvasContainerSizeChangedForClip;
-            CanvasContainer.SizeChanged += OnCanvasContainerSizeChangedForClip;
-            ApplyViewTransform();
+            HookViewTransform();
 
             // A floating selection is committed before the timeline moves off its frame; the
             // animation panels subscribe later than this, so this runs before frame pixels swap.
@@ -591,11 +588,30 @@ namespace PixlPunkt.UI.CanvasHost
 
             // Cleanup when control is unloaded
             Unloaded += OnControlUnloaded;
+            Loaded += OnControlLoaded;
         }
 
         /// <summary>
         /// Handles control unload to clean up resources like the render hook and timers.
         /// </summary>
+        /// <summary>
+        /// The host unloads whenever its tab is deselected, and unloading releases the view
+        /// transform and its handlers (see <see cref="ReleaseViewTransformForTeardown"/>), so
+        /// they must be hooked back up every time the host loads or live flips and rotation
+        /// stop reaching the canvas after a tab switch.
+        /// </summary>
+        private void OnControlLoaded(object sender, RoutedEventArgs e) => HookViewTransform();
+
+        private void HookViewTransform()
+        {
+            if (Document == null) return;
+            Document.ViewTransformChanged -= ApplyViewTransform;
+            Document.ViewTransformChanged += ApplyViewTransform;
+            CanvasContainer.SizeChanged -= OnCanvasContainerSizeChangedForClip;
+            CanvasContainer.SizeChanged += OnCanvasContainerSizeChangedForClip;
+            ApplyViewTransform();
+        }
+
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
         {
             ReleaseViewTransformForTeardown();
