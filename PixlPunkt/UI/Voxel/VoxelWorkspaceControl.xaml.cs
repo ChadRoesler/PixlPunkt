@@ -70,6 +70,7 @@ namespace PixlPunkt.UI.Voxel
         {
             None,
             Orbit,
+            Pan,
             FacePaintStroke,
             LightHandle,
         }

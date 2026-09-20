@@ -27807,6 +27807,18 @@
             Begins a drag rotation.
             </summary>
         </member>
+        <member name="P:PixlPunkt.Core.Voxel.OrbitCamera.PanOffset">
+            <summary>
+            Where the camera looks, in world units. Zero is the model centre; middle-button drags
+            move it in the camera's own plane. Position and target shift together, so orbit and
+            zoom keep working around the panned point.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Voxel.OrbitCamera.PanByScreen(System.Single,System.Single)">
+            <summary>
+            Pans by a pointer delta in render pixels: the point under the pointer stays under it.
+            </summary>
+        </member>
         <member name="M:PixlPunkt.Core.Voxel.OrbitCamera.UpdateDrag(System.Single,System.Single)">
             <summary>
             Updates rotation from pixel-space mouse deltas.
@@ -29375,6 +29387,15 @@
             <summary>
             In-tab document workspace host that contains the 2D canvas and optional voxel workspace pane.
             </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost.PopOutVoxelPane(Microsoft.UI.Xaml.Window)">
+            <summary>
+            Moves the voxel workspace into its own window (or brings that window forward). The
+            pane collapses while it is out; closing the window docks it again.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost.DockVoxelPane">
+            <summary>Docks a popped-out workspace back into the pane (closes its window).</summary>
         </member>
         <member name="M:PixlPunkt.UI.CanvasArea.DocumentWorkspaceHost.InitializeComponent">
             <summary>
@@ -35336,7 +35357,7 @@
             Merges duplicate tiles in the document.
             </summary>
         </member>
-        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Tiles_Renumber_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.Tiles_VoxelPopOut_Click(System.Object,Microsoft.UI.Xaml.RoutedEventArgs)">
             <summary>
             Renumbers the tile ids 1..N so deletions don't leave gaps like 1, 3, 45, 56, 90.
             Every layer mapping and voxel side-tile reference follows; one undo step.
@@ -36180,6 +36201,35 @@
             <summary>
             Pure-static helpers that build 3D model export data (OBJ, GLB, STL, VOX)
             from a <see cref="T:PixlPunkt.Core.Voxel.VoxelVolume"/>. Extracted from <c>VoxelWorkspaceControl</c>.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.UI.Voxel.VoxelPaneWindow">
+            <summary>
+            A floating window that hosts a document's <see cref="T:PixlPunkt.UI.Voxel.VoxelWorkspaceControl"/> after it has
+            been popped out of the workspace pane. The control instance is moved, not copied, so the
+            edit engine, camera and history stay exactly as they were; closing the window hands the
+            control back to the pane.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPaneWindow.ReleaseWorkspace">
+            <summary>Removes the workspace from this window so the caller can re-parent it.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPaneWindow.CloseAll">
+            <summary>Closes every popped-out voxel window (app exit).</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPaneWindow.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPaneWindow.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Voxel.VoxelPaneWindow.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
         <member name="T:PixlPunkt.UI.Voxel.VoxelPreviewWindow">

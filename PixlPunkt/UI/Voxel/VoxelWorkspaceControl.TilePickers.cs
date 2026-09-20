@@ -206,6 +206,7 @@ namespace PixlPunkt.UI.Voxel
                 BackdropCageScaleBox.Value = Math.Clamp(ws.BackdropCageScale, 1.05f, 4f);
                 _camera.SetOrientation(ws.CameraPitch, ws.CameraYaw, allowSnap: true);
                 _camera.SetZoomPercent(ws.CameraZoomPercent);
+                _camera.SetPanOffset(new System.Numerics.Vector3(ws.CameraPanX, ws.CameraPanY, ws.CameraPanZ));
                 ApplySidebarSectionExpandState(ws);
             }
 
@@ -255,6 +256,7 @@ namespace PixlPunkt.UI.Voxel
             ws.BackdropProjectionTilesEnabled = BackdropProjectionTilesCheckBox?.IsChecked == true;
             ws.BackdropCageScale = Math.Clamp((float)(BackdropCageScaleBox?.Value ?? 1.6d), 1.05f, 4f);
             ws.SurfaceVoxelGridEnabled = SurfaceVoxelGridCheckBox?.IsChecked == true;
+            ws.CameraPanX = _camera.PanOffset.X; ws.CameraPanY = _camera.PanOffset.Y; ws.CameraPanZ = _camera.PanOffset.Z;
             ws.ToolOptionsSectionExpanded = !(LightingSectionCard?.IsMinimized ?? false);
             ws.FaceMappingSectionExpanded = !(FaceMappingSectionCard?.IsMinimized ?? false);
             ws.DisplaySectionExpanded = !(DisplaySectionCard?.IsMinimized ?? false);

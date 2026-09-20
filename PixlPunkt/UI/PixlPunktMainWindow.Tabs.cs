@@ -59,10 +59,13 @@ namespace PixlPunkt.UI
             miDuplicate.Click += (_, __) => OpenDocInWindow(doc);
             var miVoxel = new MenuFlyoutItem { Text = "Toggle Voxel Workspace" };
             miVoxel.Click += (_, __) => GetDocumentWorkspaceHost(tab)?.ToggleVoxelPane();
+            var miVoxelPopOut = new MenuFlyoutItem { Text = "Pop Out Voxel Workspace" };
+            miVoxelPopOut.Click += (_, __) => GetDocumentWorkspaceHost(tab)?.PopOutVoxelPane(this);
             flyout.Items.Add(miDetach);
             flyout.Items.Add(miDuplicate);
             flyout.Items.Add(new MenuFlyoutSeparator());
             flyout.Items.Add(miVoxel);
+            flyout.Items.Add(miVoxelPopOut);
             tab.ContextFlyout = flyout;
             return tab;
         }
@@ -337,6 +340,7 @@ namespace PixlPunkt.UI
             _documentPaths.Remove(doc);
             _workspace.Close(doc);
 
+            GetDocumentWorkspaceHost(tab)?.DockVoxelPane();   // closes a popped-out voxel window
             // Clean up auto-save tracking for session state
             OnDocumentClosed(doc);
 

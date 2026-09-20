@@ -253,6 +253,32 @@ namespace PixlPunkt.Core.Voxel
             _animation = null; // cancel any running animation
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        // PAN
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Where the camera looks, in world units. Zero is the model centre; middle-button drags
+        /// move it in the camera's own plane. Position and target shift together, so orbit and
+        /// zoom keep working around the panned point.
+        /// </summary>
+        public Vector3 PanOffset { get; private set; }
+
+        public void SetPanOffset(Vector3 offset) => PanOffset = IsFinite(offset) ? offset : Vector3.Zero;
+
+        public void ResetPan() => PanOffset = Vector3.Zero;
+
+        /// <summary>
+        /// Pans by a pointer delta in render pixels: the point under the pointer stays under it.
+        /// </summary>
+        public void PanByScreen(float dxPixels, float dyPixels)
+        {
+            var basis = GetCameraBasis();
+            float wx = -dxPixels / MathF.Max(1f, _viewportWidth) * _frustum.Width;
+            float wy = dyPixels / MathF.Max(1f, _viewportHeight) * _frustum.Height;
+            SetPanOffset(PanOffset + basis.Right * wx + basis.Up * wy);
+        }
+
         /// <summary>
         /// Updates rotation from pixel-space mouse deltas.
         /// </summary>
@@ -459,7 +485,7 @@ namespace PixlPunkt.Core.Voxel
             right = SafeNormalize(right, Vector3.UnitX);
 
             var up = SafeNormalize(Vector3.Cross(right, forward), Vector3.UnitY);
-            return new CameraPose(position, Vector3.Zero, up);
+            return new CameraPose(position + PanOffset, PanOffset, up);
         }
 
         /// <summary>

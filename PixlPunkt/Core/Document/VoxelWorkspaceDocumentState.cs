@@ -56,6 +56,9 @@ namespace PixlPunkt.Core.Document
         public float CameraPitch { get; set; } = 0.5235988f; // 30 deg
         public float CameraYaw { get; set; } = 3.9269907f;   // 225 deg
         public float CameraZoomPercent { get; set; } = 100f;
+        public float CameraPanX { get; set; }
+        public float CameraPanY { get; set; }
+        public float CameraPanZ { get; set; }
 
         // Lighting preview utility state (Phase 5 uses these; persisted early for compatibility)
         public bool LightingEnabled { get; set; }

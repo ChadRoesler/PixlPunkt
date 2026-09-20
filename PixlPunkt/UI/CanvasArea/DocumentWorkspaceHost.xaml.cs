@@ -119,6 +119,44 @@ namespace PixlPunkt.UI.CanvasArea
 
         public void ShowVoxelPane() => SetVoxelPaneVisible(true);
 
+        // ════════════════════════════════════════════════════════════════════
+        // POP-OUT
+        // ════════════════════════════════════════════════════════════════════
+
+        private VoxelPaneWindow? _popOut;
+
+        public bool IsVoxelPanePoppedOut => _popOut != null;
+
+        /// <summary>
+        /// Moves the voxel workspace into its own window (or brings that window forward). The
+        /// pane collapses while it is out; closing the window docks it again.
+        /// </summary>
+        public void PopOutVoxelPane(Window? owner = null)
+        {
+            if (_popOut != null)
+            {
+                _popOut.Activate();
+                return;
+            }
+
+            VoxelWorkspacePresenter.Content = null;
+            SetVoxelPaneVisible(false);
+
+            _popOut = new VoxelPaneWindow(VoxelWorkspace, $"{Document.Name} - Voxel Workspace", onClosed: () =>
+            {
+                _popOut = null;
+                VoxelWorkspacePresenter.Content = VoxelWorkspace;
+                SetVoxelPaneVisible(true);
+            });
+            _popOut.Show(owner);
+        }
+
+        /// <summary>Docks a popped-out workspace back into the pane (closes its window).</summary>
+        public void DockVoxelPane()
+        {
+            _popOut?.Close();   // the Closed handler re-parents and shows the pane
+        }
+
         public void HideVoxelPane() => SetVoxelPaneVisible(false);
 
         private void PersistVoxelPaneState()

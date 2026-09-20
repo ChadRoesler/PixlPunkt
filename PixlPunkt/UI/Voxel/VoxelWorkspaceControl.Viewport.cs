@@ -1681,10 +1681,14 @@ namespace PixlPunkt.UI.Voxel
                 IsVoxelClickToolActive(activeToolId);
             bool activeToolHandlesRightClick = _voxelToolState.ActiveRegistration?.Behavior?.HandlesRightClick == true;
 
-            bool forceOrbit = props.IsMiddleButtonPressed ||
-                              (props.IsRightButtonPressed && (!activeToolHandlesRightClick || !canUseVoxelTool));
+            bool forceOrbit = props.IsRightButtonPressed && (!activeToolHandlesRightClick || !canUseVoxelTool);
 
-            if (props.IsLeftButtonPressed && TryBeginLightHandleDrag(point.Position))
+            if (props.IsMiddleButtonPressed)
+            {
+                // Middle button pans, like the 2D canvas; right button orbits.
+                _pointerDragMode = PointerDragMode.Pan;
+            }
+            else if (props.IsLeftButtonPressed && TryBeginLightHandleDrag(point.Position))
             {
                 _pointerDragMode = PointerDragMode.LightHandle;
             }
@@ -1735,6 +1739,22 @@ namespace PixlPunkt.UI.Voxel
             {
                 _lastPointerPos = pos;
                 _camera.UpdateDrag(dx, dy);
+                RenderViewport();
+                e.Handled = true;
+                return;
+            }
+
+            if (_pointerDragMode == PointerDragMode.Pan)
+            {
+                _lastPointerPos = pos;
+                // Host DIPs → render pixels, so the point under the pointer stays put at any zoom.
+                float sx = 1f, sy = 1f;
+                if (TryGetPresentedImageRectInHostDip(out var imageRect) && imageRect.Width > 0 && imageRect.Height > 0)
+                {
+                    sx = _camera.ViewportWidth / (float)imageRect.Width;
+                    sy = _camera.ViewportHeight / (float)imageRect.Height;
+                }
+                _camera.PanByScreen(dx * sx, dy * sy);
                 RenderViewport();
                 e.Handled = true;
                 return;
@@ -1791,6 +1811,10 @@ namespace PixlPunkt.UI.Voxel
             if (_pointerDragMode == PointerDragMode.Orbit)
             {
                 _camera.EndDrag();
+            }
+            else if (_pointerDragMode == PointerDragMode.Pan)
+            {
+                PersistVoxelPreviewStateToDocument();
             }
             else if (_pointerDragMode == PointerDragMode.LightHandle)
             {

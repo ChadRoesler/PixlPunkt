@@ -416,6 +416,7 @@ namespace PixlPunkt.UI
             catch (Exception) { }
 
             // Close all child windows (detached document windows, settings, color picker, etc.)
+            PixlPunkt.UI.Voxel.VoxelPaneWindow.CloseAll();
             CloseAllChildWindows();
 
             // Exit the application completely

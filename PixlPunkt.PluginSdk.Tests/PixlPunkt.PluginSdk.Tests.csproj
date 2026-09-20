@@ -12,11 +12,13 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- xunit v2: xunit.v3 runs on Microsoft.Testing.Platform, which the .NET 10 SDK refuses under the classic
+         dotnet test / VSTest path the CI scripts and the NUnit project use. -->
+    <PackageReference Include="xunit" />
   </ItemGroup>
 
   <ItemGroup>
