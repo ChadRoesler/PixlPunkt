@@ -157,19 +157,34 @@ namespace PixlPunkt.UI.CanvasHost
             }
         }
 
-        /// <summary>Remembers which cell the pointer is over, so the spacing posts have an owner.</summary>
-        private void UpdateFontFocusCell(int docX, int docY)
+        /// <summary>The cell containing a document point, or -1 when the point is off the sheet.</summary>
+        private int CellAt(int docX, int docY)
         {
-            if (!IsFontDocument) return;
-
             int cols = Math.Max(1, Document.TileCounts.Width);
             int rows = Math.Max(1, Document.TileCounts.Height);
             int col = (int)Math.Floor(docX / (double)Math.Max(1, Document.TileSize.Width));
             int row = (int)Math.Floor(docY / (double)Math.Max(1, Document.TileSize.Height));
-            if (col < 0 || col >= cols || row < 0 || row >= rows) return;
+            if (col < 0 || col >= cols || row < 0 || row >= rows) return -1;
+            return row * cols + col;
+        }
 
-            int cell = row * cols + col;
-            if (cell == _fontFocusCell) return;
+        /// <summary>
+        /// Takes a click inside a glyph's cell as choosing that glyph to work on.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately a click and not a hover. Following the pointer meant the glyph under study
+        /// changed on the way to the zoom button, which is the opposite of what a working view is
+        /// for. The click is only noted; it is never consumed, so it still paints.
+        /// </remarks>
+        private void FontGuides_NotePointerPressed(PointerRoutedEventArgs e)
+        {
+            if (!IsFontDocument) return;
+            if (!e.GetCurrentPoint(_mainCanvas).Properties.IsLeftButtonPressed) return;
+
+            var (docX, docY) = ViewToDoc(e.GetCurrentPoint(_mainCanvas).Position);
+            int cell = CellAt(docX, docY);
+            if (cell < 0 || cell == _fontFocusCell) return;
+
             SetFontFocusCell(cell);
         }
 
@@ -204,6 +219,9 @@ namespace PixlPunkt.UI.CanvasHost
         {
             var st = Document.FontState;
             if (st.Glyphs.Count == 0 || _fontFocusCell < 0) return;
+
+            // Reshaping the font, or undoing one, can leave the focus pointing past the sheet.
+            if (_fontFocusCell >= FontMetricsOps.CellCount(Document)) return;
 
             int cols = Math.Max(1, Document.TileCounts.Width);
             int focusCol = _fontFocusCell % cols;
@@ -428,7 +446,11 @@ namespace PixlPunkt.UI.CanvasHost
 
             var cell = FontMetricsOps.GetCellRect(Document, g.CellIndex);
             var (docX, _) = ViewToDoc(e.GetCurrentPoint(_mainCanvas).Position);
-            int local = docX - cell.X;
+
+            // Both posts stop at the edges of the glyph's own cell, overhang room included. Past
+            // that the pen would move further than the cell it came from and the next glyph would
+            // land on ink belonging to this one.
+            int local = Math.Clamp(docX - cell.X, 0, cell.Width);
 
             if (_fontSpacingDrag == FontSpacingKind.Origin)
             {
@@ -442,6 +464,8 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 g.Advance = Math.Max(0, local - g.OriginX);
             }
+
+            (g.OriginX, g.Advance) = FontMetricsOps.ClampToCell(Document, g.OriginX, g.Advance);
 
             Document.RaiseFontChanged();
             InvalidateMainCanvas();
@@ -472,6 +496,21 @@ namespace PixlPunkt.UI.CanvasHost
             var cell = FontMetricsOps.GetCellRect(Document, g.CellIndex);
             CenterOnDocumentPoint(cell.X + cell.Width / 2.0, cell.Y + cell.Height / 2.0);
             SetFontFocusCell(g.CellIndex);
+        }
+
+        /// <summary>
+        /// Selects the first character of the font if nothing is selected yet, without moving the
+        /// view. Now that focus follows clicks rather than the pointer, a freshly opened font would
+        /// otherwise show no spacing posts and an empty strip until the first click.
+        /// </summary>
+        public void FontFocusDefaultGlyph()
+        {
+            if (!IsFontDocument || _fontFocusCell >= 0) return;
+
+            var glyphs = FontGlyphOps.Summarize(Document);
+            if (glyphs.Count == 0) return;
+
+            SetFontFocusCell(glyphs[0].CellIndex);
         }
 
         /// <summary>Puts a glyph back on auto-fit as one undo step.</summary>

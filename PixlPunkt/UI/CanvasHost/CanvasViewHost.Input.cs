@@ -341,6 +341,11 @@ namespace PixlPunkt.UI.CanvasHost
             // ════════════════════════════════════════════════════════════════════
             // SYMMETRY AXIS INTERACTION - drag axis lines (only when Symmetry tool is active)
             // ════════════════════════════════════════════════════════════════════
+            // Clicking inside a cell chooses that glyph to work on. Noted before the guide
+            // handlers so grabbing a post also selects the glyph it belongs to, and never
+            // consumed, so the same click still paints.
+            FontGuides_NotePointerPressed(e);
+
             // Font baseline / cap-height guides sit on the canvas and are dragged directly.
             if (FontGuides_TryHandlePointerPressed(e))
             {
@@ -1197,7 +1202,6 @@ namespace PixlPunkt.UI.CanvasHost
 
             _hoverX = cx;
             _hoverY = cy;
-            UpdateFontFocusCell(cx, cy);
 
             int w = Document.Surface.Width;
             int h = Document.Surface.Height;

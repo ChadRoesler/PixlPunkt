@@ -85,6 +85,7 @@ namespace PixlPunkt.UI.CanvasArea
             CanvasHost.FontMetricsEditingChanged += GlyphPane.SetMetricsEditing;
 
             SetGlyphPaneVisible(Document.FontState.HasState);
+            CanvasHost.FontFocusDefaultGlyph();
 
             // A document only becomes a font once, but it can do so after the host exists.
             Document.FontChanged += () => DispatcherQueue.TryEnqueue(

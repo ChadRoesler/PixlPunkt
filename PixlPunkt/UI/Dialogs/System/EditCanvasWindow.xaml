@@ -94,7 +94,7 @@
         </StackPanel>
 
         <!-- Tile Size (Read-only) -->
-        <StackPanel Grid.Row="2" Margin="0,0,0,16">
+        <StackPanel x:Name="TileSizeSection" Grid.Row="2" Margin="0,0,0,16">
             <TextBlock Text="Tile Size (px)" 
                        FontWeight="SemiBold" 
                        Margin="0,0,0,8"/>
@@ -103,7 +103,7 @@
         </StackPanel>
 
         <!-- Document Tiles -->
-        <StackPanel Grid.Row="3" Margin="0,0,0,16">
+        <StackPanel x:Name="TileCountSection" Grid.Row="3" Margin="0,0,0,16">
             <TextBlock Text="Document Tiles" 
                        FontWeight="SemiBold" 
                        Margin="0,0,0,8"/>
@@ -202,6 +202,50 @@
                              GroupName="Anchor" Style="{StaticResource AnchorRadioStyle}"
                              Checked="Anchor_Checked" Tag="BottomRight"/>
             </Grid>
+        </StackPanel>
+
+        <!-- Font settings: shown instead of tile size and tile counts for a font document -->
+        <StackPanel x:Name="FontSection" Grid.Row="5" VerticalAlignment="Top"
+                    Visibility="Collapsed" Spacing="12" Margin="0,0,0,16">
+
+            <StackPanel>
+                <TextBlock Text="Em Box (px)" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <NumberBox x:Name="EmWidthBox" Minimum="1" Maximum="128" Width="100"
+                               SpinButtonPlacementMode="Hidden" ValueChanged="FontShape_ValueChanged"/>
+                    <TextBlock Text="&#xD7;" VerticalAlignment="Center"/>
+                    <NumberBox x:Name="EmHeightBox" Minimum="1" Maximum="128" Width="100"
+                               SpinButtonPlacementMode="Hidden" ValueChanged="FontShape_ValueChanged"/>
+
+                    <TextBlock Text="Drawing room" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    <NumberBox x:Name="DrawingRoomBox" Minimum="0" Maximum="32" Width="80"
+                               SpinButtonPlacementMode="Hidden" ValueChanged="FontShape_ValueChanged"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel>
+                <TextBlock Text="Characters" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <ComboBox x:Name="FontCharSetCombo" HorizontalAlignment="Stretch"
+                          SelectionChanged="FontCharSet_Changed">
+                    <ComboBoxItem Content="Keep current characters"/>
+                    <ComboBoxItem Content="Printable ASCII"/>
+                    <ComboBoxItem Content="Uppercase and digits"/>
+                    <ComboBoxItem Content="Letters and digits"/>
+                    <ComboBoxItem Content="Custom"/>
+                </ComboBox>
+                <TextBox x:Name="FontCustomChars" Margin="0,8,0,0" Visibility="Collapsed"
+                         PlaceholderText="Type the characters to keep"
+                         AcceptsReturn="False" TextChanged="FontCustom_Changed"/>
+            </StackPanel>
+
+            <TextBlock x:Name="FontShapeSummary"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       FontStyle="Italic" TextWrapping="Wrap"/>
+
+            <TextBlock x:Name="FontShapeWarning"
+                       Visibility="Collapsed"
+                       TextWrapping="Wrap"
+                       Foreground="{ThemeResource SystemFillColorCautionBrush}"/>
         </StackPanel>
 
         <!-- Buttons -->

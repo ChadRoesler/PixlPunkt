@@ -164,10 +164,13 @@ namespace PixlPunkt.UI.CanvasHost
         /// action re-syncs only for layers at root level.
         /// Reference layers are deliberately excluded: they live outside the layer tree and a
         /// plain recomposite plus invalidate is enough for them.
+        /// An item may also say so itself by implementing <see cref="IStructuralHistoryItem"/>,
+        /// which is how anything defined in Core opts in without this list having to know about it.
         /// </remarks>
         private static bool IsStructuralItem(IHistoryItem? item) =>
             item is HistoryGroupItem g ? GroupIsStructural(g) :
-            item is CanvasResizeItem
+            item is IStructuralHistoryItem
+                or CanvasResizeItem
                 or LayerAddItem
                 or LayerRemoveItem
                 or LayerReorderItem

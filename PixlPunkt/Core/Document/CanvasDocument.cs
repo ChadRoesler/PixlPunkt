@@ -1048,6 +1048,20 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
+        /// Changes the tile size without touching the canvas. Meant for a font document, where the
+        /// tile is the glyph cell and reshaping the font moves every cell at once; an ordinary
+        /// document's tile set would be left holding tiles of the wrong size.
+        /// </summary>
+        /// <param name="newTileSize">The new tile size in pixels.</param>
+        public void SetTileSize(SizeInt32 newTileSize)
+        {
+            if (newTileSize.Width <= 0 || newTileSize.Height <= 0)
+                throw new ArgumentOutOfRangeException(nameof(newTileSize), "Tile size must be positive.");
+
+            TileSize = newTileSize;
+        }
+
+        /// <summary>
         /// Restores document dimensions directly (used by undo/redo).
         /// Does NOT modify layer content - that must be done separately.
         /// </summary>

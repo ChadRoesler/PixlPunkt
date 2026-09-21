@@ -125,6 +125,8 @@ namespace PixlPunkt.UI.Font
         /// </remarks>
         public void RefreshGlyphList()
         {
+            if (StatusText is null) return;
+
             if (_document is null || !_document.FontState.HasState)
             {
                 _summaries.Clear();
@@ -367,7 +369,7 @@ namespace PixlPunkt.UI.Font
             foreach (int cp in Codepoints)
                 if (_summaries.TryGetValue(cp, out var s)) glyphs.Add(s);
 
-            int index = FontGlyphOps.FindJumpIndex(glyphs, JumpBox.Text);
+            int index = FontGlyphOps.FindJumpIndex(glyphs, JumpBox?.Text);
             if (index < 0 || index >= glyphs.Count) return;
 
             SelectedCodepoint = glyphs[index].Codepoint;

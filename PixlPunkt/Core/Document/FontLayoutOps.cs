@@ -62,6 +62,35 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
+        /// Baseline to baseline, being the em plus whatever line gap the font asks for. Measured on
+        /// the em rather than the cell, since the overhang room is drawing space and not part of
+        /// how tall the type is.
+        /// </summary>
+        public static int LineAdvance(CanvasDocument doc) =>
+            Math.Max(1, FontMetricsOps.EmHeightOf(doc) + Math.Max(0, doc.FontState.LineGap));
+
+        /// <summary>Splits a sample into lines the way a text box hands them over.</summary>
+        public static string[] SplitLines(string? text) =>
+            (text ?? string.Empty).Split(LineBreaks, StringSplitOptions.None);
+
+        private static readonly string[] LineBreaks = { "\r\n", "\r", "\n" };
+
+        /// <summary>
+        /// How much room a block of text needs, in font pixels before any scaling: the widest line's
+        /// advance by the number of lines. Width is advance, not ink, so a trailing overhang can
+        /// still reach beyond it.
+        /// </summary>
+        public static SizeInt32 MeasureBlock(CanvasDocument doc, string? text)
+        {
+            var lines = SplitLines(text);
+            int widest = 0;
+            foreach (string line in lines)
+                widest = Math.Max(widest, MeasureLine(doc, line));
+
+            return new SizeInt32 { Width = widest, Height = lines.Length * LineAdvance(doc) };
+        }
+
+        /// <summary>
         /// The bounds the ink actually covers, which can start left of zero and run past the
         /// measured advance when glyphs overhang their neighbours. Null when nothing is drawn.
         /// </summary>

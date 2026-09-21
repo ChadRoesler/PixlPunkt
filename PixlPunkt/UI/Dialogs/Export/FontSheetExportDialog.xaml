@@ -1,0 +1,28 @@
+<ContentDialog
+    x:Class="PixlPunkt.UI.Dialogs.FontSheetExportDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Export Sprite Sheet"
+    PrimaryButtonText="Export"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="12" MinWidth="400">
+        <TextBox x:Name="FaceNameBox" Header="Face name" TextChanged="Input_Changed"/>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Size" VerticalAlignment="Center"/>
+            <ComboBox x:Name="ScaleCombo" Width="190" SelectionChanged="Scale_Changed"/>
+        </StackPanel>
+
+        <CheckBox x:Name="WriteMetrics"
+                  Content="Also write BMFont metrics (.fnt)"
+                  IsChecked="True"
+                  Checked="Toggle_Changed" Unchecked="Toggle_Changed"/>
+
+        <TextBlock x:Name="SummaryText" Opacity="0.6" FontSize="11" TextWrapping="Wrap"/>
+
+        <TextBlock Text="Each character's region is its whole cell, so ink that reaches past a glyph's advance is kept rather than trimmed away."
+                   Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+    </StackPanel>
+</ContentDialog>

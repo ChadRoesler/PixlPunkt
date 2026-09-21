@@ -80,8 +80,13 @@ namespace PixlPunkt.UI.Font
             }
 
             UpdateStatus();
-            StripCanvas.Invalidate();
+            StripCanvas?.Invalidate();
         }
+
+        /// <summary>Raised when the preview button is pressed, so the window can be opened for it.</summary>
+        public event Action? PreviewRequested;
+
+        private void Preview_Click(object sender, RoutedEventArgs e) => PreviewRequested?.Invoke();
 
         /// <summary>Whether the bound document is a font, and so whether this has anything to show.</summary>
         public bool HasFont => _document?.FontState.HasState == true;
@@ -91,17 +96,17 @@ namespace PixlPunkt.UI.Font
             if (_codepoint == codepoint) return;
             _codepoint = codepoint;
             UpdateStatus();
-            StripCanvas.Invalidate();
+            StripCanvas?.Invalidate();
         });
 
         private void OnFontChanged() => DispatcherQueue.TryEnqueue(() =>
         {
             UpdateStatus();
-            StripCanvas.Invalidate();
+            StripCanvas?.Invalidate();
         });
 
         /// <summary>The character a pin box is asking for, or null when it is empty or unusable.</summary>
-        private int? PinOf(TextBox box)
+        private static int? PinOf(TextBox? box)
         {
             string text = box?.Text ?? string.Empty;
             return text.Length == 0 ? null : text[0];
@@ -110,7 +115,7 @@ namespace PixlPunkt.UI.Font
         private void Pin_Changed(object sender, TextChangedEventArgs e)
         {
             UpdateStatus();
-            StripCanvas.Invalidate();
+            StripCanvas?.Invalidate();
         }
 
         private void ZoomIn_Click(object sender, RoutedEventArgs e) => SetZoom(_zoom + 2);
@@ -122,7 +127,7 @@ namespace PixlPunkt.UI.Font
             double clamped = Math.Clamp(zoom, 2.0, 32.0);
             if (Math.Abs(clamped - _zoom) < 0.01) return;
             _zoom = clamped;
-            StripCanvas.Invalidate();
+            StripCanvas?.Invalidate();
         }
 
         /// <summary>The sample to draw, as decided by the focused glyph and the two pin boxes.</summary>

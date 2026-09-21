@@ -265,6 +265,11 @@
                         <MenuFlyoutItem Text="From Project File (.pxp)" Click="Tiles_ImportFromPxp_Click"/>
                     </MenuFlyoutSubItem>
                 </MenuBarItem>
+                <MenuBarItem x:Name="FontMenu" Title="Font" Visibility="Collapsed">
+                    <MenuFlyoutItem Text="Preview Font…" Click="Font_Preview_Click"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Export Sprite Sheet…" Click="Font_ExportSheet_Click"/>
+                </MenuBarItem>
                 <MenuBarItem Title="Settings">
                     <MenuFlyoutItem Text="Configure…" Click="OpenSettings_Click"/>
                     <MenuFlyoutSeparator/>

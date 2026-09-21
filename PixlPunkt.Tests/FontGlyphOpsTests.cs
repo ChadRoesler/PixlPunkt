@@ -191,6 +191,41 @@ public class FontGlyphOpsTests
     }
 
     [Test]
+    public void LinesAreSplitHoweverTheyWereTyped()
+    {
+        FontLayoutOps.SplitLines("a\r\nb\nc\rd").Should().Equal("a", "b", "c", "d");
+        FontLayoutOps.SplitLines("").Should().Equal(new[] { "" });
+        FontLayoutOps.SplitLines(null).Should().Equal(new[] { "" });
+    }
+
+    [Test]
+    public void LineAdvanceIsTheEmPlusTheGap_NotTheCell()
+    {
+        var doc = new CanvasDocument("f", 12 * 2, 12,
+            new SizeInt32 { Width = 12, Height = 12 }, new SizeInt32 { Width = 2, Height = 1 });
+        var st = doc.FontState;
+        st.HasState = true;
+        st.SetEmBox(emWidth: 8, emHeight: 8, cellWidth: 12, cellHeight: 12);
+
+        FontLayoutOps.LineAdvance(doc).Should().Be(8, "the overhang room is drawing space, not type size");
+
+        st.LineGap = 2;
+        FontLayoutOps.LineAdvance(doc).Should().Be(10);
+    }
+
+    [Test]
+    public void ABlockIsMeasuredByItsWidestLine()
+    {
+        var doc = NewFontDoc();
+        doc.FontState.Monospace = true;   // every glyph advances by the em, so widths are countable
+
+        var size = FontLayoutOps.MeasureBlock(doc, "ABC\nAB");
+
+        size.Width.Should().Be(3 * Em, "the widest line decides");
+        size.Height.Should().Be(2 * FontLayoutOps.LineAdvance(doc));
+    }
+
+    [Test]
     public void LabelFor_NamesTheCharactersThatShowNothing()
     {
         FontGlyphOps.LabelFor('A').Should().Be("A");

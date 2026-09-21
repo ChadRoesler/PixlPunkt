@@ -440,6 +440,57 @@ public class FontMetricsTests
     }
 
     [Test]
+    public void SpacingCannotLeaveTheCell()
+    {
+        // A post outside the cell would move the pen further than the cell it came from, so the
+        // next glyph would be laid down over ink that is not its own.
+        var doc = new CanvasDocument("f", 12 * 2, 12,
+            new SizeInt32 { Width = 12, Height = 12 }, new SizeInt32 { Width = 2, Height = 1 });
+
+        FontMetricsOps.ClampToCell(doc, originX: -4, advance: 8).Should().Be((0, 8));
+        FontMetricsOps.ClampToCell(doc, originX: 20, advance: 8).Should().Be((12, 0));
+        FontMetricsOps.ClampToCell(doc, originX: 4, advance: 30).Should().Be((4, 8),
+            "the advance post stops at the right edge of the cell");
+        FontMetricsOps.ClampToCell(doc, originX: 2, advance: -5).Should().Be((2, 0));
+    }
+
+    [Test]
+    public void SpacingSetByHandIsHeldInsideTheCell_EvenIfItWasStoredWider()
+    {
+        var doc = new CanvasDocument("f", 8, 8,
+            new SizeInt32 { Width = 8, Height = 8 }, new SizeInt32 { Width = 1, Height = 1 });
+        var st = doc.FontState;
+        st.HasState = true;
+        var g = st.GetOrAdd('a');
+        g.CellIndex = 0;
+        g.AutoFit = false;
+        g.OriginX = 3;
+        g.Advance = 40;
+
+        FontMetricsOps.ResolveMetrics(doc, 'a').Should().Be((3, 5));
+    }
+
+    [Test]
+    public void AutoFitSpacingAlsoStopsAtTheCellEdge()
+    {
+        // Ink filling the whole cell plus a side bearing each side would otherwise advance wider
+        // than the cell and drag the next glyph over this one.
+        var doc = new CanvasDocument("f", 8, 8,
+            new SizeInt32 { Width = 8, Height = 8 }, new SizeInt32 { Width = 1, Height = 1 });
+        var st = doc.FontState;
+        st.HasState = true;
+        st.SideBearing = 1;
+        st.GetOrAdd('a').CellIndex = 0;
+
+        var surf = doc.Surface;
+        for (int i = 3; i < surf.Pixels.Length; i += 4) surf.Pixels[i] = 255;
+
+        var (originX, advance) = FontMetricsOps.ResolveMetrics(doc, 'a');
+        originX.Should().Be(0, "a bearing cannot push the pen left of the cell");
+        (originX + advance).Should().BeLessThanOrEqualTo(8);
+    }
+
+    [Test]
     public void OverhangRoom_LetsAScriptGlyphReachOverBothNeighbours()
     {
         // The case that motivated splitting the em from the cell: a swash whose ink is wider than

@@ -35,6 +35,12 @@
                 <ic:FluentIcon Icon="ZoomIn" FontSize="22"/>
             </Button>
 
+            <Button x:Name="PreviewButton" Height="36" Width="36" Padding="2" CornerRadius="8"
+                    Margin="12,0,0,0" Click="Preview_Click"
+                    ToolTipService.ToolTip="Preview this font as running text">
+                <ic:FluentIcon Icon="TextFont" FontSize="22"/>
+            </Button>
+
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.6"
                        Margin="12,0,0,0" TextWrapping="NoWrap"/>
         </StackPanel>

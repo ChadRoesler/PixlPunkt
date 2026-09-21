@@ -519,6 +519,8 @@ namespace PixlPunkt.UI
             HistoryPanel.Bind(CurrentHost);
             LayersPanel.Bind(host.Document);
             TilePanel.Bind(host.Document, _toolState, _palette);
+            GlyphStrip.PreviewRequested -= OpenFontPreview;
+            GlyphStrip.PreviewRequested += OpenFontPreview;
             UpdateBottomPaneForDocument(host);
             AnimationPanel.Bind(host.Document);
             AnimationPanel.BindToolState(_toolState, _palette);

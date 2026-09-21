@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PixlPunkt.Core.Document;
@@ -43,6 +46,7 @@ namespace PixlPunkt.UI.Dialogs
 
             InitializeComponent();
             LoadDocumentValues();
+            SetUpFontSection();
         }
 
         /// <summary>
@@ -65,6 +69,120 @@ namespace PixlPunkt.UI.Dialogs
 
             // Update preview
             UpdateNewSizePreview();
+        }
+
+        // ── font documents ──────────────────────────────────────────────
+        // A font's tile is its glyph cell, made of an em box plus drawing room, and its tile count
+        // follows from the character set. So for a font those two sections are replaced rather than
+        // shown alongside: editing tile counts directly would put the sheet out of step with the
+        // characters it holds.
+
+        private const string PrintableAsciiName = "Printable ASCII";
+        private const string UpperDigits = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?'\"-:";
+        private const string LettersDigits = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?'\"-:";
+
+        private bool _fontReady;
+
+        private bool IsFontDocument => _document.FontState.HasState;
+
+        private void SetUpFontSection()
+        {
+            if (!IsFontDocument) return;
+
+            TileSizeSection.Visibility = Visibility.Collapsed;
+            TileCountSection.Visibility = Visibility.Collapsed;
+            FontSection.Visibility = Visibility.Visible;
+
+            var em = FontMetricsOps.EmBox(_document);
+            EmWidthBox.Value = em.Width;
+            EmHeightBox.Value = em.Height;
+
+            // Drawing room is whatever margin the cell has around the em, per side.
+            DrawingRoomBox.Value = Math.Max(0, (_document.TileSize.Width - em.Width) / 2);
+
+            FontCharSetCombo.SelectedIndex = 0;
+            _fontReady = true;
+            UpdateFontShape();
+        }
+
+        private static string PrintableAscii()
+        {
+            var sb = new StringBuilder();
+            for (char c = ' '; c <= '~'; c++) sb.Append(c);
+            return sb.ToString();
+        }
+
+        /// <summary>The character set the dialog is currently asking for.</summary>
+        private string ResolveCharacters() => (FontCharSetCombo?.SelectedIndex ?? 0) switch
+        {
+            1 => PrintableAscii(),
+            2 => UpperDigits,
+            3 => LettersDigits,
+            4 => FontCustomChars?.Text ?? string.Empty,
+            _ => FontReshapeOps.CurrentCharacters(_document),
+        };
+
+        /// <summary>The reshape the current settings describe, worked out but not carried out.</summary>
+        private FontReshapePlan CurrentFontPlan() => FontReshapeOps.Plan(
+            _document,
+            (int)(EmWidthBox?.Value is double w and > 0 ? w : 1),
+            (int)(EmHeightBox?.Value is double h and > 0 ? h : 1),
+            (int)(DrawingRoomBox?.Value is double r and >= 0 ? r : 0),
+            ResolveCharacters(),
+            columns: Math.Max(1, _document.TileCounts.Width));
+
+        private void FontShape_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args) =>
+            UpdateFontShape();
+
+        private void FontCustom_Changed(object sender, TextChangedEventArgs e) => UpdateFontShape();
+
+        private void FontCharSet_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (FontCustomChars is not null)
+                FontCustomChars.Visibility =
+                    FontCharSetCombo?.SelectedIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
+
+            UpdateFontShape();
+        }
+
+        /// <summary>
+        /// Restates the plan and raises the warning. Everything destructive is said here, before
+        /// Save is pressed, as well as in the confirmation afterwards.
+        /// </summary>
+        private void UpdateFontShape()
+        {
+            if (!_fontReady || FontShapeSummary is null) return;
+
+            var plan = CurrentFontPlan();
+
+            FontShapeSummary.Text =
+                $"Cell {plan.CellSize.Width} × {plan.CellSize.Height} · " +
+                $"{plan.Characters.Length} glyphs · sheet {plan.Columns} × {plan.Rows} · " +
+                $"{plan.CanvasSize.Width} × {plan.CanvasSize.Height} px";
+
+            string? warning = DescribeCost(plan);
+            FontShapeWarning.Text = warning ?? string.Empty;
+            FontShapeWarning.Visibility = warning is null ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        /// <summary>What going ahead would cost, or null when nothing drawn is at risk.</summary>
+        private string? DescribeCost(in FontReshapePlan plan)
+        {
+            var parts = new List<string>();
+
+            if (plan.LosesCharacters)
+            {
+                parts.Add($"⚠ {plan.Removed.Count} character{(plan.Removed.Count == 1 ? "" : "s")} " +
+                          "would be removed, along with anything drawn in them.");
+            }
+
+            if (plan.CropsGlyphs)
+            {
+                parts.Add("⚠ The cell is getting smaller, so any ink outside the new cell " +
+                          "will be cut off every glyph.");
+            }
+
+            return parts.Count == 0 ? null : string.Join("\n", parts);
         }
 
         /// <summary>
@@ -113,8 +231,14 @@ namespace PixlPunkt.UI.Dialogs
             Close();
         }
 
-        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        private async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            if (IsFontDocument)
+            {
+                await SaveFontAsync();
+                return;
+            }
+
             // Validate inputs
             int newTileW = (int)TileWidthBox.Value;
             int newTileH = (int)TileHeightBox.Value;
@@ -181,6 +305,119 @@ namespace PixlPunkt.UI.Dialogs
             OnCanvasChanged?.Invoke(contentOffsetX, contentOffsetY);
 
             Close();
+        }
+
+        /// <summary>
+        /// Applies a font reshape, asking first when it would destroy work. The question is asked
+        /// here rather than left to undo, because losing a set of hand-drawn glyphs is the kind of
+        /// thing someone should agree to in advance.
+        /// </summary>
+        private async Task SaveFontAsync()
+        {
+            var newName = DocumentNameTextBox.Text?.Trim();
+            if (!string.IsNullOrEmpty(newName)) _document.Name = newName;
+
+            var plan = CurrentFontPlan();
+
+            if (plan.Characters.Length == 0)
+            {
+                await ShowMessageAsync("Nothing to keep",
+                    "A font needs at least one character. Choose a character set, or type some in.");
+                return;
+            }
+
+            if (plan.IsDestructive && !await ConfirmDestructiveAsync(plan))
+                return;
+
+            var item = new FontReshapeItem(_document, "Reshape Font");
+            FontReshapeOps.Apply(_document, plan, AnchorFor(_selectedAnchor));
+            item.CaptureAfter();
+            _document.History.Push(item);
+
+            OnCanvasChanged?.Invoke(_document.PixelWidth, _document.PixelHeight);
+            _document.RaiseStructureChanged();
+            Close();
+        }
+
+        /// <summary>Maps the dialog's anchor to the one the reshape understands. Same nine positions.</summary>
+        private static GlyphAnchor AnchorFor(AnchorPosition anchor) => anchor switch
+        {
+            AnchorPosition.TopLeft => GlyphAnchor.TopLeft,
+            AnchorPosition.TopCenter => GlyphAnchor.TopCenter,
+            AnchorPosition.TopRight => GlyphAnchor.TopRight,
+            AnchorPosition.MiddleLeft => GlyphAnchor.MiddleLeft,
+            AnchorPosition.MiddleRight => GlyphAnchor.MiddleRight,
+            AnchorPosition.BottomLeft => GlyphAnchor.BottomLeft,
+            AnchorPosition.BottomCenter => GlyphAnchor.BottomCenter,
+            AnchorPosition.BottomRight => GlyphAnchor.BottomRight,
+            _ => GlyphAnchor.MiddleCenter,
+        };
+
+        private async Task<bool> ConfirmDestructiveAsync(FontReshapePlan plan)
+        {
+            var body = new StringBuilder();
+
+            if (plan.LosesCharacters)
+            {
+                body.Append(plan.Removed.Count)
+                    .Append(plan.Removed.Count == 1 ? " character will be removed" : " characters will be removed")
+                    .Append(" from this font, along with anything drawn in them");
+
+                body.Append(": ").Append(DescribeRemoved(plan)).Append('.');
+                body.AppendLine().AppendLine();
+            }
+
+            if (plan.CropsGlyphs)
+            {
+                body.Append("The cell is going from ")
+                    .Append(_document.TileSize.Width).Append(" × ").Append(_document.TileSize.Height)
+                    .Append(" to ")
+                    .Append(plan.CellSize.Width).Append(" × ").Append(plan.CellSize.Height)
+                    .Append(". Any ink outside the smaller cell will be cut off every glyph.")
+                    .AppendLine().AppendLine();
+            }
+
+            body.Append("This can be undone.");
+
+            var dialog = new ContentDialog
+            {
+                Title = "This will remove work",
+                Content = body.ToString(),
+                PrimaryButtonText = "Go ahead",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot,
+            };
+
+            return await dialog.ShowAsync() == ContentDialogResult.Primary;
+        }
+
+        /// <summary>Lists the characters being dropped, trimmed so the dialog stays readable.</summary>
+        private static string DescribeRemoved(in FontReshapePlan plan)
+        {
+            var shown = new List<string>();
+            foreach (int codepoint in plan.Removed)
+            {
+                if (shown.Count == 12)
+                {
+                    shown.Add($"and {plan.Removed.Count - 12} more");
+                    break;
+                }
+                shown.Add(FontGlyphOps.LabelFor(codepoint));
+            }
+            return string.Join(" ", shown);
+        }
+
+        private async Task ShowMessageAsync(string title, string message)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = Content.XamlRoot,
+            };
+            await dialog.ShowAsync();
         }
 
         /// <summary>

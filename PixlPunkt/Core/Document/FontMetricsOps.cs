@@ -107,18 +107,30 @@ namespace PixlPunkt.Core.Document
             if (state.Monospace)
             {
                 int emWidth = state.ResolveEmWidth(doc.TileSize.Width);
-                return (g.AutoFit ? state.EmLeft : g.OriginX, Math.Max(1, emWidth));
+                return ClampToCell(doc, g.AutoFit ? state.EmLeft : g.OriginX, Math.Max(1, emWidth));
             }
 
             if (!g.AutoFit)
-                return (g.OriginX, g.Advance);
+                return ClampToCell(doc, g.OriginX, g.Advance);
 
             int sb = Math.Max(0, state.SideBearing);
             var ink = MeasureInk(pixels, surfaceW, surfaceH, GetCellRect(doc, g.CellIndex));
             if (ink is not { } r)
-                return (0, Math.Max(1, sb * 2));   // no ink: a space, as wide as its bearings
+                return ClampToCell(doc, 0, Math.Max(1, sb * 2));   // no ink: a space, as wide as its bearings
 
-            return (r.X - sb, r.Width + sb * 2);
+            return ClampToCell(doc, r.X - sb, r.Width + sb * 2);
+        }
+
+        /// <summary>
+        /// Holds the pen and the advance post inside the glyph's own cell, overhang room included.
+        /// A post outside the cell would move the pen further than the cell it came from, so the
+        /// next glyph would be laid down on top of ink that is not its own.
+        /// </summary>
+        public static (int OriginX, int Advance) ClampToCell(CanvasDocument doc, int originX, int advance)
+        {
+            int cellW = Math.Max(1, doc.TileSize.Width);
+            int origin = Math.Clamp(originX, 0, cellW);
+            return (origin, Math.Clamp(advance, 0, cellW - origin));
         }
 
         /// <summary>Spacing resolved against the document's composited surface.</summary>

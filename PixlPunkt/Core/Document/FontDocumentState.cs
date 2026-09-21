@@ -136,6 +136,57 @@ namespace PixlPunkt.Core.Document
 
         public void Clear() => _glyphs.Clear();
 
+        /// <summary>
+        /// A complete copy, glyphs included. Reshaping a font rewrites the mapping, the em box and
+        /// the guides at once, so undo needs the whole thing rather than a field at a time.
+        /// </summary>
+        public FontDocumentState Clone()
+        {
+            var copy = new FontDocumentState
+            {
+                HasState = HasState,
+                FamilyName = FamilyName,
+                StyleName = StyleName,
+                BaselineY = BaselineY,
+                ToplineY = ToplineY,
+                Monospace = Monospace,
+                SideBearing = SideBearing,
+                LineGap = LineGap,
+                EmLeft = EmLeft,
+                EmTop = EmTop,
+                EmWidth = EmWidth,
+                EmHeight = EmHeight,
+            };
+
+            foreach (var (codepoint, glyph) in _glyphs)
+                copy._glyphs[codepoint] = glyph.Clone();
+
+            return copy;
+        }
+
+        /// <summary>Takes on another state's values wholesale, used to put one back on undo.</summary>
+        public void CopyFrom(FontDocumentState other)
+        {
+            if (other is null) throw new ArgumentNullException(nameof(other));
+
+            HasState = other.HasState;
+            FamilyName = other.FamilyName;
+            StyleName = other.StyleName;
+            BaselineY = other.BaselineY;
+            ToplineY = other.ToplineY;
+            Monospace = other.Monospace;
+            SideBearing = other.SideBearing;
+            LineGap = other.LineGap;
+            EmLeft = other.EmLeft;
+            EmTop = other.EmTop;
+            EmWidth = other.EmWidth;
+            EmHeight = other.EmHeight;
+
+            _glyphs.Clear();
+            foreach (var (codepoint, glyph) in other._glyphs)
+                _glyphs[codepoint] = glyph.Clone();
+        }
+
         /// <summary>The character assigned to a cell, or -1 when the cell is unassigned.</summary>
         public int CodepointAtCell(int cellIndex)
         {
