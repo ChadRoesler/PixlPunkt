@@ -1375,6 +1375,17 @@ namespace PixlPunkt.Core.Document
         public VoxelWorkspaceDocumentState VoxelWorkspace { get; } = new();
 
         /// <summary>
+        /// Gets the pixel-font metrics stored with the document. Present but inert
+        /// (<see cref="FontDocumentState.HasState"/> false) on an ordinary canvas.
+        /// </summary>
+        public FontDocumentState FontState { get; } = new();
+
+        /// <summary>Raised when the font metrics change, so views redraw their guides.</summary>
+        public event Action? FontChanged;
+
+        public void RaiseFontChanged() => FontChanged?.Invoke();
+
+        /// <summary>
         /// Gets persisted voxel preview settings/state stored with the document.
         /// Legacy transitional state used by the current standalone voxel preview window.
         /// </summary>

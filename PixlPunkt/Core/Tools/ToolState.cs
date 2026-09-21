@@ -49,7 +49,22 @@ namespace PixlPunkt.Core.Tools
         /// <remarks>
         /// This is the preferred property for determining which tool is currently in use.
         /// </remarks>
-        public string ActiveToolId => OverrideToolId ?? CurrentToolId;
+        public string ActiveToolId => ToolsSuspended ? ToolIds.None : (OverrideToolId ?? CurrentToolId);
+
+        /// <summary>
+        /// Whether the drawing tools are standing down for something that owns the canvas instead,
+        /// such as the font metrics tool. The chosen tool is remembered and comes back when this
+        /// clears; meanwhile nothing in the rail shows as selected and no tool accepts input.
+        /// </summary>
+        public bool ToolsSuspended { get; private set; }
+
+        /// <summary>Stands the drawing tools down, or brings them back.</summary>
+        public void SuspendTools(bool suspended)
+        {
+            if (ToolsSuspended == suspended) return;
+            ToolsSuspended = suspended;
+            ActiveToolIdChanged?.Invoke(ActiveToolId);
+        }
 
         // ════════════════════════════════════════════════════════════════════
         // UNIFIED TOOL REGISTRY
@@ -185,7 +200,16 @@ namespace PixlPunkt.Core.Tools
         /// <exception cref="ArgumentException">Thrown if the tool ID is not registered.</exception>
         public void SetById(String toolId)
         {
-            if (toolId == CurrentToolId) return;
+            // Reaching for a tool in the rail is a clear statement that whatever had taken the
+            // canvas over should let go of it.
+            bool wasSuspended = ToolsSuspended;
+            ToolsSuspended = false;
+
+            if (toolId == CurrentToolId)
+            {
+                if (wasSuspended) ActiveToolIdChanged?.Invoke(ActiveToolId);
+                return;
+            }
 
             if (!_registry.IsRegistered(toolId))
             {

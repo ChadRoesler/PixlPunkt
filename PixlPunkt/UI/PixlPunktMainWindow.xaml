@@ -10,7 +10,8 @@
     xmlns:voxeltools="using:PixlPunkt.UI.Voxel.Tools"
     xmlns:preview="using:PixlPunkt.UI.Preview"
     xmlns:history="using:PixlPunkt.UI.History"
-    xmlns:animation="using:PixlPunkt.UI.Animation">
+    xmlns:animation="using:PixlPunkt.UI.Animation"
+    xmlns:font="using:PixlPunkt.UI.Font">
     <Grid 
         x:Name="Root" 
         IsTabStop="True"  
@@ -99,6 +100,7 @@
 
                 <MenuBarItem Title="File">
                     <MenuFlyoutItem Text="New Canvas…" Click="File_NewCanvas_Click"/>
+                    <MenuFlyoutItem Text="New Font…" Click="File_NewFont_Click"/>
                     <MenuFlyoutSubItem x:Name="File_NewFromTemplate_Submenu" Text="New from Template…">
                         <MenuFlyoutItem Text="(No templates)" IsEnabled="False"/>
                     </MenuFlyoutSubItem>
@@ -381,6 +383,12 @@
                 <!-- Animation Panel -->
                 <animation:AnimationPanel x:Name="AnimationPanel" 
                                           Grid.Row="2"/>
+
+                <!-- Glyph strip: takes the same place for font documents, where an animation
+                     timeline means nothing and seeing a letter beside its neighbours means a lot -->
+                <font:GlyphStrip x:Name="GlyphStrip"
+                                 Grid.Row="2"
+                                 Visibility="Collapsed"/>
             </Grid>
 
             <!-- Collapsible Splitter between Center and Right -->

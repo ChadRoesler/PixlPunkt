@@ -1,0 +1,50 @@
+<UserControl
+    x:Class="PixlPunkt.UI.Font.GlyphStrip"
+    x:Name="Self"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ic="using:FluentIcons.WinUI"
+    xmlns:skia="using:SkiaSharp.Views.Windows"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" Padding="8" RowSpacing="6">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="Left" VerticalAlignment="Center" Opacity="0.6"/>
+            <TextBox x:Name="LeftPin" Width="48" MaxLength="1" PlaceholderText="auto"
+                     TextChanged="Pin_Changed"
+                     ToolTipService.ToolTip="Hold a character on the left. Empty follows the character set."/>
+
+            <TextBlock Text="Right" VerticalAlignment="Center" Opacity="0.6" Margin="8,0,0,0"/>
+            <TextBox x:Name="RightPin" Width="48" MaxLength="1" PlaceholderText="auto"
+                     TextChanged="Pin_Changed"
+                     ToolTipService.ToolTip="Hold a character on the right. Empty follows the character set."/>
+
+            <Button Height="36" Width="36" Padding="2" CornerRadius="8" Margin="12,0,0,0"
+                    Click="ZoomOut_Click" ToolTipService.ToolTip="Smaller">
+                <ic:FluentIcon Icon="ZoomOut" FontSize="22"/>
+            </Button>
+            <Button Height="36" Width="36" Padding="2" CornerRadius="8"
+                    Click="ZoomIn_Click" ToolTipService.ToolTip="Larger">
+                <ic:FluentIcon Icon="ZoomIn" FontSize="22"/>
+            </Button>
+
+            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.6"
+                       Margin="12,0,0,0" TextWrapping="NoWrap"/>
+        </StackPanel>
+
+        <Border Grid.Row="1"
+                Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <skia:SKXamlCanvas x:Name="StripCanvas" PaintSurface="StripCanvas_PaintSurface"/>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,3 +1,4 @@
+using System;
 using Microsoft.UI.Xaml;
 using PixlPunkt.Core.Brush;
 using PixlPunkt.Core.Effects;
@@ -50,43 +51,29 @@ public partial class App : Application
     /// </summary>
     private void ProcessStartupArguments()
     {
-        // Only Desktop (Skia on Windows/macOS/Linux) supports command-line file arguments
-        // via the Program.StartupArgs property. This code only compiles for net10.0-desktop.
-        // Other platforms handle file activation through platform-specific mechanisms.
-#if NET10_0_DESKTOP || NET9_0_DESKTOP || NET8_0_DESKTOP
+        // Every desktop head, Skia and unpackaged WinAppSdk alike, is handed the file path as an
+        // ordinary command-line argument by the shell, so read it from the environment rather than
+        // through a per-head property behind a compile symbol that is not defined. Packaged MSIX
+        // activation arrives through a different mechanism and is not handled here.
         try
         {
-            // Get args from Desktop Program.cs
-            var args = Program.StartupArgs;
-
-            if (args != null && args.Length > 0)
+            var args = Environment.GetCommandLineArgs();
+            for (int i = 1; i < args.Length; i++)
             {
-                // Find the first argument that looks like a file path
-                var filePath = args.FirstOrDefault(arg =>
-                    !string.IsNullOrWhiteSpace(arg) &&
-                    !arg.StartsWith("-") &&
-                    !arg.StartsWith("/") &&
-                    (arg.EndsWith(".pxp", StringComparison.OrdinalIgnoreCase) ||
-                     arg.EndsWith(".pxpr", StringComparison.OrdinalIgnoreCase) ||
-                     arg.EndsWith(".pxpt", StringComparison.OrdinalIgnoreCase) ||
-                     arg.EndsWith(".pbx", StringComparison.OrdinalIgnoreCase) ||
-                     arg.EndsWith(".mkr", StringComparison.OrdinalIgnoreCase) ||
-                     File.Exists(arg)));
+                var arg = args[i];
+                if (string.IsNullOrWhiteSpace(arg)) continue;
+                if (arg.StartsWith('-') || arg.StartsWith('/')) continue;
+                if (!File.Exists(arg)) continue;
 
-                if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
-                {
-                    StartupFilePath = Path.GetFullPath(filePath);
-                    System.Diagnostics.Debug.WriteLine($"[PixlPunkt] Startup file: {StartupFilePath}");
-                }
+                StartupFilePath = Path.GetFullPath(arg);
+                System.Diagnostics.Debug.WriteLine($"[PixlPunkt] Startup file: {StartupFilePath}");
+                break;
             }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[PixlPunkt] Error processing startup args: {ex.Message}");
         }
-#endif
-        // On other platforms (Android, iOS, WASM, WinAppSdk), file association
-        // is handled through platform-specific mechanisms (OnFileActivated, etc.)
     }
 
     protected Window? MainWindow { get; private set; }
@@ -251,6 +238,26 @@ public partial class App : Application
         MainWindow.SetWindowIcon("Pixl Punkt");
 
         LoggingService.Info("PixlPunkt main window activated");
+
+        // Open a document passed by the shell (double-click, "Open with"). Deferred so the tab
+        // view and XamlRoot exist before anything tries to use them.
+        if (!string.IsNullOrEmpty(StartupFilePath))
+        {
+            var startupPath = StartupFilePath;
+            main.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                async () =>
+                {
+                    try
+                    {
+                        await main.OpenDocumentPathAsync(startupPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        LoggingService.Error($"Failed to open startup file: {startupPath}", ex);
+                    }
+                });
+        }
     }
 
     /// <summary>

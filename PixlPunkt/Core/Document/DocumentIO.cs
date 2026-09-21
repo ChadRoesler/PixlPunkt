@@ -1,4 +1,5 @@
 using System;
+using PixlPunkt.Constants;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -105,7 +106,7 @@ namespace PixlPunkt.Core.Document
         /// Version 20: Added voxel pixel-preview antialiasing strength
         /// Version 21: Removed voxel lighting ambient from workspace state and added voxel sidebar section collapse state
         /// </summary>
-        private const int CurrentVersion = 21;
+        private const int CurrentVersion = 23;
 
         private const int NodeType_RasterLayer = 1;
         private const int NodeType_Folder = 2;
@@ -113,6 +114,19 @@ namespace PixlPunkt.Core.Document
         // ═══════════════════════════════════════════════════════════════
         // SAVE
         // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// The extension a document should be saved under: <c>.pxpf</c> once it carries font
+        /// metrics, <c>.pxp</c> otherwise. The bytes are identical either way.
+        /// </summary>
+        public static string ExtensionFor(CanvasDocument doc) =>
+            doc.FontState.HasState ? FileExtensions.PixlPunktFont : FileExtensions.PixlPunktDocument;
+
+        /// <summary>True when the extension is one this app writes as a document.</summary>
+        public static bool IsNativeExtension(string? extension) =>
+            !string.IsNullOrEmpty(extension) &&
+            (extension.Equals(FileExtensions.PixlPunktDocument, StringComparison.OrdinalIgnoreCase) ||
+             extension.Equals(FileExtensions.PixlPunktFont, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
         /// Saves a document to the specified file path in native .pxp format.
@@ -243,6 +257,9 @@ namespace PixlPunkt.Core.Document
             WriteVoxelPreviewState(bw, doc.VoxelPreviewState);
             WriteVoxelModelState(bw, doc.VoxelModel);
             WriteVoxelWorkspaceState(bw, doc.VoxelWorkspace);
+
+            // Pixel font metrics (Version 22+)
+            WriteFontState(bw, doc.FontState);
 
             bw.Flush();
         }
@@ -661,6 +678,74 @@ namespace PixlPunkt.Core.Document
             }
         }
 
+        /// <summary>
+        /// Writes the pixel-font metrics. Glyphs are written in codepoint order so the same
+        /// document always produces the same bytes.
+        /// </summary>
+        private static void WriteFontState(BinaryWriter bw, FontDocumentState state)
+        {
+            bw.Write(state.HasState);
+            bw.Write(state.FamilyName ?? string.Empty);
+            bw.Write(state.StyleName ?? string.Empty);
+            bw.Write(state.BaselineY);
+            bw.Write(state.ToplineY);
+            bw.Write(state.Monospace);
+            bw.Write(state.SideBearing);
+            bw.Write(state.LineGap);
+
+            var codepoints = new List<int>(state.Glyphs.Keys);
+            codepoints.Sort();
+            bw.Write(codepoints.Count);
+            foreach (var cp in codepoints)
+            {
+                var g = state.Glyphs[cp];
+                bw.Write(cp);
+                bw.Write(g.CellIndex);
+                bw.Write(g.OriginX);
+                bw.Write(g.Advance);
+                bw.Write(g.AutoFit);
+            }
+
+            // Em box (Version 23+), appended so a version 22 block still reads unchanged.
+            bw.Write(state.EmLeft);
+            bw.Write(state.EmTop);
+            bw.Write(state.EmWidth);
+            bw.Write(state.EmHeight);
+        }
+
+        private static void ReadFontState(BinaryReader br, FontDocumentState state, int version)
+        {
+            state.Clear();
+            state.HasState = br.ReadBoolean();
+            state.FamilyName = br.ReadString();
+            state.StyleName = br.ReadString();
+            state.BaselineY = br.ReadInt32();
+            state.ToplineY = br.ReadInt32();
+            state.Monospace = br.ReadBoolean();
+            state.SideBearing = br.ReadInt32();
+            state.LineGap = br.ReadInt32();
+
+            int count = br.ReadInt32();
+            for (int i = 0; i < count; i++)
+            {
+                int cp = br.ReadInt32();
+                var g = state.GetOrAdd(cp);
+                g.CellIndex = br.ReadInt32();
+                g.OriginX = br.ReadInt32();
+                g.Advance = br.ReadInt32();
+                g.AutoFit = br.ReadBoolean();
+            }
+
+            if (version >= 23)
+            {
+                state.EmLeft = br.ReadInt32();
+                state.EmTop = br.ReadInt32();
+                state.EmWidth = br.ReadInt32();
+                state.EmHeight = br.ReadInt32();
+            }
+            // Older fonts left the em equal to the cell, which zero already means.
+        }
+
         private static void WriteVoxelWorkspaceState(BinaryWriter bw, VoxelWorkspaceDocumentState state)
         {
             bw.Write(state.HasState);
@@ -852,6 +937,11 @@ namespace PixlPunkt.Core.Document
             {
                 // Migrate legacy preview settings into the new workspace state.
                 doc.VoxelWorkspace.CopyFromPreviewState(doc.VoxelPreviewState);
+            }
+
+            if (version >= 22)
+            {
+                ReadFontState(br, doc.FontState, version);
             }
 
             if (doc.Layers.Count > 0)

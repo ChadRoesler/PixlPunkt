@@ -114,6 +114,13 @@ namespace PixlPunkt.Core.Tools
         public const string BuiltInVendor = "pixlpunkt";
 
         /// <summary>
+        /// Stands for "no tool at all". Deliberately not registered, so the tool rail finds no
+        /// button to check and every category test comes back false. Used while something outside
+        /// the rail has taken over the canvas, such as the font metrics tool.
+        /// </summary>
+        public const string None = "pixlpunkt.none";
+
+        /// <summary>
         /// Checks if a tool ID is a built-in PixlPunkt tool.
         /// </summary>
         /// <param name="toolId">The tool ID to check.</param>

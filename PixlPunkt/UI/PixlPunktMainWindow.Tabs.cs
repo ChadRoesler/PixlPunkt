@@ -147,6 +147,7 @@ namespace PixlPunkt.UI
             {
                 LayersPanel.Bind(null);
                 TilePanel.Bind(null, null);
+                UpdateBottomPaneForDocument(null);
                 AnimationPanel.Bind(null);
             }
         }
@@ -208,14 +209,20 @@ namespace PixlPunkt.UI
             // For brush templates, we use a single layer (16x16 canvas)
             // No special layer setup needed - default layer works
 
-            // Apply animation defaults from app settings
+            return OpenPreparedDocument(doc);
+        }
+
+        /// <summary>
+        /// Applies the defaults every new document gets, registers it and opens it in a tab.
+        /// Shared by New Canvas and New Font so the two cannot drift apart.
+        /// </summary>
+        private CanvasViewHost? OpenPreparedDocument(CanvasDocument doc)
+        {
             doc.CanvasAnimationState.ApplyDefaults();
             doc.TileAnimationState.ApplyDefaults();
 
             _workspace.Add(doc);
             _documentPaths[doc] = null;
-
-            // Register document for auto-save
             _autoSave.RegisterDocument(doc);
 
             var tab = MakeTab(doc);
@@ -228,6 +235,40 @@ namespace PixlPunkt.UI
             });
 
             return GetCanvasHostFromTab(tab);
+        }
+
+        /// <summary>
+        /// Builds a glyph sheet from the New Font dialog: the em box becomes the tile size, the
+        /// characters are laid into cells in order, and the baseline and cap-height guides start
+        /// at sensible rows.
+        /// </summary>
+        private CanvasViewHost? CreateAndOpenFont(PixlPunkt.UI.Dialogs.NewFontResult result)
+        {
+            try { SetStripeTheme(AppSettings.Instance.StripeTheme); } catch { }
+
+            string chars = result.Characters ?? string.Empty;
+            if (chars.Length == 0) return null;
+
+            int emW = Math.Max(1, result.EmSize.Width);
+            int emH = Math.Max(1, result.EmSize.Height);
+            int cellW = Math.Max(emW, result.CellSize.Width);
+            int cellH = Math.Max(emH, result.CellSize.Height);
+            int cols = Math.Max(1, result.Columns);
+            int rows = Math.Max(1, (chars.Length + cols - 1) / cols);
+
+            string name = string.IsNullOrWhiteSpace(result.Name) ? $"NewFont{_newCanvasCounter++}" : result.Name;
+            var doc = new CanvasDocument(name, cols * cellW, rows * cellH, CreateSize(cellW, cellH), CreateSize(cols, rows));
+
+            var font = doc.FontState;
+            font.HasState = true;
+            font.FamilyName = name;
+            font.Monospace = result.Monospace;
+            font.SetEmBox(emW, emH, cellW, cellH);
+            font.SetDefaultGuides(cellH);
+            for (int i = 0; i < chars.Length; i++)
+                font.GetOrAdd(chars[i]).CellIndex = i;
+
+            return OpenPreparedDocument(doc);
         }
 
         /// <summary>
@@ -295,6 +336,7 @@ namespace PixlPunkt.UI
                 CurrentHost = null;
                 LayersPanel.Bind(null);
                 TilePanel.Bind(null, null);
+                UpdateBottomPaneForDocument(null);
                 AnimationPanel.Bind(null);
             }
             UpdateHistoryUI();
@@ -350,6 +392,7 @@ namespace PixlPunkt.UI
             {
                 LayersPanel.Bind(null);
                 TilePanel.Bind(null, null);
+                UpdateBottomPaneForDocument(null);
                 AnimationPanel.Bind(null);
             }
             UpdateGlobalToolRailMode();
@@ -431,7 +474,7 @@ namespace PixlPunkt.UI
         /// </summary>
         private async Task<bool> TrySaveDocumentAsAsync(CanvasDocument doc)
         {
-            var savePicker = WindowHost.CreateFileSavePicker(this, doc.Name ?? "Untitled", ".pxp");
+            var savePicker = WindowHost.CreateFileSavePicker(this, doc.Name ?? "Untitled", DocumentIO.ExtensionFor(doc));
 
             var file = await savePicker.PickSaveFileAsync();
             if (file is null)
@@ -476,6 +519,7 @@ namespace PixlPunkt.UI
             HistoryPanel.Bind(CurrentHost);
             LayersPanel.Bind(host.Document);
             TilePanel.Bind(host.Document, _toolState, _palette);
+            UpdateBottomPaneForDocument(host);
             AnimationPanel.Bind(host.Document);
             AnimationPanel.BindToolState(_toolState, _palette);
             AnimationPanel.BindCanvasHost(host);
@@ -576,6 +620,7 @@ namespace PixlPunkt.UI
             PreviewControl?.Detach();
             LayersPanel.Bind(null);
             TilePanel.Bind(null, null, null);
+            UpdateBottomPaneForDocument(null);
             AnimationPanel.Bind(null);
         }
 

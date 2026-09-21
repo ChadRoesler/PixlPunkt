@@ -853,6 +853,19 @@ namespace PixlPunkt.UI
             await ShowNewCanvasDialogAsync();
         }
 
+        /// <summary>Creates a pixel font document from the New Font dialog.</summary>
+        private async Task NewFontAsync()
+        {
+            if (IsTextInputFocused()) return;
+
+            var dlg = new PixlPunkt.UI.Dialogs.NewFontDialog { XamlRoot = MainXamlRoot };
+            var res = await ShowDialogGuardedAsync(dlg);
+            if (res != ContentDialogResult.Primary) return;
+
+            CreateAndOpenFont(dlg.GetResult());
+            UpdateSessionState();
+        }
+
         private async Task OpenDocumentAsync()
         {
             if (IsTextInputFocused()) return;
@@ -861,6 +874,7 @@ namespace PixlPunkt.UI
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
             picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
             picker.FileTypeFilter.Add(".pxp");
+            picker.FileTypeFilter.Add(".pxpf");
 
             var file = await picker.PickSingleFileAsync();
             if (file is null) return;
@@ -868,9 +882,9 @@ namespace PixlPunkt.UI
             try
             {
                 CanvasDocument doc;
-                if (file.FileType.Equals(".pxp", StringComparison.OrdinalIgnoreCase))
+                if (DocumentIO.IsNativeExtension(file.FileType))
                 {
-                    // Load native .pxp document
+                    // Load a native document; .pxp and .pxpf are the same container
                     doc = DocumentIO.Load(file.Path);
 
                     // Reload audio tracks from stored file paths
@@ -1243,6 +1257,7 @@ namespace PixlPunkt.UI
         // ─────────────────────────────────────────────────────────────
 
         private async void File_NewCanvas_Click(object sender, RoutedEventArgs e) => await NewCanvasAsync();
+        private async void File_NewFont_Click(object sender, RoutedEventArgs e) => await NewFontAsync();
         private async void File_OpenDocument_Click(object sender, RoutedEventArgs e) => await OpenDocumentAsync();
         private async void File_SaveDocument_Click(object sender, RoutedEventArgs e) => await SaveDocumentAsync();
         private async void File_SaveDocumentAs_Click(object sender, RoutedEventArgs e) => await SaveDocumentAsAsync();

@@ -391,6 +391,13 @@ function Create-MacInstaller {
             <key>CFBundleTypeExtensions</key>
             <array><string>pxp</string></array>
         </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>PixlPunkt Font</string>
+            <key>CFBundleTypeRole</key><string>Editor</string>
+            <key>LSHandlerRank</key><string>Owner</string>
+            <key>CFBundleTypeExtensions</key>
+            <array><string>pxpf</string></array>
+        </dict>
     </array>
 </dict>
 </plist>

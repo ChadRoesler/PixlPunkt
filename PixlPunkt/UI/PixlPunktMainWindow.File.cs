@@ -270,7 +270,7 @@ namespace PixlPunkt.UI
             if (host == null) return;
             var doc = host.Document;
 
-            var savePicker = WindowHost.CreateFileSavePicker(this, doc.Name ?? "Untitled", ".pxp");
+            var savePicker = WindowHost.CreateFileSavePicker(this, doc.Name ?? "Untitled", DocumentIO.ExtensionFor(doc));
 
             StorageFile? file = await savePicker.PickSaveFileAsync();
             if (file is null)

@@ -25,6 +25,7 @@ public static partial class WindowsFileAssociations
         new(".pxp", "PixlPunkt.Document", "PixlPunkt Document", "document"),
         new(".pxpr", "PixlPunkt.AnimationReel", "PixlPunkt Animation Reel", "reel"),
         new(".pxpt", "PixlPunkt.Tileset", "PixlPunkt Tileset", "tileset"),
+        new(".pxpf", "PixlPunkt.Font", "PixlPunkt Font", "font"),
         new(".punk", "PixlPunkt.Plugin", "PixlPunkt Plugin", "plugin"),
         new(".mkr", "PixlPunkt.Marker", "PixlPunkt Marker", "marker"),
     ];

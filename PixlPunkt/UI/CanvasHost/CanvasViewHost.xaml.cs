@@ -572,6 +572,7 @@ namespace PixlPunkt.UI.CanvasHost
             Document.LayersChanged += OnDocChanged;
             Document.DocumentModified += OnExternalDocumentModified;
             Document.SelectionChanged += OnDocumentSelectionChanged;
+            Document.FontChanged += InvalidateMainCanvas;
             HookViewTransform();
 
             // A floating selection is committed before the timeline moves off its frame; the
@@ -945,6 +946,7 @@ namespace PixlPunkt.UI.CanvasHost
                 _toolState.BrushChanged -= OnBrushChanged;
                 _toolState.ToolIdChanged -= OnToolChangedForPreview;
                 _toolState.ActiveToolIdChanged -= OnEffectiveToolChangedForPreview;
+                _toolState.ActiveToolIdChanged -= FontMetrics_OnActiveToolChanged;
                 _toolState.OptionsChanged -= OnOptionsChanged;
                 _toolState.SelectionCommitRequested -= CommitFloatingWithHistory;
                 _toolState.SelectionCancelRequested -= CancelSelection;
@@ -979,6 +981,7 @@ namespace PixlPunkt.UI.CanvasHost
             _toolState.BrushChanged += OnBrushChanged;
             _toolState.ToolIdChanged += OnToolChangedForPreview;
             _toolState.ActiveToolIdChanged += OnEffectiveToolChangedForPreview;
+            _toolState.ActiveToolIdChanged += FontMetrics_OnActiveToolChanged;
             _toolState.OptionsChanged += OnOptionsChanged;
             _toolState.SelectionCommitRequested += CommitFloatingWithHistory;
             _toolState.SelectionCancelRequested += CancelSelection;

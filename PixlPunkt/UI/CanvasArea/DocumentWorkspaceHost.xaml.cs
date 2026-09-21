@@ -22,6 +22,7 @@ namespace PixlPunkt.UI.CanvasArea
 
         private const double DefaultVoxelPaneWidth = 560d;
         private const double MinVoxelPaneWidth = 360d;
+        private const double DefaultGlyphPaneWidth = 300d;
         private double _lastVoxelPaneWidth = DefaultVoxelPaneWidth;
         private ActiveWorkspacePane _activePane = ActiveWorkspacePane.Canvas;
 
@@ -63,8 +64,50 @@ namespace PixlPunkt.UI.CanvasArea
             }
 
             SetVoxelPaneVisible(ws?.HasState == true && ws.VoxelPaneVisible);
+            SetupGlyphPane();
             SetActivePane(ActiveWorkspacePane.Canvas);
         }
+
+        /// <summary>
+        /// Puts the glyph list beside the canvas for a font document. It belongs here rather than in
+        /// the right sidebar because it is part of editing this document, like the voxel pane, and
+        /// because a font needs it open the whole time it is being drawn.
+        /// </summary>
+        private void SetupGlyphPane()
+        {
+            GlyphPane.Bind(Document);
+
+            // Picking a glyph brings its cell into view and makes its spacing posts the solid ones;
+            // the reset command is the same undoable step as dragging those posts back.
+            GlyphPane.GlyphSelected += CanvasHost.FontFocusGlyph;
+            GlyphPane.ResetSpacingRequested += CanvasHost.FontSpacing_ResetToAuto;
+            GlyphPane.MetricsEditingChanged += CanvasHost.SetFontMetricsEditing;
+            CanvasHost.FontMetricsEditingChanged += GlyphPane.SetMetricsEditing;
+
+            SetGlyphPaneVisible(Document.FontState.HasState);
+
+            // A document only becomes a font once, but it can do so after the host exists.
+            Document.FontChanged += () => DispatcherQueue.TryEnqueue(
+                () => SetGlyphPaneVisible(Document.FontState.HasState));
+        }
+
+        /// <summary>Whether the glyph list is showing beside the canvas.</summary>
+        public bool IsGlyphPaneVisible { get; private set; }
+
+        /// <summary>Shows or hides the glyph pane, collapsing its column and splitter with it.</summary>
+        public void SetGlyphPaneVisible(bool visible)
+        {
+            if (IsGlyphPaneVisible == visible) return;
+            IsGlyphPaneVisible = visible;
+
+            GlyphPaneBorder.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            GlyphSplitter.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            GlyphSplitterColumn.Width = new GridLength(visible ? 6 : 0);
+            GlyphColumn.Width = new GridLength(visible ? DefaultGlyphPaneWidth : 0);
+        }
+
+        /// <summary>Opens the glyph pane if it is closed, closes it if it is open.</summary>
+        public void ToggleGlyphPane() => SetGlyphPaneVisible(!IsGlyphPaneVisible);
 
         public CanvasDocument Document { get; }
 

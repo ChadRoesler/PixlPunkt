@@ -61,6 +61,16 @@
                     </uap:FileTypeAssociation>
                 </uap:Extension>
                 <uap:Extension Category="windows.fileTypeAssociation">
+                    <uap:FileTypeAssociation Name="pixlpunktfont">
+                        <uap:SupportedFileTypes>
+                            <uap:FileType ContentType="pixlpunkt/font">.pxpf</uap:FileType>
+                        </uap:SupportedFileTypes>
+                        <uap:DisplayName>PixlPunktFont</uap:DisplayName>
+                        <uap:Logo>Assets\Icons\pxpfFileIcon.png</uap:Logo>
+                        <uap:InfoTip>Pixl Punkt Font</uap:InfoTip>
+                    </uap:FileTypeAssociation>
+                </uap:Extension>
+                <uap:Extension Category="windows.fileTypeAssociation">
                     <uap:FileTypeAssociation Name="pixlpunktmarker">
                         <uap:SupportedFileTypes>
                             <uap:FileType ContentType="pixlpunkt/brush">.mkr</uap:FileType>

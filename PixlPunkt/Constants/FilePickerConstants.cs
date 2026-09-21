@@ -12,6 +12,13 @@ namespace PixlPunkt.Constants
         /// <summary>Native PixlPunkt document extension.</summary>
         public const string PixlPunktDocument = ".pxp";
 
+        /// <summary>
+        /// Pixel font documents. The same container as <see cref="PixlPunktDocument"/> with the
+        /// font section filled in, so either extension loads either file; this one exists so the
+        /// shell, the Open dialog and a folder listing can tell a font from a sprite sheet.
+        /// </summary>
+        public const string PixlPunktFont = ".pxpf";
+
         // ════════════════════════════════════════════════════════════════════
         // IMPORT FORMATS
         // ════════════════════════════════════════════════════════════════════
@@ -53,5 +60,6 @@ namespace PixlPunkt.Constants
 
         /// <summary>Description for PixlPunkt document type.</summary>
         public const string PixlPunktDocumentDescription = "PixlPunkt document";
+        public const string PixlPunktFontDescription = "PixlPunkt font";
     }
 }

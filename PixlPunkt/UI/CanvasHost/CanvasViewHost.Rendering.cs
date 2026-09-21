@@ -164,6 +164,8 @@ namespace PixlPunkt.UI.CanvasHost
             if (_showStageOverlay) DrawStageOverlay(renderer, dest);
 
             // Draw guides
+            DrawFontGuides(renderer, dest);   // baseline and cap height, font documents only
+
             DrawGuides(renderer, dest);
 
             DrawCanvasRulers(renderer, dest);   // only while the view is rotated

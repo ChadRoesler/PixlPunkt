@@ -109,6 +109,12 @@ namespace PixlPunkt.UI
             File_OpenRecent_Submenu.Items.Add(clear);
         }
 
+        /// <summary>
+        /// Opens a document from a path. Used by the shell when a file is double-clicked and by
+        /// the recent list; both want the same load, tab and recent-tracking behaviour.
+        /// </summary>
+        public Task OpenDocumentPathAsync(string path) => OpenRecentPathAsync(path);
+
         private async Task OpenRecentPathAsync(string path)
         {
             try

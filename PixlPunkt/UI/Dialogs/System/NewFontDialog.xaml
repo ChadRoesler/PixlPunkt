@@ -1,0 +1,53 @@
+<ContentDialog
+    x:Class="PixlPunkt.UI.Dialogs.NewFontDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="New Font"
+    PrimaryButtonText="Create"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="12" MinWidth="380">
+        <TextBox x:Name="FontName" Header="Font Name" PlaceholderText="MyFont" TextChanged="Input_Changed"/>
+
+        <TextBlock Text="Em Box (px)" FontWeight="SemiBold"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <NumberBox x:Name="EmW" Minimum="3" Maximum="128" Value="8" Width="100"
+                       SpinButtonPlacementMode="Hidden" ValueChanged="Size_Changed"/>
+            <TextBlock Text="×" VerticalAlignment="Center"/>
+            <NumberBox x:Name="EmH" Minimum="3" Maximum="128" Value="8" Width="100"
+                       SpinButtonPlacementMode="Hidden" ValueChanged="Size_Changed"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Drawing room" VerticalAlignment="Center"/>
+            <NumberBox x:Name="Overhang" Minimum="0" Maximum="16" Value="2" Width="100"
+                       SpinButtonPlacementMode="Hidden" ValueChanged="Size_Changed"/>
+            <TextBlock Text="px on every side" VerticalAlignment="Center" Opacity="0.6"/>
+        </StackPanel>
+        <TextBlock Text="Room to draw ink that reaches past a glyph's own body, for script faces and heavy accents. The em stays the design size."
+                   Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+
+        <TextBlock x:Name="CleanSizesText" Opacity="0.6" FontSize="11" TextWrapping="Wrap"/>
+
+        <ComboBox x:Name="CharSetCombo"
+                  Header="Characters"
+                  HorizontalAlignment="Stretch"
+                  SelectedIndex="0"
+                  SelectionChanged="CharSet_Changed">
+            <ComboBoxItem Content="Printable ASCII"/>
+            <ComboBoxItem Content="Uppercase and digits"/>
+            <ComboBoxItem Content="Letters and digits"/>
+            <ComboBoxItem Content="Custom"/>
+        </ComboBox>
+
+        <TextBox x:Name="CustomChars"
+                 Header="Custom characters"
+                 Visibility="Collapsed"
+                 TextChanged="Input_Changed"
+                 AcceptsReturn="False"/>
+
+        <CheckBox x:Name="MonospaceCheck" Content="Monospace (every glyph advances by the em width)"/>
+
+        <TextBlock x:Name="SheetInfo" Opacity="0.6" FontSize="11" TextWrapping="Wrap"/>
+    </StackPanel>
+</ContentDialog>

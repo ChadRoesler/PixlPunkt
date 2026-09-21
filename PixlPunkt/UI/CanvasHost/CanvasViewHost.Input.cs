@@ -341,6 +341,20 @@ namespace PixlPunkt.UI.CanvasHost
             // ════════════════════════════════════════════════════════════════════
             // SYMMETRY AXIS INTERACTION - drag axis lines (only when Symmetry tool is active)
             // ════════════════════════════════════════════════════════════════════
+            // Font baseline / cap-height guides sit on the canvas and are dragged directly.
+            if (FontGuides_TryHandlePointerPressed(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // Per-glyph spacing posts.
+            if (FontSpacing_TryHandlePointerPressed(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
             // On-canvas rulers (rotated view): drag a guide out of a band.
             if (CanvasRulers_TryHandlePointerPressed(e))
             {
@@ -582,6 +596,20 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
+            if (_fontGuideDrag != FontGuideKind.None)
+            {
+                FontGuides_HandlePointerMoved(e);
+                e.Handled = true;
+                return;
+            }
+
+            if (_fontSpacingDrag != FontSpacingKind.None)
+            {
+                FontSpacing_HandlePointerMoved(e);
+                e.Handled = true;
+                return;
+            }
+
             if (_canvasRulerDragActive)
             {
                 CanvasRulers_HandlePointerMoved(e);
@@ -639,7 +667,14 @@ namespace PixlPunkt.UI.CanvasHost
                 return;
             }
 
-            // 2. Guide interaction (highest priority when dragging)
+            // 2. Font guides read as draggable before anything else claims the cursor
+            if (FontGuides_TrySetHoverCursor(screenPos))
+            {
+                UpdateHover(screenPos);
+                return;
+            }
+
+            // 3. Guide interaction (highest priority when dragging)
             Guide_TryHandlePointerMoved(e);
             if (_isDraggingGuideOnCanvas)
             {
@@ -831,6 +866,20 @@ namespace PixlPunkt.UI.CanvasHost
             {
                 EndViewRotate();
                 _mainCanvas.ReleasePointerCaptures();
+                e.Handled = true;
+                return;
+            }
+
+            if (_fontGuideDrag != FontGuideKind.None)
+            {
+                FontGuides_HandlePointerReleased(e);
+                e.Handled = true;
+                return;
+            }
+
+            if (_fontSpacingDrag != FontSpacingKind.None)
+            {
+                FontSpacing_HandlePointerReleased(e);
                 e.Handled = true;
                 return;
             }
@@ -1148,6 +1197,7 @@ namespace PixlPunkt.UI.CanvasHost
 
             _hoverX = cx;
             _hoverY = cy;
+            UpdateFontFocusCell(cx, cy);
 
             int w = Document.Surface.Width;
             int h = Document.Surface.Height;

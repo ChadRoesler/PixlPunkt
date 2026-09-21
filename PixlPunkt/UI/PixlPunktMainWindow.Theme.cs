@@ -68,6 +68,7 @@ namespace PixlPunkt.UI
             if (PaletteCard != null) PaletteCard.RequestedTheme = theme;
             if (TilesCard != null) TilesCard.RequestedTheme = theme;
             if (LayersCard != null) LayersCard.RequestedTheme = theme;
+            if (HistoryCard != null) HistoryCard.RequestedTheme = theme;
 
             // Sync stripe theme if it follows app theme
             if (AppSettings.Instance.StripeTheme == StripeThemeChoice.System)

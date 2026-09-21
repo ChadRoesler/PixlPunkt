@@ -1,0 +1,123 @@
+<UserControl
+    x:Class="PixlPunkt.UI.Font.GlyphPanel"
+    x:Name="Self"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ic="using:FluentIcons.WinUI"
+    xmlns:skia="using:SkiaSharp.Views.Windows"
+    xmlns:ctrl="using:PixlPunkt.UI.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="Root" RowSpacing="4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Jump box and per-glyph commands -->
+        <Grid Grid.Row="0" ColumnSpacing="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="JumpBox"
+                     Grid.Column="0"
+                     PlaceholderText="Go to character"
+                     TextChanged="JumpBox_TextChanged"
+                     ToolTipService.ToolTip="Type a character to select it. U+1FAE reaches one the keyboard will not produce."/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                <ToggleButton x:Name="MetricsToolButton"
+                              Height="36" Width="36" Padding="2" CornerRadius="8"
+                              Checked="MetricsTool_Changed" Unchecked="MetricsTool_Changed"
+                              ToolTipService.ToolTip="Metrics tool: drag the baseline, cap height, origin and advance on the canvas. Turning it on puts the drawing tools down.">
+                    <ic:FluentIcon Icon="Ruler" FontSize="22"/>
+                </ToggleButton>
+                <Button x:Name="ResetSpacingButton" Height="36" Width="36" Padding="2" CornerRadius="8"
+                        Click="ResetSpacing_Click"
+                        ToolTipService.ToolTip="Return this glyph's spacing to automatic">
+                    <ic:FluentIcon Icon="ArrowReset" FontSize="22"/>
+                </Button>
+                <Button Height="36" Width="36" Padding="2" CornerRadius="8" Click="ZoomOut_Click"
+                        ToolTipService.ToolTip="Smaller cells">
+                    <ic:FluentIcon Icon="ZoomOut" FontSize="22"/>
+                </Button>
+                <Button Height="36" Width="36" Padding="2" CornerRadius="8" Click="ZoomIn_Click"
+                        ToolTipService.ToolTip="Larger cells">
+                    <ic:FluentIcon Icon="ZoomIn" FontSize="22"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock x:Name="StatusText" Grid.Row="1" Opacity="0.6" FontSize="11" TextWrapping="Wrap"/>
+
+        <Border Grid.Row="2"
+                x:Name="GlyphBox"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="4"
+                Margin="-3,0,-3,-3">
+
+            <ScrollViewer x:Name="GlyphScroll"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch">
+
+                <ItemsControl x:Name="GlyphGrid" MinHeight="48">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <ctrl:WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Width="{Binding GlyphCellSize, ElementName=Self}"
+                                  Margin="2"
+                                  Loaded="GlyphCell_Loaded"
+                                  Unloaded="GlyphCell_Unloaded">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" Height="{Binding GlyphCellSize, ElementName=Self}"
+                                      Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                                      CornerRadius="3">
+                                    <skia:SKXamlCanvas x:Name="GlyphCanvas"
+                                                       PaintSurface="GlyphCanvas_PaintSurface"/>
+
+                                    <Border x:Name="SelectionRing"
+                                            IsHitTestVisible="False"
+                                            CornerRadius="3"
+                                            BorderThickness="2"
+                                            BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                            Visibility="Collapsed"/>
+
+                                    <Border x:Name="HitOverlay"
+                                            Background="Transparent"
+                                            Tapped="GlyphCell_Tapped"/>
+                                </Grid>
+
+                                <TextBlock x:Name="GlyphLabel"
+                                           Grid.Row="1"
+                                           FontSize="14"
+                                           FontFamily="Consolas"
+                                           Margin="0,2,0,0"
+                                           HorizontalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>
