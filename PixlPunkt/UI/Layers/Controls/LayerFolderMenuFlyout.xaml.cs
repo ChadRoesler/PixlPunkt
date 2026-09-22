@@ -26,6 +26,9 @@ namespace PixlPunkt.UI.Layers.Controls
         /// <summary>Raised when "Remove Folder" is clicked.</summary>
         public event EventHandler<LayerFolder?>? RemoveRequested;
 
+        /// <summary>Raised to lift the folder out of whatever folder it currently sits in.</summary>
+        public event EventHandler<LayerFolder?>? MoveUpLevelRequested;
+
         /// <summary>
         /// Gets the MenuFlyout that can be assigned to a control's ContextFlyout.
         /// </summary>
@@ -52,6 +55,10 @@ namespace PixlPunkt.UI.Layers.Controls
             VisibleToggle.IsChecked = folder.Visible;
             LockedToggle.IsChecked = folder.Locked;
 
+            // A folder already at the top level has nowhere to go, so the entry is offered but dead
+            // rather than hidden, which keeps the menu the same shape wherever it is opened.
+            MoveUpLevelItem.IsEnabled = folder.Parent is not null;
+
             if (FolderMenuFlyout.XamlRoot == null)
             {
                 FolderMenuFlyout.XamlRoot = xamlRoot;
@@ -77,6 +84,9 @@ namespace PixlPunkt.UI.Layers.Controls
             }
             LockedToggled?.Invoke(this, TargetFolder);
         }
+
+        private void MoveUpLevel_Click(object sender, RoutedEventArgs e)
+            => MoveUpLevelRequested?.Invoke(this, TargetFolder);
 
         private void Duplicate_Click(object sender, RoutedEventArgs e)
             => DuplicateRequested?.Invoke(this, TargetFolder);

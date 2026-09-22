@@ -13,6 +13,8 @@
             <ToggleMenuFlyoutItem x:Name="VisibleToggle" Text="Visible" Click="Visible_Toggled"/>
             <ToggleMenuFlyoutItem x:Name="LockedToggle" Text="Locked" Click="Locked_Toggled"/>
             <MenuFlyoutSeparator/>
+            <MenuFlyoutItem x:Name="MoveUpLevelItem" Text="Move Up a Level" Click="MoveUpLevel_Click"/>
+            <MenuFlyoutSeparator/>
             <MenuFlyoutItem Text="Duplicate Folder" Click="Duplicate_Click"/>
             <MenuFlyoutItem Text="Flatten Folder" Click="FlattenFolder_Click"/>
             <MenuFlyoutSeparator/>

@@ -182,6 +182,29 @@ namespace PixlPunkt.UI.Layers
                 layer.UpdatePreview();
         }
 
+        /// <summary>
+        /// The scroll viewer inside the layers list, or null before it has been realised.
+        /// </summary>
+        private ScrollViewer? ListScroller =>
+            _listScroller ??= FindDescendant<ScrollViewer>(LayersList);
+
+        private ScrollViewer? _listScroller;
+
+        private static T? FindDescendant<T>(DependencyObject? from) where T : class
+        {
+            if (from is null) return null;
+
+            int count = VisualTreeHelper.GetChildrenCount(from);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(from, i);
+                if (child is T match) return match;
+                if (FindDescendant<T>(child) is { } deeper) return deeper;
+            }
+
+            return null;
+        }
+
         private void RebuildFromDoc()
         {
             // CRITICAL: NEVER rebuild during drag operations!
@@ -190,6 +213,11 @@ namespace PixlPunkt.UI.Layers
                 _needsRebuildAfterDrag = true;
                 return;
             }
+
+            // Rebuilding empties the list and fills it again, which sends the view back to the top.
+            // Renaming a layer does that for a change that moved nothing, and on a long list it
+            // loses your place entirely, so the offset is put back afterwards.
+            double scrollOffset = ListScroller?.VerticalOffset ?? 0;
 
             if (_doc is null)
             {
@@ -229,6 +257,20 @@ namespace PixlPunkt.UI.Layers
 
             ForcePreviewRefreshAll();
             UpdateUiEnabled();
+
+            RestoreScroll(scrollOffset);
+        }
+
+        /// <summary>
+        /// Puts the scroll position back after a rebuild, once the list has been laid out again.
+        /// </summary>
+        private void RestoreScroll(double offset)
+        {
+            if (offset <= 0) return;
+
+            DispatcherQueue?.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () => ListScroller?.ChangeView(null, offset, null, true));
         }
 
         private void AddFolderChildrenToUI(LayerFolder folder)
@@ -400,10 +442,30 @@ namespace PixlPunkt.UI.Layers
             _ = e;
         }
 
+        /// <summary>
+        /// What is picked in the panel, split into the two cases that decide where a new item goes:
+        /// a folder to go inside, or a layer to go above.
+        /// </summary>
+        /// <remarks>
+        /// Picked is not the same as active. The active layer wears the pill and is where painting
+        /// lands; picking is a deliberate act and so it wins when deciding placement.
+        /// </remarks>
+        private (LayerFolder? Into, LayerBase? Above) PickedTarget()
+        {
+            return LayersList.SelectedItem switch
+            {
+                LayerFolder folder => (folder, null),
+                LayerBase layer => (null, layer),
+                _ => (null, null),
+            };
+        }
+
         private void Add_Click(object sender, RoutedEventArgs e)
         {
             if (_doc is null) return;
-            _doc.AddLayer();
+
+            var (into, above) = PickedTarget();
+            _doc.AddLayer(into: into, above: above);
             RebuildFromDoc();
             RevealItem(_doc.ActiveLayer);
         }
@@ -411,9 +473,9 @@ namespace PixlPunkt.UI.Layers
         private void AddFolder_Click(object sender, RoutedEventArgs e)
         {
             if (_doc is null) return;
-            // A selected folder becomes the parent; otherwise the active layer's parent (or root).
-            var into = LayersList.SelectedItem as LayerFolder;
-            var folder = _doc.AddFolder(into: into);
+
+            var (into, above) = PickedTarget();
+            var folder = _doc.AddFolder(into: into, above: above);
             RebuildFromDoc();
             RevealItem(folder);
         }
@@ -649,6 +711,7 @@ namespace PixlPunkt.UI.Layers
                     flyout.LockedToggled += OnFolderLockedToggled;
                     flyout.DuplicateRequested += OnDuplicateFolder;
                     flyout.FlattenFolderRequested += OnFlattenFolder;
+                    flyout.MoveUpLevelRequested += OnMoveFolderUpLevel;
                     flyout.RemoveRequested += OnRemoveFolder;
                     flyout.ShowAt(element, folder, xamlRoot);
                 }

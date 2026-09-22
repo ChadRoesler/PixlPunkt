@@ -519,7 +519,24 @@ namespace PixlPunkt.Core.Document
             RaiseStructureChanged();
         }
 
-        public int AddLayer(string? name = null, int? insertAt = null)
+        /// <summary>
+        /// Creates a raster layer.
+        /// </summary>
+        /// <param name="name">The layer name, or null for the next automatic one.</param>
+        /// <param name="insertAt">An explicit index, or null to work it out from the other arguments.</param>
+        /// <param name="into">
+        /// A folder to put the layer inside, being the folder picked in the layers panel.
+        /// </param>
+        /// <param name="above">
+        /// A layer to put the new one directly above, being the layer picked in the panel.
+        /// </param>
+        /// <remarks>
+        /// Picked and active are not the same thing. The active layer is where painting lands and
+        /// carries the pill; the picked one is whatever is highlighted in the panel. A new layer
+        /// follows what was picked, because that is the deliberate choice, and falls back to the
+        /// active layer's parent only when nothing is picked.
+        /// </remarks>
+        public int AddLayer(string? name = null, int? insertAt = null, LayerFolder? into = null, LayerBase? above = null)
         {
             RaiseBeforeStructureChanged();
 
@@ -527,16 +544,11 @@ namespace PixlPunkt.Core.Document
             var layer = new RasterLayer(PixelWidth, PixelHeight, nm);
             HookLayer(layer);
 
-            // Determine target folder based on active layer's parent
-            var activeLayer = ActiveLayer;
-            LayerFolder? targetFolder = activeLayer?.Parent;
+            var (targetFolder, resolvedIndex) = ResolveInsertion(insertAt, into, above);
 
             if (targetFolder != null)
             {
-                // Insert into the same folder as the active layer, after the active layer
-                int activeIdx = targetFolder.IndexOfChild(activeLayer!);
-                int insertIdx = insertAt ?? (activeIdx + 1);
-                insertIdx = Math.Clamp(insertIdx, 0, targetFolder.Children.Count);
+                int insertIdx = Math.Clamp(resolvedIndex, 0, targetFolder.Children.Count);
                 targetFolder.InsertChild(insertIdx, layer);
 
                 // Push to unified history with folder context
@@ -545,8 +557,7 @@ namespace PixlPunkt.Core.Document
             else
             {
                 // Insert at root level
-                int at = insertAt ?? (_active + 1);
-                at = Math.Clamp(at, 0, _rootItems.Count);
+                int at = Math.Clamp(resolvedIndex, 0, _rootItems.Count);
                 _rootItems.Insert(at, layer);
 
                 // Push to unified history
@@ -561,6 +572,35 @@ namespace PixlPunkt.Core.Document
             ActiveLayerChanged?.Invoke();
             RaiseStructureChanged();
             return _active;
+        }
+
+        /// <summary>
+        /// Works out which folder a new item belongs in and at what index.
+        /// </summary>
+        /// <remarks>
+        /// The order of preference is the whole feature: a picked folder means inside it, a picked
+        /// layer means directly above that layer, and only with nothing picked does it fall back to
+        /// following the active layer.
+        /// </remarks>
+        private (LayerFolder? Folder, int Index) ResolveInsertion(int? insertAt, LayerFolder? into, LayerBase? above)
+        {
+            if (into is not null)
+                return (into, insertAt ?? into.Children.Count);
+
+            if (above is not null)
+            {
+                var parent = above.Parent;
+                int index = parent is not null ? parent.IndexOfChild(above) : _rootItems.IndexOf(above);
+                return (parent, insertAt ?? (index + 1));
+            }
+
+            var activeLayer = ActiveLayer;
+            var activeParent = activeLayer?.Parent;
+
+            if (activeParent is not null)
+                return (activeParent, insertAt ?? (activeParent.IndexOfChild(activeLayer!) + 1));
+
+            return (null, insertAt ?? (_active + 1));
         }
 
         /// <summary>
@@ -582,13 +622,13 @@ namespace PixlPunkt.Core.Document
         }
 
         /// <summary>
-        /// Creates a new folder. With <paramref name="into"/> the folder goes inside that
-        /// folder (the one selected in the layers panel); otherwise, if the active layer is
-        /// inside a folder, the new folder is created inside that same parent folder, and
-        /// otherwise at root level. Within the parent it lands just above the active layer when
-        /// that layer is a direct child, else on top.
+        /// Creates a new folder, placed the same way a new layer is: inside
+        /// <paramref name="into"/> when a folder is picked in the panel, directly above
+        /// <paramref name="above"/> when a layer is picked, and otherwise following the active
+        /// layer's parent.
         /// </summary>
-        public LayerFolder AddFolder(string? name = null, int? insertAt = null, LayerFolder? into = null)
+        public LayerFolder AddFolder(
+            string? name = null, int? insertAt = null, LayerFolder? into = null, LayerBase? above = null)
         {
             RaiseBeforeStructureChanged();
 
@@ -596,15 +636,11 @@ namespace PixlPunkt.Core.Document
             var folder = new LayerFolder(nm);
             HookLayer(folder);
 
-            var activeLayer = ActiveLayer;
-            LayerFolder? targetFolder = into ?? activeLayer?.Parent;
+            var (targetFolder, resolvedIndex) = ResolveInsertion(insertAt, into, above);
 
             if (targetFolder != null)
             {
-                int insertIdx = insertAt ?? (activeLayer != null && activeLayer.Parent == targetFolder
-                    ? targetFolder.IndexOfChild(activeLayer) + 1
-                    : targetFolder.Children.Count);
-                insertIdx = Math.Clamp(insertIdx, 0, targetFolder.Children.Count);
+                int insertIdx = Math.Clamp(resolvedIndex, 0, targetFolder.Children.Count);
                 targetFolder.InsertChild(insertIdx, folder);
 
                 // Push to unified history with folder context
@@ -613,8 +649,7 @@ namespace PixlPunkt.Core.Document
             else
             {
                 // Insert at root level
-                int at = insertAt ?? _rootItems.Count;
-                at = Math.Clamp(at, 0, _rootItems.Count);
+                int at = Math.Clamp(resolvedIndex, 0, _rootItems.Count);
                 _rootItems.Insert(at, folder);
 
                 // Push to unified history
@@ -645,6 +680,29 @@ namespace PixlPunkt.Core.Document
             LayersChanged?.Invoke();
             RaiseStructureChanged();
             return folder;
+        }
+
+        /// <summary>
+        /// Moves an item out of the folder it is in and into whatever contains that folder, landing
+        /// directly above it.
+        /// </summary>
+        /// <remarks>
+        /// Dragging a folder out of a deep nest means dragging it past everything inside it, which
+        /// is a long way in a document with many layers. This does the same move in one step.
+        /// </remarks>
+        /// <param name="item">The layer or folder to lift.</param>
+        /// <returns>False when it is already at the top level and has nowhere to go.</returns>
+        public bool MoveOutOfParent(LayerBase item)
+        {
+            if (item?.Parent is not { } parent) return false;
+
+            var grandparent = parent.Parent;
+            int parentIndex = grandparent is not null
+                ? grandparent.IndexOfChild(parent)
+                : _rootItems.IndexOf(parent);
+
+            MoveLayerToFolder(item, grandparent, parentIndex + 1);
+            return true;
         }
 
         /// <summary>

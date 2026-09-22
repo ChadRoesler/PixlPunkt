@@ -45,6 +45,7 @@ namespace PixlPunkt.UI.Layers
             FolderMenuFlyout.LockedToggled += OnFolderLockedToggled;
             FolderMenuFlyout.DuplicateRequested += OnDuplicateFolder;
             FolderMenuFlyout.FlattenFolderRequested += OnFlattenFolder;
+            FolderMenuFlyout.MoveUpLevelRequested += OnMoveFolderUpLevel;
             FolderMenuFlyout.RemoveRequested += OnRemoveFolder;
 
             // Reference layer flyout
@@ -289,6 +290,29 @@ namespace PixlPunkt.UI.Layers
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LayersPanel] OnFlattenFolder error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Lifts a folder out of the folder containing it, landing just above it.
+        /// </summary>
+        /// <remarks>
+        /// The alternative is dragging it past everything nested inside it, which on a long list is
+        /// most of the panel.
+        /// </remarks>
+        private void OnMoveFolderUpLevel(object? sender, LayerFolder? folder)
+        {
+            try
+            {
+                if (_doc == null || folder == null) return;
+                if (!_doc.MoveOutOfParent(folder)) return;
+
+                RebuildFromDoc();
+                RevealItem(folder);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LayersPanel] OnMoveFolderUpLevel error: {ex.Message}");
             }
         }
 
