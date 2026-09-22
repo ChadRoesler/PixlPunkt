@@ -269,6 +269,7 @@
                     <MenuFlyoutItem Text="Preview Font…" Click="Font_Preview_Click"/>
                     <MenuFlyoutSeparator/>
                     <MenuFlyoutItem Text="Export Sprite Sheet…" Click="Font_ExportSheet_Click"/>
+                    <MenuFlyoutItem Text="Export TrueType Font…" Click="Font_ExportTtf_Click"/>
                 </MenuBarItem>
                 <MenuBarItem Title="Settings">
                     <MenuFlyoutItem Text="Configure…" Click="OpenSettings_Click"/>

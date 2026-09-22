@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -105,6 +106,62 @@ namespace PixlPunkt.UI
                     string metricsPath = Path.ChangeExtension(file.Path, ".fnt");
                     File.WriteAllText(metricsPath, FontExportOps.BuildBMFont(doc, options));
                 }
+            }
+            catch (Exception ex)
+            {
+                await ShowFontMessageAsync("Export failed", ex.Message);
+            }
+        }
+
+        private async void Font_ExportTtf_Click(object sender, RoutedEventArgs e) => await ExportFontTtfAsync();
+
+        /// <summary>
+        /// Writes the font out as a TrueType file that can be installed and used anywhere.
+        /// </summary>
+        /// <remarks>
+        /// There is no size to choose. The outlines are the pixels, and the units per em is set to
+        /// an exact multiple of the pixel grid, so the font is crisp at every whole multiple of the
+        /// em and nowhere else. Offering a size here would only imply otherwise.
+        /// </remarks>
+        private async Task ExportFontTtfAsync()
+        {
+            var doc = CurrentHost?.Document;
+            if (doc is null || !doc.FontState.HasState) return;
+
+            if (doc.FontState.Glyphs.Count == 0)
+            {
+                await ShowFontMessageAsync("Nothing to export", "This font has no characters mapped yet.");
+                return;
+            }
+
+            var dialog = new FontTtfExportDialog(doc) { XamlRoot = MainXamlRoot };
+            if (await ShowDialogGuardedAsync(dialog) != ContentDialogResult.Primary) return;
+
+            string family = dialog.FamilyName;
+            string style = dialog.StyleName;
+            var strikes = dialog.StrikeScales;
+
+            var picker = WindowHost.CreateFileSavePicker(this, SafeFileName(family), ".ttf");
+            var file = await picker.PickSaveFileAsync();
+            if (file is null) return;
+
+            try
+            {
+                var options = new TrueTypeOptions(family, style, 1024, strikes);
+                File.WriteAllBytes(file.Path, TrueTypeWriter.Build(doc, options));
+
+                int em = FontMetricsOps.EmHeightOf(doc);
+                string embedded = strikes.Count == 0
+                    ? "No sizes were embedded, so every size is drawn from the outlines."
+                    : "Embedded as pictures at " +
+                      string.Join(", ", strikes.Select(scale => $"{em * scale} px")) + ".";
+
+                await ShowFontMessageAsync(
+                    "Exported",
+                    $"{doc.FontState.Glyphs.Count} glyphs written at {FontOutlineOps.UnitsPerEm(em)} " +
+                    $"units per em, which is {em} pixels exactly. Crisp at " +
+                    $"{string.Join(", ", FontMetricsOps.CleanSizes(doc))} px and other whole multiples " +
+                    $"of the em. {embedded}");
             }
             catch (Exception ex)
             {

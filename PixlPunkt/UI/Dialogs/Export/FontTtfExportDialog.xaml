@@ -1,0 +1,28 @@
+<ContentDialog
+    x:Class="PixlPunkt.UI.Dialogs.FontTtfExportDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Export TrueType Font"
+    PrimaryButtonText="Export"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="12" MinWidth="420">
+        <TextBox x:Name="FamilyBox" Header="Family name"/>
+        <TextBox x:Name="StyleBox" Header="Style"/>
+
+        <TextBlock Text="Embedded sizes" FontWeight="SemiBold" Margin="0,4,0,0"/>
+        <TextBlock Text="At an embedded size the reader uses a stored picture instead of drawing the outline, so it comes out exactly as painted whatever the program does. Other sizes still render from the outline."
+                   Opacity="0.6" FontSize="11" TextWrapping="Wrap"/>
+
+        <ItemsControl x:Name="StrikeList">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+        </ItemsControl>
+
+        <TextBlock x:Name="SummaryText" Opacity="0.6" FontSize="11" TextWrapping="Wrap"/>
+    </StackPanel>
+</ContentDialog>

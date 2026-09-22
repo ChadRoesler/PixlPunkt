@@ -7187,6 +7187,90 @@
             usable range. Anything else renders with uneven stems however the font is built.
             </summary>
         </member>
+        <member name="T:PixlPunkt.Core.Document.OutlinePoint">
+            <summary>A point on a glyph outline, in font units with the origin on the baseline.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.OutlinePoint.#ctor(System.Int32,System.Int32)">
+            <summary>A point on a glyph outline, in font units with the origin on the baseline.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.FontOutlineOps">
+             <summary>
+             Turns a glyph's pixels into outlines: the boundary of the filled area, following pixel edges
+             exactly, with no curve fitting of any kind.
+             </summary>
+             <remarks>
+             Fitting curves to a pixel font would be a betrayal of it. Every edge here is a straight line
+             along a whole pixel boundary, so a stem is exactly as wide as it was drawn and stays that way
+             at any whole multiple of the em.
+            
+             The boundary is found by cancellation rather than by walking pixels: every filled pixel
+             contributes its four edges, and an edge shared by two filled pixels is traversed once in each
+             direction and cancels out. What remains is the outline, and holes come out of it with the
+             opposite winding without needing to be looked for.
+             </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.ChooseUnitsPerPixel(System.Int32,System.Int32)">
+            <summary>
+            How many font units one pixel becomes, chosen so the em lands on a whole number near the
+            target. Getting this exact is the difference between crisp output and the uneven stems
+            that come of an em the pixel grid does not divide.
+            </summary>
+            <param name="emHeightPixels">The em box height in pixels.</param>
+            <param name="target">The units per em to aim for; 1024 is the usual choice.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.UnitsPerEm(System.Int32,System.Int32)">
+            <summary>Units per em that follows from the pixel grid, always an exact multiple of it.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.MaskOfCell(PixlPunkt.Core.Document.CanvasDocument,System.Int32)">
+            <summary>Which pixels of a glyph's cell have any ink, row-major.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.Trace(System.Boolean[],System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Traces a pixel mask into closed contours in font units.
+            </summary>
+            <param name="mask">Filled pixels, row-major, top row first.</param>
+            <param name="width">Mask width in pixels.</param>
+            <param name="height">Mask height in pixels.</param>
+            <param name="unitsPerPixel">Font units per pixel.</param>
+            <param name="baselineRow">The pixel row the baseline sits on; it becomes y of zero.</param>
+            <param name="originColumn">The pixel column the pen sits on; it becomes x of zero.</param>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.TraceGlyph(PixlPunkt.Core.Document.CanvasDocument,System.Int32,System.Int32)">
+            <summary>Traces one character of a font document.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.ChainIntoLoops(System.Collections.Generic.HashSet{System.ValueTuple{System.ValueTuple{System.Int32,System.Int32},System.ValueTuple{System.Int32,System.Int32}}})">
+            <summary>
+            Joins the loose boundary edges into closed loops.
+            </summary>
+            <remarks>
+            Where two pixels meet only at a corner, four edges arrive at one point and the walk has a
+            choice. It always takes the sharpest right turn, which keeps the two pixels as separate
+            loops rather than pinching them into one that crosses itself.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.PickNext(System.Collections.Generic.Dictionary{System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32}}},System.ValueTuple{System.ValueTuple{System.Int32,System.Int32},System.ValueTuple{System.Int32,System.Int32}})">
+            <summary>The next edge to walk: sharpest right turn first, then straight on, then left.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.Simplify(System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32}})">
+            <summary>Drops points that only continue a straight run, which most of them do.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.ToFontUnits(System.Collections.Generic.List{System.ValueTuple{System.Int32,System.Int32}},System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Moves a loop into font units, y upward from the baseline.
+            </summary>
+            <remarks>
+            The order is left alone. Each pixel is walked clockwise while reading the grid downward,
+            and turning y upward reverses that on its own, which lands on the clockwise outer winding
+            TrueType fills. Reversing here as well would put every contour back the wrong way round,
+            and a font whose outers are wound like holes renders as nothing at all.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontOutlineOps.SignedArea(System.Collections.Generic.IReadOnlyList{PixlPunkt.Core.Document.OutlinePoint})">
+            <summary>
+            Twice the signed area of a contour. Negative is clockwise with y upward, which is what an
+            outer contour should be; a hole comes back positive.
+            </summary>
+        </member>
         <member name="T:PixlPunkt.Core.Document.GlyphAnchor">
             <summary>Where the old cell's pixels sit inside the new one when the cell size changes.</summary>
         </member>
@@ -7315,6 +7399,81 @@
             <summary>
             Rewrites the mapping so the characters land in their new cells, carries each glyph's
             spacing across by the anchor offset, and moves the guides with the ink.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.GlyphStrikeBitmap">
+            <summary>One character drawn at one size, as a one bit per pixel image.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.GlyphStrikeBitmap.Codepoint">
+            <summary>The character this is a picture of.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.GlyphStrikeBitmap.Width">
+            <summary>Width of the image in output pixels; zero when the character is blank.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.GlyphStrikeBitmap.Height">
+            <summary>Height of the image in output pixels; zero when the character is blank.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.GlyphStrikeBitmap.BearingX">
+            <summary>Left edge of the image measured from the pen.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.GlyphStrikeBitmap.BearingY">
+            <summary>Top edge of the image measured up from the baseline.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.GlyphStrikeBitmap.Advance">
+            <summary>How far the pen moves after drawing it.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.GlyphStrikeBitmap.Rows">
+            <summary>Rows of pixels, most significant bit first, each row padded out to a whole byte.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.FontStrike">
+            <summary>Every character of a font drawn at one particular size.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.FontStrike.PixelsPerEm">
+            <summary>The size this strike is for, in pixels per em.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.FontStrike.Scale">
+            <summary>Output pixels per drawn pixel.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.FontStrike.Ascender">
+            <summary>Baseline to the top of the em, in output pixels.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.FontStrike.Descender">
+            <summary>Baseline to the bottom of the em, in output pixels, as a positive number.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.FontStrike.MaxAdvance">
+            <summary>The widest advance in the strike.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.FontStrike.Glyphs">
+            <summary>The characters, in codepoint order.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.FontStrikeOps">
+             <summary>
+             Draws a font at a fixed size as bitmaps, for embedding in a font file alongside the outlines.
+             </summary>
+             <remarks>
+             A pixel font whose outlines already land on the grid should rasterise cleanly on its own, but
+             only if whatever is drawing it grid-fits the way it was asked to. A strike removes the doubt:
+             at that size the reader uses the picture and there is nothing left to get wrong.
+            
+             The sizes on offer are whole multiples of the em, for the same reason as everywhere else.
+             </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontStrikeOps.CanBuild(PixlPunkt.Core.Document.CanvasDocument,System.Int32)">
+            <summary>
+            The fields a strike is stored in are single bytes, so a size that would overflow any of
+            them cannot be built. This is what rules out the very large multiples.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontStrikeOps.AvailableScales(PixlPunkt.Core.Document.CanvasDocument,System.Int32)">
+            <summary>The multiples of the em that can be built as strikes, smallest first.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontStrikeOps.Build(PixlPunkt.Core.Document.CanvasDocument,System.Int32)">
+            <summary>Draws every mapped character at the given multiple of the em.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.FontStrikeOps.BuildGlyph(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Document.GlyphSummary,System.Int32)">
+            <summary>
+            Draws one character. The image covers the ink and nothing else, because a strike that
+            stored whole cells would carry the overhang room of every blank margin with it.
             </summary>
         </member>
         <member name="T:PixlPunkt.Core.Document.ForeignDocumentImporter">
@@ -8658,6 +8817,115 @@
         </member>
         <member name="P:PixlPunkt.Core.Document.RecentDocumentsService.StoragePath">
             <summary>Where the MRU list is persisted.</summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.TrueTypeOptions">
+            <summary>What goes into a TrueType file beyond the glyphs themselves.</summary>
+            <param name="FamilyName">The family name, as shown in a font menu.</param>
+            <param name="StyleName">The style, normally "Regular".</param>
+            <param name="UnitsPerEmTarget">The units per em to aim for; the real value is a multiple of the pixel grid.</param>
+            <param name="StrikeScales">
+            Multiples of the em to embed as bitmaps, or null for none. At those sizes a reader uses the
+            picture rather than rasterising the outline, so there is nothing left to get wrong.
+            </param>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeOptions.#ctor(System.String,System.String,System.Int32,System.Collections.Generic.IReadOnlyList{System.Int32})">
+            <summary>What goes into a TrueType file beyond the glyphs themselves.</summary>
+            <param name="FamilyName">The family name, as shown in a font menu.</param>
+            <param name="StyleName">The style, normally "Regular".</param>
+            <param name="UnitsPerEmTarget">The units per em to aim for; the real value is a multiple of the pixel grid.</param>
+            <param name="StrikeScales">
+            Multiples of the em to embed as bitmaps, or null for none. At those sizes a reader uses the
+            picture rather than rasterising the outline, so there is nothing left to get wrong.
+            </param>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.TrueTypeOptions.FamilyName">
+            <summary>The family name, as shown in a font menu.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.TrueTypeOptions.StyleName">
+            <summary>The style, normally "Regular".</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.TrueTypeOptions.UnitsPerEmTarget">
+            <summary>The units per em to aim for; the real value is a multiple of the pixel grid.</summary>
+        </member>
+        <member name="P:PixlPunkt.Core.Document.TrueTypeOptions.StrikeScales">
+            <summary>
+            Multiples of the em to embed as bitmaps, or null for none. At those sizes a reader uses the
+            picture rather than rasterising the outline, so there is nothing left to get wrong.
+            </summary>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.TrueTypeWriter">
+             <summary>
+             Writes a pixel font out as a TrueType file.
+             </summary>
+             <remarks>
+             Two things here are what make the result crisp rather than merely correct. The units per em
+             is an exact multiple of the pixel grid, so a pixel is a whole number of font units and never
+             lands between them. And a gasp table asks for grid fitting without grey, which stops a
+             rasteriser anti-aliasing edges that were drawn as hard pixels.
+            
+             Outlines are straight lines along pixel boundaries with every point on curve. No curve
+             fitting is attempted and none should be.
+             </remarks>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.TrueTypeWriter.Glyph">
+            <summary>One glyph ready to be written: its outline and the advance that goes with it.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.Build(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Document.TrueTypeOptions@)">
+            <summary>Builds the whole font file.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.AddStrikes(PixlPunkt.Core.Document.CanvasDocument,PixlPunkt.Core.Document.TrueTypeOptions@,System.Int32,System.Collections.Generic.Dictionary{System.String,System.Byte[]})">
+            <summary>
+            Builds the embedded bitmap tables, if any sizes were asked for.
+            </summary>
+            <remarks>
+            The pair is EBLC, which says where every picture is and how it sits against the
+            baseline, and EBDT, which holds the pictures. They are written together or not at all:
+            one without the other describes a font that cannot be drawn.
+            </remarks>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.CollectGlyphs(PixlPunkt.Core.Document.CanvasDocument,System.Int32)">
+            <summary>Traces every mapped character, in codepoint order, which becomes glyph order.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.WriteCoordinates(PixlPunkt.Core.Document.TrueTypeWriter.BigEndianWriter,PixlPunkt.Core.Document.TrueTypeWriter.Glyph,System.Boolean)">
+            <summary>Coordinates are stored as differences from the previous point, not absolutes.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.BuildCmapFormat4(System.Collections.Generic.List{PixlPunkt.Core.Document.TrueTypeWriter.Glyph})">
+            <summary>Segments of consecutive characters that also have consecutive glyph numbers.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.LongDateTime">
+            <summary>
+            The current time in the form a font file wants it: seconds since the start of 1904.
+            Left at zero, readers report the font as damaged and guess at a unix timestamp instead.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.BuildGasp">
+            <summary>
+            Asks for grid fitting without grey, at every size. This is the table that stops a
+            rasteriser softening edges that were drawn as hard pixels.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.WriteChecksumAdjustment(System.Byte[],System.Collections.Generic.List{System.ValueTuple{System.String,System.Int32,System.Int32}})">
+            <summary>
+            The head table carries a number that makes the whole file sum to a fixed value, so it can
+            only be worked out once every other byte is in place.
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.Checksum(System.Byte[])">
+            <summary>Sums the data as big-endian words, treating anything past the end as zero.</summary>
+        </member>
+        <member name="M:PixlPunkt.Core.Document.TrueTypeWriter.BuildEmbeddedBitmaps(System.Collections.Generic.List{PixlPunkt.Core.Document.FontStrike},System.Int32)">
+            <summary>
+            Writes the location and data tables for every strike.
+            </summary>
+            <remarks>
+            Each strike covers the whole glyph range in one block, using index format 1, which stores
+            an offset per glyph and so lets a blank character take no space by sharing the offset of
+            the next one. Image format 1 pairs small metrics with rows padded to whole bytes, which
+            costs a few bits per row and removes all the bit shifting the packed form would need.
+            </remarks>
+        </member>
+        <member name="T:PixlPunkt.Core.Document.TrueTypeWriter.BigEndianWriter">
+            <summary>Everything in a font file is big-endian, which no BinaryWriter does by default.</summary>
         </member>
         <member name="T:PixlPunkt.Core.Document.VoxelFaceColorOverride">
             <summary>
@@ -33922,6 +34190,42 @@
             GetBindingConnector(int connectionId, object target)
             </summary>
         </member>
+        <member name="T:PixlPunkt.UI.Dialogs.FontTtfExportDialog">
+            <summary>
+            Collects what a TrueType export needs: the names to record, and which sizes to embed as
+            pictures alongside the outlines.
+            </summary>
+            <remarks>
+            There is no size to choose for the font itself. The outlines are the pixels and the units per
+            em is an exact multiple of the pixel grid, so it is crisp at every whole multiple of the em
+            and nowhere else. The embedded sizes are a belt-and-braces measure on top of that, for
+            readers that do not grid-fit the way they were asked to.
+            </remarks>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.FontTtfExportDialog.FamilyName">
+            <summary>The family name to record.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.FontTtfExportDialog.StyleName">
+            <summary>The style to record.</summary>
+        </member>
+        <member name="P:PixlPunkt.UI.Dialogs.FontTtfExportDialog.StrikeScales">
+            <summary>The multiples of the em that were ticked.</summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.FontTtfExportDialog.InitializeComponent">
+            <summary>
+            InitializeComponent()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.FontTtfExportDialog.Connect(System.Int32,System.Object)">
+            <summary>
+            Connect()
+            </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.Dialogs.FontTtfExportDialog.GetBindingConnector(System.Int32,System.Object)">
+            <summary>
+            GetBindingConnector(int connectionId, object target)
+            </summary>
+        </member>
         <member name="T:PixlPunkt.UI.Dialogs.Import.ImageImportDialog">
             <summary>
             Dialog for importing images with tile-based canvas configuration.
@@ -36157,6 +36461,16 @@
             Writes the font out as a sprite sheet, and as BMFont metrics beside it when asked. The
             metrics take the image's own file name, so the pair stays linked wherever it is moved.
             </summary>
+        </member>
+        <member name="M:PixlPunkt.UI.PixlPunktMainWindow.ExportFontTtfAsync">
+            <summary>
+            Writes the font out as a TrueType file that can be installed and used anywhere.
+            </summary>
+            <remarks>
+            There is no size to choose. The outlines are the pixels, and the units per em is set to
+            an exact multiple of the pixel grid, so the font is crisp at every whole multiple of the
+            em and nowhere else. Offering a size here would only imply otherwise.
+            </remarks>
         </member>
         <member name="M:PixlPunkt.UI.PixlPunktMainWindow.SafeFileName(System.String)">
             <summary>Strips whatever a file name cannot hold, so a face name can be used as one.</summary>
