@@ -23,6 +23,10 @@ Welcome to the **PixlPunkt Wiki** - the deep dive documentation for everything y
 - [[Voxel Workspace|Voxel-Workspace]] - Build and edit voxel models from tile faces
 - [[Voxel Tools|Voxel-Tools]] - Face paint, voxel edit, lighting, and viewport controls
 
+### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/grid_20.png" width="20"> Fonts
+- [[Font Editor|Font-Editor]] - Draw, space, and preview a pixel font
+- [[Font Export|Font-Export]] - Sprite sheets, BMFont metrics, and installable TrueType files
+
 ### <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/play_20.png" width="20"> Animation
 - [[Canvas Animation|Canvas-Animation]] - Frame-by-frame animation
 - [[Tile Animation|Tile-Animation]] - Sprite sheet animation

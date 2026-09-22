@@ -29,7 +29,40 @@ The native format preserves everything:
 | `.pxp` | Full project |
 | `.pxpt` | Project template |
 | `.pxpr` | Tile animation reel |
+| `.pxpf` | Pixel font |
 | `.pbx` | Custom brush |
+
+---
+
+## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/grid_16.png" width="16"> Font Formats
+
+### PixlPunkt Font (.pxpf)
+
+**Extension:** `.pxpf`
+
+A pixel font: the same container as a project, with the font's own information alongside.
+
+- Every glyph, drawn on a sheet of cells
+- Which character each cell stands for
+- The em box and the drawing room around it
+- Baseline and cap height
+- Per-glyph spacing, whether fitted automatically or set by hand
+
+Double-clicking a `.pxpf` opens it with the font tooling already in place. See [[Font Editor|Font-Editor]].
+
+### Font Exports
+
+| Format | What It Is | Read By |
+|--------|------------|---------|
+| `.png` + `.fnt` | Sprite sheet with BMFont metrics | Most game engines and frameworks |
+| `.ttf` | Installable TrueType font | Anything that uses fonts |
+
+Both are written from the **Font** menu. A TrueType export can also carry chosen sizes as embedded
+pictures, so those sizes come out exactly as painted whatever is drawing them.
+
+> **A pixel font is crisp at whole multiples of its em, and nowhere else.** An 8 pixel em is sharp at
+> 8, 16, 24 and so on. A size in between has to stretch a design drawn on a grid, so some stems come
+> out wider than others. No export setting changes this. See [[Font Export|Font-Export]].
 
 ---
 
