@@ -119,7 +119,13 @@ namespace PixlPunkt.Core.Document.Layer
         public LayerFolder? Parent
         {
             get => _parent;
-            internal set { if (value == _parent) return; _parent = value; OnPropertyChanged(); }
+            internal set
+            {
+                if (value == _parent) return;
+                _parent = value;
+                OnPropertyChanged();
+                NotifyDepthChanged();
+            }
         }
 
         /// <summary>
@@ -211,6 +217,26 @@ namespace PixlPunkt.Core.Document.Layer
         /// when called from a property setter using <c>[CallerMemberName]</c> attribute.</param>
         protected void OnPropertyChanged([CallerMemberName] string? p = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(p));
+
+        /// <summary>
+        /// Announces that <see cref="Depth"/> has changed, here and for everything below.
+        /// </summary>
+        /// <remarks>
+        /// Depth is computed by walking up to the root, so moving one folder changes it for every
+        /// descendant, and not one of those descendants has a property change of its own to notice
+        /// it by. Without this the layers panel keeps a row's old indentation after it moves into a
+        /// folder, because the row is still the same object in the same container and nothing told
+        /// its binding to look again.
+        /// </remarks>
+        private void NotifyDepthChanged()
+        {
+            OnPropertyChanged(nameof(Depth));
+
+            if (this is not LayerFolder folder) return;
+
+            foreach (var child in folder.Children)
+                child.NotifyDepthChanged();
+        }
 
 
         /// <inheritdoc/>

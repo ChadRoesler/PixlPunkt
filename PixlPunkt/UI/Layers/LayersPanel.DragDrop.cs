@@ -697,6 +697,34 @@ namespace PixlPunkt.UI.Layers
         // DRAG INTERACTION STATE
         // --------------------------------------------------------------------
 
+        /// <summary>
+        /// Keeps a recycled container's state honest.
+        /// </summary>
+        /// <remarks>
+        /// A ListView reuses containers as rows scroll in and out. Anything written straight onto a
+        /// container therefore rides it to whatever row it is next used for: the footer's disabled
+        /// state turned up on an ordinary layer, greying it out and making it unusable, and the
+        /// chevron's drag-time hit testing travelled the same way. Both are now derived from the
+        /// item the container currently holds, every time one is handed out, so there is nothing
+        /// left to strand.
+        /// </remarks>
+        private void LayersList_ContainerContentChanging(
+            Microsoft.UI.Xaml.Controls.ListViewBase sender,
+            Microsoft.UI.Xaml.Controls.ContainerContentChangingEventArgs args)
+        {
+            if (args.InRecycleQueue) return;
+            if (args.ItemContainer is not ListViewItem container) return;
+
+            // The footer is the drop-on-root target: live only while something is being dragged out
+            // of a folder, and inert the rest of the time.
+            bool isFooter = args.Item is RootDropZoneFooterItem;
+            container.IsEnabled = !isFooter || _draggedItem?.Parent != null;
+
+            var chevron = FindVisualDescendant<Microsoft.UI.Xaml.Controls.Primitives.ToggleButton>(
+                container, "FolderIconButton");
+            if (chevron != null) chevron.IsHitTestVisible = _draggedItem == null;
+        }
+
         private void DisableInteractiveElementsDuringDrag()
         {
             foreach (var item in _uiLayers)

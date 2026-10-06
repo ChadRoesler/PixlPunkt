@@ -317,6 +317,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "icons", "icons", "{94C50FF4
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "screenshots", "screenshots", "{EB25647E-F669-40F5-A78C-21BC6D160771}"
 	ProjectSection(SolutionItems) = preProject
+		docs\assets\screenshots\ColorPicker.png = docs\assets\screenshots\ColorPicker.png
 		docs\assets\screenshots\PixlPunktUi.png = docs\assets\screenshots\PixlPunktUi.png
 	EndProjectSection
 EndProject

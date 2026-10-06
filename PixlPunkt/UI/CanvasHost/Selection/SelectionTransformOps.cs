@@ -86,7 +86,13 @@ namespace PixlPunkt.UI.CanvasHost.Selection
         /// 2. Computes new scale based on pointer movement in local space
         /// 3. Repositions selection so anchor stays fixed in global space
         /// </remarks>
-        public void UpdateScaleFromHandle(int px, int py)
+        /// <param name="px">Pointer position in document pixels.</param>
+        /// <param name="py">Pointer position in document pixels.</param>
+        /// <param name="constrainAspect">
+        /// Holds the aspect ratio for this drag only, without disturbing the Link Scale option.
+        /// This is what Shift does on a handle.
+        /// </param>
+        public void UpdateScaleFromHandle(int px, int py, bool constrainAspect = false)
         {
             // Use original dimensions as base for scaling
             int baseW = _state.OrigW;
@@ -148,8 +154,10 @@ namespace PixlPunkt.UI.CanvasHost.Selection
             double rx = newLocalW / Math.Max(1, baseW);
             double ry = newLocalH / Math.Max(1, baseH);
 
-            // Handle linked scaling (maintain aspect ratio)
-            if (_state.ScaleLink)
+            // Handle linked scaling (maintain aspect ratio). Either the Link Scale option or
+            // Shift held during this particular drag; the option is never written to, so letting
+            // go of Shift returns to whatever the option says.
+            if (_state.ScaleLink || constrainAspect)
             {
                 bool affectsX = moveLeft || moveRight;
                 bool affectsY = moveTop || moveBottom;

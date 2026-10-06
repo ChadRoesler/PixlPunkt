@@ -94,6 +94,7 @@ namespace PixlPunkt.UI.Layers
             LayersList.CanDragItems = true;
             LayersList.AllowDrop = true;
             LayersList.CanReorderItems = false;
+            LayersList.ContainerContentChanging += LayersList_ContainerContentChanging;
             LayersList.DragItemsStarting += LayersList_DragItemsStarting;
             LayersList.DragOver += LayersList_DragOver;
             LayersList.Drop += LayersList_Drop;
@@ -183,28 +184,15 @@ namespace PixlPunkt.UI.Layers
         }
 
         /// <summary>
-        /// The scroll viewer inside the layers list, or null before it has been realised.
+        /// Brings the displayed rows in line with the document.
         /// </summary>
-        private ScrollViewer? ListScroller =>
-            _listScroller ??= FindDescendant<ScrollViewer>(LayersList);
-
-        private ScrollViewer? _listScroller;
-
-        private static T? FindDescendant<T>(DependencyObject? from) where T : class
-        {
-            if (from is null) return null;
-
-            int count = VisualTreeHelper.GetChildrenCount(from);
-            for (int i = 0; i < count; i++)
-            {
-                var child = VisualTreeHelper.GetChild(from, i);
-                if (child is T match) return match;
-                if (FindDescendant<T>(child) is { } deeper) return deeper;
-            }
-
-            return null;
-        }
-
+        /// <remarks>
+        /// The rows are reconciled rather than replaced. Emptying the collection and filling it
+        /// again sends the scroll position to the top, and putting the offset back afterwards means
+        /// the list is visibly seen at the top first, which reads as a flash on every expand,
+        /// rename or reorder. Editing the collection in place leaves the scroll position alone
+        /// because it was never disturbed, so there is nothing to put back.
+        /// </remarks>
         private void RebuildFromDoc()
         {
             // CRITICAL: NEVER rebuild during drag operations!
@@ -214,11 +202,6 @@ namespace PixlPunkt.UI.Layers
                 return;
             }
 
-            // Rebuilding empties the list and fills it again, which sends the view back to the top.
-            // Renaming a layer does that for a change that moved nothing, and on a long list it
-            // loses your place entirely, so the offset is put back afterwards.
-            double scrollOffset = ListScroller?.VerticalOffset ?? 0;
-
             if (_doc is null)
             {
                 _uiLayers.Clear();
@@ -226,71 +209,81 @@ namespace PixlPunkt.UI.Layers
                 return;
             }
 
-            _suppressCollectionMove = true;
+            var desired = new List<object>();
 
-            _uiLayers.Clear();
-
-            // Get root items in REVERSE order (top-to-bottom for UI)
+            // Root items in REVERSE order (top-to-bottom for UI)
             var rootItems = _doc.RootItems;
-
             for (int i = rootItems.Count - 1; i >= 0; i--)
             {
                 var item = rootItems[i];
+                desired.Add(item);
 
-                if (item is LayerFolder folder)
-                {
-                    _uiLayers.Add(folder);
-
-                    if (folder.IsExpanded)
-                        AddFolderChildrenToUI(folder);
-                }
-                else
-                {
-                    _uiLayers.Add(item);
-                }
+                if (item is LayerFolder folder && folder.IsExpanded)
+                    CollectFolderChildren(folder, desired);
             }
 
-            // Add the root drop zone footer item
-            _uiLayers.Add(RootDropZoneFooterItem.Instance);
+            // The root drop zone footer item
+            desired.Add(RootDropZoneFooterItem.Instance);
 
+            _suppressCollectionMove = true;
+            Reconcile(desired);
             _suppressCollectionMove = false;
 
             ForcePreviewRefreshAll();
             UpdateUiEnabled();
-
-            RestoreScroll(scrollOffset);
         }
 
         /// <summary>
-        /// Puts the scroll position back after a rebuild, once the list has been laid out again.
+        /// Edits the displayed rows into the wanted order with the fewest changes, so anything
+        /// already on screen keeps its place rather than being torn down and put back.
         /// </summary>
-        private void RestoreScroll(double offset)
+        private void Reconcile(List<object> desired)
         {
-            if (offset <= 0) return;
+            var wanted = new HashSet<object>(desired, ReferenceEqualityComparer.Instance);
 
-            DispatcherQueue?.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                () => ListScroller?.ChangeView(null, offset, null, true));
+            for (int i = _uiLayers.Count - 1; i >= 0; i--)
+            {
+                if (!wanted.Contains(_uiLayers[i])) _uiLayers.RemoveAt(i);
+            }
+
+            for (int i = 0; i < desired.Count; i++)
+            {
+                var item = desired[i];
+
+                if (i >= _uiLayers.Count)
+                {
+                    _uiLayers.Add(item);
+                    continue;
+                }
+
+                if (ReferenceEquals(_uiLayers[i], item)) continue;
+
+                int existing = -1;
+                for (int j = i + 1; j < _uiLayers.Count; j++)
+                {
+                    if (!ReferenceEquals(_uiLayers[j], item)) continue;
+                    existing = j;
+                    break;
+                }
+
+                if (existing >= 0) _uiLayers.Move(existing, i);
+                else _uiLayers.Insert(i, item);
+            }
+
+            while (_uiLayers.Count > desired.Count)
+                _uiLayers.RemoveAt(_uiLayers.Count - 1);
         }
 
-        private void AddFolderChildrenToUI(LayerFolder folder)
+        private static void CollectFolderChildren(LayerFolder folder, List<object> into)
         {
             var children = folder.Children;
             for (int i = children.Count - 1; i >= 0; i--)
             {
                 var child = children[i];
+                into.Add(child);
 
-                if (child is LayerFolder childFolder)
-                {
-                    _uiLayers.Add(childFolder);
-
-                    if (childFolder.IsExpanded)
-                        AddFolderChildrenToUI(childFolder);
-                }
-                else
-                {
-                    _uiLayers.Add(child);
-                }
+                if (child is LayerFolder childFolder && childFolder.IsExpanded)
+                    CollectFolderChildren(childFolder, into);
             }
         }
 
@@ -613,7 +606,33 @@ namespace PixlPunkt.UI.Layers
             SelectFromDoc();
         }
 
-        private void FolderChevron_Click(object sender, RoutedEventArgs e) => _doc?.RaiseStructureChanged();
+        /// <summary>
+        /// Expanding or collapsing a folder changes which rows exist, so the list is rebuilt.
+        /// </summary>
+        /// <remarks>
+        /// Raising a structure change on its own is not enough: that handler only refreshes layer
+        /// previews and never touches the list, so the children stayed unlisted until some other
+        /// action happened to rebuild. That is why expanding appeared to work only sometimes.
+        ///
+        /// The rebuild is queued rather than run inline because it replaces every row, including
+        /// the toggle button that is still in the middle of raising this very click.
+        /// </remarks>
+        private void FolderChevron_Click(object sender, RoutedEventArgs e)
+        {
+            _doc?.RaiseStructureChanged();
+
+            if (DispatcherQueue is null)
+            {
+                RebuildFromDoc();
+                return;
+            }
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RebuildFromDoc();
+                SelectFromDoc();
+            });
+        }
         private void Vis_Click(object sender, RoutedEventArgs e) => _doc?.RaiseStructureChanged();
         private void Lock_Click(object sender, RoutedEventArgs e) => _doc?.RaiseStructureChanged();
 

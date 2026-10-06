@@ -71,6 +71,16 @@
                     </uap:FileTypeAssociation>
                 </uap:Extension>
                 <uap:Extension Category="windows.fileTypeAssociation">
+                    <uap:FileTypeAssociation Name="pixlpunktvolumetric">
+                        <uap:SupportedFileTypes>
+                            <uap:FileType ContentType="pixlpunkt/volumetric">.pxpv</uap:FileType>
+                        </uap:SupportedFileTypes>
+                        <uap:DisplayName>PixlPunktVolumetric</uap:DisplayName>
+                        <uap:Logo>Assets\Icons\pxpvFileIcon.png</uap:Logo>
+                        <uap:InfoTip>Pixl Punkt Volumetric</uap:InfoTip>
+                    </uap:FileTypeAssociation>
+                </uap:Extension>
+                <uap:Extension Category="windows.fileTypeAssociation">
                     <uap:FileTypeAssociation Name="pixlpunktmarker">
                         <uap:SupportedFileTypes>
                             <uap:FileType ContentType="pixlpunkt/brush">.mkr</uap:FileType>

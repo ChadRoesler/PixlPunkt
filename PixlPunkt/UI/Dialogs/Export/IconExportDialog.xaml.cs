@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using PixlPunkt.Constants;
 using PixlPunkt.Core.Document;
+using PixlPunkt.Core.Document.Layer;
 using PixlPunkt.Core.Enums;
 using PixlPunkt.Core.Imaging;
 using PixlPunkt.UI.Rendering;
@@ -24,9 +25,36 @@ namespace PixlPunkt.UI.Dialogs.Export
     public sealed partial class IconExportDialog : ContentDialog
     {
         private readonly CanvasDocument _document;
-        private readonly byte[] _sourcePixels;
         private readonly int _sourceWidth;
         private readonly int _sourceHeight;
+
+        /// <summary>The artwork each size is shrunk from, keyed by size.</summary>
+        private readonly Dictionary<int, byte[]> _sourceForSize = new();
+
+        /// <summary>The size folders found in the document, for labelling the preview.</summary>
+        private IReadOnlyDictionary<int, LayerFolder> _sizeFolders = new Dictionary<int, LayerFolder>();
+
+        /// <summary>
+        /// The artwork for a size, falling back to the master when nothing was composited for it.
+        /// </summary>
+        private byte[] SourceFor(int size) =>
+            _sourceForSize.TryGetValue(size, out var pixels)
+                ? pixels
+                : _sourceForSize[IconExportConstants.StandardSizes[0]];
+
+        /// <summary>
+        /// Where this size's artwork came from, for the label under each preview.
+        /// </summary>
+        private string SourceLabelFor(int size)
+        {
+            int? from = IconExportOps.FolderSizeFor(_document, size);
+
+            if (from is null) return "scaled";
+            return from == size ? "drawn" : $"from {from}";
+        }
+
+        /// <summary>Whether this size was drawn by hand rather than inherited or shrunk.</summary>
+        private bool IsHandDrawn(int size) => _sizeFolders.ContainsKey(size);
 
         // Store 4 images per size: striped, white, grey, black
         private readonly List<(Image striped, Image white, Image grey, Image black)> _previewImageSets = new();
@@ -37,12 +65,15 @@ namespace PixlPunkt.UI.Dialogs.Export
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
 
-            // Compose document immediately
-            var composed = new PixelSurface(_document.PixelWidth, _document.PixelHeight);
-            _document.CompositeTo(composed);
-            _sourcePixels = composed.Pixels;
             _sourceWidth = _document.PixelWidth;
             _sourceHeight = _document.PixelHeight;
+
+            // A folder named for a size supplies that size; everything else comes from the master
+            // artwork with those folders left out. Composited once here rather than per preview,
+            // since changing the scale mode re-renders every size.
+            _sizeFolders = IconExportOps.SizeFolders(_document);
+            foreach (int size in IconExportConstants.StandardSizes)
+                _sourceForSize[size] = IconExportOps.CompositeSourceFor(_document, size);
 
             // Initialize XAML components
             InitializeComponent();
@@ -97,6 +128,16 @@ namespace PixlPunkt.UI.Dialogs.Export
                     HorizontalAlignment = HorizontalAlignment.Center
                 };
                 sizeColumn.Children.Add(sizeLabel);
+
+                // Says where this size came from, so a folder that is not being picked up is
+                // obvious here rather than after the file is written.
+                sizeColumn.Children.Add(new TextBlock
+                {
+                    Text = SourceLabelFor(size),
+                    FontSize = IconExportConstants.PreviewLabelFontSize,
+                    Opacity = IsHandDrawn(size) ? 0.9 : 0.5,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                });
 
                 // Create 4 background variants
                 var stripedImg = CreatePreviewImage(displaySize);
@@ -209,7 +250,8 @@ namespace PixlPunkt.UI.Dialogs.Export
                 }
 
                 int size = IconExportConstants.PreviewSizes[i];
-                byte[] resized = ResizeUsingMode(SelectedScaleMode, _sourcePixels, _sourceWidth, _sourceHeight, size, size);
+                byte[] resized = ResizeUsingMode(
+                    SelectedScaleMode, SourceFor(size), _sourceWidth, _sourceHeight, size, size);
 
                 // Generate 4 variants:
                 // 1. With transparency stripes
@@ -318,7 +360,8 @@ namespace PixlPunkt.UI.Dialogs.Export
             var pngList = new List<byte[]>();
             foreach (var size in IconExportConstants.StandardSizes)
             {
-                var resized = ResizeUsingMode(SelectedScaleMode, _sourcePixels, _sourceWidth, _sourceHeight, size, size);
+                var resized = ResizeUsingMode(
+                    SelectedScaleMode, SourceFor(size), _sourceWidth, _sourceHeight, size, size);
                 var pngData = await EncodePngAsync(resized, size, size);
                 pngList.Add(pngData);
             }

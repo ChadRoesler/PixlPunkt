@@ -37,6 +37,7 @@
 - [[Dithering]]
 - [[Animation Workflow|Animation-Workflow]]
 - [[Game Art|Game-Art]]
+- [[Icon Export|Icon-Export]]
 - [[File Formats|Formats]]
 
 **<img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/plug_disconnected_16.png" width="16"> Plugins**

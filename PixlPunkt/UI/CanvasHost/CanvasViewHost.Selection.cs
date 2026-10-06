@@ -402,8 +402,16 @@ namespace PixlPunkt.UI.CanvasHost
         {
             if (_selState == null) return;
 
-            _selState.Lifted = Document.Floating;
+            // Bounds before the lift state, because unlifting derives the handle frame from them
+            // and would otherwise build it out of the bounds this change has just replaced.
             _selState.Rect = _selRegion.Bounds;
+            _selState.Lifted = Document.Floating;
+
+            // A selection that is not floating owns no transform of its own: the handles are the
+            // region. Undo of a marquee never passes through the lift state, so without this the
+            // frame keeps whatever scale the last transform left behind.
+            if (!_selState.Floating) _selState.ResetFrameToRect();
+
             bool active = !_selRegion.IsEmpty || _selState.Floating;
             _selState.Active = active;
             _selState.State = active ? SelectionState.Armed : SelectionState.None;
@@ -697,7 +705,10 @@ namespace PixlPunkt.UI.CanvasHost
             bool shiftDown = (e.KeyModifiers & VirtualKeyModifiers.Shift) != 0;
             bool altDown = (e.KeyModifiers & VirtualKeyModifiers.Menu) != 0;
 
-            if (_selState.Active && _selState.State == SelectionState.Armed && !shiftDown && !altDown)
+            // A handle is grabbed whatever modifier is held. Shift and Alt mean add and subtract
+            // when starting a new marquee, but on a handle Shift constrains the aspect and
+            // pressing a handle must never begin a new selection instead.
+            if (_selState.Active && _selState.State == SelectionState.Armed)
             {
                 // Pivot handle
                 if (_selHitTest.HitTestPivotHandle(viewPos))
@@ -747,27 +758,37 @@ namespace PixlPunkt.UI.CanvasHost
                     return true;
                 }
 
-                // Move (inside selection)
-                var (mx, my) = ViewToDoc(viewPos);
-                if (_selHitTest.IsInsideTransformedSelection(mx, my))
+                // Past the handles it is the area being pressed rather than a control, so a
+                // modifier here really does mean "start a new marquee" and these must stand aside.
+                if (!shiftDown && !altDown)
                 {
-                    _selState.Drag = SelDrag.Move;
-                    if (!_selState.Floating) LiftSelectionWithHistory();
-                    _selState.MoveStartX = mx;
-                    _selState.MoveStartY = my;
-                    // Capture snapshot for history
-                    _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
-                    _mainCanvas.CapturePointer(e.Pointer);
+                    // Move (inside selection)
+                    var (mx, my) = ViewToDoc(viewPos);
+                    if (_selHitTest.IsInsideTransformedSelection(mx, my))
+                    {
+                        _selState.Drag = SelDrag.Move;
+                        if (!_selState.Floating) LiftSelectionWithHistory();
+                        _selState.MoveStartX = mx;
+                        _selState.MoveStartY = my;
+                        // Capture snapshot for history
+                        _selState.DragStartSnapshot = _selState.CaptureTransformSnapshot();
+                        _mainCanvas.CapturePointer(e.Pointer);
+                        return true;
+                    }
+
+                    // Clicked outside - deselect.
+                    //
+                    // Routed through the same command the Deselect menu entry uses, because that
+                    // one records the change. Clearing the state here directly left nothing on the
+                    // history stack, so undo stepped back over the previous marquee instead of
+                    // bringing back the selection that had just been dropped. The rest of the
+                    // teardown, presence, drag state and the handle frame, follows from the
+                    // selection-changed handler.
+                    Selection_Deselect();
+                    ActiveSelectionTool?.Cancel();
+                    InvalidateMainCanvas();
                     return true;
                 }
-
-                // Clicked outside - deselect
-                if (_selState.Floating) CommitFloatingWithHistory();
-                _selState.Clear();
-                _toolState?.SetSelectionPresence(false, false);
-                ActiveSelectionTool?.Cancel();
-                InvalidateMainCanvas();
-                return true;
             }
 
             // Start marquee
@@ -843,7 +864,10 @@ namespace PixlPunkt.UI.CanvasHost
                 case SelDrag.Scale:
                     if (_selState.Floating)
                     {
-                        _selTransform.UpdateScaleFromHandle(docX, docY);
+                        // Read each move rather than at the press, so Shift can be caught or
+                        // released part way through a drag and take effect immediately.
+                        bool constrain = (e.KeyModifiers & VirtualKeyModifiers.Shift) != 0;
+                        _selTransform.UpdateScaleFromHandle(docX, docY, constrain);
                         SyncRegionFromMask();   // stage 4: the outline follows the live transform
                         InvalidateMainCanvas();
                     }

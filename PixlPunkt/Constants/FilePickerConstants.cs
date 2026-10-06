@@ -19,6 +19,9 @@ namespace PixlPunkt.Constants
         /// </summary>
         public const string PixlPunktFont = ".pxpf";
 
+        /// <summary>A volumetric project: voxels today, tile-textured geometry later.</summary>
+        public const string PixlPunktVolumetric = ".pxpv";
+
         // ════════════════════════════════════════════════════════════════════
         // IMPORT FORMATS
         // ════════════════════════════════════════════════════════════════════
@@ -61,5 +64,8 @@ namespace PixlPunkt.Constants
         /// <summary>Description for PixlPunkt document type.</summary>
         public const string PixlPunktDocumentDescription = "PixlPunkt document";
         public const string PixlPunktFontDescription = "PixlPunkt font";
+
+        /// <summary>Description shown for a volumetric project in a file picker.</summary>
+        public const string PixlPunktVolumetricDescription = "PixlPunkt volumetric";
     }
 }

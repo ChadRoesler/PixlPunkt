@@ -272,6 +272,142 @@ namespace PixlPunkt.UI
         }
 
         /// <summary>
+        /// Creates a volumetric project: a sheet of face tiles and nothing built yet.
+        /// </summary>
+        /// <remarks>
+        /// No model is created. The workspace builds one from the faces once they are painted,
+        /// which is how the voxel workspace already behaves and avoids handing over a solid cube
+        /// nobody asked for.
+        /// </remarks>
+        private CanvasViewHost? CreateAndOpenVolumetric(PixlPunkt.UI.Dialogs.NewVolumetricResult result)
+        {
+            try { SetStripeTheme(AppSettings.Instance.StripeTheme); } catch { }
+
+            int tileW = Math.Max(2, result.TileSize.Width);
+            int tileH = Math.Max(2, result.TileSize.Height);
+
+            int sets = Math.Max(1, result.SetCount);
+            var cells = FaceCells(result.SixFaces, result.CrossLayout);
+
+            int cols = result.CrossLayout ? 4 : 3;
+            int rowsPerSet = result.SixFaces ? (result.CrossLayout ? 3 : 2) : 1;
+            int rows = rowsPerSet * sets;
+
+            string name = string.IsNullOrWhiteSpace(result.Name) ? $"Volumetric{_newCanvasCounter++}" : result.Name;
+            var doc = new CanvasDocument(name, cols * tileW, rows * tileH, CreateSize(tileW, tileH), CreateSize(cols, rows));
+
+            var volumetric = doc.VolumetricState;
+            volumetric.HasState = true;
+            volumetric.ProjectName = name;
+            volumetric.Kind = result.Kind;
+
+            var faceTiles = CreateVolumetricFaceTiles(doc, cells, sets, rowsPerSet, cols, rows);
+            ApplyVolumetricFaceMapping(doc, faceTiles, result.SixFaces);
+
+            return OpenPreparedDocument(doc);
+        }
+
+        /// <summary>
+        /// Where each face sits on the sheet, as a column and row inside one set, in face order.
+        /// </summary>
+        /// <remarks>
+        /// The cross is the cube unfolded: left, front, right and back across the middle with top
+        /// above the front and bottom below it. It costs a wider sheet with four empty cells, and
+        /// buys faces that touch along the seam they actually share, so a line can be drawn from
+        /// one face onto its neighbour without guessing where it comes out.
+        /// </remarks>
+        private static (int Col, int Row)[] FaceCells(bool sixFaces, bool cross)
+        {
+            // Face order throughout: front, back, left, right, top, bottom.
+            if (!sixFaces)
+                return [(0, 0), (1, 0), (2, 0)];   // front, side, top
+
+            if (!cross)
+                return [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)];
+
+            return [(1, 1), (3, 1), (0, 1), (2, 1), (1, 0), (1, 2)];
+        }
+
+        /// <summary>
+        /// Creates one blank tile per face and lays them out on the canvas in sheet order.
+        /// </summary>
+        /// <remarks>
+        /// A volumetric project is useless without tiles, since the faces are chosen from the tile
+        /// set rather than from the canvas, so an empty set means empty face pickers and nothing to
+        /// build from.
+        /// </remarks>
+        private static List<int> CreateVolumetricFaceTiles(
+            CanvasDocument doc, (int Col, int Row)[] cells, int sets, int rowsPerSet, int columns, int rows)
+        {
+            var ids = new List<int>(cells.Length * sets);
+            if (doc.TileSet is null) return ids;
+
+            int stride = doc.TileSize.Width * doc.TileSize.Height * 4;
+
+            // The mapping is made on demand, so a fresh document has none. Reading the property
+            // instead of asking for one left every placement silently doing nothing, which is why
+            // the tiles turned up in the panel but never on the canvas.
+            var mapping = doc.ActiveLayer?.GetOrCreateTileMapping(columns, rows);
+
+            for (int set = 0; set < sets; set++)
+            {
+                foreach (var (col, row) in cells)
+                {
+                    int id = doc.TileSet.AddTile(new byte[stride]);
+                    ids.Add(id);
+
+                    // Placed where that face belongs on the sheet, so the layout means something
+                    // rather than the tiles sitting in the panel out of sight.
+                    mapping?.SetTileId(col, (set * rowsPerSet) + row, id);
+                }
+            }
+
+            return ids;
+        }
+
+        /// <summary>
+        /// Points the face pickers at the tiles that were just made, and puts the workspace into the
+        /// face mode that was asked for.
+        /// </summary>
+        /// <remarks>
+        /// Written to the preview state as well as the workspace state, because the workspace UI
+        /// still restores its face mode and tile choices from the preview state. Setting only the
+        /// newer one leaves the pickers empty and the mode on whatever it was.
+        /// </remarks>
+        private static void ApplyVolumetricFaceMapping(CanvasDocument doc, List<int> faceTiles, bool sixFaces)
+        {
+            int faceMode = sixFaces ? 1 : 0;
+
+            var workspace = doc.VoxelWorkspace;
+            workspace.HasState = true;
+            workspace.FaceModeIndex = faceMode;
+            workspace.VoxelPaneVisible = true;
+
+            var preview = doc.VoxelPreviewState;
+            preview.HasState = true;
+            preview.FaceModeIndex = faceMode;
+
+            int At(int index) => index < faceTiles.Count ? faceTiles[index] : -1;
+
+            if (sixFaces)
+            {
+                // Sheet order: front, back, left on the first row, right, top, bottom on the second.
+                workspace.FrontTileId6 = preview.FrontTileId6 = At(0);
+                workspace.BackTileId6 = preview.BackTileId6 = At(1);
+                workspace.LeftTileId6 = preview.LeftTileId6 = At(2);
+                workspace.RightTileId6 = preview.RightTileId6 = At(3);
+                workspace.TopTileId6 = preview.TopTileId6 = At(4);
+                workspace.BottomTileId6 = preview.BottomTileId6 = At(5);
+            }
+            else
+            {
+                workspace.FrontTileId3 = preview.FrontTileId3 = At(0);
+                workspace.SideTileId3 = preview.SideTileId3 = At(1);
+                workspace.TopTileId3 = preview.TopTileId3 = At(2);
+            }
+        }
+
+        /// <summary>
         /// Creates a canvas exactly the size of the clipboard image, as one tile of that size,
         /// and pastes the clipboard into it at the origin, so copy → new → paste needs no
         /// positioning.

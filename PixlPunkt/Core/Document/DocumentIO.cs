@@ -106,7 +106,7 @@ namespace PixlPunkt.Core.Document
         /// Version 20: Added voxel pixel-preview antialiasing strength
         /// Version 21: Removed voxel lighting ambient from workspace state and added voxel sidebar section collapse state
         /// </summary>
-        private const int CurrentVersion = 23;
+        private const int CurrentVersion = 24;
 
         private const int NodeType_RasterLayer = 1;
         private const int NodeType_Folder = 2;
@@ -119,14 +119,19 @@ namespace PixlPunkt.Core.Document
         /// The extension a document should be saved under: <c>.pxpf</c> once it carries font
         /// metrics, <c>.pxp</c> otherwise. The bytes are identical either way.
         /// </summary>
-        public static string ExtensionFor(CanvasDocument doc) =>
-            doc.FontState.HasState ? FileExtensions.PixlPunktFont : FileExtensions.PixlPunktDocument;
+        public static string ExtensionFor(CanvasDocument doc)
+        {
+            if (doc.FontState.HasState) return FileExtensions.PixlPunktFont;
+            if (doc.VolumetricState.HasState) return FileExtensions.PixlPunktVolumetric;
+            return FileExtensions.PixlPunktDocument;
+        }
 
         /// <summary>True when the extension is one this app writes as a document.</summary>
         public static bool IsNativeExtension(string? extension) =>
             !string.IsNullOrEmpty(extension) &&
             (extension.Equals(FileExtensions.PixlPunktDocument, StringComparison.OrdinalIgnoreCase) ||
-             extension.Equals(FileExtensions.PixlPunktFont, StringComparison.OrdinalIgnoreCase));
+             extension.Equals(FileExtensions.PixlPunktFont, StringComparison.OrdinalIgnoreCase) ||
+             extension.Equals(FileExtensions.PixlPunktVolumetric, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
         /// Saves a document to the specified file path in native .pxp format.
@@ -260,6 +265,9 @@ namespace PixlPunkt.Core.Document
 
             // Pixel font metrics (Version 22+)
             WriteFontState(bw, doc.FontState);
+
+            // Volumetric project marker (Version 24+)
+            WriteVolumetricState(bw, doc.VolumetricState);
 
             bw.Flush();
         }
@@ -682,6 +690,30 @@ namespace PixlPunkt.Core.Document
         /// Writes the pixel-font metrics. Glyphs are written in codepoint order so the same
         /// document always produces the same bytes.
         /// </summary>
+        /// <summary>
+        /// Writes the volumetric project marker. Appended after the font block, so a version 23
+        /// file is read exactly as it was before this existed.
+        /// </summary>
+        private static void WriteVolumetricState(BinaryWriter bw, VolumetricDocumentState state)
+        {
+            bw.Write(state.HasState);
+            bw.Write(state.ProjectName ?? string.Empty);
+            bw.Write((int)state.Kind);
+        }
+
+        private static void ReadVolumetricState(BinaryReader br, VolumetricDocumentState state)
+        {
+            state.HasState = br.ReadBoolean();
+            state.ProjectName = br.ReadString();
+
+            // An unknown kind from a newer file reads as voxel rather than throwing: the geometry
+            // it describes will be missing either way, and refusing to open the file helps nobody.
+            int kind = br.ReadInt32();
+            state.Kind = Enum.IsDefined(typeof(VolumetricKind), kind)
+                ? (VolumetricKind)kind
+                : VolumetricKind.Voxel;
+        }
+
         private static void WriteFontState(BinaryWriter bw, FontDocumentState state)
         {
             bw.Write(state.HasState);
@@ -942,6 +974,11 @@ namespace PixlPunkt.Core.Document
             if (version >= 22)
             {
                 ReadFontState(br, doc.FontState, version);
+            }
+
+            if (version >= 24)
+            {
+                ReadVolumetricState(br, doc.VolumetricState);
             }
 
             if (doc.Layers.Count > 0)

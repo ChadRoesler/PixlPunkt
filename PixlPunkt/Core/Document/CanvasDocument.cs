@@ -1452,6 +1452,13 @@ namespace PixlPunkt.Core.Document
         /// </summary>
         public FontDocumentState FontState { get; } = new();
 
+        /// <summary>
+        /// Marks this document as a volumetric project. Separate from
+        /// <see cref="VoxelWorkspace"/>, which only describes how the voxel workspace is set up and
+        /// which any ordinary document acquires the moment the voxel preview is opened.
+        /// </summary>
+        public VolumetricDocumentState VolumetricState { get; } = new();
+
         /// <summary>Raised when the font metrics change, so views redraw their guides.</summary>
         public event Action? FontChanged;
 

@@ -37,10 +37,10 @@ Best practices and professional techniques for animation in PixlPunkt.
 **Spacing** = Distance moved per frame
 
 ```
-Slow motion:    ?  ?  ?  ?  ?  ?  (many frames)
-Fast motion:    ?     ?     ?     (few frames)
-Ease in:        ?  ? ? ???        (accelerate)
-Ease out:       ??? ? ?  ?        (decelerate)
+Slow motion:    ◊  ◊  ◊  ◊  ◊  ◊  (many frames)
+Fast motion:    ◊     ◊     ◊     (few frames)
+Ease in:        ◊  ◊  ◊  ◊ ◊ ◊◊◊  (accelerate)
+Ease out:       ◊◊◊ ◊ ◊  ◊  ◊  ◊  (decelerate)
 ```
 
 ### 2. Squash & Stretch
@@ -48,9 +48,9 @@ Ease out:       ??? ? ?  ?        (decelerate)
 Exaggerate compression and extension:
 
 ```
-Jump anticipation:   ???  (squash)
-Jump apex:           ?    (stretch)
-Land impact:         ??   (squash)
+Jump anticipation:   ◊◊◊  (squash)
+Jump apex:           ◊    (stretch)
+Land impact:         ◊◊   (squash)
 ```
 
 ### 3. Anticipation
@@ -232,18 +232,18 @@ Recovery     ? Stand
 ### Animation Layer Structure
 
 ```
-?? Character
-??? ?? Head
-?   ??? Face
-?   ??? Hair
-?   ??? Eyes (blink animation)
-??? ?? Body
-?   ??? Torso
-?   ??? Front Arm
-?   ??? Back Arm
-??? ?? Legs
-    ??? Front Leg
-    ??? Back Leg
+🖿 Character
+├─🖿 Head
+│ ├─🗋 Face
+│ ├─🗋 Hair
+│ └─🗋 Eyes (blink animation)
+├─🖿 Body
+│ ├─🗋 Torso
+│ ├─🗋 Front Arm
+│ └─🗋 Back Arm
+└─🖿 Legs
+  ├─🗋 Front Leg
+  └─🗋 Back Leg
 ```
 
 ### Benefits

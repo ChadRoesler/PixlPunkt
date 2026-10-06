@@ -116,15 +116,31 @@ namespace PixlPunkt.UI.CanvasHost.Selection
                 if (value == null)
                 {
                     // Back to an armed marquee (or nothing): the handle frame is the region bounds.
-                    _scaleX = _scaleY = 1.0;
-                    _angleDeg = _cumulativeAngleDeg = 0.0;
-                    _origW = Rect.Width; _origH = Rect.Height;
-                    _origCenterX = Rect.X + Rect.Width / 2; _origCenterY = Rect.Y + Rect.Height / 2;
-                    _pivotOffsetX = _pivotOffsetY = 0; _pivotCustom = false;
-                    _regionNonRectangular = false; _bufferFlipped = false;
-                    PreviewBuf = null;
+                    ResetFrameToRect();
                 }
             }
+        }
+
+        /// <summary>
+        /// Puts the handle frame back on <see cref="Rect"/> with no transform applied.
+        /// </summary>
+        /// <remarks>
+        /// While a selection is not floating, the handles belong to the region itself, so this is
+        /// an invariant rather than a one-off cleanup. It used to run only when a selection stopped
+        /// floating, which left the frame stale whenever the region changed without ever having
+        /// been lifted, an undone marquee being the obvious case.
+        ///
+        /// It reads <see cref="Rect"/>, so the caller sets that first.
+        /// </remarks>
+        public void ResetFrameToRect()
+        {
+            _scaleX = _scaleY = 1.0;
+            _angleDeg = _cumulativeAngleDeg = 0.0;
+            _origW = Rect.Width; _origH = Rect.Height;
+            _origCenterX = Rect.X + Rect.Width / 2; _origCenterY = Rect.Y + Rect.Height / 2;
+            _pivotOffsetX = _pivotOffsetY = 0; _pivotCustom = false;
+            _regionNonRectangular = false; _bufferFlipped = false;
+            PreviewBuf = null;
         }
 
         /// <summary>Gets whether the selection is floating (lifted from its layer).</summary>

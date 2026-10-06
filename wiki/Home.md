@@ -43,6 +43,7 @@ Welcome to the **PixlPunkt Wiki** - the deep dive documentation for everything y
 - [[Dithering Deep Dive|Dithering]] - Understanding all the dithering algorithms
 - [[Animation Workflow|Animation-Workflow]] - Professional animation techniques
 - [[Tile-Based Game Art|Game-Art]] - Creating game-ready assets
+- [[Icon Export|Icon-Export]] - Multi-resolution .ico files, with hand-drawn small sizes
 - [[File Formats|Formats]] - Import/export formats and compatibility
 
 ## <img src="https://raw.githubusercontent.com/ChadRoesler/PixlPunkt/main/docs/assets/icons/plug_disconnected_20.png" width="20"> Extending PixlPunkt

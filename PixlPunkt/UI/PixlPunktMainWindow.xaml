@@ -101,6 +101,7 @@
                 <MenuBarItem Title="File">
                     <MenuFlyoutItem Text="New Canvas…" Click="File_NewCanvas_Click"/>
                     <MenuFlyoutItem Text="New Font…" Click="File_NewFont_Click"/>
+                    <MenuFlyoutItem Text="New Volumetric…" Click="File_NewVolumetric_Click"/>
                     <MenuFlyoutSubItem x:Name="File_NewFromTemplate_Submenu" Text="New from Template…">
                         <MenuFlyoutItem Text="(No templates)" IsEnabled="False"/>
                     </MenuFlyoutSubItem>

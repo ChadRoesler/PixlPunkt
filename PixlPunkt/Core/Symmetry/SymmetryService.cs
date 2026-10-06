@@ -99,12 +99,18 @@ namespace PixlPunkt.Core.Symmetry
         /// </summary>
         /// <param name="x">Input X.</param>
         /// <param name="y">Input Y.</param>
-        /// <param name="axisX">X position of the vertical axis.</param>
+        /// <param name="axisX">X position of the vertical axis, in pixel edges.</param>
         /// <returns>Mirrored point.</returns>
+        /// <remarks>
+        /// The axis is measured in pixel edges, while x counts whole pixels, so the pixel at x
+        /// covers the span from x to x+1 and its centre sits at x + 0.5. Reflecting the centre and
+        /// converting back to an index is what the trailing minus one is: without it the result is
+        /// a pixel too far, which shows up as a gap beside the axis mirroring one way and an
+        /// overlap mirroring the other.
+        /// </remarks>
         private static (int x, int y) MirrorHorizontal(int x, int y, double axisX)
         {
-            // Mirror x across the vertical axis line
-            int mirrorX = (int)Math.Round(2.0 * axisX - x);
+            int mirrorX = (int)Math.Round(2.0 * axisX - x - 1.0, MidpointRounding.AwayFromZero);
             return (mirrorX, y);
         }
 
@@ -113,12 +119,12 @@ namespace PixlPunkt.Core.Symmetry
         /// </summary>
         /// <param name="x">Input X.</param>
         /// <param name="y">Input Y.</param>
-        /// <param name="axisY">Y position of the horizontal axis.</param>
+        /// <param name="axisY">Y position of the horizontal axis, in pixel edges.</param>
         /// <returns>Mirrored point.</returns>
+        /// <remarks>Reflects the pixel's centre, as <see cref="MirrorHorizontal"/> explains.</remarks>
         private static (int x, int y) MirrorVertical(int x, int y, double axisY)
         {
-            // Mirror y across the horizontal axis line
-            int mirrorY = (int)Math.Round(2.0 * axisY - y);
+            int mirrorY = (int)Math.Round(2.0 * axisY - y - 1.0, MidpointRounding.AwayFromZero);
             return (x, mirrorY);
         }
 
