@@ -41,6 +41,26 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
 
     /// <summary>Tertiary cached bitmap for DrawPixels - for reference layers (may have different dimensions).</summary>
     private SKBitmap? _cachedBitmap3;
+
+    /// <summary>
+    /// Images that do not change between frames, read once and kept at the size they are drawn.
+    /// </summary>
+    /// <remarks>
+    /// Shared across renderers rather than held by one, because a renderer lives for a single
+    /// paint: an instance cache would rebuild the image every frame and be worse than no cache.
+    /// The table holds its keys weakly, so an entry goes when the pixel array it belongs to does
+    /// and a closed document leaves nothing behind.
+    /// </remarks>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, StaticImage> _staticImages = new();
+
+    /// <summary>
+    /// The most a resized copy may cost before drawing straight from the source is the better
+    /// trade. Sixteen megapixels is sixty four megabytes, comfortably past a maximised 4K window.
+    /// </summary>
+    private const long MaxScaledPixels = 16_000_000;
+
+    /// <summary>Sampling for a picture already at its drawn size: only the sub pixel offset is left to cover.</summary>
+    private static readonly SKSamplingOptions LinearSampling = new(SKFilterMode.Linear, SKMipmapMode.None);
     private int _cachedBitmap3Width;
     private int _cachedBitmap3Height;
 
@@ -256,6 +276,69 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
         _imagePaint.IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor;
 
         DrawBitmapSampled(bitmap, srcRect.ToSKRect(), destRect.ToSKRect(), interpolation, sampling);
+    }
+
+    public void DrawStaticPixels(object key, byte[] pixels, int width, int height, Rect destRect, Rect srcRect, float opacity, ImageInterpolation interpolation)
+    {
+        if (key is null || pixels is null || width <= 0 || height <= 0) return;
+        if (_canvas is null) return;
+
+        var entry = Entry(key, pixels, width, height);
+        if (entry is null) return;
+
+        _imagePaint.Color = new SKColor(255, 255, 255, (byte)(opacity * 255));
+        _imagePaint.IsAntialias = _antialiasing && interpolation != ImageInterpolation.NearestNeighbor;
+
+        var scaled = entry.ScaledFor(destRect, srcRect, width, height, interpolation);
+
+        if (scaled is not null)
+        {
+            // Already the size it is going on screen, so the costly filter does not run again.
+            // Linear covers the fraction of a pixel the destination sits off by, and whatever
+            // rotation is waiting in the canvas matrix.
+            _canvas.DrawImage(scaled, new SKRect(0, 0, scaled.Width, scaled.Height),
+                destRect.ToSKRect(), LinearSampling, _imagePaint);
+            return;
+        }
+
+        _canvas.DrawImage(entry.Source, srcRect.ToSKRect(), destRect.ToSKRect(), MapInterpolation(interpolation), _imagePaint);
+    }
+
+    /// <summary>Finds the kept copy of a picture, reading it from the caller's pixels the first time.</summary>
+    private static StaticImage? Entry(object key, byte[] pixels, int width, int height)
+    {
+        if (_staticImages.TryGetValue(key, out var kept) && kept is not null)
+            return kept;
+
+        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+        SKImage? source;
+        var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+        try
+        {
+            using var pixmap = new SKPixmap(info, handle.AddrOfPinnedObject(), info.RowBytes);
+            source = SKImage.FromPixelCopy(pixmap);
+        }
+        finally
+        {
+            handle.Free();
+        }
+
+        if (source is null) return null;
+
+        kept = new StaticImage(source);
+        _staticImages.AddOrUpdate(key, kept);
+        return kept;
+    }
+
+    public void ForgetStaticPixels(object key)
+    {
+        if (key is null) return;
+
+        if (_staticImages.TryGetValue(key, out var kept) && kept is not null)
+            kept.Dispose();
+
+        _staticImages.Remove(key);
     }
 
     /// <summary>
@@ -476,6 +559,95 @@ public sealed class SkiaCanvasRenderer : ICanvasRenderer
     // ====================================================================
     // NESTED TYPES
     // ====================================================================
+
+    /// <summary>
+    /// A picture that does not change between frames, together with the resized copy that is what
+    /// actually goes on screen.
+    /// </summary>
+    /// <remarks>
+    /// Keeping only the source was not enough. A reference layer asks for a Mitchell cubic
+    /// resample, sixteen taps per output pixel, and Skia redoes it from the source on every paint:
+    /// profiling a session with one reference photo open put twenty eight percent of all the
+    /// process CPU inside that one DrawImage call, which is why the brush felt stuck. The resized
+    /// copy is built once per size, so painting, panning and changing opacity all reuse it and
+    /// only a zoom rebuilds it.
+    /// </remarks>
+    private sealed class StaticImage
+    {
+        /// <summary>The picture at its own resolution, kept so a new size can be resized from it.</summary>
+        public SKImage Source { get; }
+
+        private SKImage? _scaled;
+        private int _scaledWidth;
+        private int _scaledHeight;
+
+        public StaticImage(SKImage source) => Source = source;
+
+        /// <summary>
+        /// The picture at the size it is about to be drawn, or null when drawing straight from the
+        /// source is the better answer.
+        /// </summary>
+        public SKImage? ScaledFor(Rect destRect, Rect srcRect, int width, int height, ImageInterpolation interpolation)
+        {
+            // Nearest neighbour is a lookup rather than a filter, so there is no filter to save and
+            // a resized copy would only soften what is meant to stay blocky.
+            if (interpolation == ImageInterpolation.NearestNeighbor) return null;
+
+            // Only the whole picture is worth keeping: a partial source rect would want an entry
+            // of its own, and nothing asks for one.
+            if (srcRect.X != 0 || srcRect.Y != 0) return null;
+            if ((int)srcRect.Width != width || (int)srcRect.Height != height) return null;
+
+            int w = (int)Math.Round(destRect.Width);
+            int h = (int)Math.Round(destRect.Height);
+
+            if (w <= 0 || h <= 0) return null;
+            if (w == width && h == height) return null;
+            if ((long)w * h > MaxScaledPixels) return null;
+
+            if (_scaled is not null && _scaledWidth == w && _scaledHeight == h)
+                return _scaled;
+
+            var resized = Resize(w, h, interpolation);
+            if (resized is null) return null;
+
+            _scaled?.Dispose();
+            _scaled = resized;
+            _scaledWidth = w;
+            _scaledHeight = h;
+
+            return _scaled;
+        }
+
+        /// <summary>
+        /// Runs the filter the caller asked for, once, into an image of the drawn size. Opacity is
+        /// deliberately left out so that changing it does not throw the copy away.
+        /// </summary>
+        private SKImage? Resize(int w, int h, ImageInterpolation interpolation)
+        {
+            var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+            using var surface = SKSurface.Create(info);
+            if (surface is null) return null;
+
+            using var paint = new SKPaint { IsAntialias = true };
+
+            surface.Canvas.Clear(SKColors.Transparent);
+            surface.Canvas.DrawImage(Source,
+                new SKRect(0, 0, Source.Width, Source.Height),
+                new SKRect(0, 0, w, h),
+                MapInterpolation(interpolation), paint);
+
+            return surface.Snapshot();
+        }
+
+        public void Dispose()
+        {
+            _scaled?.Dispose();
+            _scaled = null;
+            Source.Dispose();
+        }
+    }
 
     private sealed class LayerScope : IDisposable
     {

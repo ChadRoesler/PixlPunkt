@@ -117,6 +117,34 @@ public interface ICanvasRenderer : IDisposable
     /// </summary>
     void DrawPixels(byte[] pixels, int width, int height, Rect destRect, Rect srcRect, float opacity, ImageInterpolation interpolation);
 
+    /// <summary>
+    /// Draws pixel data that does not change from frame to frame, keeping it ready to draw rather
+    /// than rebuilding it every time.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="DrawPixels"/> re-reads the buffer and re-filters it on every call, which is
+    /// right for the document surface because it really does change under the brush. A reference
+    /// photo does not. Profiling a session with one open put twenty eight percent of the whole
+    /// process CPU inside a single resample, redone from the full resolution photo on every paint,
+    /// which is why painting in a document carrying one felt stuck.
+    /// </para>
+    /// <para>
+    /// An implementation is expected to keep the picture at the size it is drawn, not merely to
+    /// keep the pixels, so that painting, panning and changing opacity all reuse it. Only a change
+    /// of drawn size need rebuild it.
+    /// </para>
+    /// <para>
+    /// <paramref name="key"/> identifies the image across frames: the caller must pass something
+    /// stable for the same picture, and a different object once the pixels change. Everything else
+    /// matches <see cref="DrawPixels"/>.
+    /// </para>
+    /// </remarks>
+    void DrawStaticPixels(object key, byte[] pixels, int width, int height, Rect destRect, Rect srcRect, float opacity, ImageInterpolation interpolation);
+
+    /// <summary>Forgets a cached static image, for a picture that has been removed or replaced.</summary>
+    void ForgetStaticPixels(object key);
+
     // ====================================================================
     // TEXT DRAWING
     // ====================================================================

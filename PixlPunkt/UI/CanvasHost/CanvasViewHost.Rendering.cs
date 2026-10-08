@@ -256,9 +256,13 @@ namespace PixlPunkt.UI.CanvasHost
                 var destRect = new Rect(screenX, screenY, screenW, screenH);
                 var srcRect = new Rect(0, 0, refLayer.ImageWidth, refLayer.ImageHeight);
 
+                // Keyed on the pixel buffer itself: the same photo is the same array every frame,
+                // and loading a different picture produces a different array, so a replaced
+                // reference rebuilds rather than showing the old one.
                 if (Math.Abs(refLayer.Rotation) < 0.01f)
                 {
-                    renderer.DrawPixels(refLayer.Pixels, refLayer.ImageWidth, refLayer.ImageHeight,
+                    renderer.DrawStaticPixels(refLayer.Pixels, refLayer.Pixels,
+                        refLayer.ImageWidth, refLayer.ImageHeight,
                         destRect, srcRect, opacity, ImageInterpolation.HighQualityCubic);
                 }
                 else
@@ -270,7 +274,8 @@ namespace PixlPunkt.UI.CanvasHost
                     var oldTransform = renderer.Transform;
                     renderer.Transform = Matrix3x2.CreateRotation(radians, new Vector2(centerX, centerY));
 
-                    renderer.DrawPixels(refLayer.Pixels, refLayer.ImageWidth, refLayer.ImageHeight,
+                    renderer.DrawStaticPixels(refLayer.Pixels, refLayer.Pixels,
+                        refLayer.ImageWidth, refLayer.ImageHeight,
                         destRect, srcRect, opacity, ImageInterpolation.HighQualityCubic);
 
                     renderer.Transform = oldTransform;
